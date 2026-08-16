@@ -38,6 +38,8 @@ class AuthState {
     this.errorMessage,
   });
 
+  bool get isAuthenticated => user != null;
+
   AuthState copyWith({
     bool? isLoading,
     UserEntity? user,

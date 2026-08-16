@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
+import '../../features/auth/presentation/pages/splash_screen.dart';
 import '../../features/dashboard/presentation/pages/main_bottom_nav_shell.dart';
 import '../../features/finance/presentation/pages/log_remittance_page.dart';
 import '../../features/finance/presentation/pages/remittance_details_page.dart';
@@ -17,11 +18,15 @@ import '../../features/users/presentation/pages/user_profile_page.dart';
 
 class AppRouter {
   static final router = GoRouter(
-    initialLocation: '/',
+    initialLocation: '/splash',
     redirect: (BuildContext context, GoRouterState state) {
       final session = Supabase.instance.client.auth.currentSession;
+      final isSplash = state.matchedLocation == '/splash';
       final isLoggingIn = state.matchedLocation == '/login' || state.matchedLocation == '/forgot-password';
 
+      if (isSplash) {
+        return null;
+      }
       if (session == null && !isLoggingIn) {
         return '/login';
       }
@@ -31,6 +36,10 @@ class AppRouter {
       return null;
     },
     routes: [
+      GoRoute(
+        path: '/splash',
+        builder: (context, state) => const SplashScreen(),
+      ),
       GoRoute(
         path: '/login',
         builder: (context, state) => const LoginPage(),
