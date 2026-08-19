@@ -21,6 +21,14 @@ class UserModel extends UserEntity {
     super.transportAllowance,
     super.fuelAllowance,
     super.baseSalary,
+    super.vehicleType,
+    super.vehiclePlateNumber,
+    super.operatingState,
+    super.operatingCity,
+    super.bankName,
+    super.bankAccountNumber,
+    super.bankAccountName,
+    super.agentStatus,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json, {String? deliveryAgentId}) {
@@ -30,7 +38,7 @@ class UserModel extends UserEntity {
       email: json['email'] ?? '',
       firstName: json['first_name'] ?? '',
       lastName: json['last_name'] ?? '',
-      phone: json['phone'] ?? '',
+      phone: json['phone'] ?? json['phone_number'] ?? '',
       role: json['role'] ?? 'delivery_agent',
       companyId: json['company_id'],
       deliveryAgentId: deliveryAgentId,
@@ -44,6 +52,14 @@ class UserModel extends UserEntity {
       transportAllowance: (json['transport_allowance'] as num?)?.toDouble() ?? 1500.0,
       fuelAllowance: (json['fuel_allowance'] as num?)?.toDouble() ?? 800.0,
       baseSalary: (json['base_salary'] as num?)?.toDouble() ?? 150000.0,
+      vehicleType: json['vehicle_type'] ?? 'Motorcycle',
+      vehiclePlateNumber: json['vehicle_plate_number'] ?? 'ABJ-894-XA',
+      operatingState: json['operating_state'] ?? 'Abuja (FCT)',
+      operatingCity: json['operating_city'] ?? 'Wuse 2',
+      bankName: json['bank_name'] ?? 'Kuda Microfinance Bank',
+      bankAccountNumber: json['bank_account_number'] ?? '2019847291',
+      bankAccountName: json['bank_account_name'] ?? 'Emeka Rider',
+      agentStatus: json['current_status'] ?? 'available',
     );
   }
 
@@ -67,6 +83,14 @@ class UserModel extends UserEntity {
       'transport_allowance': transportAllowance,
       'fuel_allowance': fuelAllowance,
       'base_salary': baseSalary,
+      'vehicle_type': vehicleType,
+      'vehicle_plate_number': vehiclePlateNumber,
+      'operating_state': operatingState,
+      'operating_city': operatingCity,
+      'bank_name': bankName,
+      'bank_account_number': bankAccountNumber,
+      'bank_account_name': bankAccountName,
+      'current_status': agentStatus,
     };
   }
 }

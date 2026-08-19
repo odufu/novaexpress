@@ -18,6 +18,14 @@ class UserEntity {
   final double transportAllowance; // e.g. 1500.0 (PDA transport)
   final double fuelAllowance; // e.g. 800.0 (Rider fuel)
   final double baseSalary; // e.g. 150000.0
+  final String vehicleType; // 'motorcycle' | 'van' | 'car'
+  final String vehiclePlateNumber;
+  final String operatingState;
+  final String operatingCity;
+  final String bankName;
+  final String bankAccountNumber;
+  final String bankAccountName;
+  final String agentStatus; // 'available' | 'on_delivery' | 'offline'
 
   const UserEntity({
     required this.id,
@@ -39,6 +47,14 @@ class UserEntity {
     this.transportAllowance = 1500.0,
     this.fuelAllowance = 800.0,
     this.baseSalary = 150000.0,
+    this.vehicleType = 'Motorcycle',
+    this.vehiclePlateNumber = 'ABJ-894-XA',
+    this.operatingState = 'Abuja (FCT)',
+    this.operatingCity = 'Wuse 2',
+    this.bankName = 'Kuda Microfinance Bank',
+    this.bankAccountNumber = '2019847291',
+    this.bankAccountName = 'Emeka Rider',
+    this.agentStatus = 'available',
   });
 
   String get fullName => '$firstName $lastName'.trim();

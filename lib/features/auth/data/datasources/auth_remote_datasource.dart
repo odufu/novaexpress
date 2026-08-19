@@ -139,20 +139,22 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       if (userRes != null) {
         final userId = userRes['id'];
         String? deliveryAgentId;
+        Map<String, dynamic> merged = Map<String, dynamic>.from(userRes);
 
         debugPrint('[AUTH_DATASOURCE] 📥 Querying "${SupabaseConstants.deliveryAgentsTable}" for user_id: "$userId"...');
         final agentRes = await supabaseClient
             .from(SupabaseConstants.deliveryAgentsTable)
-            .select('id')
+            .select()
             .eq('user_id', userId)
             .maybeSingle();
 
         if (agentRes != null) {
           deliveryAgentId = agentRes['id'];
+          merged.addAll(agentRes);
         }
 
         final profile = UserModel.fromJson(
-          userRes,
+          merged,
           deliveryAgentId: deliveryAgentId ?? 'b1111111-1111-4111-8111-111111111111',
         );
         debugPrint('[AUTH_DATASOURCE] ✅ User profile resolved: ${profile.firstName} ${profile.lastName} (Role: ${profile.role})');
