@@ -21,4 +21,44 @@ class OrdersRepositoryImpl implements OrdersRepository {
   Future<void> updateOrderStatus(String orderId, String status, {String? paymentStatus, String? notes}) async {
     await remoteDataSource.updateOrderStatus(orderId, status, paymentStatus: paymentStatus, notes: notes);
   }
+
+  @override
+  Future<Map<String, dynamic>> confirmDeliveryPod({
+    required String orderId,
+    required String agentId,
+    required String paymentType,
+    required String paymentMethod,
+    required double amountCollected,
+    String? customerSignatureUrl,
+    String? photoProofUrl,
+    String? notes,
+  }) async {
+    return await remoteDataSource.confirmDeliveryPod(
+      orderId: orderId,
+      agentId: agentId,
+      paymentType: paymentType,
+      paymentMethod: paymentMethod,
+      amountCollected: amountCollected,
+      customerSignatureUrl: customerSignatureUrl,
+      photoProofUrl: photoProofUrl,
+      notes: notes,
+    );
+  }
+
+  @override
+  Future<Map<String, dynamic>> logDeliveryFailure({
+    required String orderId,
+    required String agentId,
+    required String reasonCode,
+    String? notes,
+    String? scheduledCallbackAt,
+  }) async {
+    return await remoteDataSource.logDeliveryFailure(
+      orderId: orderId,
+      agentId: agentId,
+      reasonCode: reasonCode,
+      notes: notes,
+      scheduledCallbackAt: scheduledCallbackAt,
+    );
+  }
 }

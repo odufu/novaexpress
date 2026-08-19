@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/datasources/auth_remote_datasource.dart';
@@ -67,30 +68,46 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> checkCurrentUser() async {
+    debugPrint('[AUTH_PROVIDER] 🔍 checkCurrentUser() initiated...');
     state = state.copyWith(isLoading: true);
     try {
       final user = await getCurrentUserUseCase.execute();
+      if (user != null) {
+        debugPrint('[AUTH_PROVIDER] 👤 Current active session found: ${user.email} (Agent: ${user.firstName} ${user.lastName}, Role: ${user.role})');
+      } else {
+        debugPrint('[AUTH_PROVIDER] ℹ️ No active user session found.');
+      }
       state = state.copyWith(isLoading: false, user: user);
     } catch (e) {
+      debugPrint('[AUTH_PROVIDER] ⚠️ checkCurrentUser() error: $e');
       state = state.copyWith(isLoading: false);
     }
   }
 
   Future<bool> login(String email, String password) async {
+    debugPrint('[AUTH_PROVIDER] 🔐 login() initiated with email: "$email"');
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
       final user = await loginUseCase.execute(email, password);
+      debugPrint('[AUTH_PROVIDER] ✅ login() SUCCESS -> User: "${user.email}", Name: "${user.firstName} ${user.lastName}", AgentId: "${user.deliveryAgentId}"');
       state = state.copyWith(isLoading: false, user: user);
       return true;
     } catch (e) {
+      debugPrint('[AUTH_PROVIDER] ❌ login() FAILED -> Error: $e');
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
       return false;
     }
   }
 
   Future<void> logout() async {
+    debugPrint('[AUTH_PROVIDER] 🚪 logout() initiated...');
     state = state.copyWith(isLoading: true);
-    await logoutUseCase.execute();
+    try {
+      await logoutUseCase.execute();
+      debugPrint('[AUTH_PROVIDER] 👋 User session successfully signed out.');
+    } catch (e) {
+      debugPrint('[AUTH_PROVIDER] ⚠️ logout error: $e');
+    }
     state = const AuthState();
   }
 }

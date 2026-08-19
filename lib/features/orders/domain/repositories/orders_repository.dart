@@ -4,4 +4,21 @@ abstract class OrdersRepository {
   Future<List<OrderEntity>> getAssignedOrders(String deliveryAgentId);
   Future<OrderEntity> getOrderById(String orderId);
   Future<void> updateOrderStatus(String orderId, String status, {String? paymentStatus, String? notes});
+  Future<Map<String, dynamic>> confirmDeliveryPod({
+    required String orderId,
+    required String agentId,
+    required String paymentType,
+    required String paymentMethod,
+    required double amountCollected,
+    String? customerSignatureUrl,
+    String? photoProofUrl,
+    String? notes,
+  });
+  Future<Map<String, dynamic>> logDeliveryFailure({
+    required String orderId,
+    required String agentId,
+    required String reasonCode,
+    String? notes,
+    String? scheduledCallbackAt,
+  });
 }

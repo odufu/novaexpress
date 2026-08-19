@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../providers/orders_provider.dart';
 
-class ScanToCollectPage extends StatefulWidget {
+class ScanToCollectPage extends ConsumerStatefulWidget {
   const ScanToCollectPage({super.key});
 
   @override
-  State<ScanToCollectPage> createState() => _ScanToCollectPageState();
+  ConsumerState<ScanToCollectPage> createState() => _ScanToCollectPageState();
 }
 
-class _ScanToCollectPageState extends State<ScanToCollectPage> with SingleTickerProviderStateMixin {
+class _ScanToCollectPageState extends ConsumerState<ScanToCollectPage> with SingleTickerProviderStateMixin {
   late AnimationController _scanAnimationController;
   final TextEditingController _manualController = TextEditingController();
   bool _isFlashlightOn = false;
@@ -364,8 +366,28 @@ class _ScanToCollectPageState extends State<ScanToCollectPage> with SingleTicker
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        onPressed: () {
-                          context.pop();
+                        onPressed: () async {
+                          final orders = ref.read(ordersProvider).orders;
+                          final match = orders.firstWhere(
+                            (o) => o.orderNumber == _scannedTrackingNo || o.id == _scannedTrackingNo,
+                            orElse: () => orders.isNotEmpty ? orders.first : orders.first,
+                          );
+                          await ref.read(ordersProvider.notifier).updateOrderStatus(
+                                match.id,
+                                'in_transit',
+                              );
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Order #${match.orderNumber} collected from DC! Out for delivery.',
+                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                ),
+                                backgroundColor: AppColors.orange,
+                              ),
+                            );
+                            context.pop();
+                          }
                         },
                         child: const Text(
                           'CONFIRM INTAKE & RECEIVE STOCK',

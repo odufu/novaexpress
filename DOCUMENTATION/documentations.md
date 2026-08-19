@@ -1,1607 +1,2216 @@
-# NOVAEXPRESS LOGISTICS
+# NovaExpress Logistics — Master Product Requirements Document (PRD)
 
-## Product Requirements Document (PRD)
-
-**Product:** NovaExpress Logistics Management Platform
+**Document Type:** Master System PRD
+**Product:** NovaExpress Logistics Management System
 **Market:** Nigeria
-**Primary Currency:** Nigerian Naira (₦ / NGN)
-**Initial POD Products:** Grazer Herbal Tea, Respira, Alpha Man
-**Product Catalogue:** Extensible — additional products will be added
-**Primary Headquarters:** Abuja, Nigeria
+**Currency:** Nigerian Naira (₦)
+**Current Products:** Grazer Herbal Tea, Respira, Alpha Man
+**Status:** Foundational / Pre-Development
+**Purpose:** Establish the complete business, operational, inventory, delivery, commission, cash, and settlement logic before UI and module-specific PRDs are finalized.
 
 ---
 
-# 1. PRODUCT OVERVIEW
+# 1. Product Overview
 
-NovaExpress Logistics is a Nigerian logistics and distribution management platform designed to manage the movement of customer orders and physical products across Nigeria.
+NovaExpress is a Nigerian logistics and distribution company that operates a network of:
 
-NovaExpress operates through a hierarchical distribution structure consisting of:
-
-* General Operations Unit
 * Headquarters
-* Distribution Centers
+* Distribution Centers (DCs)
 * Personal Distribution Agents (PDAs)
+* In-house Riders
+* Clients
 * Customers
-* Corporate/major clients
 
-The platform manages the complete lifecycle of an order, from the moment an order enters NovaExpress through allocation, stock movement, PDA collection, customer delivery, payment collection where applicable, product returns, and financial reconciliation.
+The system will manage both:
 
-The system must support both:
+1. **Traditional package delivery**, where a client gives NovaExpress a physical package to deliver.
+2. **Distributed inventory fulfillment**, where a client supplies products in bulk and NovaExpress stores and distributes those products through its logistics network.
 
-1. **Pay on Delivery (POD)**
-2. **Non-Pay on Delivery / Prepaid orders**
+Both models may operate as:
 
-The initial products handled under POD include:
+* **Non-Pay on Delivery**
+* **Pay on Delivery (POD)**
+
+The system must also manage:
+
+* Inventory
+* Package custody
+* Orders
+* Deliveries
+* Delivery personnel
+* POD collections
+* Remittances
+* Agent commissions
+* Transport/fuel allowances
+* Salaries
+* Failed deliveries
+* Returns
+* Client charges
+* Client settlements
+* Performance
+* Financial reconciliation
+* Multi-HQ operations
+
+---
+
+# 2. Core Business Principle
+
+The system must **not** treat POD as an order type.
+
+Instead, every order has two independent dimensions:
+
+### Fulfillment Type
+
+* Client Package
+* Distributed Inventory
+
+### Payment Type
+
+* Non-POD
+* POD
+
+This produces four valid operational combinations:
+
+| Fulfillment           | Payment |
+| --------------------- | ------- |
+| Client Package        | Non-POD |
+| Client Package        | POD     |
+| Distributed Inventory | Non-POD |
+| Distributed Inventory | POD     |
+
+This structure must be used throughout the system.
+
+---
+
+# 3. Business Scenario 1 — Client Package, Non-POD
+
+A client gives NovaExpress a package that has already been prepared.
+
+Example:
+
+> Client gives NovaExpress a package to deliver to John in Lagos.
+
+The customer does not need to pay anything.
+
+### Workflow
+
+Client → NovaExpress → DC → Delivery Personnel → Customer
+
+The system tracks:
+
+* Package
+* Client
+* Customer
+* Delivery
+* Custody
+* Delivery personnel
+* Delivery status
+* Proof of delivery
+
+No product inventory transaction is required.
+
+No POD collection is required.
+
+---
+
+# 4. Business Scenario 2 — Client Package, POD
+
+A client gives NovaExpress a package to deliver.
+
+The customer must pay upon delivery.
+
+Example:
+
+> Package value/collection amount = ₦50,000.
+
+The delivery personnel collects the money.
+
+### Workflow
+
+Client → NovaExpress → DC → Delivery Personnel → Customer
+
+Financial workflow:
+
+Customer → Delivery Personnel → NovaExpress → Client
+
+The system must separately track:
+
+* Expected collection
+* Actual collection
+* Delivery fee
+* Delivery personnel earnings
+* Remittance
+* Client settlement
+
+The package itself is tracked through **custody**, not product inventory.
+
+---
+
+# 5. Business Scenario 3 — Distributed Inventory, Non-POD
+
+A client supplies products in bulk to NovaExpress.
+
+Example:
+
+NovaCare supplies:
+
+> 10,000 units of Respira.
+
+NovaExpress distributes the products through its network.
+
+A customer orders:
+
+> 2 Respira
+
+and payment has already been made.
+
+NovaExpress fulfills the order using its managed inventory.
+
+### Physical flow
+
+Client → HQ → DC → PDA/Rider → Customer
+
+Inventory must be deducted as the product moves through the system.
+
+---
+
+# 6. Business Scenario 4 — Distributed Inventory, POD
+
+This is one of NovaExpress's major operating models.
+
+Example:
+
+NovaCare supplies:
+
+> 10,000 Respira
+
+Customer orders:
+
+> 2 Respira
+
+Customer pays upon delivery.
+
+NovaExpress delivers the product and collects the customer's money.
+
+Under the current NovaCare commercial arrangement:
+
+* Successful delivery generates a **₦5,000 NovaExpress delivery charge**
+* NovaExpress retains its agreed delivery charge
+* The remaining customer collection is payable to NovaCare
+* NovaCare does not pay NovaExpress upfront for successful POD fulfillment
+* Failed delivery generates a **₦1,500 charge to NovaCare**
+* The product is returned to stock after a failed delivery
+
+All these amounts must be configurable.
+
+---
+
+# 7. Critical Rule — No Financial Rate Is Hardcoded
+
+The current figures are **business defaults**, not permanent system constants.
+
+For example:
+
+### Current successful delivery charge
+
+₦5,000
+
+### Current failed delivery charge
+
+₦1,500
+
+These may later become:
+
+₦4,000
+
+₦6,000
+
+₦7,500
+
+etc.
+
+The system must allow authorized administrators to change rates.
+
+---
+
+# 8. Client-Specific Commercial Agreements
+
+Different clients may have different agreements.
+
+Therefore the system must support **Client Commercial Agreements**.
+
+Example:
+
+### NovaCare
+
+Successful delivery:
+
+₦5,000
+
+Failed delivery:
+
+₦1,500
+
+Another client could have:
+
+Successful:
+
+₦4,000
+
+Failed:
+
+₦1,000
+
+Therefore:
+
+> **Delivery pricing must be configurable globally and overrideable per client.**
+
+---
+
+# 9. Rate Hierarchy
+
+The system should support a hierarchy of pricing rules:
+
+### Level 1 — System Default
+
+General NovaExpress rate.
+
+### Level 2 — Client Rate
+
+Specific rate negotiated with a client.
+
+### Level 3 — Special Arrangement
+
+Specific temporary/custom arrangement.
+
+The system must retain which rate was actually applied to each transaction.
+
+Changing a rate in the future must **not alter historical transactions**.
+
+---
+
+# 10. Delivery Personnel
+
+NovaExpress has two types of delivery personnel.
+
+## Type 1 — PDA
+
+Personal Distribution Agent.
+
+The PDA uses **their own means of transportation**.
+
+They may use:
+
+* Motorcycle
+* Car
+* Other approved means
+
+NovaExpress does not provide their primary delivery vehicle.
+
+---
+
+## Type 2 — In-House Rider
+
+An employee/contracted rider who uses a **NovaExpress-owned motorcycle/bike**.
+
+The company is responsible for providing the operational vehicle.
+
+The system must therefore distinguish between:
+
+**PDA**
+
+and:
+
+**In-House Rider**
+
+throughout reporting and compensation.
+
+---
+
+# 11. Compensation Type
+
+Both PDAs and In-house Riders may have different payment arrangements.
+
+The system must support:
+
+### Commission-Based
+
+Compensation is calculated based on completed delivery activities.
+
+### Salary-Based
+
+The person receives a fixed salary.
+
+### Hybrid
+
+Fixed salary plus commissions/allowances.
+
+Although the current operation may primarily use commission or salary arrangements, the architecture should support hybrid arrangements.
+
+---
+
+# 12. Compensation Must Be Individually Configurable
+
+The system must never assume:
+
+> Every PDA earns ₦1,000.
+
+or:
+
+> Every rider earns ₦500.
+
+Instead, each delivery personnel has a:
+
+# Compensation Profile
+
+Containing:
+
+* Payment model
+* Successful delivery commission
+* Failed delivery allowance
+* Transport allowance
+* Fuel allowance
+* Other allowances
+* Salary
+* Settlement frequency
+* Effective date
+* Expiry date where applicable
+
+---
+
+# 13. Current PDA Compensation Example
+
+Current default arrangement:
+
+### Successful delivery
+
+Commission:
+
+**₦1,000**
+
+Transport:
+
+**₦1,500**
+
+Total entitlement:
+
+**₦2,500**
+
+### Failed delivery
+
+Transport/failed-delivery allowance:
+
+**₦500**
+
+These are configurable.
+
+---
+
+# 14. PDA Remittance
+
+PDAs may deduct their approved earnings from the cash they collected before remitting.
+
+Example:
+
+Customer pays:
+
+**₦20,000**
+
+PDA entitlement:
+
+Commission:
+
+₦1,000
+
+Transport:
+
+₦1,500
+
+Total:
+
+₦2,500
+
+PDA remits:
+
+**₦17,500**
+
+The system records:
+
+| Transaction           |  Amount |
+| --------------------- | ------: |
+| Customer Collection   | ₦20,000 |
+| PDA Commission        |  ₦1,000 |
+| PDA Transport         |  ₦1,500 |
+| PDA Total Entitlement |  ₦2,500 |
+| Actual Remittance     | ₦17,500 |
+
+The deduction must be transparent.
+
+---
+
+# 15. In-House Rider Compensation
+
+Current default arrangement:
+
+### Successful delivery
+
+Commission:
+
+**₦500**
+
+### Fuel per trip
+
+**₦800**
+
+### Failed delivery
+
+Stipend:
+
+**₦500**
+
+However, these are also configurable.
+
+---
+
+# 16. In-House Rider Remittance
+
+Unlike the PDA arrangement, the rider normally **remits the full amount collected**.
+
+Example:
+
+Customer pays:
+
+**₦20,000**
+
+Rider remits:
+
+**₦20,000**
+
+The rider's:
+
+* ₦500 commission
+* ₦800 fuel allowance
+
+are recorded as **earnings/accruals**.
+
+They are not automatically deducted from the remittance.
+
+---
+
+# 17. Rider Monthly Earnings
+
+For commission-based riders, the system accumulates earnings throughout the month.
+
+Example:
+
+100 successful deliveries:
+
+Commission:
+
+100 × ₦500 = **₦50,000**
+
+Fuel:
+
+100 × ₦800 = **₦80,000**
+
+Total accrued:
+
+**₦130,000**
+
+The system shows:
+
+**Accrued: ₦130,000**
+
+**Paid: ₦0**
+
+**Outstanding: ₦130,000**
+
+At month-end, the company pays the rider.
+
+---
+
+# 18. Salary-Based Personnel
+
+A delivery person can instead be salary-based.
+
+Example:
+
+Monthly salary:
+
+**₦150,000**
+
+The system must record:
+
+* Salary amount
+* Salary frequency
+* Effective date
+* Payment status
+* Outstanding salary
+* Payment history
+
+The system should still track delivery performance even when the person is salary-based.
+
+---
+
+# 19. Hybrid Compensation
+
+The system should support:
+
+> Salary + Commission
+
+Example:
+
+Monthly salary:
+
+₦100,000
+
+Successful delivery commission:
+
+₦300
+
+Fuel allowance:
+
+₦500
+
+This allows future operational arrangements without architectural changes.
+
+---
+
+# 20. Delivery Pricing vs Personnel Compensation
+
+These must remain completely separate.
+
+For example:
+
+### Client pays NovaExpress
+
+₦5,000 delivery charge.
+
+### PDA receives
+
+₦1,000 commission.
+
+### PDA receives
+
+₦1,500 transport allowance.
+
+These are three different financial records.
+
+The system must never treat:
+
+> ₦5,000 = PDA earnings.
+
+---
+
+# 21. Successful Delivery Financial Event
+
+For every successful delivery, the system should calculate:
+
+### Client Delivery Charge
+
+Example:
+
+₦5,000
+
+### Delivery Personnel Compensation
+
+Example PDA:
+
+₦1,000 commission
+
+₦1,500 transport
+
+### Customer Collection
+
+Whatever the order requires.
+
+### Client Settlement
+
+Amount payable to the client.
+
+---
+
+# 22. Failed Delivery Financial Event
+
+A failed delivery is also a billable operational event where applicable.
+
+Current NovaCare arrangement:
+
+### Client charge
+
+₦1,500
+
+### PDA failed-delivery allowance
+
+₦500
+
+### Product
+
+Returned to inventory.
+
+Again, all values must be configurable.
+
+---
+
+# 23. Failed Delivery Is Not Automatically Cancellation
+
+A failed delivery should create a structured event.
+
+The system records:
+
+* Attempt number
+* Date/time
+* Agent
+* Failure reason
+* Customer contact attempt
+* Client charge
+* Agent allowance
+* Return requirement
+* Return status
+
+---
+
+# 24. Failed Delivery Reasons
+
+The system should provide predefined Nigerian operational reasons such as:
+
+* Customer unavailable
+* Customer refused package
+* Customer refused payment
+* Wrong phone number
+* Phone switched off
+* Wrong address
+* Incomplete address
+* Customer requested reschedule
+* Customer travelled
+* Location inaccessible
+* Security/access issue
+* Customer cannot afford POD amount
+* Other
+
+Admin should be able to add/edit reasons.
+
+---
+
+# 25. Product Return After Failed Delivery
+
+For distributed inventory:
+
+Successful:
+
+**DC → Agent → Customer**
+
+Failed:
+
+**DC → Agent → Customer attempt → Agent → DC**
+
+The returned stock must be verified.
+
+Possible return conditions:
+
+* Good
+* Damaged
+* Opened
+* Missing
+* Partially returned
+
+Only verified good units should automatically return to available inventory.
+
+---
+
+# 26. Package Return
+
+For client packages, a failed delivery creates a **package return/custody event**.
+
+It does not automatically create an inventory transaction.
+
+Example:
+
+Customer unavailable.
+
+Package:
+
+Customer → PDA → DC
+
+Status:
+
+**Returned to DC**
+
+---
+
+# 27. Inventory Ownership
+
+For distributed inventory:
+
+The product belongs commercially to the client.
+
+NovaExpress holds it as a logistics custodian.
+
+Example:
+
+**Respira**
+
+Owner:
+
+NovaCare
+
+Location:
+
+Wuse DC
+
+Quantity:
+
+500
+
+The system must know:
+
+> Who owns the inventory?
+
+> Where is the inventory?
+
+> Who currently has custody?
+
+---
+
+# 28. Inventory Locations
+
+Inventory can exist at:
+
+* HQ
+* Distribution Center
+* PDA
+* Transit
+* Returns
+* Damaged/Quarantine
+
+Every movement must be recorded.
+
+---
+
+# 29. Inventory Movement
+
+Examples:
+
+### Receipt
+
+Client → HQ
+
+### Transfer
+
+HQ → DC
+
+### PDA Issue
+
+DC → PDA
+
+### Fulfillment
+
+PDA → Customer
+
+### Return
+
+PDA → DC
+
+### Damage
+
+Available → Damaged
+
+Every movement must have:
+
+* Source
+* Destination
+* Product
+* Quantity
+* Date/time
+* User
+* Reason
+* Reference
+
+---
+
+# 30. Client Package Custody
+
+Packages have a different movement model.
+
+Example:
+
+Client → HQ → DC → PDA → Customer
+
+The system records **custody**, not inventory.
+
+This distinction must remain throughout the application.
+
+---
+
+# 31. Orders
+
+Every order should contain:
+
+### Order Information
+
+* Order ID
+* Client
+* External reference
+* Creation date
+* Source
+* Fulfillment type
+* Payment type
+
+### Customer
+
+* Name
+* Phone
+* Address
+* State
+* LGA
+* Landmark
+
+### Items
+
+* Product/package
+* Quantity
+* Paid quantity
+* Free quantity
+* Physical quantity
+
+### Financial
+
+* Expected collection
+* Delivery charge
+* Client charge
+* Discounts
+* Adjustments
+
+---
+
+# 32. Promotions and Free Products
+
+The system must support promotions such as:
+
+> Buy 5 Grazer Herbal Tea, get 1 free.
+
+The order must record:
+
+**Paid Quantity:** 5
+
+**Free Quantity:** 1
+
+**Physical Quantity:** 6
+
+Inventory must deduct:
+
+**6**
+
+not 5.
+
+This is mandatory for accurate stock accountability.
+
+---
+
+# 33. Current Products
+
+The current distributed/POD product catalog includes:
 
 * Grazer Herbal Tea
 * Respira
 * Alpha Man
 
-The architecture must allow administrators to add additional products without requiring changes to the core application.
+The architecture must support adding more products later.
+
+All Nigerian monetary values must be represented in:
+
+# Nigerian Naira (₦)
 
 ---
 
-# 2. NIGERIAN MARKET REQUIREMENT
+# 34. Delivery
 
-The system is specifically designed for operations within Nigeria.
+Every order creates or is associated with a delivery operation.
 
-Nigeria is not merely the geographic location of the company; Nigerian operational requirements are part of the core product specification.
+Delivery contains:
 
-The application must therefore use Nigerian conventions throughout.
+* Order
+* DC
+* Delivery personnel
+* Assignment
+* Pickup
+* Delivery destination
+* Delivery attempts
+* Status
+* Proof of delivery
+* Collection
+* Return
 
 ---
 
-# 3. CURRENCY REQUIREMENT
+# 35. Delivery Lifecycle
 
-All financial values in the system must be represented in **Nigerian Naira**.
+Recommended lifecycle:
 
-Currency code:
+**Created**
 
-**NGN**
+→ **Assigned to HQ/DC**
 
-Currency symbol:
+→ **Assigned to Delivery Personnel**
 
-**₦**
+→ **Ready for Pickup**
+
+→ **Picked Up**
+
+→ **Out for Delivery**
+
+→ **Delivered**
+
+or:
+
+**Delivery Failed**
+
+→ **Reattempt**
+
+or:
+
+**Returned**
+
+---
+
+# 36. Proof of Delivery
+
+Successful deliveries should support:
+
+* Customer name
+* Signature where applicable
+* OTP
+* Photo where required
+* Timestamp
+* GPS/location evidence where available
+* Delivery personnel identity
+
+The exact proof method can be configured by operation/client.
+
+---
+
+# 37. POD
+
+POD means:
+
+> Pay on Delivery.
+
+For POD orders, the system must store:
+
+### Expected Amount
+
+What the agent should collect.
+
+### Collected Amount
+
+What was actually collected.
+
+### Remitted Amount
+
+What was handed back to NovaExpress.
+
+### Variance
+
+Expected vs actual/remitted.
+
+---
+
+# 38. POD Reconciliation
+
+Example:
+
+Expected:
+
+₦20,000
+
+Collected:
+
+₦20,000
+
+Agent entitlement:
+
+₦2,500
+
+Remitted:
+
+₦17,500
+
+System must be able to reconcile the transaction and show why the remittance is lower than collection.
+
+---
+
+# 39. In-House Rider POD
+
+Expected:
+
+₦20,000
+
+Collected:
+
+₦20,000
+
+Remitted:
+
+₦20,000
+
+Rider earnings:
+
+₦1,300
+
+Earnings remain payable to the rider according to their compensation schedule.
+
+---
+
+# 40. Remittance
+
+Remittance is a formal financial transaction.
+
+Statuses:
+
+* Pending
+* Submitted
+* Under Review
+* Approved
+* Partially Approved
+* Rejected
+* Disputed
+
+A remittance must contain:
+
+* Agent
+* Delivery/order references
+* Expected amount
+* Collected amount
+* Approved deductions
+* POS/bank charges
+* Actual remitted amount
+* Payment method
+* Transaction reference
+* Reviewer
+* Date
+* Notes
+
+---
+
+# 41. POS Fees
+
+Agents may use a POS agent to transfer/remit cash.
+
+Example:
+
+Remittance:
+
+₦5,000
+
+POS fee:
+
+₦100
+
+The POS fee must be recorded separately.
+
+It must not be mixed with:
+
+* Agent commission
+* Transport
+* Delivery charge
+
+The system should allow administrators to define who bears the POS fee.
+
+---
+
+# 42. POS Fee Approval
+
+POS fees may require verification.
+
+Status:
+
+**Pending Approval**
+
+→ **Approved**
+
+or:
+
+→ **Rejected**
+
+Only approved fees should affect the final financial reconciliation.
+
+---
+
+# 43. Agent Earnings Ledger
+
+Every delivery can create one or more earnings entries.
+
+Example:
+
+### PDA
+
+Successful delivery:
+
+Commission ₦1,000
+
+Transport ₦1,500
+
+### Rider
+
+Successful:
+
+Commission ₦500
+
+Fuel ₦800
+
+The system maintains cumulative earnings.
+
+---
+
+# 44. Earnings Status
+
+Each earning should have:
+
+* Accrued
+* Approved
+* Deducted from Remittance
+* Payable
+* Paid
+* Reversed/Adjusted
+
+This makes salary/commission accounting auditable.
+
+---
+
+# 45. Delivery Personnel Performance
+
+The system must calculate performance independently of compensation type.
+
+For each PDA/Rider:
+
+### Total Assigned
+
+### Total Attempted
+
+### Successful
+
+### Failed
+
+### Success Rate
+
+### First-Attempt Success Rate
+
+### Average Delivery Attempts
+
+### POD Collection Accuracy
+
+### Outstanding Remittance
+
+This allows management to judge performance fairly.
+
+---
+
+# 46. Delivery Success Rate
+
+Formula:
+
+**Successful Deliveries ÷ Total Delivery Attempts × 100**
+
+Example:
+
+90 successful
+
+10 failed
+
+Total:
+
+100
+
+Success rate:
+
+**90%**
+
+The system should clearly distinguish this from:
+
+> Orders assigned but never attempted.
+
+---
+
+# 47. Personnel Dashboard
+
+Each delivery person should see:
+
+### Today's Work
+
+Assigned
+
+Picked up
+
+Out for delivery
+
+Delivered
+
+Failed
+
+Returned
+
+### Money
+
+Collected
+
+Remitted
+
+Outstanding
+
+### Earnings
+
+Commission
+
+Transport/Fuel
+
+Total accrued
+
+Total paid
+
+Outstanding
+
+### Performance
+
+Success rate
+
+First-attempt success
+
+---
+
+# 48. Admin Personnel Dashboard
+
+Management should see:
+
+### PDA/Rider
+
+* Deliveries
+* Success rate
+* Failed deliveries
+* Collections
+* Remittances
+* Outstanding cash
+* Earnings
+* Salary
+* Performance
+
+Filters:
+
+* HQ
+* DC
+* Personnel type
+* Compensation type
+* Date
+* Client
+
+---
+
+# 49. Headquarters
+
+NovaExpress can have multiple HQs.
+
+The system must therefore support:
+
+**HQ 1 — Abuja**
+
+**HQ 2 — Lagos**
+
+etc.
+
+Each HQ manages its own operational network.
+
+---
+
+# 50. Distribution Centers
+
+Each DC belongs to an HQ.
+
+DC manages:
+
+* Inventory
+* Packages
+* Orders
+* Delivery assignments
+* PDAs
+* Riders
+* Returns
+* Remittances
+* Local reconciliation
+
+---
+
+# 51. General Operations Unit
+
+The General Operations Unit has cross-HQ visibility.
+
+It can:
+
+* Create/manage HQs
+* Monitor all HQs
+* Monitor all DCs
+* Monitor inventory
+* Monitor deliveries
+* Monitor agents
+* Monitor riders
+* Configure rates
+* Monitor client settlements
+* Review performance
+* Manage system-wide policies
+
+---
+
+# 52. Financial Architecture
+
+The system should conceptually maintain separate ledgers.
+
+## Order Ledger
+
+What was ordered.
+
+## Physical Ledger
+
+Where products/packages are.
+
+## Delivery Ledger
+
+What happened during delivery.
+
+## Cash Ledger
+
+What money was collected/remitted.
+
+## Earnings Ledger
+
+What agents/riders earned.
+
+## Settlement Ledger
+
+What clients and personnel are owed/paid.
+
+---
+
+# 53. Financial Transaction Categories
+
+The system should support at least:
+
+### Revenue
+
+* Successful delivery charge
+* Failed delivery charge
+* Other client charges
+
+### Customer Cash
+
+* POD collection
+
+### Agent Costs
+
+* PDA commission
+* PDA transport
+* PDA failed allowance
+* Rider commission
+* Rider fuel
+* Rider failed stipend
+
+### Payroll
+
+* Salary
+* Salary adjustments
+
+### Other Expenses
+
+* POS fees
+* Approved operational expenses
+
+### Client Settlement
+
+* Amount payable
+* Amount settled
+* Adjustments
+
+---
+
+# 54. Historical Rate Protection
+
+This is a critical requirement.
+
+Suppose:
+
+August rate:
+
+**₦5,000**
+
+September:
+
+**₦6,000**
+
+An August order must continue showing:
+
+**₦5,000**
+
+even after the rate changes.
+
+Therefore every transaction must store the **actual rate applied at transaction time**.
+
+---
+
+# 55. Effective Dates
+
+Rates must support:
+
+* Effective from
+* Effective until
+* Status
+* Created by
+* Approved by
+
+This gives the business control over future rate changes.
+
+---
+
+# 56. Approval Controls
+
+Sensitive changes should require authorization.
 
 Examples:
 
-* ₦5,000
-* ₦25,000
-* ₦150,000
-* ₦1,250,000
+* Delivery rates
+* Client agreements
+* Personnel compensation
+* Salary
+* Manual financial adjustments
+* Remittance approval
+* POS fee approval
+* Inventory adjustments
 
-The system must not display USD, GBP, EUR or any other currency in normal NovaExpress operations.
+The system should record:
 
-Financial amounts stored in the backend should use NGN.
+**Who changed it**
 
-Examples of values that must be represented in Naira include:
+**What changed**
 
-* Product prices
-* Order values
-* Discounts
-* POD collection amounts
-* PDA cash balances
-* Remittances
-* Stock valuations
-* Client charges
+**When**
+
+**Previous value**
+
+**New value**
+
+---
+
+# 57. Audit Trail
+
+Every important financial/operational action must be auditable.
+
+Example:
+
+> Admin John changed PDA commission from ₦1,000 to ₦1,200.
+
+The system records:
+
+* User
+* Date/time
+* Previous rate
+* New rate
+* Effective date
+* Reason
+* Approval
+
+---
+
+# 58. Client Settlement
+
+For distributed POD:
+
+Customer pays:
+
+**₦20,000**
+
+Client agreement:
+
+Delivery charge:
+
+**₦5,000**
+
+Client payable:
+
+**₦15,000**
+
+The settlement system should show:
+
+### Gross Customer Collection
+
+₦20,000
+
+### NovaExpress Delivery Revenue
+
+₦5,000
+
+### Adjustments
+
+₦0
+
+### Client Payable
+
+₦15,000
+
+### Settled
+
+₦15,000
+
+### Outstanding
+
+₦0
+
+---
+
+# 59. Client Settlement Must Support Adjustments
+
+Possible adjustments:
+
+* Failed delivery charge
+* Approved refund
+* Dispute
+* Damaged item
+* Missing product
+* Pricing correction
+* Other approved adjustment
+
+Every adjustment must have a reason and audit trail.
+
+---
+
+# 60. NovaExpress Profitability
+
+Eventually management should be able to calculate:
+
+### Delivery Revenue
+
+minus:
+
+### Agent Commission
+
+### Transport/Fuel
+
+### Failed Delivery Costs
+
+### POS/Transaction Costs
+
+### Other Operational Costs
+
+=
+
+### Gross Operational Contribution
+
+This allows NovaExpress to determine which clients/routes/personnel are actually profitable.
+
+---
+
+# 61. Client-Level Profitability
+
+Management should eventually see:
+
+### NovaCare
+
+Revenue:
+
+₦X
+
+Agent costs:
+
+₦X
+
+Transport:
+
+₦X
+
+Failed delivery costs:
+
+₦X
+
+Other costs:
+
+₦X
+
+Contribution:
+
+₦X
+
+This will become extremely useful as the company adds more clients.
+
+---
+
+# 62. Route/Location Profitability
+
+The system should eventually allow:
+
+* State
+* LGA
+* Area
+* DC
+* Route
+
+analysis.
+
+This can reveal:
+
+> "This route has a high failure rate and high transport cost."
+
+This can inform future pricing.
+
+---
+
+# 63. Nigerian Operational Requirements
+
+The system should be designed specifically for Nigerian operations.
+
+It must support:
+
+* Nigerian phone numbers
+* Nigerian states
+* Nigerian LGAs
+* Nigerian addresses
+* Nigerian Naira
+* Pay on Delivery
+* POS-based cash transfers
+* Bank transfers
+* Cash remittance
+* Motorbike delivery
+* Local transport/fuel allowances
+* Nigerian delivery geography
+
+---
+
+# 64. Nigerian Location Structure
+
+Customer addresses should support:
+
+**State**
+
+→ **LGA**
+
+→ **Area**
+
+→ **Street**
+
+→ **House/Building**
+
+→ **Landmark**
+
+→ **Additional instructions**
+
+This is more practical than relying only on formal street addresses.
+
+---
+
+# 65. Core User Roles
+
+The system should eventually support:
+
+### General Operations Admin
+
+Global operational control.
+
+### HQ Admin/Manager
+
+Manages an HQ.
+
+### DC Manager
+
+Manages a Distribution Center.
+
+### Inventory Officer
+
+Manages stock.
+
+### PDA
+
+External/personal delivery agent.
+
+### In-House Rider
+
+NovaExpress rider.
+
+### Finance Officer
+
+Handles reconciliation/settlement.
+
+### Client
+
+Views/submits client operations.
+
+### Super Admin
+
+System-level administration.
+
+Permissions should be role-based and potentially location-based.
+
+---
+
+# 66. Core Modules
+
+The complete system should eventually contain:
+
+### 1. Dashboard
+
+### 2. Clients
+
+### 3. Orders
+
+### 4. Packages
+
+### 5. Products
+
+### 6. Inventory
+
+### 7. Stock Transfers
+
+### 8. Deliveries
+
+### 9. PDAs
+
+### 10. In-House Riders
+
+### 11. Remittances
+
+### 12. POD Collections
+
+### 13. Earnings & Commissions
+
+### 14. Salaries
+
+### 15. Client Settlements
+
+### 16. Rate Cards
+
+### 17. Promotions
+
+### 18. Returns
+
+### 19. Performance
+
+### 20. Reports
+
+### 21. Finance
+
+### 22. Settings
+
+### 23. Audit Logs
+
+---
+
+# 67. Important System Rule
+
+**The UI must not expose unnecessary accounting complexity to delivery personnel.**
+
+A PDA should primarily see:
+
+> Deliveries
+> Packages
+> Stock
+> Collections
+> Remittance
+> Earnings
+> Performance
+
+The DC sees more.
+
+HQ sees more.
+
+Finance sees more.
+
+General Operations sees everything they are authorized to access.
+
+---
+
+# 68. PDA vs Rider Operational Difference
+
+| Area           | PDA                             | In-House Rider           |
+| -------------- | ------------------------------- | ------------------------ |
+| Vehicle        | Own means                       | NovaExpress bike         |
+| Commission     | Configurable                    | Configurable             |
+| Salary         | Possible                        | Possible                 |
+| Transport      | Configurable                    | Fuel-based               |
+| POD Remittance | May deduct approved entitlement | Normally full remittance |
+| Settlement     | Per arrangement                 | Often monthly            |
+| Inventory      | May carry stock                 | May carry stock          |
+| Packages       | Yes                             | Yes                      |
+| Performance    | Yes                             | Yes                      |
+
+---
+
+# 69. Compensation Flexibility Requirement
+
+Admin must be able to configure an individual as:
+
+> PDA + Commission
+
+or:
+
+> PDA + Salary
+
+or:
+
+> PDA + Hybrid
+
+and:
+
+> Rider + Commission
+
+or:
+
+> Rider + Salary
+
+or:
+
+> Rider + Hybrid.
+
+Changing the compensation arrangement must not destroy historical earnings.
+
+---
+
+# 70. No Retroactive Recalculation
+
+If a PDA earned:
+
+**₦1,000**
+
+per successful delivery in August,
+
+and Admin changes the rate to:
+
+**₦1,500**
+
+in September,
+
+August deliveries must remain:
+
+**₦1,000**
+
+The September rate applies only to transactions under the new effective arrangement.
+
+---
+
+# 71. Core Business Entities
+
+At the database/domain level, the system will eventually revolve around entities such as:
+
+* Client
+* Client Agreement
+* Product
+* Promotion
+* Order
+* Order Item
+* Package
+* Delivery
+* Delivery Attempt
+* Customer
+* HQ
+* Distribution Center
+* Delivery Personnel
+* Compensation Profile
+* Rate Card
+* Inventory
+* Inventory Location
+* Stock Movement
+* Package Custody Movement
+* POD Collection
+* Remittance
+* Remittance Adjustment
+* Agent Earning
+* Salary
+* Client Settlement
+* Financial Transaction
+* Return
+* Audit Log
+
+---
+
+# 72. Non-Functional Requirements
+
+The system should be:
+
+### Secure
+
+Role-based access and financial permissions.
+
+### Auditable
+
+Financial and stock changes must be traceable.
+
+### Scalable
+
+Support multiple HQs, DCs, clients and thousands of deliveries.
+
+### Mobile-first
+
+PDA and rider operations must work effectively on smartphones.
+
+### Nigerian-network friendly
+
+The mobile experience should remain usable under inconsistent internet connectivity.
+
+### Offline-aware
+
+Critical delivery workflows should have an appropriate offline strategy where technically feasible.
+
+### Fast
+
+Delivery personnel should not need to wait unnecessarily to perform field operations.
+
+---
+
+# 73. Reporting Requirements
+
+Management reports should include:
+
+### Delivery
+
+* Total deliveries
+* Successful
+* Failed
+* Success rate
+* First-attempt success
+* Reattempts
+
+### POD
+
+* Expected collections
+* Actual collections
+* Remitted
+* Outstanding
+* Variances
+
+### Inventory
+
+* Opening
+* Received
+* Transferred
+* Issued
+* Delivered
+* Returned
+* Damaged
+* Closing
+
+### Personnel
+
+* Deliveries
+* Success rate
+* Commission
+* Transport
+* Salary
+* Outstanding earnings
+
+### Clients
+
+* Orders
+* Successful
+* Failed
+* POD collections
+* Delivery charges
+* Client payable
+* Settled
+* Outstanding
+
+---
+
+# 74. Dashboard KPI Examples
+
+General Operations dashboard:
+
+**Total Deliveries**
+
+**Success Rate**
+
+**POD Collected**
+
+**POD Outstanding**
+
+**Client Payables**
+
+**Agent Earnings**
+
+**Inventory Value/Quantity**
+
+**Failed Deliveries**
+
+**Returns**
+
+**Active PDAs**
+
+**Active Riders**
+
+**Top Performing DCs**
+
+**Top Performing Agents**
+
+---
+
+# 75. Critical Reconciliation Rules
+
+The system should constantly be able to reconcile:
+
+### Inventory
+
+Opening + Incoming − Outgoing = Closing
+
+### POD Cash
+
+Expected Collection − Approved Deductions = Expected Remittance
+
+### Remittance
+
+Expected Remittance − Actual Remittance = Variance
+
+### Agent Earnings
+
+Accrued − Paid/Deducted = Outstanding
+
+### Client Settlement
+
+Gross Collection − NovaExpress Charges ± Adjustments = Client Payable
+
+These should be system-calculated.
+
+---
+
+# 76. What the System Should Never Allow Silently
+
+The system should flag:
+
+* Missing inventory
+* Unexplained stock adjustments
+* Cash shortages
+* Excess cash
+* Unapproved deductions
+* Unapproved POS fees
+* Negative stock
+* Unverified returns
+* Duplicate remittance
+* Duplicate delivery
+* Rate changes without authorization
+* Settlement discrepancies
+
+---
+
+# 77. Recommended Development Phases
+
+Now that the master model is defined, I would structure development by **operational domains**, not simply by user roles.
+
+## Phase 1 — PDA & Rider Mobile Operations
+
+* Login
+* Assigned deliveries
+* Delivery execution
+* Package custody
+* Inventory received
+* POD collection
+* Remittance
+* Earnings
+* Performance
+* Returns
+
+---
+
+## Phase 2 — DC Operations
+
+* DC dashboard
+* Orders
+* Package receiving
+* Inventory
+* PDA/Rider management
+* Stock issuing
+* Returns
+* Remittance verification
+* Delivery monitoring
+* Local reporting
+
+---
+
+## Phase 3 — HQ Operations
+
+* HQ dashboard
+* DC management
+* Inventory oversight
+* Transfers
+* Restock approvals
+* Client operations
+* Delivery monitoring
+* Financial overview
+
+---
+
+## Phase 4 — General Operations
+
+* Multi-HQ management
+* Global dashboards
+* Rate configuration
+* Compensation configuration
+* Client agreements
+* Performance
+* Global reports
+* Operational controls
+
+---
+
+## Phase 5 — Finance & Settlement
+
+* POD reconciliation
+* Client settlements
+* Agent earnings
+* Salaries
+* POS charges
+* Financial adjustments
 * Financial reports
 
 ---
 
-# 4. NIGERIAN PHONE NUMBER REQUIREMENT
+## Phase 6 — Client Portal
 
-Customer, PDA, staff and client contact numbers should support Nigerian phone numbers.
-
-Examples:
-
-* 080XXXXXXXX
-* 081XXXXXXXX
-* 090XXXXXXXX
-* 070XXXXXXXX
-* +234XXXXXXXXXX
-
-The system should normalize phone numbers internally where necessary while allowing users to enter common Nigerian formats.
+* Order submission
+* Package tracking
+* Distributed inventory
+* Stock visibility
+* POD tracking
+* Settlement
+* Reports
 
 ---
 
-# 5. NIGERIAN ADDRESS REQUIREMENT
+# 78. Final Architectural Principle
 
-The delivery address structure must be designed for Nigerian addresses.
+The most important thing for the development team is this:
 
-The system should support:
+> **NovaExpress is not simply a delivery app.**
 
-* State
-* LGA
-* City/Town
-* Area/Neighbourhood
-* Street
-* House/Building number
-* Landmark
-* Additional directions
-* Customer delivery notes
+It is a **logistics network + inventory management + delivery execution + cash collection + agent compensation + client settlement platform.**
 
-Example:
+And the financial model must be flexible enough to accommodate changing business arrangements.
 
-**State:** FCT Abuja
-**LGA:** Abuja Municipal
-**Area:** Garki
-**Street:** Example Street
-**House:** 24
-**Landmark:** Opposite XYZ Pharmacy
+The system should therefore **never hardcode the current ₦5,000, ₦1,500, ₦1,000, ₦500, ₦1,500 or ₦800 rates as permanent business logic.**
 
-The system should not assume that a formal street address alone is sufficient.
+Instead:
 
-Landmarks and delivery instructions are important for Nigerian last-mile delivery.
+**Client Agreement**
 
----
+→ defines what NovaExpress charges the client
 
-# 6. NIGERIAN LOCATION STRUCTURE
+**Rate Card**
 
-The system should support all Nigerian states and the Federal Capital Territory.
+→ defines operational defaults
 
-The location hierarchy should generally be:
+**Compensation Profile**
 
-**Country → State/FCT → LGA → City/Town → Area → Address**
+→ defines what an individual PDA/Rider earns
 
-The Federal Capital Territory must be treated appropriately as **FCT Abuja**, rather than as a normal Nigerian state.
+**Effective Dates**
 
-The system should support expansion across:
+→ determine which rate applies
 
-* Abuja / FCT
-* Lagos
-* Kano
-* Rivers
-* Kaduna
-* Oyo
-* Anambra
-* Enugu
-* Delta
-* Edo
-* Ogun
-* Plateau
-* Nasarawa
-* Niger
-* and all other Nigerian states.
+**Financial Transaction**
 
-The location data should be configurable rather than hardcoded into individual screens.
+→ records what actually happened
 
----
+**Ledger**
 
-# 7. CORE BUSINESS OBJECTIVE
+→ maintains the historical truth.
 
-The system must provide NovaExpress with complete operational visibility over:
-
-**Orders**
-
-**Products**
-
-**Inventory**
-
-**Distribution Centers**
-
-**PDAs**
-
-**Deliveries**
-
-**POD collections**
-
-**Cash remittances**
-
-**Returns**
-
-**Stock transfers**
-
-**Restock requests**
-
-**Client packages**
-
-**Discounts**
-
-**Free products**
-
-**Reports**
-
----
-
-# 8. ORGANIZATIONAL STRUCTURE
-
-NovaExpress uses a hierarchical operational model.
-
-The highest level is the **General Operations Unit**.
-
-Under General Operations are one or more **Headquarters**.
-
-Each Headquarters manages multiple **Distribution Centers**.
-
-Each Distribution Center manages multiple **Personal Distribution Agents (PDAs)**.
-
-Therefore:
-
-**General Operations → Headquarters → Distribution Centers → PDAs → Customers**
-
-The system must maintain this relationship throughout all modules.
-
----
-
-# 9. GENERAL OPERATIONS UNIT
-
-The General Operations Unit provides company-wide operational control.
-
-It should be able to see information across all Headquarters.
-
-Responsibilities include:
-
-* Managing Headquarters
-* Monitoring nationwide orders
-* Monitoring nationwide inventory
-* Monitoring Distribution Centers
-* Monitoring PDAs
-* Monitoring POD collections
-* Monitoring outstanding cash
-* Monitoring stock transfers
-* Monitoring restock requests
-* Managing system configuration
-* Viewing company-wide reports
-
-General Operations should have a high-level dashboard rather than manually managing every individual delivery.
-
----
-
-# 10. HEADQUARTERS
-
-NovaExpress can have multiple Headquarters.
-
-The first major Headquarters is in Abuja.
-
-Additional Headquarters can be created as the company expands.
-
-Each HQ manages:
-
-* Its Distribution Centers
-* HQ inventory
-* Regional stock transfers
-* DC restocking
-* Regional orders
-* Regional PDA activity
-* Regional operational performance
-
-An HQ should not automatically have access to another HQ's operational data unless its role permits such access.
-
----
-
-# 11. DISTRIBUTION CENTERS
-
-Distribution Centers operate underneath Headquarters.
-
-A DC is responsible for local physical inventory and PDA operations.
-
-A DC should be able to:
-
-* Receive stock from HQ
-* Hold inventory
-* Request additional stock
-* Receive stock transfers
-* Issue stock to PDAs
-* Receive returned products
-* Monitor PDA inventory
-* Monitor local orders
-* Monitor local deliveries
-* Verify PDA remittances
-
----
-
-# 12. PERSONAL DISTRIBUTION AGENTS
-
-PDAs are field delivery personnel.
-
-A PDA is assigned to a Distribution Center.
-
-The PDA's primary responsibilities are:
-
-1. Receive assigned orders/products from the DC.
-2. Take the products to customers.
-3. Deliver orders.
-4. Collect customer payment for POD orders.
-5. Record delivery outcomes.
-6. Return failed/undelivered products to the DC.
-7. Remit collected POD cash according to NovaExpress procedures.
-
-The PDA application must therefore be optimized for speed and simplicity.
-
----
-
-# 13. PDA MOBILE APPLICATION
-
-The PDA should not see the complex administrative functionality available to Headquarters and General Operations.
-
-The PDA application should focus on:
-
-* Today's work
-* Orders
-* Delivery
-* Stock
-* Cash
-* Remittance
-* History
-* Profile
-
-The PDA should be able to complete most common tasks with minimal typing.
-
----
-
-# 14. PDA PRIMARY NAVIGATION
-
-The PDA application should contain the following primary areas:
-
-1. Home
-2. Orders
-3. Stock
-4. Cash
-5. History
-6. Profile
-
----
-
-# 15. PDA HOME
-
-The Home screen is the PDA's daily operational dashboard.
-
-It should immediately show:
-
-### Delivery Summary
-
-* Orders assigned today
-* Orders collected
-* Orders out for delivery
-* Orders delivered
-* Failed deliveries
-* Orders awaiting action
-
-### Stock Summary
-
-* Total products currently held
-* Products awaiting delivery
-
-### Cash Summary
-
-* POD cash collected
-* Cash already remitted
-* Cash remaining to remit
-
-### Alerts
-
-Examples:
-
-* Cash remittance pending
-* Failed delivery requiring action
-* Product return pending
-* New order assigned
-
----
-
-# 16. PDA ORDER MANAGEMENT
-
-The PDA must have an Orders section containing all orders assigned to them.
-
-Orders should be filterable by status.
-
-Suggested statuses:
-
-* Assigned
-* Ready for Collection
-* Collected
-* Out for Delivery
-* Delivered
-* Failed
-* Returned
-
-Each order should clearly display:
-
-* Order ID
-* Customer name
-* Customer location
-* Product count
-* Payment type
-* Amount to collect if POD
-* Current status
-
----
-
-# 17. ORDER DETAILS
-
-The PDA must be able to open any assigned order.
-
-Order Details should contain:
-
-### Customer
-
-* Customer name
-* Phone number
-* Delivery address
-* State
-* LGA
-* Area
-* Landmark
-* Delivery instructions
-
-### Order
-
-* Order ID
-* Client
-* Order date
-* Products
-* Paid quantities
-* Free quantities
-* Total physical quantities
-
-### Payment
-
-* POD or Non-POD
-* Amount to collect
-* Amount collected
-* Outstanding amount
-
-### Distribution
-
-* Headquarters
-* Distribution Center
-* PDA
-* Assignment date
-
----
-
-# 18. PRODUCT QUANTITY MODEL
-
-The system must distinguish between:
-
-**Paid Quantity**
-
-and
-
-**Free Quantity**
-
-and
-
-**Total Physical Quantity**
-
-Example:
-
-A customer orders:
-
-**5 Grazer Herbal Tea**
-
-Client promotion:
-
-**1 free Grazer Herbal Tea**
-
-The system must display:
-
-Paid Quantity: 5
-Free Quantity: 1
-Total Physical Quantity: 6
-
-The customer pays according to the applicable commercial rules.
-
-However, NovaExpress must physically deliver and account for **6 units**.
-
----
-
-# 19. CURRENT POD PRODUCT CATALOGUE
-
-The initial NovaExpress POD catalogue contains:
-
-### Grazer Herbal Tea
-
-### Respira
-
-### Alpha Man
-
-These are the current products.
-
-The system must not be designed around only these three products.
-
-A product management module must allow authorized administrators to add:
-
-* New products
-* Product prices
-* Product codes
-* Product descriptions
-* Product categories
-* Product status
-* Product images
-* Package rules
-* Discount rules
-* Free-product rules
-
-without redesigning the application.
-
----
-
-# 20. PRODUCT IDENTIFICATION
-
-Each product should have a unique internal product identifier.
-
-Example:
-
-**GRAZER-001**
-
-**RESPIRA-001**
-
-**ALPHA-001**
-
-The exact codes should be configurable.
-
-Products may also have:
-
-* Barcode
-* QR code
-* SKU
-* Batch number
-* Expiry date, where applicable
-
----
-
-# 21. PDA ORDER COLLECTION FROM DC
-
-When a PDA arrives at a Distribution Center, they need to collect their assigned orders.
-
-The process should be:
-
-1. PDA opens assigned orders.
-2. PDA selects orders to collect.
-3. PDA scans order/package code where applicable.
-4. DC verifies the order.
-5. Products are handed to the PDA.
-6. PDA confirms receipt.
-7. System deducts products from DC inventory.
-8. System adds products to PDA inventory.
-9. Order status changes to Collected.
-
-The system must create an inventory transaction for this movement.
-
----
-
-# 22. ORDER SCANNING
-
-The PDA application should support barcode/QR scanning where applicable.
-
-Scanning should allow the system to quickly identify:
-
-* Order
-* Product
-* Package
-* Collection reference
-
-The scan should not replace validation.
-
-The system must still verify that:
-
-* The order belongs to the PDA.
-* The order is available for collection.
-* The order has not already been collected.
-* The product quantities match.
-
----
-
-# 23. PDA INVENTORY
-
-Every PDA must have an individual inventory account.
-
-Example:
-
-PDA: John Doe
-
-Grazer Herbal Tea: 12
-Respira: 5
-Alpha Man: 4
-
-The system should know exactly how many units are currently assigned to that PDA.
-
----
-
-# 24. PDA INVENTORY MOVEMENT
-
-PDA inventory changes through transactions such as:
-
-* Received from DC
-* Delivered to customer
-* Returned to DC
-* Damaged
-* Adjusted by authorized staff
-
-Every movement must be recorded.
-
-The PDA should be able to see their current stock and basic stock history.
-
----
-
-# 25. DELIVERY PROCESS
-
-The delivery process begins when the PDA has collected the order from the DC.
-
-The PDA opens the order and sees:
-
-* Customer name
-* Customer phone
-* Nigerian delivery address
-* Landmark
-* Delivery instructions
-* Product information
-* Payment status
-
-The PDA should be able to call the customer and open navigation.
-
----
-
-# 26. CUSTOMER CONTACT
-
-The application should support quick access to the customer's Nigerian phone number.
-
-Actions may include:
-
-* Call customer
-* Copy number
-* View number
-
-The system should not expose unnecessary customer information to the PDA.
-
----
-
-# 27. DELIVERY CONFIRMATION
-
-When the PDA reaches the customer, they must confirm the delivery.
-
-Depending on the final business decision, confirmation may involve:
-
-* OTP
-* Customer signature
-* Delivery photo
-* PDA confirmation
-* Timestamp
-* GPS/location capture
-
-The PRD should keep this configurable.
-
----
-
-# 28. PAY ON DELIVERY
-
-For a POD order, the PDA must collect the amount due from the customer.
-
-The order should clearly display:
-
-**Amount to Collect: ₦XX,XXX**
-
-The PDA records the amount actually received.
-
-The application must support:
-
-* Cash
-* Bank transfer
-
-The final allowed payment methods should be configurable by NovaExpress.
-
----
-
-# 29. POD PAYMENT VALIDATION
-
-The system must compare:
-
-**Expected Amount**
-
-against
-
-**Amount Collected**
-
-Example:
-
-Expected:
-
-**₦45,000**
-
-Collected:
-
-**₦45,000**
-
-Result:
-
-**Matched**
-
-If the PDA records:
-
-Expected:
-
-**₦45,000**
-
-Collected:
-
-**₦40,000**
-
-The system must calculate:
-
-**Variance: ₦5,000**
-
-The PDA must provide a reason.
-
----
-
-# 30. NON-POD ORDERS
-
-For prepaid/non-POD orders, the PDA must not collect customer payment.
-
-The order should display:
-
-**PAID**
-
-and:
-
-**Amount to Collect: ₦0**
-
-The PDA simply completes the delivery.
-
----
-
-# 31. DELIVERY SUCCESS
-
-After a successful delivery, the system records:
-
-* Order ID
-* Customer
-* PDA
-* Products delivered
-* Delivery date
-* Delivery time
-* Delivery confirmation
-* Payment status
-* Amount collected if POD
-
-The order becomes:
-
-**Delivered**
-
-The corresponding PDA inventory is reduced.
-
----
-
-# 32. FAILED DELIVERY
-
-If delivery fails, the PDA must select a reason.
-
-Initial reasons should include:
-
-* Customer unavailable
-* Customer refused order
-* Phone unreachable
-* Wrong address
-* Address/location issue
-* Customer requested another date
-* Product issue
-* Other
-
-The PDA can add notes.
-
----
-
-# 33. DELIVERY REATTEMPT
-
-A failed order may be eligible for another delivery attempt.
-
-The system should support:
-
-* Reattempt
-* Reschedule
-* Return to DC
-
-The exact action available should depend on NovaExpress's operational rules.
-
----
-
-# 34. PRODUCT RETURNS
-
-When an order cannot be delivered and must return to the DC:
-
-1. PDA marks order for return.
-2. PDA returns physical products to DC.
-3. DC receives the products.
-4. DC verifies quantities.
-5. DC inspects condition.
-6. Inventory is updated.
-7. Order becomes Returned or another applicable status.
-
-Returned products should be classified as appropriate:
-
-* Good condition
-* Damaged
-* Opened
-* Missing
-* Unsellable
-
----
-
-# 35. PDA CASH MANAGEMENT
-
-The PDA's cash position must be tracked separately from their physical product inventory.
-
-The system should maintain:
-
-**Expected POD**
-
-**Collected POD**
-
-**Remitted**
-
-**Verified**
-
-**Outstanding**
-
-Example:
-
-Expected:
-
-**₦500,000**
-
-Collected:
-
-**₦490,000**
-
-Remitted:
-
-**₦400,000**
-
-Outstanding:
-
-**₦90,000**
-
----
-
-# 36. PDA REMITTANCE
-
-PDA remittance is the process of handing over collected POD money to NovaExpress.
-
-The PDA should be able to see:
-
-**Total collected**
-
-**Total already remitted**
-
-**Amount remaining**
-
-The PDA can initiate a remittance.
-
-The system records:
-
-* Remittance ID
-* PDA
-* DC
-* Amount
-* Payment method
-* Reference
-* Date
-* Time
-* Status
-
----
-
-# 37. CASH REMITTANCE STATUS
-
-Possible statuses:
-
-* Pending
-* Submitted
-* Received
-* Verified
-* Rejected
-* Variance
-* Outstanding
-
-The PDA should clearly know whether their submitted remittance has been verified.
-
----
-
-# 38. DC CASH VERIFICATION
-
-When the PDA submits cash/remittance, the DC or authorized finance officer verifies it.
-
-Example:
-
-Expected:
-
-**₦150,000**
-
-Received:
-
-**₦150,000**
-
-Status:
-
-**Verified**
-
-If:
-
-Expected:
-
-**₦150,000**
-
-Received:
-
-**₦140,000**
-
-Status:
-
-**Variance**
-
-Difference:
-
-**₦10,000**
-
----
-
-# 39. HEADQUARTERS INVENTORY
-
-HQ maintains its own inventory.
-
-HQ can:
-
-* Receive stock
-* Store stock
-* Transfer stock to DCs
-* Transfer stock between DCs
-* Approve DC restock requests
-* View stock levels
-* View stock movement
-
----
-
-# 40. DISTRIBUTION CENTER INVENTORY
-
-DC inventory includes:
-
-* Stock received from HQ
-* Stock currently available
-* Stock allocated to PDAs
-* Returned stock
-* Damaged stock
-* Reserved stock
-* Stock in transit
-
----
-
-# 41. RESTOCK REQUESTS
-
-A DC can request additional stock from its HQ.
-
-Example:
-
-Wuse DC requests:
-
-Grazer Herbal Tea: 500
-Respira: 200
-Alpha Man: 100
-
-The request is sent to HQ.
-
-HQ can:
-
-* Approve
-* Partially approve
-* Reject
-
-Once approved, a stock transfer is created.
-
----
-
-# 42. STOCK TRANSFERS BETWEEN DISTRIBUTION CENTERS
-
-NovaExpress must support movement of stock from one DC to another.
-
-Example:
-
-Lagos DC → Abuja DC
-
-or:
-
-Abuja DC → Nasarawa DC
-
-The system records:
-
-* Source
-* Destination
-* Products
-* Quantities
-* Requesting user
-* Approving user
-* Dispatch date
-* Receiving date
-* Expected quantities
-* Actual quantities
-* Discrepancies
-
----
-
-# 43. STOCK ACCOUNTABILITY
-
-Every product must have a traceable inventory history.
-
-The system must answer:
-
-> Where did this unit come from?
-
-> Where is it now?
-
-> Who received it?
-
-> Who delivered it?
-
-> Was it returned?
-
-> Was it damaged?
-
-This is particularly important for free products because they have physical value even when the customer was not charged for them.
-
----
-
-# 44. CLIENT MANAGEMENT
-
-NovaExpress may work with multiple major clients.
-
-Each client can have different:
-
-* Products
-* Prices
-* Discounts
-* Packages
-* Free-product arrangements
-* Order rules
-
-The system must therefore associate every order with a client.
-
----
-
-# 45. CLIENT BULK PACKAGES
-
-The system must support bulk-buying arrangements.
-
-Example:
-
-A client may have:
-
-**Buy 5 Grazer Herbal Tea**
-
-**Receive 1 free**
-
-**Additional discount applies**
-
-The package engine calculates the commercial and physical quantities.
-
-Example:
-
-Paid:
-
-5
-
-Free:
-
-1
-
-Physical fulfillment:
-
-6
-
----
-
-# 46. PROMOTION ENGINE
-
-Promotions should be configurable.
-
-Examples:
-
-* Buy 5, get 1 free
-* Buy 10, get 2 free
-* Buy X, receive percentage discount
-* Buy X products and receive another product free
-
-The system should support future promotional rules without changing the core order architecture.
-
----
-
-# 47. REPORTING
-
-The platform should provide reports for:
-
-### Orders
-
-* Total orders
-* Orders by state
-* Orders by LGA
-* Orders by client
-* Orders by product
-* POD vs Non-POD
-* Delivered
-* Failed
-* Returned
-
-### Inventory
-
-* HQ stock
-* DC stock
-* PDA stock
-* Stock transfers
-* Stock discrepancies
-* Free products distributed
-
-### Delivery
-
-* PDA performance
-* DC performance
-* Delivery success rate
-* Failed deliveries
-* Returns
-
-### Finance
-
-* POD expected
-* POD collected
-* POD remitted
-* POD verified
-* Outstanding cash
-* Variances
-
----
-
-# 48. PDA PERFORMANCE
-
-The system should calculate PDA performance metrics.
-
-Examples:
-
-* Orders assigned
-* Orders collected
-* Orders delivered
-* Failed deliveries
-* Returns
-* Delivery success rate
-* POD collected
-* POD outstanding
-* Stock currently held
-* Average delivery completion time
-
----
-
-# 49. NOTIFICATIONS
-
-The PDA should receive notifications for important events.
-
-Examples:
-
-* New order assigned
-* Order assignment changed
-* Delivery reminder
-* Customer delivery issue
-* Cash remittance due
-* Remittance verified
-* Remittance variance
-* Return required
-* Important operational message
-
-Notifications should be actionable where possible.
-
----
-
-# 50. OFFLINE / POOR CONNECTIVITY CONSIDERATION
-
-The application is designed for Nigerian field operations.
-
-The PDA may operate in locations where mobile connectivity is unstable.
-
-The system should therefore consider offline-friendly behaviour.
-
-The PDA should be able to access already assigned orders and relevant customer information even when connectivity is temporarily unavailable.
-
-Actions performed offline should be queued and synchronized when connectivity returns, subject to backend validation.
-
-Financial actions and other sensitive operations must have appropriate safeguards against duplicate submissions.
-
----
-
-# 51. SECURITY
-
-The system must protect:
-
-* Customer information
-* PDA information
-* Financial information
-* Order information
-* Inventory information
-
-PDA users should only see information necessary for their assigned operations.
-
-A PDA should not be able to access:
-
-* Another PDA's orders
-* HQ-wide inventory
-* Company financial reports
-* Other customers' unrelated orders
-* Administrative configuration
-
----
-
-# 52. ROLE-BASED ACCESS
-
-Permissions should be based on organizational role.
-
-For example:
-
-**General Operations**
-
-Nationwide access.
-
-**HQ**
-
-Access to its HQ and assigned DCs.
-
-**DC**
-
-Access to its DC and assigned PDAs.
-
-**PDA**
-
-Access to assigned orders, own inventory and own cash activity.
-
----
-
-# 53. AUDIT TRAIL
-
-Important operations must be logged.
-
-Examples:
-
-* Order assignment
-* Product collection
-* Stock transfer
-* Stock adjustment
-* Delivery confirmation
-* POD collection
-* Cash remittance
-* Cash verification
-* Return
-* Inventory adjustment
-
-The audit record should include:
-
-* User
-* Action
-* Date
-* Time
-* Reference
-* Previous state where relevant
-* New state where relevant
-
----
-
-# 54. PRODUCT CATALOGUE REQUIREMENT
-
-The initial catalogue is:
-
-1. Grazer Herbal Tea
-2. Respira
-3. Alpha Man
-
-However, the product module must be designed for expansion.
-
-An administrator must be able to add a new product without requiring a software release.
-
-New products should support:
-
-* Name
-* Product code/SKU
-* Description
-* Category
-* Selling price
-* Client-specific price where applicable
-* Stock quantity
-* Barcode/QR code
-* Product image
-* Active/inactive status
-* Package eligibility
-* Free-product eligibility
-
----
-
-# 55. DATABASE / SYSTEM DATA MODEL
-
-The core system should conceptually contain the following entities:
-
-### Organization
-
-* General Operations
-* Headquarters
-* Distribution Centers
-
-### Users
-
-* Admins
-* HQ staff
-* DC staff
-* PDAs
-
-### Clients
-
-* Client accounts
-* Client rules
-
-### Products
-
-* Product catalogue
-* SKUs
-* Prices
-
-### Packages
-
-* Bulk-buy rules
-* Discounts
-* Free products
-
-### Orders
-
-* Customer
-* Client
-* Products
-* Payment
-* Distribution
-* Delivery
-
-### Inventory
-
-* HQ stock
-* DC stock
-* PDA stock
-* Stock movements
-
-### Deliveries
-
-* Assignment
-* Delivery attempts
-* Delivery outcome
-* Returns
-
-### Finance
-
-* POD collections
-* Remittances
-* Verification
-* Variances
-
-### Audit
-
-* System activities
-
----
-
-# 56. ORDER NUMBERING
-
-Orders should have unique NovaExpress identifiers.
-
-Example:
-
-**NEX-2026-000001**
-
-The format should be configurable.
-
-Other records should have unique references as well.
-
-Examples:
-
-**TRF-000001** — Stock Transfer
-
-**RST-000001** — Restock Request
-
-**REM-000001** — Remittance
-
-**PDA-000001** — PDA ID
-
----
-
-# 57. CORE BUSINESS RULES
-
-The following rules are mandatory.
-
-### Rule 1
-
-All NovaExpress financial values are in **Nigerian Naira (₦ / NGN)**.
-
-### Rule 2
-
-Only authorized users can change product prices.
-
-### Rule 3
-
-Free products are deducted from physical inventory.
-
-### Rule 4
-
-Paid quantity and physical quantity must be separately tracked.
-
-### Rule 5
-
-Every stock movement must have a transaction record.
-
-### Rule 6
-
-Every POD collection must have an expected amount.
-
-### Rule 7
-
-PDA-reported collection must be compared against expected collection.
-
-### Rule 8
-
-PDA remittances must be separately recorded from customer collections.
-
-### Rule 9
-
-Cash is not considered reconciled until authorized staff verify it.
-
-### Rule 10
-
-Failed deliveries must have a reason.
-
-### Rule 11
-
-Returned products must be physically verified.
-
-### Rule 12
-
-PDAs can only access orders assigned to them.
-
-### Rule 13
-
-Products must be extensible.
-
-### Rule 14
-
-Headquarters and Distribution Centers must maintain separate inventory balances.
-
-### Rule 15
-
-A PDA must have an identifiable stock balance.
-
-### Rule 16
-
-An order must have a clearly identifiable client, customer, payment type, location and operational assignment.
-
----
-
-# 58. MVP — PHASE 1
-
-The first release should focus on the operational core.
-
-### Required
-
-**User Authentication**
-
-**Organization Management**
-
-**HQ Management**
-
-**DC Management**
-
-**PDA Management**
-
-**Product Management**
-
-**Order Management**
-
-**Inventory Management**
-
-**PDA Stock**
-
-**Order Assignment**
-
-**Order Collection**
-
-**Delivery**
-
-**POD Collection**
-
-**Cash Remittance**
-
-**Returns**
-
-**Restock Requests**
-
-**Stock Transfers**
-
-**Basic Reports**
-
-**Notifications**
-
-**Audit Logs**
-
----
-
-# 59. PDA MVP
-
-The PDA application MVP should contain:
-
-1. Login
-2. Home
-3. Orders
-4. Order Details
-5. Order Collection
-6. QR/Barcode Scan
-7. Delivery
-8. POD Payment
-9. Non-POD Delivery
-10. Delivery Success
-11. Failed Delivery
-12. My Stock
-13. Cash Dashboard
-14. Cash Remittance
-15. History
-16. Profile
-
----
-
-# 60. SUCCESS CRITERIA
-
-The NovaExpress system should be considered operationally successful when management can trace an order from:
-
-**Client → Order → HQ → DC → PDA → Customer → Delivery → Payment → Remittance → Reconciliation**
-
-and trace the physical products from:
-
-**HQ → DC → PDA → Customer**
-
-while accounting for:
-
-* Paid products
-* Free products
-* Discounts
-* Delivered products
-* Returned products
-* Damaged products
-* POD cash
-* Remitted cash
-* Cash discrepancies
-
----
-
-# 61. PRIMARY DESIGN PRINCIPLE
-
-NovaExpress should not be designed as a generic delivery app.
-
-It is a **Nigerian distribution operations platform**.
-
-The product design must reflect the actual operational realities of moving physical products and collecting money across Nigeria.
-
-The interface should always make these questions easy to answer:
-
-**Where is the order?**
-
-**Where is the product?**
-
-**Which HQ is responsible?**
-
-**Which DC is responsible?**
-
-**Which PDA has the order?**
-
-**Has the customer received it?**
-
-**Is it Pay on Delivery?**
-
-**How much should the PDA collect in ₦?**
-
-**How much did the PDA collect?**
-
-**How much has the PDA remitted?**
-
-**How much is still outstanding?**
-
-**Where are the free products?**
-
-**Has every physical unit been accounted for?**
-
-**Is there a stock or cash discrepancy?**
-
-That traceability is the foundation of the NovaExpress Logistics platform.
+That architecture will allow NovaExpress to change its pricing, negotiate different client agreements, change a PDA's commission, move someone from commission to salary, introduce new products, add new HQs/DCs, and add new delivery personnel **without rebuilding the system.**

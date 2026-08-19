@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:intl/intl.dart';
+import '../../../../core/providers/navigation_provider.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -16,8 +18,12 @@ class UserProfilePage extends ConsumerWidget {
     final isDark = themeMode == ThemeMode.dark;
 
     final user = authState.user;
-    final agentName = user != null ? '${user.firstName} ${user.lastName}' : 'Babatunde Lawal';
-    final agentInitials = user != null && user.firstName.isNotEmpty ? user.firstName.substring(0, 1) : 'B';
+    final agentName = user != null && user.firstName.isNotEmpty ? '${user.firstName} ${user.lastName}' : 'Emeka Rider';
+    final agentInitials = user != null && user.firstName.isNotEmpty ? user.firstName.substring(0, 1).toUpperCase() : 'E';
+    final agentCode = user?.deliveryAgentCode ?? (user?.id.isNotEmpty == true ? 'PDA-${user!.id.substring(0, 4).toUpperCase()}' : 'PDA-7000');
+    final dcName = user?.distributionCenterName ?? 'Wuse DC';
+    final lifetimeDrops = user?.lifetimeDeliveriesCount != null ? NumberFormat('#,###').format(user!.lifetimeDeliveriesCount) : '4,892';
+    final performanceRating = user?.rating != null ? user!.rating!.toStringAsFixed(1) : '4.9';
 
     final theme = Theme.of(context);
 
@@ -28,7 +34,13 @@ class UserProfilePage extends ConsumerWidget {
         elevation: 0.5,
         leading: IconButton(
           icon: Icon(Icons.arrow_back_rounded, color: theme.colorScheme.onSurface),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              ref.read(bottomNavIndexProvider.notifier).state = 0;
+            }
+          },
         ),
         title: Text(
           'PROFILE & SETTINGS',
@@ -89,7 +101,7 @@ class UserProfilePage extends ConsumerWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        'PDA ID: PDA-402 • Wuse DC',
+                        'PDA ID: $agentCode • $dcName',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
@@ -116,7 +128,7 @@ class UserProfilePage extends ConsumerWidget {
                     child: Column(
                       children: [
                         Text(
-                          '4,892',
+                          lifetimeDrops,
                           style: TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
@@ -151,7 +163,7 @@ class UserProfilePage extends ConsumerWidget {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              '4.9',
+                              performanceRating,
                               style: TextStyle(
                                 fontSize: 22,
                                 fontWeight: FontWeight.bold,
@@ -210,7 +222,7 @@ class UserProfilePage extends ConsumerWidget {
                     leading: Icon(Icons.notifications_outlined, color: theme.colorScheme.onSurface),
                     title: Text('Notifications Preferences', style: TextStyle(fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface)),
                     trailing: const Icon(Icons.chevron_right_rounded),
-                    onTap: () {},
+                    onTap: () => context.push('/notifications'),
                   ),
                   const Divider(height: 1),
                   ListTile(

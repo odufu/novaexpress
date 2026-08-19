@@ -18,4 +18,21 @@ class DateTimeFormatter {
   static String formatShortDate(DateTime dateTime) {
     return DateFormat('dd MMM yyyy').format(dateTime);
   }
+
+  static String formatRelativeTime(DateTime dateTime) {
+    final now = DateTime.now();
+    final isToday = now.year == dateTime.year && now.month == dateTime.month && now.day == dateTime.day;
+    final isYesterday = now.subtract(const Duration(days: 1)).year == dateTime.year &&
+        now.subtract(const Duration(days: 1)).month == dateTime.month &&
+        now.subtract(const Duration(days: 1)).day == dateTime.day;
+
+    final timeStr = DateFormat('hh:mm a').format(dateTime);
+    if (isToday) {
+      return 'Today, $timeStr';
+    } else if (isYesterday) {
+      return 'Yesterday, $timeStr';
+    } else {
+      return DateFormat('dd MMM, hh:mm a').format(dateTime);
+    }
+  }
 }

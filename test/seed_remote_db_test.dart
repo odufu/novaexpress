@@ -1,0 +1,371 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:novexps/core/constants/supabase_constants.dart';
+
+void main() {
+  test('Seed remote Supabase database with master operational datasets', () async {
+    final client = SupabaseClient(
+      SupabaseConstants.supabaseUrl,
+      SupabaseConstants.supabaseServiceRoleKey,
+    );
+
+    print('🚀 Starting live database seeding on ${SupabaseConstants.supabaseUrl} ...');
+
+    // 1. Companies
+    try {
+      await client.from('companies').upsert({
+        'id': '11111111-1111-4111-8111-111111111111',
+        'name': 'NovaExpress Logistics Limited',
+        'code': 'NOVEXPS',
+        'email': 'operations@novaexpress.ng',
+        'phone': '+2348000000000',
+        'address': 'Plot 102 Central Business District, Abuja, Nigeria',
+        'currency': 'NGN',
+      });
+      print('✅ Company seeded');
+    } catch (e) {
+      print('ℹ️ Company notice: $e');
+    }
+
+    // 2. Distribution Centers
+    try {
+      await client.from('distribution_centers').upsert([
+        {
+          'id': '22222222-2222-4222-8222-222222222222',
+          'company_id': '11111111-1111-4111-8111-111111111111',
+          'name': 'Wuse Distribution Center',
+          'code': 'DC-WUSE-01',
+          'state': 'Abuja (FCT)',
+          'city': 'Wuse 2',
+          'address': 'Plot 402 Aminu Kano Crescent, Wuse 2, Abuja',
+          'is_hub': true,
+        },
+        {
+          'id': '22222222-2222-4222-8222-333333333333',
+          'company_id': '11111111-1111-4111-8111-111111111111',
+          'name': 'Ikeja Central Distribution Center',
+          'code': 'DC-IKEJA-01',
+          'state': 'Lagos',
+          'city': 'Ikeja',
+          'address': 'Plot 14 Commercial Avenue, Ikeja GRA, Lagos',
+          'is_hub': true,
+        }
+      ]);
+      print('✅ Distribution Centers seeded');
+    } catch (e) {
+      print('ℹ️ Distribution Centers notice: $e');
+    }
+
+    // 3. Users & Delivery Agents (Emeka Rider - Freelance PDA, and Babatunde Lawal - InHouse)
+    try {
+      await client.from('users').upsert([
+        {
+          'id': 'a1111111-1111-4111-8111-111111111111',
+          'company_id': '11111111-1111-4111-8111-111111111111',
+          'email': 'emeka.rider@novaexpress.ng',
+          'phone_number': '08031234567',
+          'first_name': 'Emeka',
+          'last_name': 'Rider',
+          'role': 'delivery_agent',
+        },
+        {
+          'id': 'a3333333-3333-4333-8333-333333333333',
+          'company_id': '11111111-1111-4111-8111-111111111111',
+          'email': 'babatunde.lawal@novaexpress.ng',
+          'phone_number': '08022223344',
+          'first_name': 'Babatunde',
+          'last_name': 'Lawal',
+          'role': 'delivery_agent',
+        },
+        {
+          'id': 'a2222222-2222-4222-8222-222222222222',
+          'company_id': '11111111-1111-4111-8111-111111111111',
+          'email': 'dc.supervisor@novaexpress.ng',
+          'phone_number': '08091112233',
+          'first_name': 'Adekunle',
+          'last_name': 'Supervisor',
+          'role': 'dc_manager',
+        }
+      ]);
+      print('✅ Users seeded');
+
+      await client.from('delivery_agents').upsert([
+        {
+          'id': 'b1111111-1111-4111-8111-111111111111',
+          'user_id': 'a1111111-1111-4111-8111-111111111111',
+          'distribution_center_id': '22222222-2222-4222-8222-222222222222',
+          'agent_code': 'PDA-7000',
+          'vehicle_type': 'motorcycle',
+          'vehicle_plate_number': 'ABJ-789-XY',
+          'operating_state': 'Abuja (FCT)',
+          'operating_city': 'Wuse 2',
+          'current_status': 'available',
+          'current_cod_balance': 55000.0,
+          'direct_transfer_balance': 24500.0,
+          'bank_name': 'Zenith Bank',
+          'bank_account_number': '0123456789',
+          'bank_account_name': 'Emeka Rider',
+        },
+        {
+          'id': 'b2222222-2222-4222-8222-222222222222',
+          'user_id': 'a3333333-3333-4333-8333-333333333333',
+          'distribution_center_id': '22222222-2222-4222-8222-222222222222',
+          'agent_code': 'PDA-402',
+          'vehicle_type': 'motorcycle',
+          'vehicle_plate_number': 'ABJ-402-FL',
+          'operating_state': 'Abuja (FCT)',
+          'operating_city': 'Wuse 2',
+          'current_status': 'available',
+          'current_cod_balance': 0.0,
+          'direct_transfer_balance': 0.0,
+          'bank_name': 'Access Bank',
+          'bank_account_number': '0098765432',
+          'bank_account_name': 'Babatunde Lawal',
+        }
+      ]);
+      print('✅ Delivery Agents (Freelance PDA & In-House Rider) seeded');
+    } catch (e) {
+      print('ℹ️ Users/Agents notice: $e');
+    }
+
+    // 4. Products Master Catalog
+    try {
+      await client.from('products').upsert([
+        {
+          'id': 'd1111111-1111-4111-8111-111111111111',
+          'company_id': '11111111-1111-4111-8111-111111111111',
+          'sku': 'SKU-RSP01',
+          'name': 'Respira Detox Tea',
+          'category': 'Herbal Detox',
+          'description': 'Organic herbal detox blend formulated for respiratory purification, revitalization and digestive health.',
+          'base_price': 26000.0,
+          'reorder_level': 5,
+          'low_stock_threshold': 5,
+        },
+        {
+          'id': 'd2222222-2222-4222-8222-222222222222',
+          'company_id': '11111111-1111-4111-8111-111111111111',
+          'sku': 'SKU-GRZ02',
+          'name': 'Grazer Herbal Tea',
+          'category': 'Digestive Care',
+          'description': 'Botanical colon cleanse herbal tea for gentle digestive support and natural detox.',
+          'base_price': 15000.0,
+          'reorder_level': 5,
+          'low_stock_threshold': 5,
+        },
+        {
+          'id': 'd3333333-3333-4333-8333-333333333333',
+          'company_id': '11111111-1111-4111-8111-111111111111',
+          'sku': 'SKU-ALM03',
+          'name': 'Alpha Man Vitality',
+          'category': 'Mens Wellness',
+          'description': 'Daily organic vitality supplement for mens physical endurance and wellness.',
+          'base_price': 22000.0,
+          'reorder_level': 5,
+          'low_stock_threshold': 5,
+        },
+        {
+          'id': 'd4444444-4444-4444-8444-444444444444',
+          'company_id': '11111111-1111-4111-8111-111111111111',
+          'sku': 'SKU-IBP04',
+          'name': 'Immunity Booster Pack',
+          'category': 'Immunity & Wellness',
+          'description': 'Organic wellness daily defense formula with citrus, ginger, turmeric and herbal antioxidants.',
+          'base_price': 18500.0,
+          'reorder_level': 8,
+          'low_stock_threshold': 5,
+        },
+        {
+          'id': 'd5555555-5555-4555-8555-555555555555',
+          'company_id': '11111111-1111-4111-8111-111111111111',
+          'sku': 'SKU-SFM05',
+          'name': 'SlimFit Herbal Metabolism Pack',
+          'category': 'Weight Management',
+          'description': 'Targeted green herbal thermogenic blend promoting natural calorie burning and energy support.',
+          'base_price': 12500.0,
+          'reorder_level': 6,
+          'low_stock_threshold': 4,
+        }
+      ]);
+      print('✅ Products catalog seeded');
+    } catch (e) {
+      print('ℹ️ Products notice: $e');
+    }
+
+    // 5. Orders (Diverse States: in_transit, accepted, delivered, call_back, failed)
+    try {
+      await client.from('orders').upsert([
+        {
+          'id': '20202020-2020-4020-8020-202020202020',
+          'company_id': '11111111-1111-4111-8111-111111111111',
+          'order_number': 'TRK-8924',
+          'delivery_agent_id': 'b1111111-1111-4111-8111-111111111111',
+          'distribution_center_id': '22222222-2222-4222-8222-222222222222',
+          'customer_name': 'Chief Aliyu Mohammed',
+          'customer_phone': '08031234567',
+          'customer_alt_phone': '08099887766',
+          'delivery_state': 'Abuja (FCT)',
+          'delivery_city': 'Wuse 2',
+          'delivery_address': 'Plot 402 Aminu Kano Crescent, Near KFC, Wuse 2, Abuja',
+          'product_name': 'Respira Detox Tea',
+          'quantity': 3,
+          'base_price': 45000.0,
+          'upsell_amount': 10000.0,
+          'total_amount': 55000.0,
+          'payment_type': 'pay_on_delivery',
+          'payment_status': 'pending',
+          'status': 'in_transit',
+          'delivery_notes': 'Call 10 minutes before arrival. Gate code #402.',
+        },
+        {
+          'id': '20202020-2020-4020-8020-303030303030',
+          'company_id': '11111111-1111-4111-8111-111111111111',
+          'order_number': 'TRK-8925',
+          'delivery_agent_id': 'b1111111-1111-4111-8111-111111111111',
+          'distribution_center_id': '22222222-2222-4222-8222-222222222222',
+          'customer_name': 'Dr. Aisha Garba',
+          'customer_phone': '08129990011',
+          'delivery_state': 'Abuja (FCT)',
+          'delivery_city': 'Maitama',
+          'delivery_address': '12 Aguiyi Ironsi Street, Maitama, Abuja',
+          'product_name': 'Grazer Herbal Tea',
+          'quantity': 2,
+          'base_price': 30000.0,
+          'upsell_amount': 5000.0,
+          'total_amount': 35000.0,
+          'payment_type': 'pay_on_delivery',
+          'payment_status': 'pending',
+          'status': 'accepted',
+          'delivery_notes': 'Intake completed at Wuse DC. Vehicle loaded.',
+        },
+        {
+          'id': '20202020-2020-4020-8020-404040404040',
+          'company_id': '11111111-1111-4111-8111-111111111111',
+          'order_number': 'TRK-8921',
+          'delivery_agent_id': 'b1111111-1111-4111-8111-111111111111',
+          'distribution_center_id': '22222222-2222-4222-8222-222222222222',
+          'customer_name': 'Engr. Nnamdi Eze',
+          'customer_phone': '07065554433',
+          'delivery_state': 'Abuja (FCT)',
+          'delivery_city': 'Garki II',
+          'delivery_address': 'Suite B12, Gimbiya Street, Garki II, Abuja',
+          'product_name': 'Respira Detox Tea',
+          'quantity': 4,
+          'base_price': 60000.0,
+          'upsell_amount': 15000.0,
+          'total_amount': 75000.0,
+          'payment_type': 'pay_on_delivery',
+          'payment_status': 'paid',
+          'status': 'delivered',
+          'delivery_notes': 'Delivered successfully. POD cash collected in full.',
+        },
+        {
+          'id': '20202020-2020-4020-8020-505050505050',
+          'company_id': '11111111-1111-4111-8111-111111111111',
+          'order_number': 'TRK-8920',
+          'delivery_agent_id': 'b1111111-1111-4111-8111-111111111111',
+          'distribution_center_id': '22222222-2222-4222-8222-222222222222',
+          'customer_name': 'Mrs. Folake Adebayo',
+          'customer_phone': '08051112233',
+          'delivery_state': 'Abuja (FCT)',
+          'delivery_city': 'Asokoro',
+          'delivery_address': '8 Yakubu Gowon Crescent, Asokoro, Abuja',
+          'product_name': 'Immunity Booster Pack',
+          'quantity': 1,
+          'base_price': 18000.0,
+          'upsell_amount': 0.0,
+          'total_amount': 18000.0,
+          'payment_type': 'pay_on_delivery',
+          'payment_status': 'pending',
+          'status': 'call_back',
+          'delivery_notes': 'Customer requested callback at 4:30 PM after office meeting.',
+        }
+      ]);
+      print('✅ Orders seeded');
+    } catch (e) {
+      print('ℹ️ Orders notice: $e');
+    }
+
+    // 6. Cash Remittances
+    try {
+      await client.from('cash_remittances').upsert([
+        {
+          'id': '40404040-4040-4040-8040-505050505050',
+          'company_id': '11111111-1111-4111-8111-111111111111',
+          'delivery_agent_id': 'b1111111-1111-4111-8111-111111111111',
+          'reference_number': 'RMT-0005',
+          'amount': 25000.0,
+          'gross_collections': 45000.0,
+          'commission_deducted': 8000.0,
+          'transport_allowance_deducted': 12000.0,
+          'payment_method': 'bank_transfer',
+          'status': 'pending',
+          'notes': 'Bank transfer awaiting DC Finance receipt confirmation.',
+        },
+        {
+          'id': '40404040-4040-4040-8040-404040404040',
+          'company_id': '11111111-1111-4111-8111-111111111111',
+          'delivery_agent_id': 'b1111111-1111-4111-8111-111111111111',
+          'reference_number': 'RMT-0004',
+          'amount': 15000.0,
+          'gross_collections': 30000.0,
+          'commission_deducted': 6000.0,
+          'transport_allowance_deducted': 9000.0,
+          'payment_method': 'bank_transfer',
+          'status': 'approved',
+          'verified_by_name': 'Wuse DC Finance Desk',
+          'notes': 'Bank transfer verified & reconciled by Wuse DC Finance desk.',
+        }
+      ]);
+      print('✅ Cash remittances seeded');
+    } catch (e) {
+      print('ℹ️ Cash Remittances notice: $e');
+    }
+
+    // 7. Notifications
+    try {
+      await client.from('notifications').upsert([
+        {
+          'id': '50505050-5050-4050-8050-101010101010',
+          'company_id': '11111111-1111-4111-8111-111111111111',
+          'title': 'New Delivery Assigned 📦',
+          'message': 'Order TRK-8925 (Dr. Aisha Garba) in Maitama has been assigned to your queue.',
+          'category': 'delivery',
+          'is_read': false,
+          'action_route': '/orders',
+        },
+        {
+          'id': '50505050-5050-4050-8050-202020202020',
+          'company_id': '11111111-1111-4111-8111-111111111111',
+          'title': 'Remittance Approved ✓',
+          'message': 'Your cash remittance of ₦15,000 (RMT-0004) has been verified and reconciled by Wuse DC Finance desk.',
+          'category': 'finance',
+          'is_read': false,
+          'action_route': '/cash/history',
+        },
+        {
+          'id': '50505050-5050-4050-8050-303030303030',
+          'company_id': '11111111-1111-4111-8111-111111111111',
+          'title': 'Stock Replenishment Ready 🏷️',
+          'message': 'Transfer request REQ-00482 (20x Respira, 15x Grazer) is packaged and ready for pickup at Wuse DC counter.',
+          'category': 'stock',
+          'is_read': false,
+          'action_route': '/orders/scan',
+        },
+        {
+          'id': '50505050-5050-4050-8050-404040404040',
+          'company_id': '11111111-1111-4111-8111-111111111111',
+          'title': 'Security & Field Alert ⚠️',
+          'message': 'Severe rain advisory in Lekki/Ajah expressway. Maintain speed safety and verify waterproof package seals.',
+          'category': 'system',
+          'is_read': true,
+        }
+      ]);
+      print('✅ Notifications seeded');
+    } catch (e) {
+      print('ℹ️ Notifications notice: $e');
+    }
+
+    print('🎉 Master Database Seeding Test Completed!');
+  });
+}

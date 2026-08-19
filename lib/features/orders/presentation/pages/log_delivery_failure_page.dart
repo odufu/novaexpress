@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../../core/theme/app_theme.dart';
+import '../../../../core/constants/supabase_constants.dart';
 import '../../../../core/providers/navigation_provider.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_logo_widget.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/entities/order.dart';
 import '../providers/orders_provider.dart';
 
@@ -73,9 +75,28 @@ class _LogDeliveryFailurePageState extends ConsumerState<LogDeliveryFailurePage>
       _isLoading = true;
     });
 
-    await ref.read(ordersProvider.notifier).updateOrderStatus(
-          widget.orderId,
-          'failed',
+    final authState = ref.read(authProvider);
+    final agentId = authState.user?.deliveryAgentId ?? authState.user?.id ?? SupabaseConstants.defaultDeliveryAgentId;
+    final formattedNotes = _notesController.text.trim().isNotEmpty
+        ? '[$_selectedReason] ${_notesController.text.trim()}'
+        : '[$_selectedReason] Delivery failure reported by PDA.';
+
+    String reasonCode = 'other';
+    if (_selectedReason == 'Customer Unavailable') {
+      reasonCode = 'customer_unavailable';
+    } else if (_selectedReason == 'Wrong / Incomplete Address') {
+      reasonCode = 'wrong_address';
+    } else if (_selectedReason == 'Customer Rescheduled') {
+      reasonCode = 'rescheduled';
+    } else if (_selectedReason == 'Payment Refused') {
+      reasonCode = 'cash_shortfall';
+    }
+
+    await ref.read(ordersProvider.notifier).logDeliveryFailure(
+          orderId: widget.orderId,
+          agentId: agentId,
+          reasonCode: reasonCode,
+          notes: formattedNotes,
         );
 
     await Future.delayed(const Duration(milliseconds: 600));

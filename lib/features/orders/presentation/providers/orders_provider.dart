@@ -49,12 +49,11 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     await loadOrders();
   }
 
-  Future<void> loadOrders() async {
+  Future<void> loadOrders([String? agentId]) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      final orderEntities = await _repository.getAssignedOrders(
-        SupabaseConstants.defaultDeliveryAgentId,
-      );
+      final targetAgentId = agentId ?? SupabaseConstants.defaultDeliveryAgentId;
+      final orderEntities = await _repository.getAssignedOrders(targetAgentId);
       state = state.copyWith(isLoading: false, orders: orderEntities);
     } catch (e) {
       state = state.copyWith(
@@ -64,10 +63,20 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     }
   }
 
-  Future<void> updateOrderStatus(String orderId, String newStatus) async {
+  Future<void> updateOrderStatus(
+    String orderId,
+    String newStatus, {
+    String? paymentStatus,
+    String? notes,
+  }) async {
     state = state.copyWith(isLoading: true);
     try {
-      await _repository.updateOrderStatus(orderId, newStatus);
+      await _repository.updateOrderStatus(
+        orderId,
+        newStatus,
+        paymentStatus: paymentStatus,
+        notes: notes,
+      );
       final updatedList = state.orders.map((o) {
         if (o.id == orderId || o.orderNumber == orderId) {
           return OrderEntity(
@@ -79,14 +88,24 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
             deliveryCity: o.deliveryCity,
             deliveryState: o.deliveryState,
             deliveryAddress: o.deliveryAddress,
+            landmark: o.landmark,
+            lga: o.lga,
+            productName: o.productName,
             status: newStatus,
             quantity: o.quantity,
+            paidQuantity: o.paidQuantity,
+            freeQuantity: o.freeQuantity,
             basePrice: o.basePrice,
             upsellAmount: o.upsellAmount,
             totalAmount: o.totalAmount,
             paymentType: o.paymentType,
-            paymentStatus: newStatus == 'delivered' ? 'collected' : o.paymentStatus,
-            deliveryNotes: o.deliveryNotes,
+            paymentStatus: paymentStatus ?? (newStatus == 'delivered' ? 'paid' : o.paymentStatus),
+            fulfillmentType: o.fulfillmentType,
+            clientName: o.clientName,
+            packageCustodyId: o.packageCustodyId,
+            clientDeliveryFee: o.clientDeliveryFee,
+            agentEntitlement: o.agentEntitlement,
+            deliveryNotes: notes ?? o.deliveryNotes,
             createdAt: o.createdAt,
           );
         }
@@ -95,6 +114,134 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
       state = state.copyWith(isLoading: false, orders: updatedList);
     } catch (e) {
       state = state.copyWith(isLoading: false);
+    }
+  }
+
+  Future<Map<String, dynamic>> confirmDeliveryPod({
+    required String orderId,
+    required String agentId,
+    required String paymentType,
+    required String paymentMethod,
+    required double amountCollected,
+    String? customerSignatureUrl,
+    String? photoProofUrl,
+    String? notes,
+  }) async {
+    state = state.copyWith(isLoading: true);
+    try {
+      final result = await _repository.confirmDeliveryPod(
+        orderId: orderId,
+        agentId: agentId,
+        paymentType: paymentType,
+        paymentMethod: paymentMethod,
+        amountCollected: amountCollected,
+        customerSignatureUrl: customerSignatureUrl,
+        photoProofUrl: photoProofUrl,
+        notes: notes,
+      );
+
+      final updatedList = state.orders.map((o) {
+        if (o.id == orderId || o.orderNumber == orderId) {
+          return OrderEntity(
+            id: o.id,
+            orderNumber: o.orderNumber,
+            customerName: o.customerName,
+            customerPhone: o.customerPhone,
+            customerAltPhone: o.customerAltPhone,
+            deliveryCity: o.deliveryCity,
+            deliveryState: o.deliveryState,
+            deliveryAddress: o.deliveryAddress,
+            landmark: o.landmark,
+            lga: o.lga,
+            productName: o.productName,
+            status: 'delivered',
+            quantity: o.quantity,
+            paidQuantity: o.paidQuantity,
+            freeQuantity: o.freeQuantity,
+            basePrice: o.basePrice,
+            upsellAmount: o.upsellAmount,
+            totalAmount: o.totalAmount,
+            paymentType: paymentType,
+            paymentStatus: 'paid',
+            fulfillmentType: o.fulfillmentType,
+            clientName: o.clientName,
+            packageCustodyId: o.packageCustodyId,
+            clientDeliveryFee: o.clientDeliveryFee,
+            agentEntitlement: o.agentEntitlement,
+            deliveryNotes: notes ?? o.deliveryNotes,
+            createdAt: o.createdAt,
+          );
+        }
+        return o;
+      }).toList();
+
+      state = state.copyWith(isLoading: false, orders: updatedList);
+      return result;
+    } catch (e) {
+      state = state.copyWith(isLoading: false);
+      return {'status': 'error', 'error': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> logDeliveryFailure({
+    required String orderId,
+    required String agentId,
+    required String reasonCode,
+    String? notes,
+    String? scheduledCallbackAt,
+  }) async {
+    state = state.copyWith(isLoading: true);
+    final isCallback = reasonCode == 'rescheduled' || scheduledCallbackAt != null;
+    final newStatus = isCallback ? 'call_back' : 'failed';
+    try {
+      final result = await _repository.logDeliveryFailure(
+        orderId: orderId,
+        agentId: agentId,
+        reasonCode: reasonCode,
+        notes: notes,
+        scheduledCallbackAt: scheduledCallbackAt,
+      );
+
+      final updatedList = state.orders.map((o) {
+        if (o.id == orderId || o.orderNumber == orderId) {
+          return OrderEntity(
+            id: o.id,
+            orderNumber: o.orderNumber,
+            customerName: o.customerName,
+            customerPhone: o.customerPhone,
+            customerAltPhone: o.customerAltPhone,
+            deliveryCity: o.deliveryCity,
+            deliveryState: o.deliveryState,
+            deliveryAddress: o.deliveryAddress,
+            landmark: o.landmark,
+            lga: o.lga,
+            productName: o.productName,
+            status: newStatus,
+            quantity: o.quantity,
+            paidQuantity: o.paidQuantity,
+            freeQuantity: o.freeQuantity,
+            basePrice: o.basePrice,
+            upsellAmount: o.upsellAmount,
+            totalAmount: o.totalAmount,
+            paymentType: o.paymentType,
+            paymentStatus: o.paymentStatus,
+            fulfillmentType: o.fulfillmentType,
+            clientName: o.clientName,
+            packageCustodyId: o.packageCustodyId,
+            clientDeliveryFee: o.clientDeliveryFee,
+            agentEntitlement: o.agentEntitlement,
+            deliveryNotes: notes ?? o.deliveryNotes,
+            createdAt: o.createdAt,
+          );
+        }
+        return o;
+      }).toList();
+
+      state = state.copyWith(isLoading: false, orders: updatedList);
+      return result;
+    } catch (e) {
+      state = state.copyWith(isLoading: false);
+      return {'status': 'error', 'error': e.toString()};
     }
   }
 }

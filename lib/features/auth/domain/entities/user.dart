@@ -8,6 +8,16 @@ class UserEntity {
   final String role;
   final String? companyId;
   final String? deliveryAgentId;
+  final String? deliveryAgentCode;
+  final String? distributionCenterName;
+  final int? lifetimeDeliveriesCount;
+  final double? rating;
+  final String personnelType; // 'pda' (own vehicle) | 'in_house_rider' (company bike)
+  final String compensationType; // 'commission' | 'salary' | 'hybrid'
+  final double commissionRate; // e.g. 1000.0 (PDA) or 500.0 (Rider)
+  final double transportAllowance; // e.g. 1500.0 (PDA transport)
+  final double fuelAllowance; // e.g. 800.0 (Rider fuel)
+  final double baseSalary; // e.g. 150000.0
 
   const UserEntity({
     required this.id,
@@ -19,7 +29,19 @@ class UserEntity {
     required this.role,
     this.companyId,
     this.deliveryAgentId,
+    this.deliveryAgentCode = 'PDA-7000',
+    this.distributionCenterName = 'Wuse DC',
+    this.lifetimeDeliveriesCount = 4892,
+    this.rating = 4.9,
+    this.personnelType = 'pda',
+    this.compensationType = 'commission',
+    this.commissionRate = 1000.0,
+    this.transportAllowance = 1500.0,
+    this.fuelAllowance = 800.0,
+    this.baseSalary = 150000.0,
   });
 
   String get fullName => '$firstName $lastName'.trim();
+  bool get isPda => personnelType == 'pda';
+  bool get isInHouseRider => personnelType == 'in_house_rider';
 }

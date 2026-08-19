@@ -26,15 +26,21 @@ class _LoginFormState extends ConsumerState<LoginForm> {
   }
 
   void _submit() async {
+    debugPrint('[AUTH_UI] 🚀 "Sign In" button tapped. Running form validation...');
     if (_formKey.currentState!.validate()) {
-      final success = await ref.read(authProvider.notifier).login(
-            _agentIdController.text.trim(),
-            _passwordController.text,
-          );
+      final email = _agentIdController.text.trim();
+      final password = _passwordController.text;
+      debugPrint('[AUTH_UI] 📝 Form valid. Dispatching login request for: "$email", PasswordLength=${password.length}, RememberMe=$_rememberMe');
 
+      final success = await ref.read(authProvider.notifier).login(email, password);
+
+      debugPrint('[AUTH_UI] 🎯 authProvider.login() completed -> success: $success');
       if (success && mounted) {
+        debugPrint('[AUTH_UI] 🚀 Navigating user to dashboard via context.go(\'/\')...');
         context.go('/');
       }
+    } else {
+      debugPrint('[AUTH_UI] ⚠️ Form validation failed. Missing required fields.');
     }
   }
 

@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../core/widgets/app_logo_widget.dart';
 import '../../../../core/widgets/app_skeleton_loader.dart';
 import '../../domain/entities/stock_item.dart';
 import '../providers/stock_provider.dart';
@@ -13,15 +12,16 @@ class StockDetailsGrazerPage extends ConsumerWidget {
 
   const StockDetailsGrazerPage({
     super.key,
-    this.productName = 'Grazer Herbal Tea',
+    this.productName = 'Respira Detox Tea',
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final stockState = ref.watch(stockProvider);
 
-    // Safe loop lookup matching product name from database state
+    // Find matched item
     StockItemEntity? matchedItem;
     for (final item in stockState.stockItems) {
       if (item.name.toLowerCase() == productName.toLowerCase()) {
@@ -32,40 +32,37 @@ class StockDetailsGrazerPage extends ConsumerWidget {
     final item = matchedItem ?? (stockState.stockItems.isNotEmpty ? stockState.stockItems.first : null);
 
     final String displayName = item?.name ?? productName;
-    final String displaySku = item?.sku ?? 'SKU: GRAZER-001';
+    final String displaySku = item?.sku ?? 'RDT-001';
     final String displayDesc = (item != null && item.description.isNotEmpty)
         ? item.description
-        : 'Premium organic herbal tea blend formulated for colon detox and digestive health. Store in cool, dry conditions.';
-    final int heldCount = item?.quantityHeld ?? 20;
-    final int availableCount = item?.availableCount ?? 8;
-    final int allocatedCount = item?.allocatedCount ?? 12;
+        : 'Premium organic herbal blend formulated for detox, purification, and daily wellness. Store in cool, dry conditions.';
+    final int assigned = item?.assignedCount ?? 0;
+    final int delivered = item?.deliveredCount ?? 0;
+    final int available = item?.availableCount ?? 0;
+    final int returned = item?.returnedCount ?? 0;
+    final String? imageAsset = item?.imageAsset;
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
       appBar: AppBar(
-        backgroundColor: theme.appBarTheme.backgroundColor,
-        elevation: 0.5,
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_rounded, color: theme.colorScheme.onSurface),
+          icon: Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: theme.colorScheme.onSurface),
           onPressed: () => context.pop(),
         ),
         title: Text(
-          'STOCK DETAILS',
-          style: TextStyle(
+          'Product Details',
+          style: GoogleFonts.inter(
             color: theme.colorScheme.onSurface,
-            fontSize: 16,
+            fontSize: 18,
             fontWeight: FontWeight.bold,
-            letterSpacing: 1.2,
           ),
         ),
-        centerTitle: true,
         actions: [
-          const Padding(
-            padding: EdgeInsets.only(right: 16),
-            child: AppLogoWidget(
-              variant: AppLogoVariant.landscape,
-              height: 24,
-            ),
+          IconButton(
+            icon: Icon(Icons.more_vert_rounded, color: theme.colorScheme.onSurface),
+            onPressed: () {},
           ),
         ],
       ),
@@ -74,225 +71,97 @@ class StockDetailsGrazerPage extends ConsumerWidget {
               padding: EdgeInsets.all(16),
               child: Column(
                 children: [
+                  AppSkeletonLoader(width: double.infinity, height: 180, borderRadius: 16),
+                  SizedBox(height: 16),
+                  AppSkeletonLoader(width: double.infinity, height: 120, borderRadius: 16),
+                  SizedBox(height: 16),
                   AppSkeletonLoader(width: double.infinity, height: 140, borderRadius: 16),
-                  SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(child: AppSkeletonLoader(width: double.infinity, height: 90, borderRadius: 16)),
-                      SizedBox(width: 12),
-                      Expanded(child: AppSkeletonLoader(width: double.infinity, height: 90, borderRadius: 16)),
-                    ],
-                  ),
-                  SizedBox(height: 16),
-                  AppSkeletonLoader(width: double.infinity, height: 80, borderRadius: 16),
                 ],
               ),
             )
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Product Header Card
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: theme.cardColor,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.15)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    displaySku.toUpperCase(),
-                                    style: GoogleFonts.jetBrainsMono(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      color: theme.colorScheme.onSurfaceVariant,
-                                      letterSpacing: 1,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    displayName,
-                                    style: TextStyle(
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.bold,
-                                      color: theme.colorScheme.onSurface,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: AppColors.orange.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Icon(Icons.eco_rounded, color: AppColors.orange, size: 24),
-                            ),
-                          ],
+                  // Product Image Hero
+                  Center(
+                    child: Container(
+                      width: 140,
+                      height: 160,
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
                         ),
-                        const SizedBox(height: 12),
-                        Text(
-                          displayDesc,
-                          style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13),
-                        ),
-                      ],
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(15),
+                        child: imageAsset != null
+                            ? Image.asset(
+                                imageAsset,
+                                fit: BoxFit.contain,
+                                errorBuilder: (_, __, ___) => const Icon(
+                                  Icons.inventory_2_rounded,
+                                  size: 64,
+                                  color: AppColors.primary,
+                                ),
+                              )
+                            : const Icon(
+                                Icons.inventory_2_rounded,
+                                size: 64,
+                                color: AppColors.primary,
+                              ),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
 
-                  // Inventory Stats Grid
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: theme.cardColor,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.15)),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'TOTAL HELD',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.baseline,
-                                textBaseline: TextBaseline.alphabetic,
-                                children: [
-                                  Text(
-                                    '$heldCount',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 28,
-                                      fontWeight: FontWeight.bold,
-                                      color: theme.colorScheme.onSurface,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Units',
-                                    style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: theme.cardColor,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: AppColors.primary, width: 2),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'AVAILABLE',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.baseline,
-                                textBaseline: TextBaseline.alphabetic,
-                                children: [
-                                  Text(
-                                    '$availableCount',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 28,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.orange,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Units',
-                                    style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Allocated Card
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: theme.cardColor,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.15)),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  // Product Header Info
+                  Center(
+                    child: Column(
                       children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: theme.colorScheme.surfaceContainer,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.pending_actions_rounded, color: AppColors.orange, size: 20),
-                            ),
-                            const SizedBox(width: 12),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'ALLOCATED TO ORDERS',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                                Text(
-                                  'Assigned for dispatch',
-                                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
                         Text(
-                          '$allocatedCount Units',
-                          style: GoogleFonts.jetBrainsMono(
-                            fontSize: 18,
+                          displayName,
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.inter(
+                            fontSize: 22,
                             fontWeight: FontWeight.bold,
                             color: theme.colorScheme.onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'SKU: $displaySku',
+                            style: GoogleFonts.jetBrainsMono(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          displayDesc,
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            color: const Color(0xFF64748B),
+                            height: 1.4,
                           ),
                         ),
                       ],
@@ -300,75 +169,300 @@ class StockDetailsGrazerPage extends ConsumerWidget {
                   ),
                   const SizedBox(height: 24),
 
-                  // Recent Movements Section
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Recent Movements',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.onSurface,
-                        ),
-                      ),
-                      Text(
-                        'FILTER',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
+                  // AVAILABLE STOCK Card
                   Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: theme.cardColor,
+                      color: isDark ? const Color(0xFF1E293B) : Colors.white,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.15)),
+                      border: Border.all(
+                        color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                      ),
                     ),
                     child: Column(
                       children: [
-                        ListTile(
-                          leading: const CircleAvatar(
-                            backgroundColor: Color(0xFFFFDAD6),
-                            child: Icon(Icons.arrow_upward_rounded, color: Color(0xFFBA1A1A), size: 20),
-                          ),
-                          title: Text(
-                            'Issued for Order #NEX-8821',
-                            style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
-                          ),
-                          subtitle: Text('Today, 08:45 AM', style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant)),
-                          trailing: Text(
-                            '-$allocatedCount Units',
-                            style: GoogleFonts.jetBrainsMono(fontWeight: FontWeight.bold, color: const Color(0xFFBA1A1A), fontSize: 15),
+                        Text(
+                          'AVAILABLE STOCK',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.2,
+                            color: const Color(0xFF64748B),
                           ),
                         ),
-                        const Divider(height: 1),
-                        ListTile(
-                          leading: const CircleAvatar(
-                            backgroundColor: Color(0xFF9EF6B6),
-                            child: Icon(Icons.arrow_downward_rounded, color: Color(0xFF00522A), size: 20),
+                        const SizedBox(height: 8),
+                        Text(
+                          '$available',
+                          style: GoogleFonts.inter(
+                            fontSize: 40,
+                            fontWeight: FontWeight.w900,
+                            color: available > 0 ? const Color(0xFF16A34A) : const Color(0xFFE11D48),
                           ),
-                          title: Text(
-                            'Received from DC Warehouse',
-                            style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
+                        ),
+                        Text(
+                          'Units Available in Possession',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: const Color(0xFF64748B),
+                            fontWeight: FontWeight.w500,
                           ),
-                          subtitle: Text('Yesterday, 16:30 PM', style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant)),
-                          trailing: Text(
-                            '+$heldCount Units',
-                            style: GoogleFonts.jetBrainsMono(fontWeight: FontWeight.bold, color: const Color(0xFF00522A), fontSize: 15),
+                        ),
+                        const SizedBox(height: 18),
+                        // 2x2 Grid Summary
+                        Container(
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              _buildMatrixRow(
+                                'Assigned',
+                                '$assigned Units',
+                                'Delivered',
+                                '$delivered Units',
+                                isDark,
+                              ),
+                              Divider(
+                                height: 1,
+                                color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                              ),
+                              _buildMatrixRow(
+                                'Returned',
+                                '$returned Units',
+                                'Available',
+                                '$available Units',
+                                isDark,
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
+                  const SizedBox(height: 24),
+
+                  // STOCK ACTIVITY Header
+                  Text(
+                    'STOCK ACTIVITY',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.8,
+                      color: const Color(0xFF475569),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Stock Activity Timeline
+                  Container(
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        _buildActivityTile(
+                          day: 'Today',
+                          quantityText: '− 2 units',
+                          actionText: 'Delivered • TRK-8925',
+                          isPositive: false,
+                          isDark: isDark,
+                        ),
+                        Divider(
+                          height: 1,
+                          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                        ),
+                        _buildActivityTile(
+                          day: 'Today',
+                          quantityText: '+ 10 units',
+                          actionText: 'Stock Received • INV-0021',
+                          isPositive: true,
+                          isDark: isDark,
+                        ),
+                        Divider(
+                          height: 1,
+                          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                        ),
+                        _buildActivityTile(
+                          day: 'Yesterday',
+                          quantityText: '− 3 units',
+                          actionText: 'Delivered • TRK-8919',
+                          isPositive: false,
+                          isDark: isDark,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Action Buttons Row
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            context.push('/stock/history');
+                          },
+                          icon: const Icon(Icons.history_rounded, size: 16, color: AppColors.primary),
+                          label: Text(
+                            'Full History',
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: AppColors.primary, width: 1.2),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            context.push('/orders');
+                          },
+                          icon: const Icon(Icons.local_shipping_rounded, size: 16, color: Colors.white),
+                          label: Text(
+                            'Deliveries',
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
                 ],
               ),
             ),
+    );
+  }
+
+  Widget _buildMatrixRow(String label1, String val1, String label2, String val2, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  label1,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: const Color(0xFF64748B),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                Text(
+                  val1,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : const Color(0xFF1E293B),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 24),
+          Expanded(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  label2,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: const Color(0xFF64748B),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                Text(
+                  val2,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : const Color(0xFF1E293B),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActivityTile({
+    required String day,
+    required String quantityText,
+    required String actionText,
+    required bool isPositive,
+    required bool isDark,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              day,
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF64748B),
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(
+              actionText,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white : const Color(0xFF1E293B),
+              ),
+            ),
+          ),
+          Text(
+            quantityText,
+            style: GoogleFonts.jetBrainsMono(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: isPositive ? const Color(0xFF16A34A) : const Color(0xFFE11D48),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

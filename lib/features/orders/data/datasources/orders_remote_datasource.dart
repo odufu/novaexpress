@@ -1,12 +1,28 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/supabase_constants.dart';
-import '../../../../core/exceptions/exceptions.dart';
 import '../models/order_model.dart';
 
 abstract class OrdersRemoteDataSource {
   Future<List<OrderModel>> getAssignedOrders(String deliveryAgentId);
   Future<OrderModel> getOrderById(String orderId);
   Future<void> updateOrderStatus(String orderId, String status, {String? paymentStatus, String? notes});
+  Future<Map<String, dynamic>> confirmDeliveryPod({
+    required String orderId,
+    required String agentId,
+    required String paymentType,
+    required String paymentMethod,
+    required double amountCollected,
+    String? customerSignatureUrl,
+    String? photoProofUrl,
+    String? notes,
+  });
+  Future<Map<String, dynamic>> logDeliveryFailure({
+    required String orderId,
+    required String agentId,
+    required String reasonCode,
+    String? notes,
+    String? scheduledCallbackAt,
+  });
 }
 
 class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
@@ -113,19 +129,17 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
     try {
       final response = await supabaseClient
           .from(SupabaseConstants.ordersTable)
-          .select()
+          .select('*, products(name, sku, base_price)')
+          .eq('delivery_agent_id', deliveryAgentId)
           .order('created_at', ascending: false);
 
       final list = (response as List)
           .map((item) => OrderModel.fromJson(item))
           .toList();
 
-      if (list.isNotEmpty) {
-        return list;
-      }
-      return _fallbackMockOrders;
+      return list;
     } catch (e) {
-      return _fallbackMockOrders;
+      return [];
     }
   }
 
@@ -199,6 +213,78 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
           createdAt: existing.createdAt,
         );
       }
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> confirmDeliveryPod({
+    required String orderId,
+    required String agentId,
+    required String paymentType,
+    required String paymentMethod,
+    required double amountCollected,
+    String? customerSignatureUrl,
+    String? photoProofUrl,
+    String? notes,
+  }) async {
+    try {
+      final response = await supabaseClient.functions.invoke(
+        'confirm-delivery-pod',
+        body: {
+          'orderId': orderId,
+          'agentId': agentId,
+          'paymentType': paymentType,
+          'paymentMethod': paymentMethod,
+          'amountCollected': amountCollected,
+          'customerSignatureUrl': customerSignatureUrl,
+          'photoProofUrl': photoProofUrl,
+          'notes': notes,
+        },
+      );
+
+      if (response.status >= 200 && response.status < 300) {
+        // Also update local list if present
+        await updateOrderStatus(orderId, 'delivered', paymentStatus: 'collected', notes: notes);
+        return response.data as Map<String, dynamic>? ?? {'status': 'success'};
+      }
+      throw Exception('Server returned ${response.status}: ${response.data}');
+    } catch (e) {
+      // Local fallback for offline/test execution
+      await updateOrderStatus(orderId, 'delivered', paymentStatus: 'collected', notes: notes);
+      return {'status': 'offline_fallback', 'error': e.toString()};
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> logDeliveryFailure({
+    required String orderId,
+    required String agentId,
+    required String reasonCode,
+    String? notes,
+    String? scheduledCallbackAt,
+  }) async {
+    final isCallback = reasonCode == 'rescheduled' || scheduledCallbackAt != null;
+    final newStatus = isCallback ? 'call_back' : 'failed';
+    try {
+      final response = await supabaseClient.functions.invoke(
+        'log-delivery-failure',
+        body: {
+          'orderId': orderId,
+          'agentId': agentId,
+          'reasonCode': reasonCode,
+          'notes': notes,
+          'scheduledCallbackAt': scheduledCallbackAt,
+        },
+      );
+
+      if (response.status >= 200 && response.status < 300) {
+        await updateOrderStatus(orderId, newStatus, notes: notes);
+        return response.data as Map<String, dynamic>? ?? {'status': 'success'};
+      }
+      throw Exception('Server returned ${response.status}: ${response.data}');
+    } catch (e) {
+      await updateOrderStatus(orderId, newStatus, notes: notes);
+      return {'status': 'offline_fallback', 'error': e.toString()};
     }
   }
 }

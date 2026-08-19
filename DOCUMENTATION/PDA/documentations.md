@@ -2,13 +2,21 @@
 
 ## Product Requirements Document — Phase 1: PDA Mobile Application
 
-**Product:** NovaExpress Logistics PDA App
-**Phase:** Phase 1 — Personal Distribution Agent (PDA)
-**Market:** Nigeria
-**Currency:** Nigerian Naira (₦ / NGN)
-**Primary HQ:** Abuja, Nigeria
-**Initial POD Products:** Grazer Herbal Tea, Respira, Alpha Man
-**Product Catalogue:** Extensible; additional products will be added later
+**Product:** NovaExpress Logistics PDA App  
+**Phase:** Phase 1 — Personal Distribution Agent (PDA)  
+**Market:** Nigeria  
+**Currency:** Nigerian Naira (₦ / NGN)  
+**Primary HQ:** Abuja, Nigeria  
+**Initial POD Products:** Grazer Herbal Tea, Respira, Alpha Man  
+**Product Catalogue:** Extensible; additional products will be added later  
+
+---
+
+### 📚 Core Technical Architecture & Database Schema Documents
+- 🗄️ **[Database Schema & Entity Interdependence](file:///c:/PROJECT/NoveXPS/DOCUMENTATION/PDA/DATABASE_SCHEMA_AND_DEPENDENCIES.md)**: Full PostgreSQL / Supabase relational DDL, Mermaid ER diagrams, table schemas, triggers, indexes, and RLS policies.
+- 🗺️ **[Function to Database & API Mapping](file:///c:/PROJECT/NoveXPS/DOCUMENTATION/PDA/FUNCTION_TO_DATABASE_MAPPING.md)**: Exhaustive screen-by-screen, button-by-button mapping of all UI widgets and providers to SQL queries, mutations, and side-effects.
+- 🔄 **[System Workflows & State Machines](file:///c:/PROJECT/NoveXPS/DOCUMENTATION/PDA/SYSTEM_WORKFLOWS_AND_STATE_MACHINES.md)**: End-to-end payment sequence diagrams (Cash POD vs Monnify Dynamic NUBAN), stock handover/return lifecycle, remittance settlement, and payout workflows.
+- 💾 **[Database Migration SQL](file:///c:/PROJECT/NoveXPS/supabase/migrations/20260819180000_full_schema_pda_system.sql)** & **[Database Seed SQL](file:///c:/PROJECT/NoveXPS/supabase/migrations/20260819183000_seed_data_all_modules.sql)**
 
 ---
 
@@ -1646,3 +1654,19 @@ The final Figma deliverable for Phase 1 should contain:
 **20. Success States**
 
 The designer should treat **POD payment, physical stock accountability, free-product quantities, and delivery status** as the highest-priority interaction areas because these are where NovaExpress has the greatest operational and financial risk.
+
+---
+
+# 63. Direct Monnify Transfer Payments & Rider Balance Ledger
+
+### Direct Transfer via Monnify Dynamic Virtual Account
+* At the end of every delivery where the customer opts to pay via bank transfer, the PDA app fetches/generates a **dynamic virtual bank account number (powered by Monnify)** specific to that delivery order.
+* The customer transfers funds directly into NovaExpress's company account.
+* Once the transfer is confirmed via webhook:
+  - **No physical cash remittance is required from the rider** (rider holds ₦0.00 cash).
+  - The company credits the rider's earned delivery commission and transport allowance to the **"My Balance" (Rider Balance)** ledger.
+
+### Rider Balance & Payout Request Workflow
+* Accrued earnings from direct company payments and approved allowances are clearly visible in the **"My Balance"** card within the Remittance module.
+* Riders can tap **"Request Payout"**, enter their personal bank account details, and submit a withdrawal request.
+* Payout requests are verified and approved by the Distribution Center (DC) Finance team before disbursement.

@@ -1,36 +1,56 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/splash_screen.dart';
+import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../features/dashboard/presentation/pages/main_bottom_nav_shell.dart';
 import '../../features/finance/presentation/pages/log_remittance_page.dart';
+import '../../features/finance/presentation/pages/payouts_page.dart';
 import '../../features/finance/presentation/pages/remittance_details_page.dart';
 import '../../features/finance/presentation/pages/remittance_history_page.dart';
+import '../../features/finance/presentation/pages/transaction_history_page.dart';
+import '../../features/notifications/presentation/pages/notifications_page.dart';
 import '../../features/orders/presentation/pages/confirm_delivery_pod_page.dart';
 import '../../features/orders/presentation/pages/log_delivery_failure_page.dart';
 import '../../features/orders/presentation/pages/order_detail_page.dart';
 import '../../features/orders/presentation/pages/orders_list_page.dart';
 import '../../features/orders/presentation/pages/scan_to_collect_page.dart';
+import '../../features/stock/presentation/pages/inventory_audit_page.dart';
+import '../../features/stock/presentation/pages/process_returns_page.dart';
+import '../../features/stock/presentation/pages/request_stock_page.dart';
 import '../../features/stock/presentation/pages/stock_details_grazer_page.dart';
+import '../../features/stock/presentation/pages/stock_handover_page.dart';
+import '../../features/stock/presentation/pages/stock_history_page.dart';
 import '../../features/users/presentation/pages/user_profile_page.dart';
 
-class AppRouter {
-  static final router = GoRouter(
+final routerProvider = Provider<GoRouter>((ref) {
+  final authState = ref.watch(authProvider);
+
+  return GoRouter(
     initialLocation: '/splash',
     redirect: (BuildContext context, GoRouterState state) {
-      final session = Supabase.instance.client.auth.currentSession;
+      Session? session;
+      try {
+        session = Supabase.instance.client.auth.currentSession;
+      } catch (_) {}
+      final isAuthenticated = authState.isAuthenticated || session != null;
       final isSplash = state.matchedLocation == '/splash';
       final isLoggingIn = state.matchedLocation == '/login' || state.matchedLocation == '/forgot-password';
+
+      debugPrint('[AUTH_ROUTER] 🚦 Route check: location="${state.matchedLocation}", isAuthenticated=$isAuthenticated (riverpod=${authState.isAuthenticated}, supabase=${session != null})');
 
       if (isSplash) {
         return null;
       }
-      if (session == null && !isLoggingIn) {
+      if (!isAuthenticated && !isLoggingIn) {
+        debugPrint('[AUTH_ROUTER] 🛑 Access denied for unauthenticated state -> Redirecting to /login');
         return '/login';
       }
-      if (session != null && isLoggingIn) {
+      if (isAuthenticated && isLoggingIn) {
+        debugPrint('[AUTH_ROUTER] ✅ Authenticated user on login screen -> Redirecting to /');
         return '/';
       }
       return null;
@@ -53,6 +73,10 @@ class AppRouter {
         builder: (context, state) => const MainBottomNavShell(),
       ),
       GoRoute(
+        path: '/notifications',
+        builder: (context, state) => const NotificationsPage(),
+      ),
+      GoRoute(
         path: '/profile',
         builder: (context, state) => const UserProfilePage(),
       ),
@@ -63,6 +87,14 @@ class AppRouter {
       GoRoute(
         path: '/cash/history',
         builder: (context, state) => const RemittanceHistoryPage(),
+      ),
+      GoRoute(
+        path: '/finance/payouts',
+        builder: (context, state) => const PayoutsPage(),
+      ),
+      GoRoute(
+        path: '/finance/transactions',
+        builder: (context, state) => const TransactionHistoryPage(),
       ),
       GoRoute(
         path: '/cash/remittance/:id',
@@ -76,11 +108,34 @@ class AppRouter {
         builder: (context, state) => const ScanToCollectPage(),
       ),
       GoRoute(
+        path: '/stock/request',
+        builder: (context, state) => const RequestStockPage(),
+      ),
+      GoRoute(
+        path: '/stock/handover/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id'] ?? 'REQ-00482';
+          return StockHandoverPage(requestId: id);
+        },
+      ),
+      GoRoute(
+        path: '/stock/audit',
+        builder: (context, state) => const InventoryAuditPage(),
+      ),
+      GoRoute(
+        path: '/stock/returns',
+        builder: (context, state) => const ProcessReturnsPage(),
+      ),
+      GoRoute(
         path: '/stock/details/:name',
         builder: (context, state) {
-          final name = state.pathParameters['name'] ?? 'Grazer Herbal Tea';
+          final name = state.pathParameters['name'] ?? 'Respira Detox Tea';
           return StockDetailsGrazerPage(productName: name);
         },
+      ),
+      GoRoute(
+        path: '/stock/history',
+        builder: (context, state) => const StockHistoryPage(),
       ),
       GoRoute(
         path: '/orders',
@@ -112,5 +167,12 @@ class AppRouter {
         ],
       ),
     ],
+  );
+});
+
+class AppRouter {
+  static GoRouter get router => GoRouter(
+    initialLocation: '/splash',
+    routes: [],
   );
 }
