@@ -35,63 +35,17 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
 
   FinanceRemoteDataSourceImpl(this.supabaseClient);
 
-  static final List<RemittanceModel> _fallbackRemittances = [
-    RemittanceModel(
-      id: 'f-rem-00481',
-      referenceNumber: 'REM-00481',
-      companyId: '11111111-1111-4111-8111-111111111111',
-      deliveryAgentId: SupabaseConstants.defaultDeliveryAgentId,
-      amount: 45000.0,
-      grossCollections: 90000.0,
-      commissionDeducted: 18000.0,
-      transportAllowanceDeducted: 27000.0,
-      paymentMethod: 'bank_transfer',
-      status: 'verified',
-      verifiedByName: 'Wuse DC — Operations',
-      notes: 'Bank Transfer to NovaExpress GTBank (Ref: TRX-829101). Fully verified.',
-      createdAt: DateTime.now().subtract(const Duration(days: 1)),
-      verifiedAt: DateTime.now().subtract(const Duration(days: 1, hours: -1)),
-    ),
-    RemittanceModel(
-      id: 'f-rem-00472',
-      referenceNumber: 'REM-00472',
-      companyId: '11111111-1111-4111-8111-111111111111',
-      deliveryAgentId: SupabaseConstants.defaultDeliveryAgentId,
-      amount: 32500.0,
-      grossCollections: 65000.0,
-      commissionDeducted: 13000.0,
-      transportAllowanceDeducted: 19500.0,
-      paymentMethod: 'cash_to_dc',
-      status: 'pending',
-      notes: 'Cash handed over at Wuse DC reception to Supervisor Adekunle. Awaiting audit closure.',
-      createdAt: DateTime.now().subtract(const Duration(days: 2)),
-    ),
-    RemittanceModel(
-      id: 'f-rem-00463',
-      referenceNumber: 'REM-00463',
-      companyId: '11111111-1111-4111-8111-111111111111',
-      deliveryAgentId: SupabaseConstants.defaultDeliveryAgentId,
-      amount: 28000.0,
-      grossCollections: 56000.0,
-      commissionDeducted: 11200.0,
-      transportAllowanceDeducted: 16800.0,
-      posFee: 100.0,
-      paymentMethod: 'pos',
-      status: 'verified',
-      verifiedByName: 'Ikeja DC Finance',
-      notes: 'POS transfer via Moniepoint POS Terminal (Ref: POS-839201). Receipt attached.',
-      createdAt: DateTime.now().subtract(const Duration(days: 3)),
-      verifiedAt: DateTime.now().subtract(const Duration(days: 3, hours: -2)),
-    ),
-  ];
-
   @override
   Future<List<RemittanceModel>> getAgentRemittances(String agentId) async {
     try {
+      final agentFilter = agentId.isNotEmpty
+          ? 'delivery_agent_id.eq.$agentId,delivery_agent_id.eq.b1111111-1111-4111-8111-111111111111,delivery_agent_id.is.null'
+          : 'delivery_agent_id.eq.b1111111-1111-4111-8111-111111111111,delivery_agent_id.is.null';
+
       final response = await supabaseClient
           .from(SupabaseConstants.cashRemittancesTable)
           .select()
-          .eq('delivery_agent_id', agentId)
+          .or(agentFilter)
           .order('created_at', ascending: false);
 
       final list = (response as List)
@@ -178,27 +132,8 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
           .single();
 
       return RemittanceModel.fromJson(response);
-    } catch (_) {
-      final fallback = RemittanceModel(
-        id: 'f-local-${DateTime.now().millisecondsSinceEpoch}',
-        referenceNumber: ref,
-        companyId: companyId,
-        deliveryAgentId: agentId,
-        amount: amount,
-        grossCollections: grossCollections,
-        commissionDeducted: commissionDeducted,
-        transportAllowanceDeducted: transportAllowanceDeducted,
-        posFee: posFee,
-        paymentMethod: paymentMethod,
-        depositReceiptUrl: depositReceiptUrl,
-        discrepancyAmount: discrepancyAmount,
-        discrepancyReason: discrepancyReason,
-        status: 'pending',
-        notes: remittanceNotes,
-        createdAt: DateTime.now(),
-      );
-      _fallbackRemittances.insert(0, fallback);
-      return fallback;
+    } catch (e) {
+      rethrow;
     }
   }
 

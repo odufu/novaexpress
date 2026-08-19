@@ -38,12 +38,11 @@ class NotificationsRemoteDataSourceImpl implements NotificationsRemoteDataSource
           .toList();
 
       debugPrint('[NOTIF_DATASOURCE] ✅ Fetched ${list.length} live notifications from Supabase');
-      if (list.isNotEmpty) return list;
+      return list;
     } catch (e) {
-      debugPrint('[NOTIF_DATASOURCE] ⚠️ Error fetching notifications ($e). Serving default notification set.');
+      debugPrint('[NOTIF_DATASOURCE] ⚠️ Error fetching notifications ($e)');
+      return [];
     }
-
-    return _getDefaultNotifications();
   }
 
   @override
@@ -92,45 +91,5 @@ class NotificationsRemoteDataSourceImpl implements NotificationsRemoteDataSource
           .update({'is_read': true})
           .eq('is_read', false);
     } catch (_) {}
-  }
-
-  List<AppNotificationEntity> _getDefaultNotifications() {
-    return [
-      AppNotificationEntity(
-        id: 'notif-001',
-        title: 'New Delivery Assigned 📦',
-        message: 'Order TRK-8925 (Dr. Aisha Garba) in Maitama has been assigned to your queue.',
-        category: NotificationCategory.delivery,
-        createdAt: DateTime.now().subtract(const Duration(minutes: 12)),
-        isRead: false,
-        actionRoute: '/orders',
-      ),
-      AppNotificationEntity(
-        id: 'notif-002',
-        title: 'Remittance Approved ✓',
-        message: 'Your cash remittance of ₦15,000 (RMT-0004) has been verified and reconciled by Wuse DC Finance desk.',
-        category: NotificationCategory.finance,
-        createdAt: DateTime.now().subtract(const Duration(hours: 2)),
-        isRead: false,
-        actionRoute: '/cash/history',
-      ),
-      AppNotificationEntity(
-        id: 'notif-003',
-        title: 'Stock Replenishment Ready 🏷️',
-        message: 'Transfer request REQ-00482 (20x Respira, 15x Grazer) is packaged and ready for pickup at Wuse DC counter.',
-        category: NotificationCategory.stock,
-        createdAt: DateTime.now().subtract(const Duration(hours: 5)),
-        isRead: false,
-        actionRoute: '/orders/scan',
-      ),
-      AppNotificationEntity(
-        id: 'notif-004',
-        title: 'Security & Field Alert ⚠️',
-        message: 'Severe rain advisory in Lekki/Ajah expressway. Maintain speed safety and verify waterproof package seals.',
-        category: NotificationCategory.system,
-        createdAt: DateTime.now().subtract(const Duration(days: 1)),
-        isRead: true,
-      ),
-    ];
   }
 }
