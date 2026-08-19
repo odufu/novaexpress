@@ -88,10 +88,7 @@ class _CashPageState extends ConsumerState<CashPage> {
         .toList();
     final double pendingApproval = pendingRemittances.fold(0.0, (acc, r) => acc + r.amount);
 
-    final double totalCashCollected = deliveredCashOrders.fold(0.0, (acc, o) => acc + o.totalAmount);
-    final double riderCashEarningsRetained = deliveredCashOrders.length * totalEarningPerOrder;
-
-    final double toRemit = (totalCashCollected - riderCashEarningsRetained - remitted - pendingApproval).clamp(0.0, double.infinity);
+    final double toRemit = (cashCollected - totalCommission - totalTransport - remitted - pendingApproval).clamp(0.0, double.infinity);
     final double riderBalance = user?.compensationType == 'salary'
         ? (user?.baseSalary ?? 150000.0)
         : (financeState.totalEarnedBalance > 0
