@@ -89,41 +89,34 @@ void main() {
       ]);
       print('✅ Users seeded');
 
-      await client.from('delivery_agents').upsert([
-        {
+      final agentPayload = {
+        'id': 'b1111111-1111-4111-8111-111111111111',
+        'user_id': 'a1111111-1111-4111-8111-111111111111',
+        'distribution_center_id': '22222222-2222-4222-8222-222222222222',
+        'agent_code': 'PDA-7000',
+        'vehicle_type': 'Motorcycle',
+        'vehicle_plate_number': 'ABJ-894-XA',
+        'operating_state': 'Abuja (FCT)',
+        'operating_city': 'Wuse 2',
+        'current_status': 'available',
+        'current_cod_balance': 55000.0,
+        'direct_transfer_balance': 24500.0,
+        'bank_name': 'Kuda Microfinance Bank',
+        'bank_account_number': '2019847291',
+      };
+
+      try {
+        await client.from('delivery_agents').upsert(agentPayload);
+        print('✅ Primary Delivery Agent (PDA-7000) seeded successfully');
+      } catch (_) {
+        // Fallback for minimal column set
+        await client.from('delivery_agents').upsert({
           'id': 'b1111111-1111-4111-8111-111111111111',
           'user_id': 'a1111111-1111-4111-8111-111111111111',
-          'distribution_center_id': '22222222-2222-4222-8222-222222222222',
           'agent_code': 'PDA-7000',
-          'vehicle_type': 'motorcycle',
-          'vehicle_plate_number': 'ABJ-789-XY',
-          'operating_state': 'Abuja (FCT)',
-          'operating_city': 'Wuse 2',
-          'current_status': 'available',
-          'current_cod_balance': 55000.0,
-          'direct_transfer_balance': 24500.0,
-          'bank_name': 'Zenith Bank',
-          'bank_account_number': '0123456789',
-          'bank_account_name': 'Emeka Rider',
-        },
-        {
-          'id': 'b2222222-2222-4222-8222-222222222222',
-          'user_id': 'a3333333-3333-4333-8333-333333333333',
-          'distribution_center_id': '22222222-2222-4222-8222-222222222222',
-          'agent_code': 'PDA-402',
-          'vehicle_type': 'motorcycle',
-          'vehicle_plate_number': 'ABJ-402-FL',
-          'operating_state': 'Abuja (FCT)',
-          'operating_city': 'Wuse 2',
-          'current_status': 'available',
-          'current_cod_balance': 0.0,
-          'direct_transfer_balance': 0.0,
-          'bank_name': 'Access Bank',
-          'bank_account_number': '0098765432',
-          'bank_account_name': 'Babatunde Lawal',
-        }
-      ]);
-      print('✅ Delivery Agents (Freelance PDA & In-House Rider) seeded');
+        });
+        print('✅ Primary Delivery Agent (PDA-7000) seeded with base columns');
+      }
     } catch (e) {
       print('ℹ️ Users/Agents notice: $e');
     }
