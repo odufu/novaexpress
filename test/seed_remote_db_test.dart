@@ -141,7 +141,6 @@ void main() {
           'category': 'Herbal Detox',
           'description': 'Organic herbal detox blend formulated for respiratory purification, revitalization and digestive health.',
           'base_price': 26000.0,
-          'reorder_level': 5,
           'low_stock_threshold': 5,
         },
         {
@@ -152,7 +151,6 @@ void main() {
           'category': 'Digestive Care',
           'description': 'Botanical colon cleanse herbal tea for gentle digestive support and natural detox.',
           'base_price': 15000.0,
-          'reorder_level': 5,
           'low_stock_threshold': 5,
         },
         {
@@ -163,7 +161,6 @@ void main() {
           'category': 'Mens Wellness',
           'description': 'Daily organic vitality supplement for mens physical endurance and wellness.',
           'base_price': 22000.0,
-          'reorder_level': 5,
           'low_stock_threshold': 5,
         },
         {
@@ -174,7 +171,6 @@ void main() {
           'category': 'Immunity & Wellness',
           'description': 'Organic wellness daily defense formula with citrus, ginger, turmeric and herbal antioxidants.',
           'base_price': 18500.0,
-          'reorder_level': 8,
           'low_stock_threshold': 5,
         },
         {
@@ -185,7 +181,6 @@ void main() {
           'category': 'Weight Management',
           'description': 'Targeted green herbal thermogenic blend promoting natural calorie burning and energy support.',
           'base_price': 12500.0,
-          'reorder_level': 6,
           'low_stock_threshold': 4,
         }
       ]);
@@ -194,13 +189,14 @@ void main() {
       print('ℹ️ Products notice: $e');
     }
 
-    // 5. Orders (Diverse States: in_transit, accepted, delivered, call_back, failed)
+    // 5. Orders (Diverse Operational States)
     try {
       await client.from('orders').upsert([
         {
           'id': '20202020-2020-4020-8020-202020202020',
           'company_id': '11111111-1111-4111-8111-111111111111',
           'order_number': 'TRK-8924',
+          'product_id': 'd1111111-1111-4111-8111-111111111111',
           'delivery_agent_id': 'b1111111-1111-4111-8111-111111111111',
           'distribution_center_id': '22222222-2222-4222-8222-222222222222',
           'customer_name': 'Chief Aliyu Mohammed',
@@ -209,7 +205,6 @@ void main() {
           'delivery_state': 'Abuja (FCT)',
           'delivery_city': 'Wuse 2',
           'delivery_address': 'Plot 402 Aminu Kano Crescent, Near KFC, Wuse 2, Abuja',
-          'product_name': 'Respira Detox Tea',
           'quantity': 3,
           'base_price': 45000.0,
           'upsell_amount': 10000.0,
@@ -223,6 +218,7 @@ void main() {
           'id': '20202020-2020-4020-8020-303030303030',
           'company_id': '11111111-1111-4111-8111-111111111111',
           'order_number': 'TRK-8925',
+          'product_id': 'd2222222-2222-4222-8222-222222222222',
           'delivery_agent_id': 'b1111111-1111-4111-8111-111111111111',
           'distribution_center_id': '22222222-2222-4222-8222-222222222222',
           'customer_name': 'Dr. Aisha Garba',
@@ -230,7 +226,6 @@ void main() {
           'delivery_state': 'Abuja (FCT)',
           'delivery_city': 'Maitama',
           'delivery_address': '12 Aguiyi Ironsi Street, Maitama, Abuja',
-          'product_name': 'Grazer Herbal Tea',
           'quantity': 2,
           'base_price': 30000.0,
           'upsell_amount': 5000.0,
@@ -244,6 +239,7 @@ void main() {
           'id': '20202020-2020-4020-8020-404040404040',
           'company_id': '11111111-1111-4111-8111-111111111111',
           'order_number': 'TRK-8921',
+          'product_id': 'd1111111-1111-4111-8111-111111111111',
           'delivery_agent_id': 'b1111111-1111-4111-8111-111111111111',
           'distribution_center_id': '22222222-2222-4222-8222-222222222222',
           'customer_name': 'Engr. Nnamdi Eze',
@@ -251,7 +247,6 @@ void main() {
           'delivery_state': 'Abuja (FCT)',
           'delivery_city': 'Garki II',
           'delivery_address': 'Suite B12, Gimbiya Street, Garki II, Abuja',
-          'product_name': 'Respira Detox Tea',
           'quantity': 4,
           'base_price': 60000.0,
           'upsell_amount': 15000.0,
@@ -265,6 +260,7 @@ void main() {
           'id': '20202020-2020-4020-8020-505050505050',
           'company_id': '11111111-1111-4111-8111-111111111111',
           'order_number': 'TRK-8920',
+          'product_id': 'd4444444-4444-4444-8444-444444444444',
           'delivery_agent_id': 'b1111111-1111-4111-8111-111111111111',
           'distribution_center_id': '22222222-2222-4222-8222-222222222222',
           'customer_name': 'Mrs. Folake Adebayo',
@@ -272,7 +268,6 @@ void main() {
           'delivery_state': 'Abuja (FCT)',
           'delivery_city': 'Asokoro',
           'delivery_address': '8 Yakubu Gowon Crescent, Asokoro, Abuja',
-          'product_name': 'Immunity Booster Pack',
           'quantity': 1,
           'base_price': 18000.0,
           'upsell_amount': 0.0,
@@ -281,9 +276,30 @@ void main() {
           'payment_status': 'pending',
           'status': 'call_back',
           'delivery_notes': 'Customer requested callback at 4:30 PM after office meeting.',
+        },
+        {
+          'id': '20202020-2020-4020-8020-606060606060',
+          'company_id': '11111111-1111-4111-8111-111111111111',
+          'order_number': 'TRK-8919',
+          'product_id': 'd3333333-3333-4333-8333-333333333333',
+          'delivery_agent_id': 'b1111111-1111-4111-8111-111111111111',
+          'distribution_center_id': '22222222-2222-4222-8222-222222222222',
+          'customer_name': 'Mallam Ibrahim Usman',
+          'customer_phone': '08023334455',
+          'delivery_state': 'Abuja (FCT)',
+          'delivery_city': 'Utako',
+          'delivery_address': 'Block 5 Plot 18, Obafemi Awolowo Way, Utako, Abuja',
+          'quantity': 2,
+          'base_price': 32000.0,
+          'upsell_amount': 0.0,
+          'total_amount': 32000.0,
+          'payment_type': 'prepaid',
+          'payment_status': 'paid',
+          'status': 'delivered',
+          'delivery_notes': 'Prepaid order delivered to receptionist Mary.',
         }
       ]);
-      print('✅ Orders seeded');
+      print('✅ Orders seeded successfully!');
     } catch (e) {
       print('ℹ️ Orders notice: $e');
     }
@@ -295,12 +311,8 @@ void main() {
           'id': '40404040-4040-4040-8040-505050505050',
           'company_id': '11111111-1111-4111-8111-111111111111',
           'delivery_agent_id': 'b1111111-1111-4111-8111-111111111111',
-          'reference_number': 'RMT-0005',
           'amount': 25000.0,
-          'gross_collections': 45000.0,
-          'commission_deducted': 8000.0,
-          'transport_allowance_deducted': 12000.0,
-          'payment_method': 'bank_transfer',
+          'deposit_receipt_url': 'https://novexps.storage/receipts/rec-0005.jpg',
           'status': 'pending',
           'notes': 'Bank transfer awaiting DC Finance receipt confirmation.',
         },
@@ -308,14 +320,9 @@ void main() {
           'id': '40404040-4040-4040-8040-404040404040',
           'company_id': '11111111-1111-4111-8111-111111111111',
           'delivery_agent_id': 'b1111111-1111-4111-8111-111111111111',
-          'reference_number': 'RMT-0004',
           'amount': 15000.0,
-          'gross_collections': 30000.0,
-          'commission_deducted': 6000.0,
-          'transport_allowance_deducted': 9000.0,
-          'payment_method': 'bank_transfer',
-          'status': 'approved',
-          'verified_by_name': 'Wuse DC Finance Desk',
+          'deposit_receipt_url': 'https://novexps.storage/receipts/rec-0004.jpg',
+          'status': 'verified',
           'notes': 'Bank transfer verified & reconciled by Wuse DC Finance desk.',
         }
       ]);
