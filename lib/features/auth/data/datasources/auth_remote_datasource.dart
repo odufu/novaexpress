@@ -169,43 +169,16 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
         final profile = UserModel.fromJson(
           merged,
-          deliveryAgentId: deliveryAgentId ?? 'b1111111-1111-4111-8111-111111111111',
+          deliveryAgentId: deliveryAgentId,
         );
-        debugPrint('[AUTH_DATASOURCE] ✅ User profile resolved: ${profile.firstName} ${profile.lastName} (Role: ${profile.role})');
+        debugPrint('[AUTH_DATASOURCE] ✅ User profile resolved from database: ${profile.firstName} ${profile.lastName} (Code: ${profile.deliveryAgentCode})');
         return profile;
       }
     } catch (e) {
-      debugPrint('[AUTH_DATASOURCE] ⚠️ Error fetching profile from DB ($e). Using default profile.');
+      debugPrint('[AUTH_DATASOURCE] ❌ Database error fetching user profile ($e)');
+      rethrow;
     }
 
-    // Default profile for signed-in PDA Agent
-    return UserModel(
-      id: '70000000-0000-4000-8000-000000000007',
-      authUserId: authUserId,
-      email: email.isNotEmpty ? email : 'emeka.rider@novaexpress.ng',
-      firstName: 'Emeka',
-      lastName: 'Rider',
-      phone: '+234 803 999 8877',
-      role: 'delivery_agent',
-      deliveryAgentId: 'b1111111-1111-4111-8111-111111111111',
-      deliveryAgentCode: 'PDA-7000',
-      distributionCenterName: 'Wuse Distribution Center',
-      companyId: '11111111-1111-4111-8111-111111111111',
-      lifetimeDeliveriesCount: 4892,
-      rating: 4.9,
-      personnelType: 'pda',
-      compensationType: 'commission',
-      commissionRate: 1000.0,
-      transportAllowance: 1500.0,
-      fuelAllowance: 800.0,
-      baseSalary: 150000.0,
-      vehicleType: 'Motorcycle',
-      vehiclePlateNumber: 'ABJ-894-XA',
-      operatingState: 'Abuja (FCT)',
-      operatingCity: 'Wuse 2',
-      bankName: 'Kuda Microfinance Bank',
-      bankAccountNumber: '2019847291',
-      bankAccountName: 'Emeka Rider',
-    );
+    throw Exception('User profile not found in Supabase database for email "$email". Please ensure account is registered in DB.');
   }
 }
