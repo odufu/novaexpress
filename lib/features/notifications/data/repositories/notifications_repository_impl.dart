@@ -8,8 +8,25 @@ class NotificationsRepositoryImpl implements NotificationsRepository {
   NotificationsRepositoryImpl({required this.remoteDataSource});
 
   @override
-  Future<List<AppNotificationEntity>> getNotifications() {
-    return remoteDataSource.getNotifications();
+  Future<List<AppNotificationEntity>> getNotifications([String? agentId]) {
+    return remoteDataSource.getNotifications(agentId);
+  }
+
+  @override
+  Future<void> emitNotification({
+    required String title,
+    required String message,
+    required String category,
+    String? agentId,
+    String? actionRoute,
+  }) {
+    return remoteDataSource.createNotification(
+      title: title,
+      message: message,
+      category: category,
+      agentId: agentId,
+      actionRoute: actionRoute,
+    );
   }
 
   @override

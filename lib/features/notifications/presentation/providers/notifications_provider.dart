@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/datasources/notifications_remote_datasource.dart';
 import '../../data/repositories/notifications_repository_impl.dart';
 import '../../domain/entities/app_notification.dart';
@@ -65,21 +66,48 @@ class NotificationsState {
 
 class NotificationsNotifier extends StateNotifier<NotificationsState> {
   final NotificationsRepository _repository;
+  final Ref _ref;
 
-  NotificationsNotifier({required NotificationsRepository repository})
-      : _repository = repository,
+  NotificationsNotifier({
+    required NotificationsRepository repository,
+    required Ref ref,
+  })  : _repository = repository,
+        _ref = ref,
         super(const NotificationsState()) {
-    fetchNotifications();
+    final agentId = _getAgentId();
+    fetchNotifications(agentId);
   }
 
-  Future<void> fetchNotifications() async {
+  String _getAgentId() {
+    return _ref.read(authProvider).user?.deliveryAgentId ?? 'b1111111-1111-4111-8111-111111111111';
+  }
+
+  Future<void> fetchNotifications([String? agentId]) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      final list = await _repository.getNotifications();
+      final targetId = agentId ?? _getAgentId();
+      final list = await _repository.getNotifications(targetId);
       state = state.copyWith(notifications: list, isLoading: false);
     } catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
     }
+  }
+
+  Future<void> emitNotification({
+    required String title,
+    required String message,
+    required String category,
+    String? actionRoute,
+  }) async {
+    final agentId = _getAgentId();
+    await _repository.emitNotification(
+      title: title,
+      message: message,
+      category: category,
+      agentId: agentId,
+      actionRoute: actionRoute,
+    );
+    await fetchNotifications(agentId);
   }
 
   void setFilter(String filter) {
@@ -104,5 +132,5 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
 
 final notificationsProvider = StateNotifierProvider<NotificationsNotifier, NotificationsState>((ref) {
   final repository = ref.watch(notificationsRepositoryProvider);
-  return NotificationsNotifier(repository: repository);
+  return NotificationsNotifier(repository: repository, ref: ref);
 });

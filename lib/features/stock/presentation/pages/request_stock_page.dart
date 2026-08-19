@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/constants/supabase_constants.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../notifications/presentation/providers/notifications_provider.dart';
 import '../providers/stock_provider.dart';
 
 class RequestStockPage extends ConsumerStatefulWidget {
@@ -496,6 +497,13 @@ class _RequestStockPageState extends ConsumerState<RequestStockPage> {
         }).toList(),
         notes: 'Restock request submitted to $_selectedDC',
       );
+
+      ref.read(notificationsProvider.notifier).emitNotification(
+            title: 'Stock Transfer Requested 🏷️',
+            message: 'Inventory replenishment request submitted to $_selectedDC.',
+            category: 'stock',
+            actionRoute: '/orders/scan',
+          );
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

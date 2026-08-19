@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/helpers/formatters.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../notifications/presentation/providers/notifications_provider.dart';
 import '../providers/finance_provider.dart';
 
 class LogRemittancePage extends ConsumerStatefulWidget {
@@ -646,6 +647,12 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
                   );
 
               if (success && context.mounted) {
+                ref.read(notificationsProvider.notifier).emitNotification(
+                      title: 'Remittance Logged 💸',
+                      message: 'Your cash remittance of ${CurrencyFormatter.formatNaira(enteredAmount)} (Ref: $refText) was logged and sent for DC verification.',
+                      category: 'finance',
+                      actionRoute: '/cash/history',
+                    );
                 _showSuccessDialog(context, enteredAmount, refText);
               }
             },

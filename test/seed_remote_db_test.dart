@@ -321,6 +321,7 @@ void main() {
         {
           'id': '50505050-5050-4050-8050-101010101010',
           'company_id': '11111111-1111-4111-8111-111111111111',
+          'delivery_agent_id': 'b1111111-1111-4111-8111-111111111111',
           'title': 'New Delivery Assigned 📦',
           'message': 'Order TRK-8925 (Dr. Aisha Garba) in Maitama has been assigned to your queue.',
           'category': 'delivery',
@@ -330,6 +331,7 @@ void main() {
         {
           'id': '50505050-5050-4050-8050-202020202020',
           'company_id': '11111111-1111-4111-8111-111111111111',
+          'delivery_agent_id': 'b1111111-1111-4111-8111-111111111111',
           'title': 'Remittance Approved ✓',
           'message': 'Your cash remittance of ₦15,000 (RMT-0004) has been verified and reconciled by Wuse DC Finance desk.',
           'category': 'finance',
@@ -339,6 +341,7 @@ void main() {
         {
           'id': '50505050-5050-4050-8050-303030303030',
           'company_id': '11111111-1111-4111-8111-111111111111',
+          'delivery_agent_id': 'b1111111-1111-4111-8111-111111111111',
           'title': 'Stock Replenishment Ready 🏷️',
           'message': 'Transfer request REQ-00482 (20x Respira, 15x Grazer) is packaged and ready for pickup at Wuse DC counter.',
           'category': 'stock',

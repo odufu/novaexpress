@@ -11,6 +11,7 @@ import '../../../../core/widgets/app_logo_widget.dart';
 import '../../../../core/widgets/signature_pad_widget.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../finance/presentation/providers/finance_provider.dart';
+import '../../../notifications/presentation/providers/notifications_provider.dart';
 import '../../../stock/presentation/providers/stock_provider.dart';
 import '../../domain/entities/order.dart';
 import '../providers/orders_provider.dart';
@@ -108,9 +109,15 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
           notes: notes,
         );
 
-    // Refresh finance, orders & stock state
+    // Refresh finance, orders, stock & notifications state
     ref.read(financeProvider.notifier).fetchRemittances();
     ref.read(stockProvider.notifier).fetchStockItems();
+    ref.read(notificationsProvider.notifier).emitNotification(
+          title: 'Delivery POD Confirmed 🎉',
+          message: 'Order ${widget.orderId} was successfully delivered. Net cash collection recorded.',
+          category: 'delivery',
+          actionRoute: '/orders',
+        );
 
     await Future.delayed(const Duration(milliseconds: 400));
 
