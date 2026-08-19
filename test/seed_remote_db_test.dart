@@ -371,6 +371,97 @@ void main() {
       print('ℹ️ Notifications notice: $e');
     }
 
+    // 8. Vehicle Stock Custody (Products currently in rider's van/bike)
+    try {
+      await client.from('product_stock_custody').upsert([
+        {
+          'id': '60606060-6060-4060-8060-101010101010',
+          'delivery_agent_id': 'b1111111-1111-4111-8111-111111111111',
+          'product_id': 'd1111111-1111-4111-8111-111111111111',
+          'quantity': 18,
+          'allocated_quantity': 5,
+          'available_quantity': 13,
+        },
+        {
+          'id': '60606060-6060-4060-8060-202020202020',
+          'delivery_agent_id': 'b1111111-1111-4111-8111-111111111111',
+          'product_id': 'd2222222-2222-4222-8222-222222222222',
+          'quantity': 12,
+          'allocated_quantity': 3,
+          'available_quantity': 9,
+        },
+        {
+          'id': '60606060-6060-4060-8060-303030303030',
+          'delivery_agent_id': 'b1111111-1111-4111-8111-111111111111',
+          'product_id': 'd3333333-3333-4333-8333-333333333333',
+          'quantity': 8,
+          'allocated_quantity': 2,
+          'available_quantity': 6,
+        },
+        {
+          'id': '60606060-6060-4060-8060-404040404040',
+          'delivery_agent_id': 'b1111111-1111-4111-8111-111111111111',
+          'product_id': 'd4444444-4444-4444-8444-444444444444',
+          'quantity': 15,
+          'allocated_quantity': 1,
+          'available_quantity': 14,
+        }
+      ]);
+      print('✅ Product stock custody seeded');
+    } catch (e) {
+      print('ℹ️ Product stock custody notice: $e');
+    }
+
+    // 9. Stock Transfer Requests
+    try {
+      await client.from('stock_transfer_requests').upsert([
+        {
+          'id': '70707070-7070-4070-8070-101010101010',
+          'request_number': 'REQ-00482',
+          'delivery_agent_id': 'b1111111-1111-4111-8111-111111111111',
+          'distribution_center_id': '22222222-2222-4222-8222-222222222222',
+          'product_id': 'd1111111-1111-4111-8111-111111111111',
+          'quantity': 20,
+          'status': 'ready_for_pickup',
+          'notes': 'Packaged and ready for pickup at Wuse DC counter.',
+        },
+        {
+          'id': '70707070-7070-4070-8070-202020202020',
+          'request_number': 'REQ-00483',
+          'delivery_agent_id': 'b1111111-1111-4111-8111-111111111111',
+          'distribution_center_id': '22222222-2222-4222-8222-222222222222',
+          'product_id': 'd3333333-3333-4333-8333-333333333333',
+          'quantity': 10,
+          'status': 'pending',
+          'notes': 'Requested by rider for weekend restocking.',
+        }
+      ]);
+      print('✅ Stock transfer requests seeded');
+    } catch (e) {
+      print('ℹ️ Stock transfer requests notice: $e');
+    }
+
+    // 10. Rider Transactions (Direct transfer payouts & commission earnings)
+    try {
+      await client.from('rider_transactions').upsert([
+        {
+          'id': '80808080-8080-4080-8080-101010101010',
+          'delivery_agent_id': 'b1111111-1111-4111-8111-111111111111',
+          'transaction_code': 'TXN-98402',
+          'title': 'Direct Transfer Delivery Credited',
+          'category': 'direct_transfer',
+          'amount': 24500.0,
+          'is_credit': true,
+          'reference': 'PAY-2026-0091',
+          'status': 'settled',
+          'description': 'Direct transfer settlement for non-cash commissions & allowances.',
+        }
+      ]);
+      print('✅ Rider transactions seeded');
+    } catch (e) {
+      print('ℹ️ Rider transactions notice: $e');
+    }
+
     print('🎉 Master Database Seeding Test Completed!');
   });
 }
