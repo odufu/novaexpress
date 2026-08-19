@@ -29,6 +29,7 @@ class UserModel extends UserEntity {
     super.bankAccountNumber,
     super.bankAccountName,
     super.agentStatus,
+    super.avatarUrl,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json, {String? deliveryAgentId}) {
@@ -60,6 +61,7 @@ class UserModel extends UserEntity {
       bankAccountNumber: json['bank_account_number'] ?? '2019847291',
       bankAccountName: json['bank_account_name'] ?? 'Emeka Rider',
       agentStatus: json['current_status'] ?? 'available',
+      avatarUrl: json['avatar_url']?.toString(),
     );
   }
 
@@ -91,6 +93,7 @@ class UserModel extends UserEntity {
       'bank_account_number': bankAccountNumber,
       'bank_account_name': bankAccountName,
       'current_status': agentStatus,
+      'avatar_url': avatarUrl,
     };
   }
 }

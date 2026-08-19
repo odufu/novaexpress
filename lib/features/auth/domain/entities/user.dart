@@ -26,6 +26,7 @@ class UserEntity {
   final String bankAccountNumber;
   final String bankAccountName;
   final String agentStatus; // 'available' | 'on_delivery' | 'offline'
+  final String? avatarUrl;
 
   const UserEntity({
     required this.id,
@@ -55,6 +56,7 @@ class UserEntity {
     this.bankAccountNumber = '2019847291',
     this.bankAccountName = 'Emeka Rider',
     this.agentStatus = 'available',
+    this.avatarUrl,
   });
 
   String get fullName => '$firstName $lastName'.trim();

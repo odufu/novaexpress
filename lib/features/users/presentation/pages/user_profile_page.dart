@@ -10,6 +10,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
+import '../widgets/edit_profile_modal.dart';
 
 class UserProfilePage extends ConsumerWidget {
   const UserProfilePage({super.key});
@@ -80,6 +81,12 @@ class UserProfilePage extends ConsumerWidget {
         centerTitle: true,
         actions: [
           IconButton(
+            icon: const Icon(Icons.edit_note_rounded, color: AppColors.orange, size: 26),
+            onPressed: () {
+              if (user != null) EditProfileModal.show(context, user);
+            },
+          ),
+          IconButton(
             icon: Icon(
               isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
               color: isDark ? const Color(0xFFFF8928) : AppColors.primary,
@@ -119,34 +126,39 @@ class UserProfilePage extends ConsumerWidget {
                 ),
                 child: Column(
                   children: [
-                    Stack(
-                      children: [
-                        CircleAvatar(
-                          radius: 42,
-                          backgroundColor: AppColors.primary,
-                          child: Text(
-                            agentInitials,
-                            style: GoogleFonts.inter(
-                              fontSize: 34,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                    GestureDetector(
+                      onTap: () {
+                        if (user != null) EditProfileModal.show(context, user);
+                      },
+                      child: Stack(
+                        children: [
+                          CircleAvatar(
+                            radius: 42,
+                            backgroundColor: AppColors.primary,
+                            child: Text(
+                              agentInitials,
+                              style: GoogleFonts.inter(
+                                fontSize: 34,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
-                        ),
-                        Positioned(
-                          bottom: 2,
-                          right: 2,
-                          child: Container(
-                            width: 18,
-                            height: 18,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF16A34A),
-                              shape: BoxShape.circle,
-                              border: Border.all(color: theme.cardColor, width: 2.5),
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: AppColors.orange,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: theme.cardColor, width: 2),
+                              ),
+                              child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 14),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 12),
                     Text(
@@ -155,6 +167,22 @@ class UserProfilePage extends ConsumerWidget {
                         fontSize: 21,
                         fontWeight: FontWeight.bold,
                         color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        side: BorderSide(color: AppColors.orange.withValues(alpha: 0.5)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: () {
+                        if (user != null) EditProfileModal.show(context, user);
+                      },
+                      icon: const Icon(Icons.edit_outlined, size: 15, color: AppColors.orange),
+                      label: Text(
+                        'Edit Profile & DP',
+                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.orange),
                       ),
                     ),
                     const SizedBox(height: 4),

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/datasources/auth_remote_datasource.dart';
 import '../../data/repositories/auth_repository_impl.dart';
+import '../../data/models/user_model.dart';
 import '../../domain/entities/user.dart';
 import '../../domain/usecases/get_current_user.dart';
 import '../../domain/usecases/login.dart';
@@ -109,6 +110,92 @@ class AuthNotifier extends StateNotifier<AuthState> {
       debugPrint('[AUTH_PROVIDER] ⚠️ logout error: $e');
     }
     state = const AuthState();
+  }
+
+  Future<bool> updateProfile({
+    required String firstName,
+    required String lastName,
+    required String phone,
+    required String operatingState,
+    required String operatingCity,
+    required String vehicleType,
+    required String vehiclePlateNumber,
+    required String bankName,
+    required String bankAccountNumber,
+    required String bankAccountName,
+    String? avatarUrl,
+  }) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      final currentUser = state.user;
+      final client = Supabase.instance.client;
+
+      if (currentUser != null) {
+        // 1. Update users table in Supabase
+        await client.from('users').update({
+          'first_name': firstName,
+          'last_name': lastName,
+          'phone_number': phone,
+          if (avatarUrl != null) 'avatar_url': avatarUrl,
+          'updated_at': DateTime.now().toIso8601String(),
+        }).eq('id', currentUser.id);
+
+        // 2. Update delivery_agents table in Supabase
+        final agentId = currentUser.deliveryAgentId ?? 'b1111111-1111-4111-8111-111111111111';
+        try {
+          await client.from('delivery_agents').update({
+            'operating_state': operatingState,
+            'operating_city': operatingCity,
+            'vehicle_type': vehicleType,
+            'vehicle_plate_number': vehiclePlateNumber,
+            'bank_name': bankName,
+            'bank_account_number': bankAccountNumber,
+            'bank_account_name': bankAccountName,
+            'updated_at': DateTime.now().toIso8601String(),
+          }).eq('id', agentId);
+        } catch (_) {}
+
+        // 3. Update local state
+        final updatedUser = UserModel(
+          id: currentUser.id,
+          authUserId: currentUser.authUserId,
+          email: currentUser.email,
+          firstName: firstName,
+          lastName: lastName,
+          phone: phone,
+          role: currentUser.role,
+          companyId: currentUser.companyId,
+          deliveryAgentId: currentUser.deliveryAgentId,
+          deliveryAgentCode: currentUser.deliveryAgentCode,
+          distributionCenterName: currentUser.distributionCenterName,
+          lifetimeDeliveriesCount: currentUser.lifetimeDeliveriesCount,
+          rating: currentUser.rating,
+          personnelType: currentUser.personnelType,
+          compensationType: currentUser.compensationType,
+          commissionRate: currentUser.commissionRate,
+          transportAllowance: currentUser.transportAllowance,
+          fuelAllowance: currentUser.fuelAllowance,
+          baseSalary: currentUser.baseSalary,
+          vehicleType: vehicleType,
+          vehiclePlateNumber: vehiclePlateNumber,
+          operatingState: operatingState,
+          operatingCity: operatingCity,
+          bankName: bankName,
+          bankAccountNumber: bankAccountNumber,
+          bankAccountName: bankAccountName,
+          agentStatus: currentUser.agentStatus,
+          avatarUrl: avatarUrl ?? currentUser.avatarUrl,
+        );
+
+        state = state.copyWith(isLoading: false, user: updatedUser);
+        return true;
+      }
+      state = state.copyWith(isLoading: false);
+      return false;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      return false;
+    }
   }
 }
 
