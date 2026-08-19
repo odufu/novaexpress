@@ -151,6 +151,20 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         if (agentRes != null) {
           deliveryAgentId = agentRes['id'];
           merged.addAll(agentRes);
+
+          final dcId = agentRes['distribution_center_id'];
+          if (dcId != null) {
+            try {
+              final dcRes = await supabaseClient
+                  .from('distribution_centers')
+                  .select('name')
+                  .eq('id', dcId)
+                  .maybeSingle();
+              if (dcRes != null) {
+                merged['distribution_center_name'] = dcRes['name'];
+              }
+            } catch (_) {}
+          }
         }
 
         final profile = UserModel.fromJson(
@@ -168,13 +182,30 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     return UserModel(
       id: '70000000-0000-4000-8000-000000000007',
       authUserId: authUserId,
-      email: email.isNotEmpty ? email : 'rider.emeka@novaexpress.com',
+      email: email.isNotEmpty ? email : 'emeka.rider@novaexpress.ng',
       firstName: 'Emeka',
       lastName: 'Rider',
-      phone: '+2348037778899',
+      phone: '+234 803 999 8877',
       role: 'delivery_agent',
       deliveryAgentId: 'b1111111-1111-4111-8111-111111111111',
-      companyId: '00000000-0000-0000-0000-000000000001',
+      deliveryAgentCode: 'PDA-7000',
+      distributionCenterName: 'Wuse Distribution Center',
+      companyId: '11111111-1111-4111-8111-111111111111',
+      lifetimeDeliveriesCount: 4892,
+      rating: 4.9,
+      personnelType: 'pda',
+      compensationType: 'commission',
+      commissionRate: 1000.0,
+      transportAllowance: 1500.0,
+      fuelAllowance: 800.0,
+      baseSalary: 150000.0,
+      vehicleType: 'Motorcycle',
+      vehiclePlateNumber: 'ABJ-894-XA',
+      operatingState: 'Abuja (FCT)',
+      operatingCity: 'Wuse 2',
+      bankName: 'Kuda Microfinance Bank',
+      bankAccountNumber: '2019847291',
+      bankAccountName: 'Emeka Rider',
     );
   }
 }

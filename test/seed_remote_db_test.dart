@@ -103,6 +103,14 @@ void main() {
         'direct_transfer_balance': 24500.0,
         'bank_name': 'Kuda Microfinance Bank',
         'bank_account_number': '2019847291',
+        'bank_account_name': 'Emeka Rider',
+        'personnel_type': 'pda',
+        'commission_rate': 1000.0,
+        'transport_allowance': 1500.0,
+        'fuel_allowance': 800.0,
+        'base_salary': 150000.0,
+        'lifetime_deliveries_count': 4892,
+        'rating': 4.9,
       };
 
       try {
