@@ -71,12 +71,11 @@ class _CashPageState extends ConsumerState<CashPage> {
     final todayDeliveredCashOrders = todayDeliveredOrders.where((o) => o.paymentType != 'prepaid' && o.isPod).toList();
     final todayDeliveredPrepaidOrders = todayDeliveredOrders.where((o) => o.paymentType == 'prepaid' || !o.isPod).toList();
 
-    final activeDeliveredOrders = todayDeliveredOrders.isNotEmpty ? todayDeliveredOrders : deliveredOrders;
     final activeDeliveredCashOrders = todayDeliveredCashOrders.isNotEmpty ? todayDeliveredCashOrders : deliveredCashOrders;
 
     final double cashCollected = activeDeliveredCashOrders.fold(0.0, (acc, o) => acc + o.totalAmount);
-    final double totalCommission = activeDeliveredOrders.length * commissionPerOrder;
-    final double totalTransport = activeDeliveredOrders.length * transportPerOrder;
+    final double totalCommission = activeDeliveredCashOrders.length * commissionPerOrder;
+    final double totalTransport = activeDeliveredCashOrders.length * transportPerOrder;
 
     final approvedRemittances = financeState.remittances
         .where((r) => r.isVerified || r.status.toLowerCase() == 'approved')
