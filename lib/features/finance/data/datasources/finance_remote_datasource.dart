@@ -162,15 +162,23 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       if (response.status >= 200 && response.status < 300) {
         return response.data as Map<String, dynamic>? ?? {'status': 'success'};
       }
-      throw Exception('Server returned ${response.status}: ${response.data}');
-    } catch (e) {
-      // Local fallback for offline/test mode
-      return {
-        'status': 'offline_fallback',
-        'payoutNumber': 'PAY-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}',
-        'message': 'Payout request saved locally: $e',
-      };
-    }
+    } catch (_) {}
+
+    final dbRes = await supabaseClient
+        .from('payout_requests')
+        .insert({
+          'delivery_agent_id': agentId,
+          'amount': amount,
+          'bank_name': bankName,
+          'account_number': accountNumber,
+          'account_name': accountName,
+          'notes': notes,
+          'status': 'pending',
+          'created_at': DateTime.now().toIso8601String(),
+        })
+        .select()
+        .single();
+    return dbRes;
   }
 
   @override
