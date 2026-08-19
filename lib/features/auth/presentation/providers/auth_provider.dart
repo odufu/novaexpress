@@ -125,7 +125,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String bankAccountName,
     String? avatarUrl,
   }) async {
-    state = state.copyWith(isLoading: true, errorMessage: null);
     try {
       final currentUser = state.user;
       final client = Supabase.instance.client;

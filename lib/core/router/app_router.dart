@@ -27,7 +27,7 @@ import '../../features/stock/presentation/pages/stock_history_page.dart';
 import '../../features/users/presentation/pages/user_profile_page.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authProvider);
+  final isAuthFromState = ref.watch(authProvider.select((s) => s.isAuthenticated));
 
   return GoRouter(
     initialLocation: '/splash',
@@ -36,11 +36,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       try {
         session = Supabase.instance.client.auth.currentSession;
       } catch (_) {}
-      final isAuthenticated = authState.isAuthenticated || session != null;
+      final isAuthenticated = isAuthFromState || session != null;
       final isSplash = state.matchedLocation == '/splash';
       final isLoggingIn = state.matchedLocation == '/login' || state.matchedLocation == '/forgot-password';
 
-      debugPrint('[AUTH_ROUTER] 🚦 Route check: location="${state.matchedLocation}", isAuthenticated=$isAuthenticated (riverpod=${authState.isAuthenticated}, supabase=${session != null})');
+      debugPrint('[AUTH_ROUTER] 🚦 Route check: location="${state.matchedLocation}", isAuthenticated=$isAuthenticated (riverpod=$isAuthFromState, supabase=${session != null})');
 
       if (isSplash) {
         return null;
