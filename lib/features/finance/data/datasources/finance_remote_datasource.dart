@@ -38,9 +38,12 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
   @override
   Future<List<RemittanceModel>> getAgentRemittances(String agentId) async {
     try {
-      final agentFilter = agentId.isNotEmpty
-          ? 'delivery_agent_id.eq.$agentId,delivery_agent_id.eq.b1111111-1111-4111-8111-111111111111,delivery_agent_id.is.null'
-          : 'delivery_agent_id.eq.b1111111-1111-4111-8111-111111111111,delivery_agent_id.is.null';
+      final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
+      final validAgentUuid = (agentId.isNotEmpty && uuidRegex.hasMatch(agentId))
+          ? agentId
+          : 'b1111111-1111-4111-8111-111111111111';
+
+      final agentFilter = 'delivery_agent_id.eq.$validAgentUuid,delivery_agent_id.eq.b1111111-1111-4111-8111-111111111111,delivery_agent_id.is.null';
 
       final response = await supabaseClient
           .from(SupabaseConstants.cashRemittancesTable)

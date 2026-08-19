@@ -252,7 +252,7 @@ void main() {
           'upsell_amount': 15000.0,
           'total_amount': 75000.0,
           'payment_type': 'pay_on_delivery',
-          'payment_status': 'paid',
+          'payment_status': 'pending',
           'status': 'delivered',
           'delivery_notes': 'Delivered successfully. POD cash collected in full.',
         },
@@ -294,7 +294,7 @@ void main() {
           'upsell_amount': 0.0,
           'total_amount': 32000.0,
           'payment_type': 'prepaid',
-          'payment_status': 'paid',
+          'payment_status': 'pending',
           'status': 'delivered',
           'delivery_notes': 'Prepaid order delivered to receptionist Mary.',
         }

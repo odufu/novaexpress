@@ -26,8 +26,17 @@ class _OrdersListPageState extends ConsumerState<OrdersListPage> {
   String _filterPaymentType = 'All'; // All, POD, Prepaid
   String _filterDeliveryType = 'All'; // All, Distributed Inventory, Client Package
   String _filterClient = 'All'; // All, Novacare, Other
-
   final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final user = ref.read(authProvider).user;
+      final agentId = user?.deliveryAgentId ?? 'b1111111-1111-4111-8111-111111111111';
+      ref.read(ordersProvider.notifier).loadOrders(agentId);
+    });
+  }
 
   @override
   void dispose() {

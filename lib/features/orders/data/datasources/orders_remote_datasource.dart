@@ -33,9 +33,12 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
   @override
   Future<List<OrderModel>> getAssignedOrders(String deliveryAgentId) async {
     try {
-      final agentFilter = deliveryAgentId.isNotEmpty
-          ? 'delivery_agent_id.eq.$deliveryAgentId,delivery_agent_id.eq.b1111111-1111-4111-8111-111111111111,delivery_agent_id.is.null'
-          : 'delivery_agent_id.eq.b1111111-1111-4111-8111-111111111111,delivery_agent_id.is.null';
+      final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
+      final validAgentUuid = (deliveryAgentId.isNotEmpty && uuidRegex.hasMatch(deliveryAgentId))
+          ? deliveryAgentId
+          : 'b1111111-1111-4111-8111-111111111111';
+
+      final agentFilter = 'delivery_agent_id.eq.$validAgentUuid,delivery_agent_id.eq.b1111111-1111-4111-8111-111111111111,delivery_agent_id.is.null';
 
       final response = await supabaseClient
           .from(SupabaseConstants.ordersTable)
