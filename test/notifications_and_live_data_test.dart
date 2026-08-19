@@ -1,6 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:novexps/features/auth/data/datasources/auth_remote_datasource.dart';
+import 'package:novexps/features/auth/data/models/user_model.dart';
+import 'package:novexps/features/auth/data/repositories/auth_repository_impl.dart';
+import 'package:novexps/features/auth/domain/entities/user.dart';
+import 'package:novexps/features/auth/domain/usecases/get_current_user.dart';
+import 'package:novexps/features/auth/domain/usecases/login.dart';
+import 'package:novexps/features/auth/domain/usecases/logout.dart';
+import 'package:novexps/features/auth/presentation/providers/auth_provider.dart';
+import 'package:novexps/features/notifications/data/datasources/notifications_remote_datasource.dart';
 import 'package:novexps/features/notifications/domain/entities/app_notification.dart';
 import 'package:novexps/features/notifications/domain/repositories/notifications_repository.dart';
 import 'package:novexps/features/notifications/presentation/pages/notifications_page.dart';
@@ -46,7 +55,34 @@ class MockNotificationsRepository implements NotificationsRepository {
   ];
 
   @override
-  Future<List<AppNotificationEntity>> getNotifications() async => list;
+  Future<List<AppNotificationEntity>> getNotifications([String? agentId]) async => list;
+
+  @override
+  Future<void> emitNotification({
+    required String title,
+    required String message,
+    required String category,
+    String? agentId,
+    String? actionRoute,
+  }) async {
+    NotificationCategory cat = NotificationCategory.system;
+    if (category.contains('delivery')) cat = NotificationCategory.delivery;
+    if (category.contains('finance')) cat = NotificationCategory.finance;
+    if (category.contains('stock')) cat = NotificationCategory.stock;
+
+    list.insert(
+      0,
+      AppNotificationEntity(
+        id: 'notif-${DateTime.now().millisecondsSinceEpoch}',
+        title: title,
+        message: message,
+        category: cat,
+        createdAt: DateTime.now(),
+        isRead: false,
+        actionRoute: actionRoute,
+      ),
+    );
+  }
 
   @override
   Future<void> markAsRead(String notificationId) async {
@@ -56,6 +92,60 @@ class MockNotificationsRepository implements NotificationsRepository {
   @override
   Future<void> markAllAsRead() async {
     list = list.map((n) => n.copyWith(isRead: true)).toList();
+  }
+}
+
+class MockNotificationsRemoteDataSource implements NotificationsRemoteDataSource {
+  @override
+  Future<List<AppNotificationEntity>> getNotifications([String? agentId]) async => [];
+  @override
+  Future<void> createNotification({
+    required String title,
+    required String message,
+    required String category,
+    String? agentId,
+    String? actionRoute,
+  }) async {}
+  @override
+  Future<void> markAsRead(String notificationId) async {}
+  @override
+  Future<void> markAllAsRead() async {}
+}
+
+class MockAuthRemoteDataSource implements AuthRemoteDataSource {
+  @override
+  Future<UserModel> login(String email, String password) async => const UserModel(
+        id: '70000000-0000-4000-8000-000000000007',
+        email: 'rider.emeka@novaexpress.com',
+        firstName: 'Emeka',
+        lastName: 'Rider',
+        phone: '+2348037778899',
+        role: 'delivery_agent',
+      );
+  @override
+  Future<void> logout() async {}
+  @override
+  Future<UserModel?> getCurrentUser() async => null;
+}
+
+class MockAuthNotifier extends AuthNotifier {
+  MockAuthNotifier()
+      : super(
+          loginUseCase: LoginUseCase(AuthRepositoryImpl(MockAuthRemoteDataSource())),
+          logoutUseCase: LogoutUseCase(AuthRepositoryImpl(MockAuthRemoteDataSource())),
+          getCurrentUserUseCase: GetCurrentUserUseCase(AuthRepositoryImpl(MockAuthRemoteDataSource())),
+        ) {
+    state = const AuthState(
+      user: UserEntity(
+        id: '70000000-0000-4000-8000-000000000007',
+        email: 'rider.emeka@novaexpress.com',
+        firstName: 'Emeka',
+        lastName: 'Rider',
+        phone: '+2348037778899',
+        role: 'delivery_agent',
+        deliveryAgentId: 'b1111111-1111-4111-8111-111111111111',
+      ),
+    );
   }
 }
 
@@ -132,6 +222,8 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            authProvider.overrideWith((ref) => MockAuthNotifier()),
+            notificationsRemoteDataSourceProvider.overrideWithValue(MockNotificationsRemoteDataSource()),
             notificationsRepositoryProvider.overrideWithValue(MockNotificationsRepository()),
           ],
           child: const MaterialApp(
