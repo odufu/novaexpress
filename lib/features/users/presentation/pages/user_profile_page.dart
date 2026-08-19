@@ -39,14 +39,23 @@ class UserProfilePage extends ConsumerWidget {
     final bankAccountName = user?.bankAccountName ?? 'Emeka Rider';
 
     final deliveredOrders = ordersState.orders.where((o) => o.status == 'delivered').toList();
-    final totalOrders = ordersState.orders.length;
+    final failedOrders = ordersState.orders.where((o) => o.status == 'failed' || o.status == 'cancelled').toList();
+    final totalAttempted = deliveredOrders.length + failedOrders.length;
 
-    final String lifetimeDrops = totalOrders > 0
-        ? NumberFormat('#,###').format(deliveredOrders.isNotEmpty ? deliveredOrders.length : (user?.lifetimeDeliveriesCount ?? 4892))
-        : NumberFormat('#,###').format(user?.lifetimeDeliveriesCount ?? 4892);
+    // Dynamic lifetime drops = database historical total + current session delivered drops
+    final int baseCount = user?.lifetimeDeliveriesCount ?? 4892;
+    final int totalLifetimeCount = baseCount + deliveredOrders.length;
+    final String lifetimeDrops = NumberFormat('#,###').format(totalLifetimeCount);
 
-    final double computedRating = totalOrders > 0
-        ? ((deliveredOrders.length / totalOrders) * 5.0).clamp(4.0, 5.0)
+    // Dynamic success rate % = (delivered / total attempted) * 100
+    final double successRateVal = totalAttempted > 0
+        ? ((deliveredOrders.length / totalAttempted) * 100.0)
+        : 98.4;
+    final String successRateStr = '${successRateVal.toStringAsFixed(1)}%';
+
+    // Dynamic performance rating
+    final double computedRating = totalAttempted > 0
+        ? ((deliveredOrders.length / totalAttempted) * 5.0).clamp(4.2, 5.0)
         : (user?.rating ?? 4.9);
     final String performanceRating = computedRating.toStringAsFixed(1);
 
@@ -295,7 +304,7 @@ class UserProfilePage extends ConsumerWidget {
                           const Icon(Icons.verified_outlined, color: Color(0xFF16A34A), size: 20),
                           const SizedBox(height: 4),
                           Text(
-                            '98.4%',
+                            successRateStr,
                             style: GoogleFonts.inter(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
