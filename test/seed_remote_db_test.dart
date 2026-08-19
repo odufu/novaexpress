@@ -121,6 +121,7 @@ void main() {
         await client.from('delivery_agents').upsert({
           'id': 'b1111111-1111-4111-8111-111111111111',
           'user_id': 'a1111111-1111-4111-8111-111111111111',
+          'distribution_center_id': '22222222-2222-4222-8222-222222222222',
           'agent_code': 'PDA-7000',
         });
         print('✅ Primary Delivery Agent (PDA-7000) seeded with base columns');
