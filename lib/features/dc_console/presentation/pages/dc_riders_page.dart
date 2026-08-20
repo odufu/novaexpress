@@ -28,31 +28,29 @@ class DCRidersPage extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Top Header & Onboard CTA
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Riders & Delivery Fleet Control',
-                      style: GoogleFonts.inter(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : const Color(0xFF0F172A),
-                      ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isMobile = constraints.maxWidth < 650;
+              final headerContent = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Riders & Delivery Fleet Control',
+                    style: GoogleFonts.inter(
+                      fontSize: isMobile ? 18 : 22,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Onboard and manage PDAs & in-house riders with custom commission and transport agreements (BR-010 to BR-015)',
-                      style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B)),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              ElevatedButton.icon(
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Onboard and manage PDAs & in-house riders with custom commission and transport agreements (BR-010 to BR-015)',
+                    style: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF64748B)),
+                  ),
+                ],
+              );
+
+              final actionButton = ElevatedButton.icon(
                 onPressed: () => DCOnboardRiderModal.show(context),
                 icon: const Icon(Icons.person_add_alt_1_rounded, size: 18, color: Colors.white),
                 label: const Text(
@@ -64,8 +62,28 @@ class DCRidersPage extends ConsumerWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-              ),
-            ],
+              );
+
+              if (isMobile) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    headerContent,
+                    const SizedBox(height: 12),
+                    SizedBox(width: double.infinity, child: actionButton),
+                  ],
+                );
+              }
+
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(child: headerContent),
+                  const SizedBox(width: 12),
+                  actionButton,
+                ],
+              );
+            },
           ),
 
           const SizedBox(height: 20),

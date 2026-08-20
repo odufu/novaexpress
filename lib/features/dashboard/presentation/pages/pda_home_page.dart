@@ -7,6 +7,7 @@ import '../../../../core/helpers/formatters.dart';
 import '../../../../core/providers/navigation_provider.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_logo_widget.dart';
+import '../../../../core/widgets/app_skeleton_loader.dart';
 import '../../../../core/widgets/offline_sync_banner.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../finance/domain/entities/financial_summary.dart';
@@ -28,7 +29,7 @@ class _PdaHomePageState extends ConsumerState<PdaHomePage> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final user = ref.read(authProvider).user;
-      final agentId = user?.deliveryAgentId ?? 'b1111111-1111-4111-8111-111111111111';
+      final agentId = user?.deliveryAgentId ?? user?.id ?? '';
       ref.read(ordersProvider.notifier).loadOrders(agentId);
       ref.read(financeProvider.notifier).loadRemittances(agentId);
     });
@@ -698,7 +699,7 @@ class _PdaHomePageState extends ConsumerState<PdaHomePage> {
                     child: _PerformanceMetricItem(
                       icon: Icons.speed_rounded,
                       iconBgColor: const Color(0xFF008844),
-                      title: 'Success ...',
+                      title: 'Success',
                       subtitle: '($successfulCount/$completedCount Done)',
                       value: '$successRate%',
                       valueColor: const Color(0xFF008844),
@@ -720,8 +721,8 @@ class _PdaHomePageState extends ConsumerState<PdaHomePage> {
                     child: _PerformanceMetricItem(
                       icon: Icons.check_circle_rounded,
                       iconBgColor: const Color(0xFF008844),
-                      title: 'Success...',
-                      subtitle: '(Delivered)',
+                      title: 'Delivered',
+                      subtitle: '(Successful)',
                       value: '$successfulCount',
                       valueColor: const Color(0xFF008844),
                     ),
@@ -868,15 +869,60 @@ class _PdaHomePageState extends ConsumerState<PdaHomePage> {
             ),
             const SizedBox(height: 10),
 
-            // Delivery cards list mirroring orders_list_page.dart exactly
-            ...orders.take(3).toList().asMap().entries.map((entry) {
-              final idx = entry.key;
-              final o = entry.value;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _HomeDeliveryOperationalCard(order: o, index: idx),
-              );
-            }),
+            // Delivery cards list mirroring orders_list_page.dart with skeleton loading
+            if (ordersState.isLoading) ...[
+              const OrderCardSkeleton(),
+              const OrderCardSkeleton(),
+            ] else if (orders.isEmpty) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.check_circle_outline_rounded,
+                      size: 36,
+                      color: AppColors.primary.withValues(alpha: 0.6),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'No deliveries assigned yet for today',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Check back when your Distribution Center dispatches new routes',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ] else ...[
+              ...orders.take(3).toList().asMap().entries.map((entry) {
+                final idx = entry.key;
+                final o = entry.value;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _HomeDeliveryOperationalCard(order: o, index: idx),
+                );
+              }),
+            ],
 
             const SizedBox(height: 6),
 
@@ -1132,6 +1178,7 @@ class _HomeDeliveryOperationalCard extends StatelessWidget {
                   ),
                 ),
               ),
+              const SizedBox(height: 24),
             ],
           ),
         ),

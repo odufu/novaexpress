@@ -13,6 +13,31 @@ class OrdersRepositoryImpl implements OrdersRepository {
   }
 
   @override
+  Future<List<OrderEntity>> getDistributionCenterOrders(String distributionCenterId) async {
+    return await remoteDataSource.getDistributionCenterOrders(distributionCenterId);
+  }
+
+  @override
+  Future<OrderEntity> createOrder(Map<String, dynamic> orderData) async {
+    return await remoteDataSource.createOrder(orderData);
+  }
+
+  @override
+  Future<void> assignOrderToRider({
+    required String orderId,
+    required String riderId,
+    required String riderName,
+    required String riderCode,
+  }) async {
+    await remoteDataSource.assignOrderToRider(
+      orderId: orderId,
+      riderId: riderId,
+      riderName: riderName,
+      riderCode: riderCode,
+    );
+  }
+
+  @override
   Future<OrderEntity> getOrderById(String orderId) async {
     return await remoteDataSource.getOrderById(orderId);
   }

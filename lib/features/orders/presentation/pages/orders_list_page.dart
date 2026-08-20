@@ -33,7 +33,7 @@ class _OrdersListPageState extends ConsumerState<OrdersListPage> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final user = ref.read(authProvider).user;
-      final agentId = user?.deliveryAgentId ?? 'b1111111-1111-4111-8111-111111111111';
+      final agentId = user?.deliveryAgentId ?? user?.id ?? '';
       ref.read(ordersProvider.notifier).loadOrders(agentId);
     });
   }
@@ -424,6 +424,7 @@ class _OrdersListPageState extends ConsumerState<OrdersListPage> {
                           return _DeliveryOperationalCard(order: order, index: index);
                         },
                       ),
+                      const SizedBox(height: 24),
                     ],
                   ],
                 ),

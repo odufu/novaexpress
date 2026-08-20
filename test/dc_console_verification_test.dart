@@ -39,6 +39,8 @@ import 'package:novexps/features/dc_console/presentation/pages/dc_stock_page.dar
 import 'package:novexps/features/dc_console/presentation/pages/dc_finance_page.dart';
 import 'package:novexps/features/dc_console/presentation/pages/dc_returns_page.dart';
 import 'package:novexps/features/dc_console/presentation/pages/dc_payouts_page.dart';
+import 'package:novexps/features/dc_console/domain/entities/dc_fleet_driver.dart';
+import 'package:novexps/features/dc_console/presentation/providers/dc_console_provider.dart';
 import 'package:novexps/features/dc_console/presentation/pages/dc_riders_page.dart';
 
 class _MockNotificationsRepo implements NotificationsRepository {
@@ -101,6 +103,38 @@ class _MockAuthRemoteDS implements AuthRemoteDataSource {
 class _MockOrdersRemoteDS implements OrdersRemoteDataSource {
   @override
   Future<List<OrderModel>> getAssignedOrders([String? agentId]) async => [];
+
+  @override
+  Future<List<OrderModel>> getDistributionCenterOrders([String? distributionCenterId]) async => [
+        OrderModel(
+          id: 'ord-8930',
+          orderNumber: 'TRK-8930',
+          customerName: 'Senator Kashim Shettima',
+          customerPhone: '08091112233',
+          deliveryState: 'Abuja (FCT)',
+          deliveryCity: 'Abuja',
+          deliveryAddress: 'Plot 104 Shehu Shagari Way, Maitama, Abuja',
+          productName: '2x Respira Detox Tea',
+          status: 'pending',
+          quantity: 2,
+          basePrice: 25000.0,
+          upsellAmount: 0.0,
+          totalAmount: 50000.0,
+          paymentType: 'pay_on_delivery',
+          paymentStatus: 'pending',
+          distributionCenterId: '22222222-2222-4222-8222-222222222222',
+          createdAt: DateTime.now(),
+        ),
+      ];
+
+  @override
+  Future<void> assignOrderToRider({
+    required String orderId,
+    required String riderId,
+    required String riderName,
+    required String riderCode,
+  }) async {}
+
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
@@ -168,6 +202,54 @@ void main() {
         }),
         notificationsRemoteDataSourceProvider.overrideWithValue(_MockNotificationsRemoteDS()),
         notificationsRepositoryProvider.overrideWithValue(_MockNotificationsRepo()),
+        dcConsoleProvider.overrideWith((ref) {
+          final notifier = DCConsoleNotifier();
+          notifier.state = notifier.state.copyWith(
+            drivers: const [
+              DCFleetDriver(
+                id: 'drv-001',
+                driverCode: 'RDR-103',
+                name: 'Jameson Miller',
+                phone: '08023456789',
+                avatarUrl: '',
+                vehicleModel: 'Isuzu NPR',
+                vehiclePlate: '12-XZ-01',
+                vehicleType: 'Van',
+                status: 'active',
+                assignedZone: 'Wuse II & Zone 4',
+                totalAssignedOrders: 18,
+                completedOrders: 13,
+                routeProgressPercent: 72.0,
+                efficiencyRating: 98.4,
+                cashInCustody: 145000.0,
+                itemsInCustody: 12,
+                personnelType: 'in_house_rider',
+                compensationType: 'hybrid',
+              ),
+              DCFleetDriver(
+                id: 'b1111111-1111-4111-8111-111111111111',
+                driverCode: 'PDA-7000',
+                name: 'Emeka Rider',
+                phone: '08012345678',
+                avatarUrl: '',
+                vehicleModel: 'Bajaj Boxer',
+                vehiclePlate: 'ABJ-204-XY',
+                vehicleType: 'Motorcycle',
+                status: 'active',
+                assignedZone: 'Wuse II & Abuja Central',
+                totalAssignedOrders: 53,
+                completedOrders: 51,
+                routeProgressPercent: 96.0,
+                efficiencyRating: 99.2,
+                cashInCustody: 953000.0,
+                itemsInCustody: 22,
+                personnelType: 'pda',
+                compensationType: 'commission',
+              ),
+            ],
+          );
+          return notifier;
+        }),
       ];
     }
 

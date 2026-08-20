@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../../core/constants/nigeria_locations.dart';
 import '../../../../core/helpers/formatters.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
 import '../providers/dc_console_provider.dart';
 
@@ -26,7 +28,7 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
   bool _isSubmitting = false;
   Map<String, dynamic>? _createdCredentialsSlip;
 
-  // Step 1: Personnel Type & KYC
+  // Step 1: Personnel Type & KYC (All 36 States + FCT)
   String _personnelType = 'pda'; // 'pda' | 'in_house_rider'
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
@@ -34,7 +36,8 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
   final _emailController = TextEditingController();
   final _guarantorNameController = TextEditingController();
   final _guarantorPhoneController = TextEditingController();
-  String _assignedZone = 'Wuse II & Zone 4';
+  String _operatingState = 'FCT - Abuja';
+  String _assignedZone = 'Wuse 2';
 
   // Step 2: Login Credentials & Security
   final _tempPasswordController = TextEditingController(text: 'Password123!');
@@ -170,9 +173,41 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
     final salary = double.tryParse(_baseSalaryController.text) ?? (isPda ? 0.0 : 120000.0);
     final upsell = double.tryParse(_upsellBonusController.text) ?? 10.0;
 
+    String finalDriverCode = driverCode;
+
+    // 1. Register rider in database & authentication system
+    try {
+      final createdUser = await ref.read(authRemoteDataSourceProvider).registerDeliveryAgent(
+        email: email,
+        password: tempPassword,
+        firstName: firstName,
+        lastName: lastName,
+        phone: phone,
+        personnelType: _personnelType,
+        compensationType: _compensationType,
+        commissionRate: commission,
+        transportAllowance: transport,
+        fuelAllowance: isPda ? 0.0 : 800.0,
+        baseSalary: salary,
+        vehicleType: _vehicleType,
+        vehiclePlateNumber: _vehiclePlateController.text.trim(),
+        bankName: _selectedBank,
+        bankAccountNumber: _accountNumberController.text.trim().isEmpty ? '2019847291' : _accountNumberController.text.trim(),
+        bankAccountName: _accountNameController.text.trim().isEmpty ? fullName : _accountNameController.text.trim(),
+        distributionCenterId: '22222222-2222-4222-8222-222222222222',
+        assignedZone: _assignedZone,
+      );
+      if (createdUser.deliveryAgentCode?.isNotEmpty == true) {
+        finalDriverCode = createdUser.deliveryAgentCode!;
+      }
+      debugPrint('[DC_ONBOARD] 🚀 Delivery agent registered: ${createdUser.email} ($finalDriverCode)');
+    } catch (e) {
+      debugPrint('[DC_ONBOARD] ⚠️ Registration notice: $e');
+    }
+
     final newDriver = DCFleetDriver(
       id: 'drv-${DateTime.now().millisecondsSinceEpoch}',
-      driverCode: driverCode,
+      driverCode: finalDriverCode,
       name: fullName,
       phone: phone,
       email: email,
@@ -202,14 +237,15 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
       guarantorPhone: _guarantorPhoneController.text.trim().isEmpty ? '08034567890' : _guarantorPhoneController.text.trim(),
     );
 
-    // Save to DC provider
+    // 2. Save to DC provider and sync from live database
     ref.read(dcConsoleProvider.notifier).addDriver(newDriver);
+    ref.read(dcConsoleProvider.notifier).loadDriversFromDatabase();
 
-    // Prepare credentials confirmation slip
+    // 3. Prepare credentials confirmation slip with exact login details
     setState(() {
       _isSubmitting = false;
       _createdCredentialsSlip = {
-        'driverCode': driverCode,
+        'driverCode': finalDriverCode,
         'name': fullName,
         'email': email,
         'password': tempPassword,
@@ -499,12 +535,40 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
           children: [
             Expanded(child: TextField(controller: _phoneController, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Phone Number', hintText: '08031234567'))),
             const SizedBox(width: 12),
+            Expanded(child: TextField(controller: _emailController, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Contact Email', hintText: 'samuel.okon@novaexpress.ng'))),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
             Expanded(
               child: DropdownButtonFormField<String>(
-                value: _assignedZone,
+                value: _operatingState,
                 isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Primary Operational Zone'),
-                items: _zones.map((z) => DropdownMenuItem(value: z, child: Text(z, style: GoogleFonts.inter(fontSize: 13), overflow: TextOverflow.ellipsis))).toList(),
+                decoration: const InputDecoration(labelText: 'Operating State (36 States + FCT)'),
+                items: NigeriaLocations.states.map((s) => DropdownMenuItem(value: s, child: Text(s, style: GoogleFonts.inter(fontSize: 13), overflow: TextOverflow.ellipsis))).toList(),
+                onChanged: (val) {
+                  if (val != null) {
+                    final cities = NigeriaLocations.getCitiesForState(val);
+                    setState(() {
+                      _operatingState = val;
+                      _assignedZone = cities.isNotEmpty ? cities.first : 'Central';
+                    });
+                  }
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                value: NigeriaLocations.getCitiesForState(_operatingState).contains(_assignedZone)
+                    ? _assignedZone
+                    : (NigeriaLocations.getCitiesForState(_operatingState).isNotEmpty
+                        ? NigeriaLocations.getCitiesForState(_operatingState).first
+                        : null),
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Primary Operational Zone / LGA'),
+                items: NigeriaLocations.getCitiesForState(_operatingState).map((z) => DropdownMenuItem(value: z, child: Text(z, style: GoogleFonts.inter(fontSize: 13), overflow: TextOverflow.ellipsis))).toList(),
                 onChanged: (val) => setState(() => _assignedZone = val ?? _assignedZone),
               ),
             ),

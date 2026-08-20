@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/supabase_constants.dart';
 import '../../data/datasources/orders_remote_datasource.dart';
+import '../../data/models/order_model.dart';
 import '../../data/repositories/orders_repository_impl.dart';
 import '../../domain/entities/order.dart';
 import '../../domain/repositories/orders_repository.dart';
@@ -52,14 +53,103 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
   Future<void> loadOrders([String? agentId]) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      final targetAgentId = agentId ?? SupabaseConstants.defaultDeliveryAgentId;
-      final orderEntities = await _repository.getAssignedOrders(targetAgentId);
-      state = state.copyWith(isLoading: false, orders: orderEntities);
+      if (agentId != null && agentId.isNotEmpty) {
+        final orderEntities = await _repository.getAssignedOrders(agentId);
+        state = state.copyWith(isLoading: false, orders: orderEntities);
+      } else {
+        final orderEntities = await _repository.getDistributionCenterOrders('22222222-2222-4222-8222-222222222222');
+        state = state.copyWith(isLoading: false, orders: orderEntities);
+      }
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
         errorMessage: 'Failed to load manifest orders: $e',
       );
+    }
+  }
+
+  Future<void> loadDcOrders([String? dcId]) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      final orderEntities = await _repository.getDistributionCenterOrders(dcId ?? '22222222-2222-4222-8222-222222222222');
+      state = state.copyWith(isLoading: false, orders: orderEntities);
+    } catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: 'Failed to load DC orders: $e');
+    }
+  }
+
+  Future<bool> createOrder(Map<String, dynamic> orderData) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      final created = await _repository.createOrder(orderData);
+      state = state.copyWith(
+        isLoading: false,
+        orders: [created, ...state.orders.where((o) => o.id != created.id && o.orderNumber != created.orderNumber)],
+      );
+      return true;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: 'Failed to create order: $e');
+      return false;
+    }
+  }
+
+  Future<bool> assignOrderToRider({
+    required String orderId,
+    required String riderId,
+    required String riderName,
+    required String riderCode,
+  }) async {
+    try {
+      await _repository.assignOrderToRider(
+        orderId: orderId,
+        riderId: riderId,
+        riderName: riderName,
+        riderCode: riderCode,
+      );
+
+      final updatedList = state.orders.map((o) {
+        if (o.id == orderId || o.orderNumber == orderId) {
+          return OrderModel(
+            id: o.id,
+            orderNumber: o.orderNumber,
+            customerName: o.customerName,
+            customerPhone: o.customerPhone,
+            customerAltPhone: o.customerAltPhone,
+            deliveryState: o.deliveryState,
+            deliveryCity: o.deliveryCity,
+            deliveryAddress: o.deliveryAddress,
+            landmark: o.landmark,
+            lga: o.lga,
+            productName: o.productName,
+            status: 'assigned',
+            quantity: o.quantity,
+            paidQuantity: o.paidQuantity,
+            freeQuantity: o.freeQuantity,
+            basePrice: o.basePrice,
+            upsellAmount: o.upsellAmount,
+            totalAmount: o.totalAmount,
+            paymentType: o.paymentType,
+            paymentStatus: o.paymentStatus,
+            fulfillmentType: o.fulfillmentType,
+            clientName: o.clientName,
+            packageCustodyId: o.packageCustodyId,
+            clientDeliveryFee: o.clientDeliveryFee,
+            agentEntitlement: o.agentEntitlement,
+            deliveryNotes: o.deliveryNotes,
+            createdAt: o.createdAt,
+            deliveryAgentId: riderId,
+            deliveryAgentName: riderName,
+            deliveryAgentCode: riderCode,
+            distributionCenterId: o.distributionCenterId ?? '22222222-2222-4222-8222-222222222222',
+          );
+        }
+        return o;
+      }).toList();
+
+      state = state.copyWith(orders: updatedList);
+      return true;
+    } catch (e) {
+      return false;
     }
   }
 

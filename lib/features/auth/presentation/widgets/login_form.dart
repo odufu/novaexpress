@@ -21,7 +21,25 @@ class _LoginFormState extends ConsumerState<LoginForm> {
   String _selectedRole = 'rider'; // 'rider' | 'dc_manager'
 
   @override
+  void initState() {
+    super.initState();
+    _agentIdController.addListener(_onAgentIdChanged);
+  }
+
+  void _onAgentIdChanged() {
+    final text = _agentIdController.text.trim().toLowerCase();
+    final isDc = text.contains('dc.') || text.contains('supervisor') || text.contains('dc-mgr') || text.contains('dc.wuse');
+    final expectedRole = isDc ? 'dc_manager' : 'rider';
+    if (_selectedRole != expectedRole && mounted) {
+      setState(() {
+        _selectedRole = expectedRole;
+      });
+    }
+  }
+
+  @override
   void dispose() {
+    _agentIdController.removeListener(_onAgentIdChanged);
     _agentIdController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -52,12 +70,16 @@ class _LoginFormState extends ConsumerState<LoginForm> {
       debugPrint('[AUTH_UI] 🎯 authProvider.login() completed -> success: $success');
       if (success && mounted) {
         final authState = ref.read(authProvider);
-        if (authState.user?.isDcManager == true || _selectedRole == 'dc_manager' || email.contains('dc.')) {
-          debugPrint('[AUTH_UI] 🏢 Navigating DC Manager to DC Operations Console (/dc)...');
-          context.go('/dc');
-        } else {
-          debugPrint('[AUTH_UI] 🚚 Navigating Delivery Agent to PDA Dashboard (/)...');
-          context.go('/');
+        try {
+          if (authState.user?.isDcManager == true) {
+            debugPrint('[AUTH_UI] 🏢 Navigating DC Manager to DC Operations Console (/dc)...');
+            context.go('/dc');
+          } else {
+            debugPrint('[AUTH_UI] 🚚 Navigating Delivery Agent (${authState.user?.firstName} ${authState.user?.lastName}) to PDA Dashboard (/)...');
+            context.go('/');
+          }
+        } catch (routerErr) {
+          debugPrint('[AUTH_UI] ℹ️ Router navigation notice ($routerErr)');
         }
       }
     } else {

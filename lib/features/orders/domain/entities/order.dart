@@ -25,6 +25,10 @@ class OrderEntity {
   final double clientDeliveryFee; // e.g. 5000.0
   final double agentEntitlement; // e.g. 2500.0
   final String? deliveryNotes;
+  final String? deliveryAgentId;
+  final String? deliveryAgentName;
+  final String? deliveryAgentCode;
+  final String? distributionCenterId;
   final DateTime createdAt;
 
   const OrderEntity({
@@ -54,6 +58,10 @@ class OrderEntity {
     this.clientDeliveryFee = 5000.0,
     this.agentEntitlement = 2500.0,
     this.deliveryNotes,
+    this.deliveryAgentId,
+    this.deliveryAgentName,
+    this.deliveryAgentCode,
+    this.distributionCenterId,
     required this.createdAt,
   });
 

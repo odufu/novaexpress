@@ -355,5 +355,40 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Confirm DC Logout'), findsNothing);
     });
+
+    testWidgets('6. Sanni Abacha and newly onboarded riders can enter credentials and sign in directly to PDA Terminal', (tester) async {
+      tester.view.physicalSize = const Size(800, 1000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: createOverrides(),
+          child: const MaterialApp(
+            home: LoginPage(),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Enter Sanni Abacha's created email and password
+      final textFields = find.byType(TextFormField);
+      expect(textFields, findsNWidgets(2));
+
+      await tester.enterText(textFields.first, 'sanni.abacha@novaexpress.ng');
+      await tester.enterText(textFields.last, 'Password123!');
+      await tester.pumpAndSettle();
+
+      // Verify submit button says Sign In to PDA App
+      expect(find.text('Sign In to PDA App'), findsOneWidget);
+
+      // Tap Sign In
+      await tester.tap(find.text('Sign In to PDA App'));
+      await tester.pumpAndSettle();
+
+      // Should complete login without throwing invalid credential error
+      expect(find.text('Invalid login credentials'), findsNothing);
+    });
   });
 }

@@ -33,7 +33,8 @@ class _MainBottomNavShellState extends ConsumerState<MainBottomNavShell>
     final currentIndex = ref.watch(bottomNavIndexProvider);
 
     // Responsive theme styling for the curved floating bar
-    final barBgColor = isDark ? const Color(0xFF0F172A) : const Color(0xFF1E293B);
+    final barBgColor =
+        isDark ? const Color(0xFF0F172A) : const Color(0xFF1E293B);
     final borderColor = isDark
         ? const Color(0xFF334155).withValues(alpha: 0.8)
         : const Color(0xFF334155).withValues(alpha: 0.4);
@@ -42,86 +43,98 @@ class _MainBottomNavShellState extends ConsumerState<MainBottomNavShell>
         : const Color(0xFF0F172A).withValues(alpha: 0.25);
 
     return Scaffold(
-      extendBody: true,
+      extendBody: false,
       body: IndexedStack(
         index: currentIndex,
         children: _pages,
       ),
-      bottomNavigationBar: Container(
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-        height: 74,
-        child: Stack(
-          clipBehavior: Clip.none,
-          alignment: Alignment.bottomCenter,
-          children: [
-            // 1. Custom Curved Hump Background Painter
-            CustomPaint(
-              size: const Size(double.infinity, 64),
-              painter: _CurvedHumpPainter(
-                color: barBgColor,
-                borderColor: borderColor,
-                shadowColor: shadowColor,
-              ),
-              child: SizedBox(
-                height: 64,
-                width: double.infinity,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: Row(
-                    children: [
-                      // Tab 0: Home
-                      Expanded(
-                        child: _AnimatedNavItem(
-                          icon: Icons.home_rounded,
-                          label: 'Home',
-                          isSelected: currentIndex == 0,
-                          onTap: () => ref.read(bottomNavIndexProvider.notifier).state = 0,
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+          height: 74,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.bottomCenter,
+            children: [
+              // 1. Custom Curved Hump Background Painter
+              CustomPaint(
+                size: const Size(double.infinity, 64),
+                painter: _CurvedHumpPainter(
+                  color: barBgColor,
+                  borderColor: borderColor,
+                  shadowColor: shadowColor,
+                ),
+                child: SizedBox(
+                  height: 64,
+                  width: double.infinity,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Row(
+                      children: [
+                        // Tab 0: Home
+                        Expanded(
+                          child: _AnimatedNavItem(
+                            icon: Icons.home_rounded,
+                            label: 'Home',
+                            isSelected: currentIndex == 0,
+                            onTap: () => ref
+                                .read(bottomNavIndexProvider.notifier)
+                                .state = 0,
+                          ),
                         ),
-                      ),
-                      // Tab 1: Inventory
-                      Expanded(
-                        child: _AnimatedNavItem(
-                          icon: Icons.inventory_2_rounded,
-                          label: 'Inventory',
-                          isSelected: currentIndex == 1,
-                          onTap: () => ref.read(bottomNavIndexProvider.notifier).state = 1,
+                        // Tab 1: Inventory
+                        Expanded(
+                          child: _AnimatedNavItem(
+                            icon: Icons.inventory_2_rounded,
+                            label: 'Inventory',
+                            isSelected: currentIndex == 1,
+                            onTap: () => ref
+                                .read(bottomNavIndexProvider.notifier)
+                                .state = 1,
+                          ),
                         ),
-                      ),
-                      // Spacer for the center raised Deliveries button
-                      const SizedBox(width: 72),
-                      // Tab 3: Remittance
-                      Expanded(
-                        child: _AnimatedNavItem(
-                          icon: Icons.payments_rounded,
-                          label: 'Remittance',
-                          isSelected: currentIndex == 3,
-                          onTap: () => ref.read(bottomNavIndexProvider.notifier).state = 3,
+                        // Spacer for the center raised Deliveries button
+                        const SizedBox(width: 72),
+                        // Tab 3: Remittance
+                        Expanded(
+                          child: _AnimatedNavItem(
+                            icon: Icons.payments_rounded,
+                            label: 'Remittance',
+                            isSelected: currentIndex == 3,
+                            onTap: () => ref
+                                .read(bottomNavIndexProvider.notifier)
+                                .state = 3,
+                          ),
                         ),
-                      ),
-                      // Tab 4: More
-                      Expanded(
-                        child: _AnimatedNavItem(
-                          icon: Icons.person_rounded,
-                          label: 'More',
-                          isSelected: currentIndex == 4,
-                          onTap: () => ref.read(bottomNavIndexProvider.notifier).state = 4,
+                        // Tab 4: More
+                        Expanded(
+                          child: _AnimatedNavItem(
+                            icon: Icons.person_rounded,
+                            label: 'More',
+                            isSelected: currentIndex == 4,
+                            onTap: () => ref
+                                .read(bottomNavIndexProvider.notifier)
+                                .state = 4,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
 
-            // 2. Elevated Center Convex Deliveries Button with Animated Glow
-            Positioned(
-              top: 0,
-              child: _CenterDeliveriesHumpButton(
-                isSelected: currentIndex == 2,
-                onTap: () => ref.read(bottomNavIndexProvider.notifier).state = 2,
+              // 2. Elevated Center Convex Deliveries Button with Animated Glow
+              Positioned(
+                top: 0,
+                child: _CenterDeliveriesHumpButton(
+                  isSelected: currentIndex == 2,
+                  onTap: () =>
+                      ref.read(bottomNavIndexProvider.notifier).state = 2,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -349,16 +362,22 @@ class _CurvedHumpPainter extends CustomPainter {
 
     // Smooth organic cubic bezier curve UP into center hump
     path.cubicTo(
-      cx - humpWidth / 3.2, 0,
-      cx - humpWidth / 3.5, -humpHeight,
-      cx, -humpHeight,
+      cx - humpWidth / 3.2,
+      0,
+      cx - humpWidth / 3.5,
+      -humpHeight,
+      cx,
+      -humpHeight,
     );
 
     // Smooth organic cubic bezier curve DOWN from center hump
     path.cubicTo(
-      cx + humpWidth / 3.5, -humpHeight,
-      cx + humpWidth / 3.2, 0,
-      cx + humpWidth / 2, 0,
+      cx + humpWidth / 3.5,
+      -humpHeight,
+      cx + humpWidth / 3.2,
+      0,
+      cx + humpWidth / 2,
+      0,
     );
 
     // Flat line to top-right corner

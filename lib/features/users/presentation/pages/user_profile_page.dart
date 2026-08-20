@@ -621,6 +621,7 @@ class UserProfilePage extends ConsumerWidget {
                   ),
                 ),
               ),
+              const SizedBox(height: 24),
             ],
           ),
         ),

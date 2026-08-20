@@ -28,6 +28,10 @@ class OrderModel extends OrderEntity {
     super.clientDeliveryFee,
     super.agentEntitlement,
     super.deliveryNotes,
+    super.deliveryAgentId,
+    super.deliveryAgentName,
+    super.deliveryAgentCode,
+    super.distributionCenterId,
     required super.createdAt,
   });
 
@@ -80,6 +84,10 @@ class OrderModel extends OrderEntity {
       clientDeliveryFee: (json['client_delivery_fee'] as num?)?.toDouble() ?? 5000.0,
       agentEntitlement: (json['agent_entitlement'] as num?)?.toDouble() ?? 2500.0,
       deliveryNotes: json['delivery_notes'],
+      deliveryAgentId: json['delivery_agent_id']?.toString(),
+      deliveryAgentName: json['delivery_agent_name']?.toString(),
+      deliveryAgentCode: json['delivery_agent_code']?.toString() ?? json['assigned_agent_code']?.toString(),
+      distributionCenterId: json['distribution_center_id']?.toString(),
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])
           : DateTime.now(),
@@ -108,6 +116,10 @@ class OrderModel extends OrderEntity {
       'payment_type': paymentType,
       'payment_status': paymentStatus,
       'fulfillment_type': fulfillmentType,
+      'delivery_agent_id': deliveryAgentId,
+      'delivery_agent_name': deliveryAgentName,
+      'delivery_agent_code': deliveryAgentCode,
+      'distribution_center_id': distributionCenterId,
       'client_name': clientName,
       'package_custody_id': packageCustodyId,
       'client_delivery_fee': clientDeliveryFee,

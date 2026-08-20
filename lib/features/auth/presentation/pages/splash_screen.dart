@@ -46,15 +46,25 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
   }
 
   void _initAppAndNavigate() async {
-    await Future.delayed(const Duration(milliseconds: 1800));
+    await Future.delayed(const Duration(milliseconds: 1400));
 
+    if (!mounted) return;
+
+    await ref.read(authProvider.notifier).checkCurrentUser();
     if (!mounted) return;
 
     final authState = ref.read(authProvider);
 
-    if (authState.isAuthenticated) {
-      context.go('/');
+    if (authState.isAuthenticated && authState.user != null) {
+      if (authState.user?.isDcManager == true) {
+        debugPrint('[SPLASH] 🏢 Authenticated DC Manager (${authState.user?.email}) -> Routing to /dc');
+        context.go('/dc');
+      } else {
+        debugPrint('[SPLASH] 🚚 Authenticated Rider (${authState.user?.email}) -> Routing to /');
+        context.go('/');
+      }
     } else {
+      debugPrint('[SPLASH] 🔒 No active session -> Routing to /login');
       context.go('/login');
     }
   }

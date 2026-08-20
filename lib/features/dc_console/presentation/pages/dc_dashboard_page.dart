@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/helpers/formatters.dart';
+import '../../../finance/presentation/providers/finance_provider.dart';
+import '../../../orders/presentation/providers/orders_provider.dart';
 import '../providers/dc_console_provider.dart';
 import '../widgets/dc_driver_manifest_table.dart';
 import '../widgets/dc_city_map_widget.dart';
+import '../widgets/dc_create_order_modal.dart';
 
 class DCDashboardPage extends ConsumerWidget {
   const DCDashboardPage({super.key});
@@ -15,6 +18,13 @@ class DCDashboardPage extends ConsumerWidget {
     final isDark = theme.brightness == Brightness.dark;
     final dcState = ref.watch(dcConsoleProvider);
     final dcNotifier = ref.read(dcConsoleProvider.notifier);
+    final ordersState = ref.watch(ordersProvider);
+    final financeState = ref.watch(financeProvider);
+
+    final inTransitCount = ordersState.orders.where((o) => o.status == 'in_transit' || o.status == 'assigned').length;
+    final unassignedCount = ordersState.orders.where((o) => (o.deliveryAgentId == null || o.deliveryAgentId!.isEmpty) && o.status != 'delivered' && o.status != 'cancelled' && o.status != 'failed').length;
+    final pendingReturnsCount = ordersState.orders.where((o) => o.status == 'failed' || o.status == 'call_back').length;
+    final pendingRemittance = financeState.totalPendingRemittance;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -22,71 +32,114 @@ class DCDashboardPage extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Hub Header Banner
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Column(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isMobile = constraints.maxWidth < 650;
+              final headerInfo = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          dcState.activeHubName,
+                          style: GoogleFonts.inter(
+                            fontSize: isMobile ? 18 : 22,
+                            fontWeight: FontWeight.w800,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          dcState.activeHubCode,
+                          style: GoogleFonts.firaCode(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF059669),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Primary Operations & PDA Fleet Control Desk • Plot 402 Aminu Kano Crescent, Wuse 2, Abuja',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: const Color(0xFF64748B),
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              );
+
+              final actionButtons = Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (ctx) => const DCCreateOrderModal(),
+                      );
+                    },
+                    icon: const Icon(Icons.add_rounded, size: 16, color: Colors.white),
+                    label: const Text(
+                      'Create Order',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFF37021),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: () => dcNotifier.setActiveTab(1),
+                    icon: const Icon(Icons.outbox_rounded, size: 16, color: Colors.white),
+                    label: const Text(
+                      'Orders & Routes',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF031632),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ],
+              );
+
+              if (isMobile) {
+                return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            dcState.activeHubName,
-                            style: GoogleFonts.inter(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w800,
-                              color: isDark ? Colors.white : const Color(0xFF0F172A),
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF10B981).withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            dcState.activeHubCode,
-                            style: GoogleFonts.firaCode(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: const Color(0xFF059669),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Primary Operations & PDA Fleet Control Desk • Plot 402 Aminu Kano Crescent, Wuse 2, Abuja',
-                      style: GoogleFonts.inter(
-                        fontSize: 12.5,
-                        color: const Color(0xFF64748B),
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    headerInfo,
+                    const SizedBox(height: 12),
+                    actionButtons,
                   ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              ElevatedButton.icon(
-                onPressed: () => dcNotifier.setActiveTab(1),
-                icon: const Icon(Icons.outbox_rounded, size: 16, color: Colors.white),
-                label: const Text(
-                  'Orders & Routes',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF031632),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-            ],
+                );
+              }
+
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(child: headerInfo),
+                  const SizedBox(width: 12),
+                  actionButtons,
+                ],
+              );
+            },
           ),
 
           const SizedBox(height: 20),
@@ -109,18 +162,18 @@ class DCDashboardPage extends ConsumerWidget {
                 children: [
                   _buildMetricCard(
                     title: 'Restock Picking Queue',
-                    value: '2 Requests',
-                    subtext: '30 units pending dispatch',
+                    value: '$unassignedCount Orders',
+                    subtext: 'Awaiting rider allocation',
                     icon: Icons.inventory_2_rounded,
                     color: const Color(0xFFF37021),
                     isDark: isDark,
                     width: cardWidth,
-                    onTap: () => dcNotifier.setActiveTab(2),
+                    onTap: () => dcNotifier.setActiveTab(1),
                   ),
                   _buildMetricCard(
                     title: 'In-Transit Orders',
-                    value: '12 Active Routes',
-                    subtext: '96.2% on-time SLA',
+                    value: '$inTransitCount Active Routes',
+                    subtext: 'Active field deliveries',
                     icon: Icons.local_shipping_rounded,
                     color: const Color(0xFF2563EB),
                     isDark: isDark,
@@ -129,8 +182,8 @@ class DCDashboardPage extends ConsumerWidget {
                   ),
                   _buildMetricCard(
                     title: 'Cash in Fleet Custody',
-                    value: '₦953,000.00',
-                    subtext: 'Unverified COD collections',
+                    value: CurrencyFormatter.formatNaira(pendingRemittance),
+                    subtext: 'Pending COD remittance',
                     icon: Icons.account_balance_wallet_rounded,
                     color: const Color(0xFF10B981),
                     isDark: isDark,
@@ -139,8 +192,8 @@ class DCDashboardPage extends ConsumerWidget {
                   ),
                   _buildMetricCard(
                     title: 'Returns Awaiting QC',
-                    value: '2 Packages',
-                    subtext: 'Pending inspection & grading',
+                    value: '$pendingReturnsCount Orders',
+                    subtext: 'Pending QC or rescheduling',
                     icon: Icons.assignment_return_rounded,
                     color: const Color(0xFF8B5CF6),
                     isDark: isDark,

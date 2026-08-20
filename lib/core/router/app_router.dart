@@ -50,14 +50,28 @@ final routerProvider = Provider<GoRouter>((ref) {
         debugPrint('[AUTH_ROUTER] 🛑 Access denied for unauthenticated state -> Redirecting to /login');
         return '/login';
       }
-      if (isAuthenticated && isLoggingIn) {
+      if (isAuthenticated) {
         final authState = ref.read(authProvider);
-        if (authState.user?.isDcManager == true) {
-          debugPrint('[AUTH_ROUTER] 🏢 Authenticated DC Manager -> Redirecting to /dc');
+        final isDc = authState.user?.isDcManager == true;
+
+        if (isLoggingIn) {
+          if (isDc) {
+            debugPrint('[AUTH_ROUTER] 🏢 Authenticated DC Manager -> Redirecting to /dc');
+            return '/dc';
+          }
+          debugPrint('[AUTH_ROUTER] ✅ Authenticated Rider user -> Redirecting to /');
+          return '/';
+        }
+
+        if (state.matchedLocation == '/' && isDc) {
+          debugPrint('[AUTH_ROUTER] 🏢 Authenticated DC Manager on root path -> Redirecting to /dc');
           return '/dc';
         }
-        debugPrint('[AUTH_ROUTER] ✅ Authenticated Rider user -> Redirecting to /');
-        return '/';
+
+        if (state.matchedLocation.startsWith('/dc') && !isDc && authState.user != null) {
+          debugPrint('[AUTH_ROUTER] 🚚 Delivery Rider on DC path -> Redirecting to /');
+          return '/';
+        }
       }
       return null;
     },

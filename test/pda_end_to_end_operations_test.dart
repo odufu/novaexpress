@@ -172,6 +172,12 @@ class MockOrdersRemoteDataSource implements OrdersRemoteDataSource {
     String? notes,
     String? scheduledCallbackAt,
   }) async => {'success': true};
+  @override
+  Future<List<OrderModel>> getDistributionCenterOrders(String distributionCenterId) async => orders;
+  @override
+  Future<void> assignOrderToRider({required String orderId, required String riderId, required String riderName, required String riderCode}) async {}
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class MockFinanceRemoteDataSource implements FinanceRemoteDataSource {
