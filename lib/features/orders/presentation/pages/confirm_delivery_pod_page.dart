@@ -94,8 +94,9 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
     final paymentMethod = isDirectTransfer ? 'bank_transfer' : (isPos ? 'pos' : 'cash');
     final amount = double.tryParse(_amountController.text.trim()) ?? 0.0;
     final refNo = _referenceController.text.trim();
+    final orderIdPrefix = (widget.orderId.length >= 4 ? widget.orderId.substring(0, 4) : widget.orderId).toUpperCase();
     final notes = isDirectTransfer
-        ? '[POD Paid via Monnify Direct Transfer • Ref: MNFY-${widget.orderId.substring(0, 4).toUpperCase()}] ₦0 cash held by PDA. Commission credited to My Balance.'
+        ? '[POD Paid via Monnify Direct Transfer • Ref: MNFY-$orderIdPrefix] ₦0 cash held by PDA. Commission credited to My Balance.'
         : (refNo.isNotEmpty
             ? '[POD Collected via $_selectedPaymentMethod (Ref: $refNo)] Cash in custody.'
             : '[POD Collected via $_selectedPaymentMethod] Cash in custody.');

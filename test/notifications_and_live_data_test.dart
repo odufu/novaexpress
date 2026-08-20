@@ -126,6 +126,36 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
   Future<void> logout() async {}
   @override
   Future<UserModel?> getCurrentUser() async => null;
+  @override
+  Future<UserModel> registerDeliveryAgent({
+    required String email,
+    required String password,
+    required String firstName,
+    required String lastName,
+    required String phone,
+    required String personnelType,
+    required String compensationType,
+    required double commissionRate,
+    required double transportAllowance,
+    required double fuelAllowance,
+    required double baseSalary,
+    required String vehicleType,
+    required String vehiclePlateNumber,
+    required String bankName,
+    required String bankAccountNumber,
+    required String bankAccountName,
+    required String distributionCenterId,
+    required String assignedZone,
+  }) async =>
+      UserModel(
+        id: 'mock-agent-id',
+        email: email,
+        firstName: firstName,
+        lastName: lastName,
+        phone: phone,
+        role: 'delivery_agent',
+        deliveryAgentId: 'mock-agent-id',
+      );
 }
 
 class MockAuthNotifier extends AuthNotifier {

@@ -1,7 +1,7 @@
 import '../entities/stock_item.dart';
 
 abstract class StockRepository {
-  Future<List<StockItemEntity>> getVehicleStockItems();
+  Future<List<StockItemEntity>> getVehicleStockItems([String? agentId]);
   Future<Map<String, dynamic>> requestStockTransfer({
     required String agentId,
     required String companyId,

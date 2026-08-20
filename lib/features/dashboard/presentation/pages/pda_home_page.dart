@@ -9,6 +9,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_logo_widget.dart';
 import '../../../../core/widgets/offline_sync_banner.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../finance/domain/entities/financial_summary.dart';
 import '../../../finance/presentation/providers/finance_provider.dart';
 import '../../../notifications/presentation/providers/notifications_provider.dart';
 import '../../../orders/domain/entities/order.dart';
@@ -25,7 +26,7 @@ class _PdaHomePageState extends ConsumerState<PdaHomePage> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       final user = ref.read(authProvider).user;
       final agentId = user?.deliveryAgentId ?? 'b1111111-1111-4111-8111-111111111111';
       ref.read(ordersProvider.notifier).loadOrders(agentId);
@@ -44,12 +45,10 @@ class _PdaHomePageState extends ConsumerState<PdaHomePage> {
 
     final user = authState.user;
     final bool isSalaried = user?.compensationType == 'salary' || user?.personnelType == 'inhouse';
-    final agentName = user != null && user.firstName.isNotEmpty
+    final agentName = user != null && (user.firstName.isNotEmpty || user.lastName.isNotEmpty)
         ? '${user.firstName} ${user.lastName}'.trim()
-        : 'Emeka Rider';
-    final agentId = user?.deliveryAgentCode ?? (user?.id.isNotEmpty == true
-        ? 'PDA-${user!.id.substring(0, 4).toUpperCase()}'
-        : 'PDA-7000');
+        : (user?.fullName.isNotEmpty == true ? user!.fullName : '');
+    final agentId = user?.deliveryAgentCode ?? '';
     final agentRole = isSalaried ? 'In-House Staff' : 'Freelance PDA';
 
     final orders = ordersState.orders;
@@ -68,31 +67,17 @@ class _PdaHomePageState extends ConsumerState<PdaHomePage> {
         ? ((successfulCount / totalAssignedToday) * 100).round()
         : 0;
 
-    final commissionPerOrder = user?.commissionRate ?? (user?.isPda == false ? 500.0 : 1000.0);
-    final transportPerOrder = user?.isPda == false ? (user?.fuelAllowance ?? 800.0) : (user?.transportAllowance ?? 1500.0);
-    final totalEarningPerOrder = commissionPerOrder + transportPerOrder;
+    final summary = FinancialSummary.calculate(
+      orders: orders,
+      remittances: financeState.remittances,
+      user: user,
+      manualEarnedBalance: financeState.totalEarnedBalance,
+    );
 
-    final deliveredOrders = orders.where((o) => o.status == 'delivered').toList();
-    final deliveredCashOrders = deliveredOrders.where((o) => o.paymentType != 'prepaid' && o.isPod).toList();
-    final deliveredPrepaidOrders = deliveredOrders.where((o) => o.paymentType == 'prepaid' || !o.isPod).toList();
-
-    final double cashCollectedToday = deliveredCashOrders.fold(0.0, (acc, o) => acc + o.totalAmount);
-    final double riderCashEarningsRetained = deliveredCashOrders.length * totalEarningPerOrder;
-
-    final double remittedTotal = financeState.remittances
-        .where((r) => r.isVerified || r.status.toLowerCase() == 'approved')
-        .fold(0.0, (acc, r) => acc + r.amount);
-    final double pendingApproval = financeState.remittances
-        .where((r) => r.isPending || r.status.toLowerCase() == 'submitted')
-        .fold(0.0, (acc, r) => acc + r.amount);
-
-    final double pendingRemittance = (cashCollectedToday - riderCashEarningsRetained - remittedTotal - pendingApproval).clamp(0.0, double.infinity);
-    final double riderBalance = isSalaried
-        ? (user?.baseSalary ?? 150000.0)
-        : (financeState.totalEarnedBalance > 0 ? financeState.totalEarnedBalance : (deliveredPrepaidOrders.length * totalEarningPerOrder));
-    final double monthlyEarnings = isSalaried
-        ? (user?.baseSalary ?? 150000.0)
-        : (deliveredOrders.length * totalEarningPerOrder);
+    final double cashCollectedToday = summary.cashCollectedToday;
+    final double pendingRemittance = summary.pendingRemittanceToDC;
+    final double riderBalance = summary.myDirectTransfersBalance;
+    final double monthlyEarnings = summary.totalMonthEarnings;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -117,7 +102,7 @@ class _PdaHomePageState extends ConsumerState<PdaHomePage> {
                 radius: 16,
                 backgroundColor: AppColors.primary,
                 child: Text(
-                  agentName.substring(0, 1).toUpperCase(),
+                  agentName.isNotEmpty ? agentName.substring(0, 1).toUpperCase() : 'U',
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
@@ -630,10 +615,10 @@ class _PdaHomePageState extends ConsumerState<PdaHomePage> {
                                     Text(
                                       'MY BALANCE',
                                       style: GoogleFonts.inter(
-                                        fontSize: 11,
+                                        fontSize: 10.5,
                                         fontWeight: FontWeight.w800,
                                         color: const Color(0xFF93C5FD),
-                                        letterSpacing: 0.6,
+                                        letterSpacing: 0.5,
                                       ),
                                     ),
                                     const SizedBox(width: 4),
@@ -641,10 +626,11 @@ class _PdaHomePageState extends ConsumerState<PdaHomePage> {
                                       child: Text(
                                         '(Direct Transfers)',
                                         style: GoogleFonts.inter(
-                                          fontSize: 10.5,
+                                          fontSize: 9.5,
                                           color: const Color(0xFFCBD5E1),
                                           fontWeight: FontWeight.w500,
                                         ),
+                                        maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),

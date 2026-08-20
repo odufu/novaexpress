@@ -8,8 +8,8 @@ class StockRepositoryImpl implements StockRepository {
   StockRepositoryImpl({required this.remoteDataSource});
 
   @override
-  Future<List<StockItemEntity>> getVehicleStockItems() async {
-    return await remoteDataSource.getVehicleStockItems();
+  Future<List<StockItemEntity>> getVehicleStockItems([String? agentId]) async {
+    return await remoteDataSource.getVehicleStockItems(agentId);
   }
 
   @override

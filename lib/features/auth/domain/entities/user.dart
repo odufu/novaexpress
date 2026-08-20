@@ -9,6 +9,7 @@ class UserEntity {
   final String? companyId;
   final String? deliveryAgentId;
   final String? deliveryAgentCode;
+  final String? distributionCenterId;
   final String? distributionCenterName;
   final int? lifetimeDeliveriesCount;
   final double? rating;
@@ -39,6 +40,7 @@ class UserEntity {
     this.companyId,
     this.deliveryAgentId,
     this.deliveryAgentCode = '',
+    this.distributionCenterId,
     this.distributionCenterName = '',
     this.lifetimeDeliveriesCount = 0,
     this.rating = 0.0,
@@ -60,6 +62,7 @@ class UserEntity {
   });
 
   String get fullName => '$firstName $lastName'.trim();
-  bool get isPda => personnelType == 'pda';
-  bool get isInHouseRider => personnelType == 'in_house_rider';
+  bool get isPda => (role == 'delivery_agent' || role == 'pda') && personnelType == 'pda';
+  bool get isInHouseRider => role == 'delivery_agent' && personnelType == 'in_house_rider';
+  bool get isDcManager => role == 'dc_manager' || role == 'dc_supervisor' || role == 'super_admin';
 }

@@ -3,32 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/helpers/formatters.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
+import '../../domain/entities/financial_summary.dart';
+import '../../domain/entities/transaction_item.dart';
 import '../providers/finance_provider.dart';
-
-class TransactionItem {
-  final String id;
-  final String title;
-  final String category; // 'earnings', 'remittance', 'direct_transfer', 'payout'
-  final double amount;
-  final bool isCredit;
-  final DateTime timestamp;
-  final String reference;
-  final String status; // 'settled', 'verified', 'pending', 'approved'
-  final String description;
-
-  TransactionItem({
-    required this.id,
-    required this.title,
-    required this.category,
-    required this.amount,
-    required this.isCredit,
-    required this.timestamp,
-    required this.reference,
-    required this.status,
-    required this.description,
-  });
-}
 
 class TransactionHistoryPage extends ConsumerStatefulWidget {
   const TransactionHistoryPage({super.key});
@@ -40,74 +19,16 @@ class TransactionHistoryPage extends ConsumerStatefulWidget {
 class _TransactionHistoryPageState extends ConsumerState<TransactionHistoryPage> {
   String _selectedCategory = 'all'; // 'all', 'earnings', 'direct_transfer', 'remittance', 'payout'
 
-  final List<TransactionItem> _defaultTransactions = [
-    TransactionItem(
-      id: 'TXN-9021',
-      title: 'Direct Transfer Credit (TRK-8924)',
-      category: 'direct_transfer',
-      amount: 2500.0,
-      isCredit: true,
-      timestamp: DateTime.now().subtract(const Duration(minutes: 45)),
-      reference: 'MNFY-TRK-8924',
-      status: 'settled',
-      description: 'Commission (₦1,000) + Transport Allowance (₦1,500) credited to My Balance from Monnify customer transfer.',
-    ),
-    TransactionItem(
-      id: 'TXN-9018',
-      title: 'Cash POD Collection (TRK-8923)',
-      category: 'earnings',
-      amount: 27500.0,
-      isCredit: false,
-      timestamp: DateTime.now().subtract(const Duration(hours: 2)),
-      reference: 'POD-8923-CASH',
-      status: 'pending',
-      description: 'Cash in physical custody. Added to To Remit ledger for end of day settlement.',
-    ),
-    TransactionItem(
-      id: 'TXN-9005',
-      title: 'Balance Payout Requested',
-      category: 'payout',
-      amount: 15000.0,
-      isCredit: false,
-      timestamp: DateTime.now().subtract(const Duration(hours: 4)),
-      reference: 'PAY-0082',
-      status: 'pending',
-      description: 'Withdrawal from My Balance to Zenith Bank (0123456789). Awaiting DC Approval.',
-    ),
-    TransactionItem(
-      id: 'TXN-8992',
-      title: 'Remittance Verified & Reconciled',
-      category: 'remittance',
-      amount: 15000.0,
-      isCredit: false,
-      timestamp: DateTime.now().subtract(const Duration(days: 1)),
-      reference: 'RMT-0004',
-      status: 'verified',
-      description: 'Bank transfer remittance reconciled by Wuse DC Finance desk.',
-    ),
-    TransactionItem(
-      id: 'TXN-8980',
-      title: 'Delivery Commission Payout Disbursed',
-      category: 'payout',
-      amount: 20000.0,
-      isCredit: true,
-      timestamp: DateTime.now().subtract(const Duration(days: 6)),
-      reference: 'DISB-88374291',
-      status: 'approved',
-      description: 'Disbursement paid into registered Zenith Bank account.',
-    ),
-    TransactionItem(
-      id: 'TXN-8975',
-      title: 'Remittance Verified & Reconciled',
-      category: 'remittance',
-      amount: 10000.0,
-      isCredit: false,
-      timestamp: DateTime.now().subtract(const Duration(days: 8)),
-      reference: 'RMT-0002',
-      status: 'verified',
-      description: 'Bank transfer remittance reconciled by Wuse DC Finance desk.',
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final user = ref.read(authProvider).user;
+      final agentId = user?.deliveryAgentId ?? 'b1111111-1111-4111-8111-111111111111';
+      ref.read(financeProvider.notifier).loadRemittances(agentId);
+      ref.read(ordersProvider.notifier).loadOrders(agentId);
+    });
+  }
 
   void _showTransactionDetailsModal(BuildContext context, TransactionItem item) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -127,7 +48,14 @@ class _TransactionHistoryPageState extends ConsumerState<TransactionHistoryPage>
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(item.id, style: GoogleFonts.jetBrainsMono(fontSize: 15, fontWeight: FontWeight.bold)),
+                Expanded(
+                  child: Text(
+                    item.id,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.jetBrainsMono(fontSize: 15, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
@@ -165,6 +93,7 @@ class _TransactionHistoryPageState extends ConsumerState<TransactionHistoryPage>
             Text('Timestamp: ${item.timestamp.day} Aug 2026 • ${item.timestamp.hour}:${item.timestamp.minute.toString().padLeft(2, '0')}', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
             const SizedBox(height: 12),
             Container(
+              width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
@@ -188,25 +117,83 @@ class _TransactionHistoryPageState extends ConsumerState<TransactionHistoryPage>
     );
   }
 
+  List<TransactionItem> _getLiveOrDerivedTransactions(
+    FinanceState financeState,
+    OrdersState ordersState,
+  ) {
+    if (financeState.transactions.isNotEmpty) {
+      return financeState.transactions;
+    }
+
+    // Dynamic derivation from live state if table is syncing
+    final List<TransactionItem> derived = [];
+
+    // Remittances
+    for (final r in financeState.remittances) {
+      derived.add(
+        TransactionItem(
+          id: r.id.length >= 8 ? 'RMT-${r.id.substring(0, 4).toUpperCase()}' : r.id,
+          title: r.isVerified ? 'Remittance Verified & Reconciled' : 'Remittance Submitted to DC',
+          category: 'remittance',
+          amount: r.amount,
+          isCredit: false,
+          timestamp: r.createdAt,
+          reference: r.referenceNumber,
+          status: r.status,
+          description: (r.notes != null && r.notes!.isNotEmpty)
+              ? r.notes!
+              : 'Bank transfer remittance (${CurrencyFormatter.formatNaira(r.amount)}) to Distribution Center.',
+        ),
+      );
+    }
+
+    // Delivered Orders
+    final deliveredOrders = ordersState.orders.where((o) => o.status == 'delivered').toList();
+    for (final o in deliveredOrders) {
+      final isPrepaid = o.paymentType == 'prepaid' || !o.isPod;
+      derived.add(
+        TransactionItem(
+          id: 'TXN-${o.orderNumber}',
+          title: isPrepaid
+              ? 'Direct Transfer Credit (${o.orderNumber})'
+              : 'Cash POD Collection (${o.orderNumber})',
+          category: isPrepaid ? 'direct_transfer' : 'earnings',
+          amount: isPrepaid ? 2500.0 : o.totalAmount,
+          isCredit: isPrepaid,
+          timestamp: o.createdAt,
+          reference: o.orderNumber,
+          status: isPrepaid ? 'settled' : 'pending',
+          description: isPrepaid
+              ? 'Commission (₦1,000) + Transport Allowance (₦1,500) credited to My Balance from customer prepaid transfer.'
+              : 'Cash in physical custody for ${o.productName}. Added to To Remit ledger.',
+        ),
+      );
+    }
+
+    derived.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    return derived;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final authState = ref.watch(authProvider);
     final financeState = ref.watch(financeProvider);
     final ordersState = ref.watch(ordersProvider);
 
-    final double toRemit = financeState.cashInCustody > 0
-        ? financeState.cashInCustody
-        : ordersState.orders.where((o) => o.status == 'delivered' && o.paymentType != 'prepaid').fold(0.0, (acc, o) => acc + o.totalAmount);
-    final double remitted = financeState.remittances.where((r) => r.status.toLowerCase() == 'approved').fold(0.0, (acc, r) => acc + r.amount);
-    final double pendingApproval = financeState.remittances.where((r) => r.status.toLowerCase() == 'pending' || r.status.toLowerCase() == 'submitted').fold(0.0, (acc, r) => acc + r.amount);
-    final double cashCollected = toRemit + remitted + pendingApproval;
-    final double riderBalance = financeState.totalEarnedBalance > 0 ? financeState.totalEarnedBalance : 18500.0;
-    final double monthlyEarnings = riderBalance;
+    final summary = FinancialSummary.calculate(
+      orders: ordersState.orders,
+      remittances: financeState.remittances,
+      user: authState.user,
+      manualEarnedBalance: financeState.totalEarnedBalance,
+    );
 
-    final filteredList = _defaultTransactions.where((t) {
+    final transactionsList = _getLiveOrDerivedTransactions(financeState, ordersState);
+
+    final filteredList = transactionsList.where((t) {
       if (_selectedCategory == 'all') return true;
-      return t.category == _selectedCategory;
+      return t.category.toLowerCase() == _selectedCategory.toLowerCase();
     }).toList();
 
     return Scaffold(
@@ -227,200 +214,223 @@ class _TransactionHistoryPageState extends ConsumerState<TransactionHistoryPage>
           ),
         ),
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 1. TOP BRAND DARK BLUE SUMMARY HEADER
-            Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E293B) : const Color(0xFF0F172A),
-                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(22)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.12),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'FINANCIAL SUMMARY OVERVIEW',
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.8,
-                      color: const Color(0xFF94A3B8),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          final user = ref.read(authProvider).user;
+          final agentId = user?.deliveryAgentId ?? 'b1111111-1111-4111-8111-111111111111';
+          await Future.wait([
+            ref.read(financeProvider.notifier).loadRemittances(agentId),
+            ref.read(ordersProvider.notifier).loadOrders(agentId),
+          ]);
+        },
+        color: const Color(0xFF2563EB),
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 1. TOP BRAND DARK BLUE SUMMARY HEADER (Unified with Home & Remittance Screens)
+              Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E293B) : const Color(0xFF0F172A),
+                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(22)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.12),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
                     ),
-                  ),
-                  const SizedBox(height: 10),
+                  ],
+                ),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'FINANCIAL SUMMARY OVERVIEW',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
+                        color: const Color(0xFF94A3B8),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
 
-                  // 4-Column Summary Container matching reference
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF0F172A) : const Color(0xFF1E293B),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFF334155)),
+                    // 4-Column Summary Container matching reference & live unified data
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFF1E293B),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFF334155)),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _buildSummaryMetricColumn(
+                              icon: Icons.account_balance_rounded,
+                              iconColor: const Color(0xFF60A5FA),
+                              label: 'My Balance',
+                              sublabel: '(Direct Transfers)',
+                              amount: CurrencyFormatter.formatNaira(summary.myDirectTransfersBalance),
+                              amountColor: const Color(0xFF60A5FA),
+                            ),
+                          ),
+                          _buildVerticalDivider(),
+                          Expanded(
+                            child: _buildSummaryMetricColumn(
+                              icon: Icons.account_balance_wallet_rounded,
+                              iconColor: const Color(0xFF4ADE80),
+                              label: 'Earnings',
+                              sublabel: '(This month)',
+                              amount: CurrencyFormatter.formatNaira(summary.totalMonthEarnings),
+                              amountColor: const Color(0xFF4ADE80),
+                            ),
+                          ),
+                          _buildVerticalDivider(),
+                          Expanded(
+                            child: _buildSummaryMetricColumn(
+                              icon: Icons.payments_rounded,
+                              iconColor: const Color(0xFFCBD5E1),
+                              label: 'Collected',
+                              sublabel: '(Today)',
+                              amount: CurrencyFormatter.formatNaira(summary.cashCollectedToday),
+                              amountColor: Colors.white,
+                            ),
+                          ),
+                          _buildVerticalDivider(),
+                          Expanded(
+                            child: _buildSummaryMetricColumn(
+                              icon: Icons.north_east_rounded,
+                              iconColor: const Color(0xFFFB923C),
+                              label: 'To Remit',
+                              sublabel: '(Cash Custody)',
+                              amount: CurrencyFormatter.formatNaira(summary.pendingRemittanceToDC),
+                              amountColor: const Color(0xFFFB923C),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    child: Row(
+                    const SizedBox(height: 12),
+
+                    // Quick Action Links: [ Request Payout ] | [ Remit Cash ]
+                    Row(
                       children: [
                         Expanded(
-                          child: _buildSummaryMetricColumn(
-                            icon: Icons.account_balance_rounded,
-                            iconColor: const Color(0xFF60A5FA),
-                            label: 'My Balance',
-                            sublabel: '(Direct Transfers)',
-                            amount: CurrencyFormatter.formatNaira(riderBalance),
-                            amountColor: const Color(0xFF60A5FA),
+                          child: ElevatedButton.icon(
+                            onPressed: () => context.push('/finance/payouts'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF2563EB),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 9),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            icon: const Icon(Icons.payments_outlined, size: 15),
+                            label: Text('Request Payout', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold)),
                           ),
                         ),
-                        _buildVerticalDivider(),
+                        const SizedBox(width: 10),
                         Expanded(
-                          child: _buildSummaryMetricColumn(
-                            icon: Icons.account_balance_wallet_rounded,
-                            iconColor: const Color(0xFF4ADE80),
-                            label: 'Earnings',
-                            sublabel: '(This month)',
-                            amount: CurrencyFormatter.formatNaira(monthlyEarnings),
-                            amountColor: const Color(0xFF4ADE80),
-                          ),
-                        ),
-                        _buildVerticalDivider(),
-                        Expanded(
-                          child: _buildSummaryMetricColumn(
-                            icon: Icons.payments_rounded,
-                            iconColor: const Color(0xFFCBD5E1),
-                            label: 'Collected',
-                            sublabel: '(Today)',
-                            amount: CurrencyFormatter.formatNaira(cashCollected),
-                            amountColor: Colors.white,
-                          ),
-                        ),
-                        _buildVerticalDivider(),
-                        Expanded(
-                          child: _buildSummaryMetricColumn(
-                            icon: Icons.north_east_rounded,
-                            iconColor: const Color(0xFFFB923C),
-                            label: 'To Remit',
-                            sublabel: '(Cash Custody)',
-                            amount: CurrencyFormatter.formatNaira(toRemit),
-                            amountColor: const Color(0xFFFB923C),
+                          child: ElevatedButton.icon(
+                            onPressed: () => context.push('/cash/remit'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFEA580C),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 9),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            icon: const Icon(Icons.arrow_forward_rounded, size: 15),
+                            label: Text('Remit Cash', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold)),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 12),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
 
-                  // Quick Action Links: [ Request Payout ] | [ Remit Cash ]
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () => context.push('/finance/payouts'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF2563EB),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 9),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              // 2. TRANSACTIONS LIST SECTION
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'TRANSACTION AUDIT LOG',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.6,
+                            color: const Color(0xFF475569),
                           ),
-                          icon: const Icon(Icons.payments_outlined, size: 15),
-                          label: Text('Request Payout', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold)),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () => context.push('/cash/remit'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFEA580C),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 9),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        if (financeState.isLoading)
+                          const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
                           ),
-                          icon: const Icon(Icons.arrow_forward_rounded, size: 15),
-                          label: Text('Remit Cash', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Filter Pills
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _buildFilterPill('All (${transactionsList.length})', 'all', isDark),
+                          const SizedBox(width: 8),
+                          _buildFilterPill('Direct Transfers', 'direct_transfer', isDark),
+                          const SizedBox(width: 8),
+                          _buildFilterPill('Remittances', 'remittance', isDark),
+                          const SizedBox(width: 8),
+                          _buildFilterPill('Earnings', 'earnings', isDark),
+                          const SizedBox(width: 8),
+                          _buildFilterPill('Payouts', 'payout', isDark),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Transaction Cards List
+                    if (filteredList.isNotEmpty) ...[
+                      ...filteredList.map((t) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: _buildTransactionCard(context, t, isDark, theme),
+                          )),
+                    ] else ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(28),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                        ),
+                        child: Center(
+                          child: Text(
+                            'No transactions found in this category.',
+                            style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B)),
+                          ),
                         ),
                       ),
                     ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
 
-            // 2. TRANSACTIONS LIST SECTION
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'TRANSACTION AUDIT LOG',
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.6,
-                      color: const Color(0xFF475569),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-
-                  // Filter Pills
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        _buildFilterPill('All (${_defaultTransactions.length})', 'all', isDark),
-                        const SizedBox(width: 8),
-                        _buildFilterPill('Direct Transfers', 'direct_transfer', isDark),
-                        const SizedBox(width: 8),
-                        _buildFilterPill('Remittances', 'remittance', isDark),
-                        const SizedBox(width: 8),
-                        _buildFilterPill('Earnings', 'earnings', isDark),
-                        const SizedBox(width: 8),
-                        _buildFilterPill('Payouts', 'payout', isDark),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-
-                  // Transaction Cards List
-                  if (filteredList.isNotEmpty) ...[
-                    ...filteredList.map((t) => Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: _buildTransactionCard(context, t, isDark, theme),
-                        )),
-                  ] else ...[
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(28),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                      ),
-                      child: Center(
-                        child: Text(
-                          'No transactions found in this category.',
-                          style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B)),
-                        ),
-                      ),
-                    ),
+                    const SizedBox(height: 24),
                   ],
-
-                  const SizedBox(height: 24),
-                ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../providers/auth_provider.dart';
 
@@ -13,16 +14,30 @@ class LoginForm extends ConsumerStatefulWidget {
 
 class _LoginFormState extends ConsumerState<LoginForm> {
   final _formKey = GlobalKey<FormState>();
-  final _agentIdController = TextEditingController(text: 'rider.emeka@novaexpress.com');
+  final _agentIdController = TextEditingController(text: 'emeka.rider@novaexpress.ng');
   final _passwordController = TextEditingController(text: 'Password123!');
   bool _obscurePassword = true;
   bool _rememberMe = true;
+  String _selectedRole = 'rider'; // 'rider' | 'dc_manager'
 
   @override
   void dispose() {
     _agentIdController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  void _selectRole(String role) {
+    setState(() {
+      _selectedRole = role;
+      if (role == 'rider') {
+        _agentIdController.text = 'emeka.rider@novaexpress.ng';
+        _passwordController.text = 'Password123!';
+      } else {
+        _agentIdController.text = 'dc.supervisor@novaexpress.ng';
+        _passwordController.text = 'Password123!';
+      }
+    });
   }
 
   void _submit() async {
@@ -36,8 +51,14 @@ class _LoginFormState extends ConsumerState<LoginForm> {
 
       debugPrint('[AUTH_UI] 🎯 authProvider.login() completed -> success: $success');
       if (success && mounted) {
-        debugPrint('[AUTH_UI] 🚀 Navigating user to dashboard via context.go(\'/\')...');
-        context.go('/');
+        final authState = ref.read(authProvider);
+        if (authState.user?.isDcManager == true || _selectedRole == 'dc_manager' || email.contains('dc.')) {
+          debugPrint('[AUTH_UI] 🏢 Navigating DC Manager to DC Operations Console (/dc)...');
+          context.go('/dc');
+        } else {
+          debugPrint('[AUTH_UI] 🚚 Navigating Delivery Agent to PDA Dashboard (/)...');
+          context.go('/');
+        }
       }
     } else {
       debugPrint('[AUTH_UI] ⚠️ Form validation failed. Missing required fields.');
@@ -53,6 +74,82 @@ class _LoginFormState extends ConsumerState<LoginForm> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Quick Test Account Selector Ribbon
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'TEST LOGIN SELECTOR',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.6,
+                          color: const Color(0xFF64748B),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2563EB).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'Auto-fills Credentials',
+                        style: GoogleFonts.inter(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF2563EB),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+
+                // Card 1: Delivery Agent (PDA Rider)
+                _buildRoleCard(
+                  roleKey: 'rider',
+                  title: 'Emeka Rider (PDA-7000)',
+                  subtitle: 'Parent DC: Wuse Distribution Center (DC-WUSE-01)',
+                  tag: 'PDA Mobile View',
+                  icon: Icons.two_wheeler_rounded,
+                  activeColor: AppColors.orange,
+                  isSelected: _selectedRole == 'rider',
+                  onTap: () => _selectRole('rider'),
+                ),
+
+                const SizedBox(height: 8),
+
+                // Card 2: DC Operations Supervisor (Console Mode)
+                _buildRoleCard(
+                  roleKey: 'dc_manager',
+                  title: 'Adekunle Supervisor (DC Manager)',
+                  subtitle: 'Managing DC: Wuse Distribution Center (DC-WUSE-01)',
+                  tag: 'DC Console Mode',
+                  icon: Icons.admin_panel_settings_rounded,
+                  activeColor: const Color(0xFF0B192C),
+                  isSelected: _selectedRole == 'dc_manager',
+                  onTap: () => _selectRole('dc_manager'),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
           if (authState.errorMessage != null) ...[
             Container(
               padding: const EdgeInsets.all(12),
@@ -77,9 +174,9 @@ class _LoginFormState extends ConsumerState<LoginForm> {
             ),
           ],
 
-          // Agent ID Field
+          // Agent ID / Email Field
           const Text(
-            'Agent ID',
+            'Account Email / Agent ID',
             style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 14,
@@ -89,9 +186,9 @@ class _LoginFormState extends ConsumerState<LoginForm> {
           const SizedBox(height: 6),
           TextFormField(
             controller: _agentIdController,
-            style: const TextStyle(color: Color(0xFF181C1E), fontSize: 15),
+            style: const TextStyle(color: Color(0xFF181C1E), fontSize: 14),
             decoration: InputDecoration(
-              hintText: 'Enter your Agent ID',
+              hintText: 'Enter your Account Email or Agent ID',
               hintStyle: const TextStyle(color: Color(0xFF75777E), fontSize: 14),
               filled: true,
               fillColor: const Color(0xFFF7FAFC),
@@ -111,7 +208,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
               ),
             ),
             validator: (val) {
-              if (val == null || val.isEmpty) return 'Please enter your Agent ID';
+              if (val == null || val.isEmpty) return 'Please enter your account email or ID';
               return null;
             },
           ),
@@ -130,7 +227,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
           TextFormField(
             controller: _passwordController,
             obscureText: _obscurePassword,
-            style: const TextStyle(color: Color(0xFF181C1E), fontSize: 15),
+            style: const TextStyle(color: Color(0xFF181C1E), fontSize: 14),
             decoration: InputDecoration(
               hintText: 'Enter your Password',
               hintStyle: const TextStyle(color: Color(0xFF75777E), fontSize: 14),
@@ -181,10 +278,11 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                 },
                 borderRadius: BorderRadius.circular(4),
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     SizedBox(
-                      width: 24,
-                      height: 24,
+                      width: 20,
+                      height: 20,
                       child: Checkbox(
                         value: _rememberMe,
                         activeColor: AppColors.orange,
@@ -199,12 +297,12 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                         },
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
                     const Text(
                       'Remember me',
                       style: TextStyle(
                         color: Color(0xFF44474D),
-                        fontSize: 14,
+                        fontSize: 13,
                       ),
                     ),
                   ],
@@ -217,7 +315,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                   style: TextStyle(
                     color: AppColors.navy,
                     fontWeight: FontWeight.bold,
-                    fontSize: 14,
+                    fontSize: 13,
                   ),
                 ),
               ),
@@ -228,14 +326,14 @@ class _LoginFormState extends ConsumerState<LoginForm> {
           // Sign In Button
           SizedBox(
             width: double.infinity,
-            height: 48,
+            height: 50,
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.orange,
+                backgroundColor: _selectedRole == 'dc_manager' ? const Color(0xFF0B192C) : AppColors.orange,
                 foregroundColor: Colors.white,
                 elevation: 1,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(10),
                 ),
               ),
               onPressed: authState.isLoading ? null : _submit,
@@ -245,23 +343,127 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                       height: 22,
                       child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                     )
-                  : const Row(
+                  : Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          'Sign In',
-                          style: TextStyle(
-                            fontSize: 16,
+                          _selectedRole == 'dc_manager' ? 'Sign In to DC Console' : 'Sign In to PDA App',
+                          style: const TextStyle(
+                            fontSize: 15,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        SizedBox(width: 8),
-                        Icon(Icons.arrow_forward_rounded, size: 20),
+                        const SizedBox(width: 8),
+                        const Icon(Icons.arrow_forward_rounded, size: 18),
                       ],
                     ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildRoleCard({
+    required String roleKey,
+    required String title,
+    required String subtitle,
+    required String tag,
+    required IconData icon,
+    required Color activeColor,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: isSelected ? Colors.white : const Color(0xFFF8FAFC),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected ? activeColor : const Color(0xFFCBD5E1),
+              width: isSelected ? 2 : 1,
+            ),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: activeColor.withValues(alpha: 0.12),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : [],
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: isSelected ? activeColor.withValues(alpha: 0.12) : const Color(0xFFE2E8F0),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  size: 18,
+                  color: isSelected ? activeColor : const Color(0xFF64748B),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            title,
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFF0F172A),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: isSelected ? activeColor : const Color(0xFFE2E8F0),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            tag,
+                            style: GoogleFonts.inter(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: isSelected ? Colors.white : const Color(0xFF64748B),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: GoogleFonts.inter(
+                        fontSize: 10.5,
+                        color: const Color(0xFF64748B),
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

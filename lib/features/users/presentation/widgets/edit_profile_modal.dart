@@ -191,7 +191,7 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> {
                           radius: 28,
                           backgroundColor: AppColors.primary,
                           child: Text(
-                            preset['label']!.substring(0, 1),
+                            preset['label']!.isNotEmpty ? preset['label']!.substring(0, 1) : 'U',
                             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
                           ),
                         ),

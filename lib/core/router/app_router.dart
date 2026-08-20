@@ -25,6 +25,7 @@ import '../../features/stock/presentation/pages/stock_details_grazer_page.dart';
 import '../../features/stock/presentation/pages/stock_handover_page.dart';
 import '../../features/stock/presentation/pages/stock_history_page.dart';
 import '../../features/users/presentation/pages/user_profile_page.dart';
+import '../../features/dc_console/presentation/pages/dc_console_layout.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final isAuthFromState = ref.watch(authProvider.select((s) => s.isAuthenticated));
@@ -50,7 +51,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         return '/login';
       }
       if (isAuthenticated && isLoggingIn) {
-        debugPrint('[AUTH_ROUTER] ✅ Authenticated user on login screen -> Redirecting to /');
+        final authState = ref.read(authProvider);
+        if (authState.user?.isDcManager == true) {
+          debugPrint('[AUTH_ROUTER] 🏢 Authenticated DC Manager -> Redirecting to /dc');
+          return '/dc';
+        }
+        debugPrint('[AUTH_ROUTER] ✅ Authenticated Rider user -> Redirecting to /');
         return '/';
       }
       return null;
@@ -71,6 +77,25 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/',
         builder: (context, state) => const MainBottomNavShell(),
+      ),
+      GoRoute(
+        path: '/dc',
+        builder: (context, state) => const DCConsoleLayout(),
+        routes: [
+          GoRoute(path: 'dashboard', builder: (context, state) => const DCConsoleLayout()),
+          GoRoute(path: 'orders', builder: (context, state) => const DCConsoleLayout()),
+          GoRoute(path: 'inventory', builder: (context, state) => const DCConsoleLayout()),
+          GoRoute(path: 'remittances', builder: (context, state) => const DCConsoleLayout()),
+          GoRoute(path: 'returns', builder: (context, state) => const DCConsoleLayout()),
+          GoRoute(path: 'payouts', builder: (context, state) => const DCConsoleLayout()),
+          GoRoute(path: 'riders', builder: (context, state) => const DCConsoleLayout()),
+          // Aliases for seamless backward compatibility
+          GoRoute(path: 'fleet', builder: (context, state) => const DCConsoleLayout()),
+          GoRoute(path: 'stock', builder: (context, state) => const DCConsoleLayout()),
+          GoRoute(path: 'dispatch', builder: (context, state) => const DCConsoleLayout()),
+          GoRoute(path: 'finance', builder: (context, state) => const DCConsoleLayout()),
+          GoRoute(path: 'analytics', builder: (context, state) => const DCConsoleLayout()),
+        ],
       ),
       GoRoute(
         path: '/notifications',

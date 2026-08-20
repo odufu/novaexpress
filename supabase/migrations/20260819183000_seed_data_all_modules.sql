@@ -94,6 +94,65 @@ ALTER TABLE IF EXISTS agent_inventory ADD COLUMN IF NOT EXISTS delivered_count_t
 ALTER TABLE IF EXISTS agent_inventory ADD COLUMN IF NOT EXISTS returned_count INT DEFAULT 0;
 ALTER TABLE IF EXISTS agent_inventory ADD COLUMN IF NOT EXISTS awaiting_return_count INT DEFAULT 0;
 
+ALTER TABLE IF EXISTS cash_remittances ALTER COLUMN deposit_receipt_url DROP NOT NULL;
+ALTER TABLE IF EXISTS cash_remittances ADD COLUMN IF NOT EXISTS deposit_receipt_url TEXT;
+ALTER TABLE IF EXISTS cash_remittances ADD COLUMN IF NOT EXISTS reference_number VARCHAR(100);
+ALTER TABLE IF EXISTS cash_remittances ADD COLUMN IF NOT EXISTS gross_collections NUMERIC(14,2) DEFAULT 0.00;
+ALTER TABLE IF EXISTS cash_remittances ADD COLUMN IF NOT EXISTS commission_deducted NUMERIC(14,2) DEFAULT 0.00;
+ALTER TABLE IF EXISTS cash_remittances ADD COLUMN IF NOT EXISTS transport_allowance_deducted NUMERIC(14,2) DEFAULT 0.00;
+ALTER TABLE IF EXISTS cash_remittances ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50) DEFAULT 'bank_transfer';
+ALTER TABLE IF EXISTS cash_remittances ADD COLUMN IF NOT EXISTS verified_by_name VARCHAR(100);
+ALTER TABLE IF EXISTS cash_remittances ADD COLUMN IF NOT EXISTS verified_at TIMESTAMPTZ;
+
+CREATE TABLE IF NOT EXISTS payout_requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    payout_number VARCHAR(100),
+    delivery_agent_id UUID,
+    amount NUMERIC(14,2) DEFAULT 0.00,
+    bank_name VARCHAR(100),
+    account_number VARCHAR(50),
+    account_name VARCHAR(255),
+    status VARCHAR(50) DEFAULT 'pending',
+    disbursement_ref VARCHAR(100),
+    dc_notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE IF EXISTS payout_requests ADD COLUMN IF NOT EXISTS payout_number VARCHAR(100);
+ALTER TABLE IF EXISTS payout_requests ADD COLUMN IF NOT EXISTS delivery_agent_id UUID;
+ALTER TABLE IF EXISTS payout_requests ADD COLUMN IF NOT EXISTS amount NUMERIC(14,2) DEFAULT 0.00;
+ALTER TABLE IF EXISTS payout_requests ADD COLUMN IF NOT EXISTS bank_name VARCHAR(100);
+ALTER TABLE IF EXISTS payout_requests ADD COLUMN IF NOT EXISTS account_number VARCHAR(50);
+ALTER TABLE IF EXISTS payout_requests ADD COLUMN IF NOT EXISTS account_name VARCHAR(255);
+ALTER TABLE IF EXISTS payout_requests ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'pending';
+ALTER TABLE IF EXISTS payout_requests ADD COLUMN IF NOT EXISTS disbursement_ref VARCHAR(100);
+ALTER TABLE IF EXISTS payout_requests ADD COLUMN IF NOT EXISTS dc_notes TEXT;
+
+CREATE TABLE IF NOT EXISTS rider_transactions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    delivery_agent_id UUID,
+    transaction_code VARCHAR(100),
+    title VARCHAR(255),
+    category VARCHAR(100),
+    amount NUMERIC(14,2) DEFAULT 0.00,
+    is_credit BOOLEAN DEFAULT true,
+    reference VARCHAR(100),
+    status VARCHAR(50) DEFAULT 'settled',
+    description TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE IF EXISTS rider_transactions ADD COLUMN IF NOT EXISTS delivery_agent_id UUID;
+ALTER TABLE IF EXISTS rider_transactions ADD COLUMN IF NOT EXISTS transaction_code VARCHAR(100);
+ALTER TABLE IF EXISTS rider_transactions ADD COLUMN IF NOT EXISTS title VARCHAR(255);
+ALTER TABLE IF EXISTS rider_transactions ADD COLUMN IF NOT EXISTS category VARCHAR(100);
+ALTER TABLE IF EXISTS rider_transactions ADD COLUMN IF NOT EXISTS amount NUMERIC(14,2) DEFAULT 0.00;
+ALTER TABLE IF EXISTS rider_transactions ADD COLUMN IF NOT EXISTS is_credit BOOLEAN DEFAULT true;
+ALTER TABLE IF EXISTS rider_transactions ADD COLUMN IF NOT EXISTS reference VARCHAR(100);
+ALTER TABLE IF EXISTS rider_transactions ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'settled';
+ALTER TABLE IF EXISTS rider_transactions ADD COLUMN IF NOT EXISTS description TEXT;
+
 -- 1. COMPANIES
 INSERT INTO companies (id, name, code, email, phone, address, currency)
 VALUES (
@@ -418,7 +477,7 @@ INSERT INTO orders (
     15000.00,
     75000.00,
     'pay_on_delivery',
-    'paid',
+    'collected',
     'delivered',
     'Delivered successfully. POD cash collected in full.',
     2500.00,
@@ -480,6 +539,7 @@ INSERT INTO cash_remittances (
     company_id,
     delivery_agent_id,
     reference_number,
+    deposit_receipt_url,
     amount,
     gross_collections,
     commission_deducted,
@@ -496,6 +556,7 @@ INSERT INTO cash_remittances (
     '11111111-1111-4111-8111-111111111111',
     'b1111111-1111-4111-8111-111111111111',
     'RMT-0005',
+    'https://novexps.storage/receipts/rec-0005.jpg',
     25000.00,
     45000.00,
     8000.00,
@@ -512,12 +573,13 @@ INSERT INTO cash_remittances (
     '11111111-1111-4111-8111-111111111111',
     'b1111111-1111-4111-8111-111111111111',
     'RMT-0004',
+    'https://novexps.storage/receipts/rec-0004.jpg',
     15000.00,
     30000.00,
     6000.00,
     9000.00,
     'bank_transfer',
-    'approved',
+    'verified',
     'Wuse DC Finance Desk',
     NOW() - INTERVAL '1 day',
     'Bank transfer verified & reconciled by Wuse DC Finance desk.',
@@ -528,12 +590,13 @@ INSERT INTO cash_remittances (
     '11111111-1111-4111-8111-111111111111',
     'b1111111-1111-4111-8111-111111111111',
     'RMT-0003',
+    'https://novexps.storage/receipts/rec-0003.jpg',
     20000.00,
     40000.00,
     8000.00,
     12000.00,
     'cash_to_dc',
-    'approved',
+    'verified',
     'Adekunle Supervisor',
     NOW() - INTERVAL '4 days',
     'Cash handed over at Wuse DC reception.',
@@ -544,12 +607,13 @@ INSERT INTO cash_remittances (
     '11111111-1111-4111-8111-111111111111',
     'b1111111-1111-4111-8111-111111111111',
     'RMT-0002',
+    'https://novexps.storage/receipts/rec-0002.jpg',
     10000.00,
     20000.00,
     4000.00,
     6000.00,
     'pos',
-    'approved',
+    'verified',
     'Ikeja DC Finance',
     NOW() - INTERVAL '8 days',
     'POS terminal receipt attached and approved.',

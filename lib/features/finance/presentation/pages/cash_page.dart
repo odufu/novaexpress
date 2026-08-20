@@ -7,6 +7,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../notifications/presentation/providers/notifications_provider.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
+import '../../domain/entities/financial_summary.dart';
 import '../../domain/entities/remittance.dart';
 import '../providers/finance_provider.dart';
 
@@ -42,57 +43,36 @@ class _CashPageState extends ConsumerState<CashPage> {
     final notifState = ref.watch(notificationsProvider);
 
     final user = authState.user;
-    final agentName = user != null && user.firstName.isNotEmpty
+    final agentName = user != null && (user.firstName.isNotEmpty || user.lastName.isNotEmpty)
         ? '${user.firstName} ${user.lastName}'.trim()
-        : 'Emeka Rider';
-    final agentCode = user?.deliveryAgentCode ?? (user?.id.isNotEmpty == true
-        ? 'PDA-${user!.id.substring(0, 4).toUpperCase()}'
-        : 'PDA-7000');
+        : (user?.fullName.isNotEmpty == true ? user!.fullName : '');
+    final agentCode = user?.deliveryAgentCode ?? '';
 
-    // Dynamically calculate from real database/provider state
-    final commissionPerOrder = user?.commissionRate ?? (user?.isPda == false ? 500.0 : 1000.0);
-    final transportPerOrder = user?.isPda == false ? (user?.fuelAllowance ?? 800.0) : (user?.transportAllowance ?? 1500.0);
-    final totalEarningPerOrder = commissionPerOrder + transportPerOrder;
-
-    final now = DateTime.now();
-    bool isToday(DateTime dt) {
-      final localDt = dt.toLocal();
-      final localNow = now.toLocal();
-      return localDt.year == localNow.year &&
-          localDt.month == localNow.month &&
-          localDt.day == localNow.day;
-    }
-
-    final deliveredOrders = ordersState.orders.where((o) => o.status == 'delivered').toList();
-    final deliveredCashOrders = deliveredOrders.where((o) => o.paymentType != 'prepaid' && o.isPod).toList();
-    final deliveredPrepaidOrders = deliveredOrders.where((o) => o.paymentType == 'prepaid' || !o.isPod).toList();
-
-    final todayDeliveredOrders = deliveredOrders.where((o) => isToday(o.createdAt)).toList();
-    final todayDeliveredCashOrders = todayDeliveredOrders.where((o) => o.paymentType != 'prepaid' && o.isPod).toList();
-    final todayDeliveredPrepaidOrders = todayDeliveredOrders.where((o) => o.paymentType == 'prepaid' || !o.isPod).toList();
-
-    final activeDeliveredCashOrders = todayDeliveredCashOrders.isNotEmpty ? todayDeliveredCashOrders : deliveredCashOrders;
-
-    final double cashCollected = activeDeliveredCashOrders.fold(0.0, (acc, o) => acc + o.totalAmount);
-    final double totalCommission = activeDeliveredCashOrders.length * commissionPerOrder;
-    final double totalTransport = activeDeliveredCashOrders.length * transportPerOrder;
+    // Dynamically calculate from unified financial summary
+    final summary = FinancialSummary.calculate(
+      orders: ordersState.orders,
+      remittances: financeState.remittances,
+      user: user,
+      manualEarnedBalance: financeState.totalEarnedBalance,
+    );
 
     final approvedRemittances = financeState.remittances
         .where((r) => r.isVerified || r.status.toLowerCase() == 'approved')
         .toList();
-    final double remitted = approvedRemittances.fold(0.0, (acc, r) => acc + r.amount);
-
     final pendingRemittances = financeState.remittances
         .where((r) => r.isPending || r.status.toLowerCase() == 'submitted')
         .toList();
-    final double pendingApproval = pendingRemittances.fold(0.0, (acc, r) => acc + r.amount);
+    final int deliveredCashCount = summary.todayDeliveredOrdersCount > 0
+        ? summary.todayDeliveredOrdersCount
+        : summary.deliveredCashOrdersCount;
 
-    final double toRemit = (cashCollected - totalCommission - totalTransport - remitted - pendingApproval).clamp(0.0, double.infinity);
-    final double riderBalance = user?.compensationType == 'salary'
-        ? (user?.baseSalary ?? 150000.0)
-        : (financeState.totalEarnedBalance > 0
-            ? financeState.totalEarnedBalance
-            : ((todayDeliveredPrepaidOrders.isNotEmpty ? todayDeliveredPrepaidOrders.length : deliveredPrepaidOrders.length) * totalEarningPerOrder));
+    final double cashCollected = summary.cashCollectedToday > 0 ? summary.cashCollectedToday : summary.cashCollectedAllTime;
+    final double totalCommission = summary.totalCommissionRetained;
+    final double totalTransport = summary.totalTransportRetained;
+    final double remitted = summary.totalVerifiedRemitted;
+    final double pendingApproval = summary.totalPendingApprovalRemitted;
+    final double toRemit = summary.pendingRemittanceToDC;
+    final double riderBalance = summary.myDirectTransfersBalance;
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0B132B) : const Color(0xFFF8FAFC),
@@ -345,11 +325,15 @@ class _CashPageState extends ConsumerState<CashPage> {
                                           ),
                                         ),
                                         const SizedBox(width: 4),
-                                        Text(
-                                          '(Direct Transfers)',
-                                          style: GoogleFonts.inter(
-                                            fontSize: 9.5,
-                                            color: const Color(0xFF94A3B8),
+                                        Flexible(
+                                          child: Text(
+                                            '(Direct Transfers)',
+                                            style: GoogleFonts.inter(
+                                              fontSize: 9.5,
+                                              color: const Color(0xFF94A3B8),
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
                                           ),
                                         ),
                                       ],
@@ -573,15 +557,18 @@ class _CashPageState extends ConsumerState<CashPage> {
                                     children: [
                                       const Icon(Icons.account_balance_wallet_outlined, size: 13, color: Color(0xFF64748B)),
                                       const SizedBox(width: 4),
-                                      Text(
-                                        'Collected: ${CurrencyFormatter.formatNaira(cashCollected)}',
-                                        style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B), fontWeight: FontWeight.w500),
+                                      Flexible(
+                                        child: Text(
+                                          'Collected: ${CurrencyFormatter.formatNaira(cashCollected)}',
+                                          overflow: TextOverflow.ellipsis,
+                                          style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B), fontWeight: FontWeight.w500),
+                                        ),
                                       ),
-                                      const SizedBox(width: 10),
+                                      const SizedBox(width: 8),
                                       const Icon(Icons.inventory_2_outlined, size: 13, color: Color(0xFF64748B)),
                                       const SizedBox(width: 4),
                                       Text(
-                                        '${todayDeliveredCashOrders.length} order${todayDeliveredCashOrders.length == 1 ? '' : 's'}',
+                                        '$deliveredCashCount order${deliveredCashCount == 1 ? '' : 's'}',
                                         style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B), fontWeight: FontWeight.w500),
                                       ),
                                       const Spacer(),
@@ -969,15 +956,19 @@ class _CashPageState extends ConsumerState<CashPage> {
                       children: [
                         Row(
                           children: [
-                            Text(
-                              rem.referenceNumber,
-                              style: GoogleFonts.inter(
-                                fontSize: 14.5,
-                                fontWeight: FontWeight.w800,
-                                color: theme.colorScheme.onSurface,
+                            Expanded(
+                              child: Text(
+                                rem.referenceNumber,
+                                style: GoogleFonts.inter(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                  color: theme.colorScheme.onSurface,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            const Spacer(),
+                            const SizedBox(width: 6),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                               decoration: BoxDecoration(
@@ -993,11 +984,11 @@ class _CashPageState extends ConsumerState<CashPage> {
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 10),
+                            const SizedBox(width: 8),
                             Text(
                               CurrencyFormatter.formatNaira(rem.amount),
                               style: GoogleFonts.inter(
-                                fontSize: 14.5,
+                                fontSize: 14,
                                 fontWeight: FontWeight.w800,
                                 color: theme.colorScheme.onSurface,
                               ),

@@ -145,9 +145,9 @@ class _StockHistoryPageState extends ConsumerState<StockHistoryPage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _StatColumn(label: 'Received', value: '+30', color: const Color(0xFF4ADE80)),
-                      _StatColumn(label: 'Delivered', value: '-15', color: const Color(0xFFF87171)),
-                      _StatColumn(label: 'Returned', value: '-2', color: const Color(0xFFFB923C)),
+                      const _StatColumn(label: 'Received', value: '+30', color: Color(0xFF4ADE80)),
+                      const _StatColumn(label: 'Delivered', value: '-15', color: Color(0xFFF87171)),
+                      const _StatColumn(label: 'Returned', value: '-2', color: Color(0xFFFB923C)),
                       _StatColumn(label: 'Current Custody', value: '${stockState.totalInCustody}', color: Colors.white),
                     ],
                   ),

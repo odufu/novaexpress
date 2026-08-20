@@ -52,7 +52,7 @@ class StockState {
   });
 
   int get totalInCustody {
-    return stockItems.fold(0, (acc, item) => acc + item.totalStockQuantity);
+    return stockItems.fold(0, (acc, item) => acc + item.assignedCount);
   }
 
   int get totalReserved {
@@ -99,7 +99,6 @@ class StockState {
       list = list.where((item) {
         return item.name.toLowerCase().contains(q) ||
             item.sku.toLowerCase().contains(q) ||
-            item.ownerName.toLowerCase().contains(q) ||
             item.category.toLowerCase().contains(q);
       }).toList();
     }
@@ -137,10 +136,10 @@ class StockNotifier extends StateNotifier<StockState> {
     fetchStockItems();
   }
 
-  Future<void> fetchStockItems() async {
+  Future<void> fetchStockItems([String? agentId]) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      final items = await repository.getVehicleStockItems();
+      final items = await repository.getVehicleStockItems(agentId);
       final defaultRequests = [
         const InboundStockRequest(
           requestId: 'REQ-00482',
@@ -148,11 +147,11 @@ class StockNotifier extends StateNotifier<StockState> {
           status: 'Ready for Collection',
           requestDate: null,
           requestedQuantities: {
-            'Respira': 10,
+            'Respira Detox Tea': 10,
             'Grazer Herbal Tea': 20,
           },
           approvedQuantities: {
-            'Respira': 10,
+            'Respira Detox Tea': 10,
             'Grazer Herbal Tea': 20,
           },
         ),
@@ -161,7 +160,7 @@ class StockNotifier extends StateNotifier<StockState> {
       state = state.copyWith(
         isLoading: false,
         stockItems: items,
-        inboundRequests: defaultRequests,
+        inboundRequests: state.inboundRequests.isNotEmpty ? state.inboundRequests : defaultRequests,
         lastAuditedTime: DateTime.now().subtract(const Duration(hours: 4)),
         isAuditRequired: false,
       );
@@ -201,8 +200,10 @@ class StockNotifier extends StateNotifier<StockState> {
   }
 
   void completeStockHandover(String requestId) {
+    InboundStockRequest? targetReq;
     final updatedRequests = state.inboundRequests.map((r) {
       if (r.requestId == requestId) {
+        targetReq = r;
         return InboundStockRequest(
           requestId: r.requestId,
           dcName: r.dcName,
@@ -215,7 +216,48 @@ class StockNotifier extends StateNotifier<StockState> {
       return r;
     }).toList();
 
-    state = state.copyWith(inboundRequests: updatedRequests);
+    List<StockItemEntity> updatedItems = state.stockItems;
+    if (targetReq != null) {
+      final approved = targetReq!.approvedQuantities;
+      updatedItems = state.stockItems.map((item) {
+        int addUnits = 0;
+        approved.forEach((pName, qty) {
+          if (item.name.toLowerCase().contains(pName.toLowerCase()) || pName.toLowerCase().contains(item.name.toLowerCase())) {
+            addUnits += qty;
+          }
+        });
+        if (addUnits > 0) {
+          return StockItemEntity(
+            id: item.id,
+            sku: item.sku,
+            name: item.name,
+            description: item.description,
+            price: item.price,
+            ownerName: item.ownerName,
+            inventoryType: item.inventoryType,
+            totalInCustody: item.totalInCustody + addUnits,
+            reservedCount: item.reservedCount,
+            assignedCount: item.assignedCount + addUnits,
+            deliveredCount: item.deliveredCount,
+            availableCount: item.availableCount + addUnits,
+            returnedCount: item.returnedCount,
+            awaitingReturnCount: item.awaitingReturnCount,
+            lowStockThreshold: item.lowStockThreshold,
+            reorderLevel: item.reorderLevel,
+            category: item.category,
+            imageAsset: item.imageAsset,
+            batchNumber: item.batchNumber,
+            lastAuditDate: item.lastAuditDate,
+          );
+        }
+        return item;
+      }).toList();
+    }
+
+    state = state.copyWith(
+      inboundRequests: updatedRequests,
+      stockItems: updatedItems,
+    );
   }
 
   void recordAuditSubmission() {

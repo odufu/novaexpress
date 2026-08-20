@@ -1,4 +1,5 @@
 import '../../domain/entities/remittance.dart';
+import '../../domain/entities/transaction_item.dart';
 import '../../domain/repositories/finance_repository.dart';
 import '../datasources/finance_remote_datasource.dart';
 
@@ -67,5 +68,11 @@ class FinanceRepositoryImpl implements FinanceRepository {
   @override
   Future<List<Map<String, dynamic>>> getPayoutRequests(String agentId) async {
     return await remoteDataSource.getPayoutRequests(agentId);
+  }
+
+  @override
+  Future<List<TransactionItem>> getRiderTransactions(String agentId) async {
+    final rawList = await remoteDataSource.getRiderTransactions(agentId);
+    return rawList.map((json) => TransactionItem.fromJson(json)).toList();
   }
 }

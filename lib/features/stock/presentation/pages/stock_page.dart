@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/providers/navigation_provider.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_skeleton_loader.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../notifications/presentation/providers/notifications_provider.dart';
 import '../../domain/entities/stock_item.dart';
 import '../providers/stock_provider.dart';
@@ -19,6 +20,16 @@ class StockPage extends ConsumerStatefulWidget {
 
 class _StockPageState extends ConsumerState<StockPage> {
   final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final user = ref.read(authProvider).user;
+      final agentId = user?.deliveryAgentId ?? 'b1111111-1111-4111-8111-111111111111';
+      ref.read(stockProvider.notifier).fetchStockItems(agentId);
+    });
+  }
 
   @override
   void dispose() {
@@ -163,7 +174,11 @@ class _StockPageState extends ConsumerState<StockPage> {
         ),
       ),
       body: RefreshIndicator(
-        onRefresh: () => stockNotifier.fetchStockItems(),
+        onRefresh: () async {
+          final user = ref.read(authProvider).user;
+          final agentId = user?.deliveryAgentId ?? 'b1111111-1111-4111-8111-111111111111';
+          await stockNotifier.fetchStockItems(agentId);
+        },
         color: AppColors.primary,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -966,18 +981,21 @@ class _ProductInventoryCard extends StatelessWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
-                          Text(
-                            'Stock Level',
-                            style: GoogleFonts.inter(
-                              fontSize: 10,
-                              color: const Color(0xFF64748B),
-                              fontWeight: FontWeight.w500,
+                          Flexible(
+                            child: Text(
+                              'Stock Level',
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.inter(
+                                fontSize: 10,
+                                color: const Color(0xFF64748B),
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 2),
                           const Icon(
                             Icons.chevron_right_rounded,
-                            size: 16,
+                            size: 14,
                             color: Color(0xFF94A3B8),
                           ),
                         ],
@@ -1083,27 +1101,30 @@ class _ProductInventoryCard extends StatelessWidget {
     return Row(
       children: [
         Container(
-          width: 6,
-          height: 6,
+          width: 5,
+          height: 5,
           decoration: BoxDecoration(
             color: dotColor,
             shape: BoxShape.circle,
           ),
         ),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 12,
-            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-            fontWeight: FontWeight.w500,
+        const SizedBox(width: 5),
+        Expanded(
+          child: Text(
+            label,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.inter(
+              fontSize: 11.5,
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
-        const Spacer(),
+        const SizedBox(width: 4),
         Text(
           value,
           style: GoogleFonts.inter(
-            fontSize: 12,
+            fontSize: 11.5,
             fontWeight: FontWeight.w700,
             color: isDark ? Colors.white : const Color(0xFF1E293B),
           ),

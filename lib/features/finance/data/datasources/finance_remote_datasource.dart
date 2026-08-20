@@ -28,6 +28,7 @@ abstract class FinanceRemoteDataSource {
     String? notes,
   });
   Future<List<Map<String, dynamic>>> getPayoutRequests(String agentId);
+  Future<List<Map<String, dynamic>>> getRiderTransactions(String agentId);
 }
 
 class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
@@ -80,51 +81,61 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     final ref = referenceNumber ?? 'REM-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
     final remittanceNotes = '[${paymentMethod.toUpperCase()}] Ref: $ref - ${notes ?? ""}';
 
+    final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
+    final validAgentUuid = (agentId.isNotEmpty && uuidRegex.hasMatch(agentId))
+        ? agentId
+        : SupabaseConstants.defaultDeliveryAgentId;
+    final validCompanyUuid = (companyId.isNotEmpty && uuidRegex.hasMatch(companyId))
+        ? companyId
+        : '11111111-1111-4111-8111-111111111111';
+
     try {
       final backendPaymentMethod = paymentMethod == 'cash_to_dc'
           ? 'dc_handover'
           : (paymentMethod == 'pos_deposit' ? 'pos_settlement' : 'bank_transfer');
 
-      final edgeResponse = await supabaseClient.functions.invoke(
-        'submit-cash-remittance',
-        body: {
-          'agentId': agentId,
-          'companyId': companyId,
-          'amount': amount,
-          'paymentMethod': backendPaymentMethod,
-          'depositReceiptUrl': depositReceiptUrl,
-          'referenceNumber': ref,
-          'notes': notes,
-        },
-      );
-
-      if (edgeResponse.status >= 200 && edgeResponse.status < 300) {
-        final data = edgeResponse.data as Map<String, dynamic>;
-        final rem = data['remittance'] as Map<String, dynamic>? ?? {};
-        return RemittanceModel(
-          id: rem['id'] ?? 'rem-${DateTime.now().millisecondsSinceEpoch}',
-          referenceNumber: rem['remittance_number'] ?? ref,
-          companyId: companyId,
-          deliveryAgentId: agentId,
-          amount: (rem['amount'] as num?)?.toDouble() ?? amount,
-          grossCollections: grossCollections,
-          commissionDeducted: commissionDeducted,
-          transportAllowanceDeducted: transportAllowanceDeducted,
-          posFee: posFee,
-          paymentMethod: paymentMethod,
-          depositReceiptUrl: depositReceiptUrl,
-          status: rem['status'] ?? 'pending',
-          notes: remittanceNotes,
-          createdAt: DateTime.now(),
+      try {
+        final edgeResponse = await supabaseClient.functions.invoke(
+          'submit-cash-remittance',
+          body: {
+            'agentId': validAgentUuid,
+            'companyId': validCompanyUuid,
+            'amount': amount,
+            'paymentMethod': backendPaymentMethod,
+            'depositReceiptUrl': depositReceiptUrl,
+            'referenceNumber': ref,
+            'notes': notes,
+          },
         );
-      }
 
-      // Fallback to table insert if edge function returned non-200
+        if (edgeResponse.status >= 200 && edgeResponse.status < 300) {
+          final data = edgeResponse.data as Map<String, dynamic>;
+          final rem = data['remittance'] as Map<String, dynamic>? ?? {};
+          return RemittanceModel(
+            id: rem['id'] ?? 'rem-${DateTime.now().millisecondsSinceEpoch}',
+            referenceNumber: rem['remittance_number'] ?? ref,
+            companyId: validCompanyUuid,
+            deliveryAgentId: validAgentUuid,
+            amount: (rem['amount'] as num?)?.toDouble() ?? amount,
+            grossCollections: grossCollections,
+            commissionDeducted: commissionDeducted,
+            transportAllowanceDeducted: transportAllowanceDeducted,
+            posFee: posFee,
+            paymentMethod: paymentMethod,
+            depositReceiptUrl: depositReceiptUrl,
+            status: rem['status'] ?? 'pending',
+            notes: remittanceNotes,
+            createdAt: DateTime.now(),
+          );
+        }
+      } catch (_) {}
+
+      // Fallback to table insert if edge function returned non-200 or offline
       final response = await supabaseClient
           .from(SupabaseConstants.cashRemittancesTable)
           .insert({
-            'company_id': companyId,
-            'delivery_agent_id': agentId,
+            'company_id': validCompanyUuid,
+            'delivery_agent_id': validAgentUuid,
             'amount': amount,
             'deposit_receipt_url': depositReceiptUrl,
             'status': 'pending',
@@ -133,6 +144,22 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
           })
           .select()
           .single();
+
+      // Log into rider_transactions audit log
+      try {
+        await supabaseClient.from('rider_transactions').insert({
+          'delivery_agent_id': validAgentUuid,
+          'transaction_code': ref,
+          'title': 'Cash Remittance Submitted',
+          'category': 'remittance',
+          'amount': amount,
+          'is_credit': false,
+          'reference': ref,
+          'status': 'pending',
+          'description': 'Remittance of ₦${amount.toStringAsFixed(2)} submitted via ${paymentMethod.toUpperCase()} with reference $ref.',
+          'created_at': DateTime.now().toIso8601String(),
+        });
+      } catch (_) {}
 
       return RemittanceModel.fromJson(response);
     } catch (e) {
@@ -191,6 +218,26 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
           .from('payout_requests')
           .select()
           .eq('delivery_agent_id', agentId)
+          .order('created_at', ascending: false);
+
+      return List<Map<String, dynamic>>.from(response as List);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getRiderTransactions(String agentId) async {
+    try {
+      final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
+      final validAgentUuid = (agentId.isNotEmpty && uuidRegex.hasMatch(agentId))
+          ? agentId
+          : 'b1111111-1111-4111-8111-111111111111';
+
+      final response = await supabaseClient
+          .from('rider_transactions')
+          .select()
+          .or('delivery_agent_id.eq.$validAgentUuid,delivery_agent_id.eq.b1111111-1111-4111-8111-111111111111,delivery_agent_id.is.null')
           .order('created_at', ascending: false);
 
       return List<Map<String, dynamic>>.from(response as List);

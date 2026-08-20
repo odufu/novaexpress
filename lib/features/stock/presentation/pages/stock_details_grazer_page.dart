@@ -365,16 +365,18 @@ class StockDetailsGrazerPage extends ConsumerWidget {
         children: [
           Expanded(
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  label1,
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: const Color(0xFF64748B),
-                    fontWeight: FontWeight.w500,
+                Expanded(
+                  child: Text(
+                    label1,
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: const Color(0xFF64748B),
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
+                const SizedBox(width: 4),
                 Text(
                   val1,
                   style: GoogleFonts.inter(
@@ -386,19 +388,21 @@ class StockDetailsGrazerPage extends ConsumerWidget {
               ],
             ),
           ),
-          const SizedBox(width: 24),
+          const SizedBox(width: 16),
           Expanded(
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  label2,
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: const Color(0xFF64748B),
-                    fontWeight: FontWeight.w500,
+                Expanded(
+                  child: Text(
+                    label2,
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: const Color(0xFF64748B),
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
+                const SizedBox(width: 4),
                 Text(
                   val2,
                   style: GoogleFonts.inter(

@@ -5,6 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/constants/supabase_constants.dart';
 import '../../../../core/helpers/formatters.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../orders/presentation/providers/orders_provider.dart';
+import '../../domain/entities/financial_summary.dart';
 import '../providers/finance_provider.dart';
 
 class PayoutRequestItem {
@@ -342,11 +344,17 @@ class _PayoutsPageState extends ConsumerState<PayoutsPage> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final financeState = ref.watch(financeProvider);
+    final ordersState = ref.watch(ordersProvider);
     final user = ref.watch(authProvider).user;
-    final isSalaried = user?.compensationType == 'salary';
-    final availableBalance = isSalaried
-        ? (user?.baseSalary ?? 0.0)
-        : (financeState.totalEarnedBalance > 0 ? financeState.totalEarnedBalance : _availableBalance);
+
+    final summary = FinancialSummary.calculate(
+      orders: ordersState.orders,
+      remittances: financeState.remittances,
+      user: user,
+      manualEarnedBalance: financeState.totalEarnedBalance,
+    );
+
+    final availableBalance = summary.myDirectTransfersBalance;
 
     final filteredList = _payouts.where((p) {
       if (_selectedFilter == 'all') return true;
@@ -402,15 +410,19 @@ class _PayoutsPageState extends ConsumerState<PayoutsPage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'MY EARNINGS BALANCE',
-                        style: GoogleFonts.inter(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.8,
-                          color: const Color(0xFF93C5FD),
+                      Expanded(
+                        child: Text(
+                          'MY EARNINGS BALANCE',
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.8,
+                            color: const Color(0xFF93C5FD),
+                          ),
                         ),
                       ),
+                      const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                         decoration: BoxDecoration(
@@ -570,14 +582,18 @@ class _PayoutsPageState extends ConsumerState<PayoutsPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  item.id,
-                  style: GoogleFonts.jetBrainsMono(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: theme.colorScheme.onSurface,
+                Expanded(
+                  child: Text(
+                    item.id,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.jetBrainsMono(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: theme.colorScheme.onSurface,
+                    ),
                   ),
                 ),
+                const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
@@ -611,9 +627,14 @@ class _PayoutsPageState extends ConsumerState<PayoutsPage> {
                     color: item.isApproved ? const Color(0xFF16A34A) : const Color(0xFF2563EB),
                   ),
                 ),
-                Text(
-                  '${item.bankName} • ${item.accountNumber.substring(0, 4)}***',
-                  style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '${item.bankName} • ${item.accountNumber.length >= 4 ? item.accountNumber.substring(0, 4) : item.accountNumber}***',
+                    textAlign: TextAlign.end,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
+                  ),
                 ),
               ],
             ),

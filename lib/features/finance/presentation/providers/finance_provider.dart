@@ -4,6 +4,7 @@ import '../../../../core/constants/supabase_constants.dart';
 import '../../data/datasources/finance_remote_datasource.dart';
 import '../../data/repositories/finance_repository_impl.dart';
 import '../../domain/entities/remittance.dart';
+import '../../domain/entities/transaction_item.dart';
 import '../../domain/repositories/finance_repository.dart';
 
 final financeRemoteDataSourceProvider = Provider<FinanceRemoteDataSource>((ref) {
@@ -17,6 +18,7 @@ final financeRepositoryProvider = Provider<FinanceRepository>((ref) {
 class FinanceState {
   final bool isLoading;
   final List<RemittanceEntity> remittances;
+  final List<TransactionItem> transactions;
   final String activeFilter; // 'All', 'Verified', 'Pending', 'Rejected', 'Disputed'
   final String? errorMessage;
   final double cashInCustody;
@@ -25,6 +27,7 @@ class FinanceState {
   FinanceState({
     this.isLoading = false,
     this.remittances = const [],
+    this.transactions = const [],
     this.activeFilter = 'All',
     this.errorMessage,
     this.cashInCustody = 0.0,
@@ -34,6 +37,7 @@ class FinanceState {
   FinanceState copyWith({
     bool? isLoading,
     List<RemittanceEntity>? remittances,
+    List<TransactionItem>? transactions,
     String? activeFilter,
     String? errorMessage,
     double? cashInCustody,
@@ -42,6 +46,7 @@ class FinanceState {
     return FinanceState(
       isLoading: isLoading ?? this.isLoading,
       remittances: remittances ?? this.remittances,
+      transactions: transactions ?? this.transactions,
       activeFilter: activeFilter ?? this.activeFilter,
       errorMessage: errorMessage,
       cashInCustody: cashInCustody ?? this.cashInCustody,
@@ -83,13 +88,26 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
     try {
       final targetAgentId = agentId ?? SupabaseConstants.defaultDeliveryAgentId;
       final items = await _repository.getAgentRemittances(targetAgentId);
-      state = state.copyWith(isLoading: false, remittances: items);
+      final txns = await _repository.getRiderTransactions(targetAgentId);
+      state = state.copyWith(
+        isLoading: false,
+        remittances: items,
+        transactions: txns,
+      );
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
         errorMessage: 'Failed to load remittances: $e',
       );
     }
+  }
+
+  Future<void> loadTransactions([String? agentId]) async {
+    try {
+      final targetAgentId = agentId ?? SupabaseConstants.defaultDeliveryAgentId;
+      final txns = await _repository.getRiderTransactions(targetAgentId);
+      state = state.copyWith(transactions: txns);
+    } catch (_) {}
   }
 
   void setFilter(String filter) {
@@ -99,6 +117,8 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
   Future<bool> submitRemittance({
     required double amount,
     required String paymentMethod,
+    String? agentId,
+    String? companyId,
     double grossCollections = 0.0,
     double commissionDeducted = 0.0,
     double transportAllowanceDeducted = 0.0,
@@ -111,9 +131,16 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
   }) async {
     state = state.copyWith(isLoading: true);
     try {
+      final targetAgentId = (agentId != null && agentId.isNotEmpty)
+          ? agentId
+          : SupabaseConstants.defaultDeliveryAgentId;
+      final targetCompanyId = (companyId != null && companyId.isNotEmpty)
+          ? companyId
+          : '11111111-1111-4111-8111-111111111111';
+
       final newRemittance = await _repository.submitRemittance(
-        agentId: SupabaseConstants.defaultDeliveryAgentId,
-        companyId: '11111111-1111-4111-8111-111111111111',
+        agentId: targetAgentId,
+        companyId: targetCompanyId,
         amount: amount,
         paymentMethod: paymentMethod,
         grossCollections: grossCollections,
@@ -129,6 +156,7 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
 
       final updatedList = [newRemittance, ...state.remittances];
       state = state.copyWith(isLoading: false, remittances: updatedList);
+      loadRemittances(targetAgentId);
       return true;
     } catch (e) {
       state = state.copyWith(

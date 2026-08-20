@@ -38,6 +38,7 @@ graph TD
 | **06** | **Cash & Remittance Reconciliation** | Bank teller/POS receipt verification (`REF-POS-9921`), corporate account credit matching, clearing rider COD custody balances. | DC Finance Supervisor, Treasury | [06_CASH_AND_REMITTANCE_RECONCILIATION_WORKFLOW.md](file:///c:/PROJECT/NoveXPS/DOCUMENTATION/DC/WORKFLOW/06_CASH_AND_REMITTANCE_RECONCILIATION_WORKFLOW.md) |
 | **07** | **Rider Fleet & Zone Assignments** | Rider onboarding, vehicle type registration, route/zone lead assignment, and active status tracking. | DC Operations Manager, Field Riders | [07_RIDER_FLEET_MANAGEMENT_AND_ASSIGNMENTS_WORKFLOW.md](file:///c:/PROJECT/NoveXPS/DOCUMENTATION/DC/WORKFLOW/07_RIDER_FLEET_MANAGEMENT_AND_ASSIGNMENTS_WORKFLOW.md) |
 | **08** | **DC Warehouse Stock Audit & Reconciliation** | Physical warehouse count vs system expected count, batch expiration monitoring, variance logging, and audit reports. | DC Warehouse Manager, Internal Audit | [08_DC_WAREHOUSE_STOCK_AUDIT_WORKFLOW.md](file:///c:/PROJECT/NoveXPS/DOCUMENTATION/DC/WORKFLOW/08_DC_WAREHOUSE_STOCK_AUDIT_WORKFLOW.md) |
+| **09** | **DC Admin Console Screen Specification Guide** | Complete UI/UX, responsive breakpoint rules, brand palette tokens, tab-by-tab deep-dive, and database entity integration map. | All DC Personas, UI/UX Engineers | [DC_CONSOLE_SCREENS_SPECIFICATION_GUIDE.md](file:///c:/PROJECT/NoveXPS/DOCUMENTATION/DC/DC_CONSOLE_SCREENS_SPECIFICATION_GUIDE.md) |
 
 ---
 

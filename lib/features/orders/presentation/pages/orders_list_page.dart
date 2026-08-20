@@ -50,7 +50,7 @@ class _OrdersListPageState extends ConsumerState<OrdersListPage> {
     final authState = ref.watch(authProvider);
     final ordersState = ref.watch(ordersProvider);
     final user = authState.user;
-    final agentName = user != null && user.firstName.isNotEmpty ? user.firstName : 'Emeka';
+    final agentName = user?.firstName ?? '';
 
     final allOrders = ordersState.orders;
 
@@ -156,7 +156,7 @@ class _OrdersListPageState extends ConsumerState<OrdersListPage> {
                 radius: 15,
                 backgroundColor: AppColors.orange,
                 child: Text(
-                  agentName.substring(0, 1).toUpperCase(),
+                  agentName.isNotEmpty ? agentName.substring(0, 1).toUpperCase() : 'R',
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -245,15 +245,20 @@ class _OrdersListPageState extends ConsumerState<OrdersListPage> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                'DELIVERY SUMMARY TODAY',
-                                style: GoogleFonts.jetBrainsMono(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: const Color(0xFF94A3B8),
-                                  letterSpacing: 0.8,
+                              Expanded(
+                                child: Text(
+                                  'DELIVERY SUMMARY TODAY',
+                                  style: GoogleFonts.jetBrainsMono(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: const Color(0xFF94A3B8),
+                                    letterSpacing: 0.5,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
+                              const SizedBox(width: 8),
                               Text(
                                 '${allOrders.length} Total',
                                 style: GoogleFonts.jetBrainsMono(

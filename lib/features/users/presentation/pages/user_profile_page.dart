@@ -377,12 +377,14 @@ class UserProfilePage extends ConsumerWidget {
                       children: [
                         const Icon(Icons.person_outline_rounded, color: AppColors.orange, size: 20),
                         const SizedBox(width: 8),
-                        Text(
-                          'Personal & Contact Details',
-                          style: GoogleFonts.inter(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.bold,
-                            color: theme.colorScheme.onSurface,
+                        Expanded(
+                          child: Text(
+                            'Personal & Contact Details',
+                            style: GoogleFonts.inter(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.onSurface,
+                            ),
                           ),
                         ),
                       ],
@@ -425,12 +427,14 @@ class UserProfilePage extends ConsumerWidget {
                       children: [
                         const Icon(Icons.two_wheeler_rounded, color: Color(0xFF2563EB), size: 20),
                         const SizedBox(width: 8),
-                        Text(
-                          'Vehicle & Fleet License',
-                          style: GoogleFonts.inter(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.bold,
-                            color: theme.colorScheme.onSurface,
+                        Expanded(
+                          child: Text(
+                            'Vehicle & Fleet License',
+                            style: GoogleFonts.inter(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.onSurface,
+                            ),
                           ),
                         ),
                       ],
@@ -474,12 +478,14 @@ class UserProfilePage extends ConsumerWidget {
                       children: [
                         const Icon(Icons.account_balance_wallet_outlined, color: Color(0xFF16A34A), size: 20),
                         const SizedBox(width: 8),
-                        Text(
-                          'Compensation & Settlement Bank',
-                          style: GoogleFonts.inter(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.bold,
-                            color: theme.colorScheme.onSurface,
+                        Expanded(
+                          child: Text(
+                            'Compensation & Settlement Bank',
+                            style: GoogleFonts.inter(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.onSurface,
+                            ),
                           ),
                         ),
                       ],
@@ -607,12 +613,7 @@ class UserProfilePage extends ConsumerWidget {
                     ),
                     elevation: 0,
                   ),
-                  onPressed: () async {
-                    await Supabase.instance.client.auth.signOut();
-                    if (context.mounted) {
-                      context.go('/login');
-                    }
-                  },
+                  onPressed: () => _showLogoutDialog(context, ref),
                   icon: const Icon(Icons.logout_rounded, size: 20),
                   label: Text(
                     'LOGOUT OF TERMINAL',
@@ -623,6 +624,56 @@ class UserProfilePage extends ConsumerWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _showLogoutDialog(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.logout_rounded, color: Color(0xFFBA1A1A)),
+            const SizedBox(width: 10),
+            Text(
+              'Confirm Logout',
+              style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to log out of the NovaExpress Rider Terminal?',
+          style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF64748B)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: const Color(0xFF64748B)),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFBA1A1A),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              await ref.read(authProvider.notifier).logout();
+              if (context.mounted) {
+                context.go('/login');
+              }
+            },
+            child: Text(
+              'Logout',
+              style: GoogleFonts.inter(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -650,6 +701,7 @@ class _ProfileDetailRow extends StatelessWidget {
         Icon(icon, size: 16, color: theme.colorScheme.onSurfaceVariant),
         const SizedBox(width: 8),
         Expanded(
+          flex: 2,
           child: Text(
             label,
             style: TextStyle(
@@ -658,12 +710,18 @@ class _ProfileDetailRow extends StatelessWidget {
             ),
           ),
         ),
-        Text(
-          value,
-          style: GoogleFonts.inter(
-            fontSize: 13,
-            fontWeight: FontWeight.bold,
-            color: valueColor ?? theme.colorScheme.onSurface,
+        const SizedBox(width: 8),
+        Flexible(
+          flex: 3,
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: valueColor ?? theme.colorScheme.onSurface,
+            ),
           ),
         ),
       ],

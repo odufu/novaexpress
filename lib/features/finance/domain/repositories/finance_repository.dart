@@ -1,4 +1,5 @@
 import '../entities/remittance.dart';
+import '../entities/transaction_item.dart';
 
 abstract class FinanceRepository {
   Future<List<RemittanceEntity>> getAgentRemittances(String agentId);
@@ -26,4 +27,5 @@ abstract class FinanceRepository {
     String? notes,
   });
   Future<List<Map<String, dynamic>>> getPayoutRequests(String agentId);
+  Future<List<TransactionItem>> getRiderTransactions(String agentId);
 }

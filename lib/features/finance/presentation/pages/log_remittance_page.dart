@@ -5,7 +5,10 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/helpers/formatters.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../notifications/presentation/providers/notifications_provider.dart';
+import '../../../orders/presentation/providers/orders_provider.dart';
+import '../../domain/entities/financial_summary.dart';
 import '../providers/finance_provider.dart';
 
 class LogRemittancePage extends ConsumerStatefulWidget {
@@ -23,11 +26,7 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
   final _posAgentNameController = TextEditingController();
   final _dcStaffNameController = TextEditingController(text: 'Supervisor Adekunle');
   final _notesController = TextEditingController();
-
-  final double _grossCollections = 75000.0;
-  final double _commissionDeduction = 15000.0;
-  final double _transportDeduction = 22500.0;
-  late double _expectedAmount;
+  bool _isInitialAmountSet = false;
 
   String _selectedMethod = 'bank_transfer'; // 'bank_transfer', 'cash_to_dc', 'pos'
   String? _selectedDiscrepancyReason;
@@ -41,13 +40,6 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
     'POS/transaction issue',
     'Other',
   ];
-
-  @override
-  void initState() {
-    super.initState();
-    _expectedAmount = _grossCollections - _commissionDeduction - _transportDeduction;
-    _amountController.text = _expectedAmount.toInt().toString();
-  }
 
   @override
   void dispose() {
@@ -64,11 +56,35 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final authState = ref.watch(authProvider);
+    final ordersState = ref.watch(ordersProvider);
     final financeState = ref.watch(financeProvider);
+    final user = authState.user;
+
+    final summary = FinancialSummary.calculate(
+      orders: ordersState.orders,
+      remittances: financeState.remittances,
+      user: user,
+      manualEarnedBalance: financeState.totalEarnedBalance,
+    );
+
+    final double grossCollections = summary.cashCollectedAllTime;
+    final double commissionDeduction = summary.totalCommissionRetained;
+    final double transportDeduction = summary.totalTransportRetained;
+    final double remitted = summary.totalVerifiedRemitted;
+    final double pendingApproval = summary.totalPendingApprovalRemitted;
+    final double expectedAmount = summary.pendingRemittanceToDC;
+
+    if (!_isInitialAmountSet && expectedAmount > 0) {
+      _isInitialAmountSet = true;
+      _amountController.text = expectedAmount.toInt().toString();
+    } else if (_amountController.text.isEmpty && expectedAmount > 0) {
+      _amountController.text = expectedAmount.toInt().toString();
+    }
 
     final enteredAmount = double.tryParse(_amountController.text) ?? 0.0;
-    final hasDiscrepancy = (enteredAmount - _expectedAmount).abs() > 0.01;
-    final discrepancyAmount = enteredAmount - _expectedAmount;
+    final hasDiscrepancy = (enteredAmount - expectedAmount).abs() > 0.01;
+    final discrepancyAmount = enteredAmount - expectedAmount;
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
@@ -131,39 +147,77 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Gross Customer Collections', style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFFCBD5E1))),
-                        Text(CurrencyFormatter.formatNaira(_grossCollections), style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
+                        Expanded(
+                          child: Text('Gross Customer Collections', style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFFCBD5E1))),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(CurrencyFormatter.formatNaira(grossCollections), style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
                       ],
                     ),
                     const SizedBox(height: 6),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Less: Commission (15 deliveries)', style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF4ADE80))),
-                        Text('-${CurrencyFormatter.formatNaira(_commissionDeduction)}', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF4ADE80))),
+                        Expanded(
+                          child: Text('Less: Commission (${summary.deliveredCashOrdersCount} deliveries)', style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF4ADE80))),
+                        ),
+                        const SizedBox(width: 8),
+                        Text('-${CurrencyFormatter.formatNaira(commissionDeduction)}', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF4ADE80))),
                       ],
                     ),
                     const SizedBox(height: 6),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Less: Transport Allowance', style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF38BDF8))),
-                        Text('-${CurrencyFormatter.formatNaira(_transportDeduction)}', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF38BDF8))),
+                        Expanded(
+                          child: Text('Less: Transport Allowance (${summary.deliveredCashOrdersCount} orders)', style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF38BDF8))),
+                        ),
+                        const SizedBox(width: 8),
+                        Text('-${CurrencyFormatter.formatNaira(transportDeduction)}', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF38BDF8))),
                       ],
                     ),
+                    if (remitted > 0) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text('Less: Verified Remittances', style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFFA7F3D0))),
+                          ),
+                          const SizedBox(width: 8),
+                          Text('-${CurrencyFormatter.formatNaira(remitted)}', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFFA7F3D0))),
+                        ],
+                      ),
+                    ],
+                    if (pendingApproval > 0) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text('Less: Submitted Awaiting Review', style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFFFDE68A))),
+                          ),
+                          const SizedBox(width: 8),
+                          Text('-${CurrencyFormatter.formatNaira(pendingApproval)}', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFFFDE68A))),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     const Divider(color: Color(0xFF334155), height: 1),
                     const SizedBox(height: 12),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          'Expected Remittance',
-                          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                        Expanded(
+                          child: Text(
+                            'Expected Remittance',
+                            style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                          ),
                         ),
+                        const SizedBox(width: 8),
                         Text(
-                          CurrencyFormatter.formatNaira(_expectedAmount),
-                          style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w900, color: const Color(0xFFF97316)),
+                          CurrencyFormatter.formatNaira(expectedAmount),
+                          style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w900, color: const Color(0xFFF97316)),
                         ),
                       ],
                     ),
@@ -599,11 +653,28 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
   void _handleReviewAndSubmit(BuildContext context) {
     if (!_formKey.currentState!.validate()) return;
 
+    final authState = ref.read(authProvider);
+    final ordersState = ref.read(ordersProvider);
+    final financeState = ref.read(financeProvider);
+    final user = authState.user;
+
+    final summary = FinancialSummary.calculate(
+      orders: ordersState.orders,
+      remittances: financeState.remittances,
+      user: user,
+      manualEarnedBalance: financeState.totalEarnedBalance,
+    );
+
+    final grossCollections = summary.cashCollectedAllTime;
+    final commissionDeduction = summary.totalCommissionRetained;
+    final transportDeduction = summary.totalTransportRetained;
+    final expectedAmount = summary.pendingRemittanceToDC;
+
     final enteredAmount = double.tryParse(_amountController.text) ?? 0.0;
     final posFee = double.tryParse(_posFeeController.text) ?? 0.0;
     final refText = _referenceController.text.isNotEmpty
         ? _referenceController.text
-        : (_selectedMethod == 'cash_to_dc' ? 'CASH-${_dcStaffNameController.text}' : 'REM-00482');
+        : (_selectedMethod == 'cash_to_dc' ? 'CASH-${_dcStaffNameController.text}' : 'REM-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}');
 
     showDialog(
       context: context,
@@ -616,9 +687,9 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
           children: [
             Text('Please verify remittance settlement details before final submission:', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
             const SizedBox(height: 14),
-            _buildConfirmRow('Gross Collections:', CurrencyFormatter.formatNaira(_grossCollections)),
-            _buildConfirmRow('Less Commission:', '-${CurrencyFormatter.formatNaira(_commissionDeduction)}'),
-            _buildConfirmRow('Less Transport:', '-${CurrencyFormatter.formatNaira(_transportDeduction)}'),
+            _buildConfirmRow('Gross Collections:', CurrencyFormatter.formatNaira(grossCollections)),
+            _buildConfirmRow('Less Commission:', '-${CurrencyFormatter.formatNaira(commissionDeduction)}'),
+            _buildConfirmRow('Less Transport:', '-${CurrencyFormatter.formatNaira(transportDeduction)}'),
             const Divider(height: 16),
             _buildConfirmRow('Net Amount Remitted:', CurrencyFormatter.formatNaira(enteredAmount), isBold: true),
             _buildConfirmRow('Method:', _selectedMethod.toUpperCase()),
@@ -636,13 +707,15 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
               final success = await ref.read(financeProvider.notifier).submitRemittance(
                     amount: enteredAmount,
                     paymentMethod: _selectedMethod,
-                    grossCollections: _grossCollections,
-                    commissionDeducted: _commissionDeduction,
-                    transportAllowanceDeducted: _transportDeduction,
+                    agentId: user?.deliveryAgentId,
+                    companyId: user?.companyId,
+                    grossCollections: grossCollections,
+                    commissionDeducted: commissionDeduction,
+                    transportAllowanceDeducted: transportDeduction,
                     posFee: posFee,
                     referenceNumber: refText,
                     discrepancyReason: _selectedDiscrepancyReason,
-                    discrepancyAmount: (enteredAmount - _expectedAmount),
+                    discrepancyAmount: (enteredAmount - expectedAmount),
                     notes: _notesController.text,
                   );
 
@@ -670,7 +743,10 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+          Expanded(
+            child: Text(label, style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+          ),
+          const SizedBox(width: 8),
           Text(
             val,
             style: GoogleFonts.inter(
