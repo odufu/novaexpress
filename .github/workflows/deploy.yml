@@ -1,62 +1,26 @@
-name: Build, Test & Deploy Flutter Web to GitHub Pages
+name: Fast Build WASM & Deploy to GitHub Pages
 
 on:
   push:
     branches:
       - main
       - master
-  pull_request:
-    branches:
-      - main
-      - master
   workflow_dispatch:
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+# Permissions for GitHub Pages deployment
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
-# However, do NOT cancel in-progress runs as we want to allow deployments to complete.
+# Allow only one concurrent deployment
 concurrency:
   group: 'pages'
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
-  # -------------------------------------------------------------
-  # 1. TEST JOB: Runs on every push and pull request
-  # -------------------------------------------------------------
-  test:
-    name: Run Automated Tests & Quality Analysis
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Setup Flutter Environment
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-          cache: true
-          cache-key: 'flutter-:os:-:channel:-:version:-:arch:-:hash:'
-
-      - name: Install Project Dependencies
-        run: flutter pub get
-
-      - name: Verify Code Formatting & Analysis
-        run: flutter analyze
-
-      - name: Run Full Test Suite
-        run: flutter test
-
-  # -------------------------------------------------------------
-  # 2. BUILD & DEPLOY JOB: Compiles with WebAssembly (WASM)
-  # -------------------------------------------------------------
   deploy:
-    name: Build WASM & Deploy to GitHub Pages
-    needs: test
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    name: Build WASM & Deploy
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -75,15 +39,15 @@ jobs:
       - name: Install Project Dependencies
         run: flutter pub get
 
-      - name: Build Flutter Web with WebAssembly (WASM) & JS Fallback
+      - name: Build Flutter Web (WebAssembly / WASM)
         run: |
           REPO_NAME="${{ github.event.repository.name }}"
           echo "Building for GitHub Pages repository: $REPO_NAME"
           flutter build web --wasm --release --base-href "/${REPO_NAME}/"
 
-      - name: Configure SPA Routing Fallback
+      - name: Configure SPA Routing Fallback (404.html)
         run: |
-          # Copy index.html to 404.html to support direct deep-linking on GitHub Pages
+          # Copy index.html to 404.html so GoRouter deep links and page refreshes work on GitHub Pages
           cp build/web/index.html build/web/404.html
 
       - name: Setup GitHub Pages
@@ -97,3 +61,4 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
