@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../../../core/constants/supabase_constants.dart';
 import '../../data/datasources/orders_remote_datasource.dart';
 import '../../data/models/order_model.dart';
 import '../../data/repositories/orders_repository_impl.dart';

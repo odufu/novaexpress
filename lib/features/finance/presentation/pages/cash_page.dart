@@ -69,8 +69,6 @@ class _CashPageState extends ConsumerState<CashPage> {
     final double cashCollected = summary.cashCollectedToday > 0 ? summary.cashCollectedToday : summary.cashCollectedAllTime;
     final double totalCommission = summary.totalCommissionRetained;
     final double totalTransport = summary.totalTransportRetained;
-    final double remitted = summary.totalVerifiedRemitted;
-    final double pendingApproval = summary.totalPendingApprovalRemitted;
     final double toRemit = summary.pendingRemittanceToDC;
     final double riderBalance = summary.myDirectTransfersBalance;
 

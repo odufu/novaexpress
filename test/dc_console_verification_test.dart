@@ -14,7 +14,6 @@ import 'package:novexps/features/auth/presentation/providers/auth_provider.dart'
 import 'package:novexps/features/orders/data/datasources/orders_remote_datasource.dart';
 import 'package:novexps/features/orders/data/models/order_model.dart';
 import 'package:novexps/features/orders/data/repositories/orders_repository_impl.dart';
-import 'package:novexps/features/orders/domain/entities/order.dart';
 import 'package:novexps/features/orders/presentation/providers/orders_provider.dart';
 
 import 'package:novexps/features/stock/data/datasources/stock_remote_datasource.dart';
@@ -36,7 +35,6 @@ import 'package:novexps/features/dc_console/presentation/pages/dc_console_layout
 import 'package:novexps/features/dc_console/presentation/pages/dc_dashboard_page.dart';
 import 'package:novexps/features/dc_console/presentation/pages/dc_orders_page.dart';
 import 'package:novexps/features/dc_console/presentation/pages/dc_stock_page.dart';
-import 'package:novexps/features/dc_console/presentation/pages/dc_finance_page.dart';
 import 'package:novexps/features/dc_console/presentation/pages/dc_returns_page.dart';
 import 'package:novexps/features/dc_console/presentation/pages/dc_payouts_page.dart';
 import 'package:novexps/features/dc_console/domain/entities/dc_fleet_driver.dart';
@@ -74,8 +72,6 @@ class _MockAuthRemoteDS implements AuthRemoteDataSource {
   Future<void> logout() async {}
   @override
   Future<UserModel?> getCurrentUser() async => testUser;
-  @override
-  Future<UserModel?> checkCurrentUser() async => testUser;
   @override
   Future<UserModel> registerDeliveryAgent({
     required String email,
@@ -149,8 +145,6 @@ class _MockFinanceRemoteDS implements FinanceRemoteDataSource {
 class _MockStockRemoteDS implements StockRemoteDataSource {
   @override
   Future<List<StockItemModel>> getVehicleStockItems([String? agentId]) async => [];
-  @override
-  Future<List<StockItemModel>> getWarehouseStockItems() async => [];
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

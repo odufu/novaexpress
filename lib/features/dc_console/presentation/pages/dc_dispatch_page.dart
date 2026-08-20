@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/helpers/formatters.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
-import '../providers/dc_console_provider.dart';
 
 class DCDispatchPage extends ConsumerWidget {
   const DCDispatchPage({super.key});
@@ -13,9 +12,7 @@ class DCDispatchPage extends ConsumerWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final ordersState = ref.watch(ordersProvider);
-    final dcState = ref.watch(dcConsoleProvider);
 
-    final pendingOrders = ordersState.orders.where((o) => o.status == 'pending' || o.status == 'accepted').toList();
     final inTransitOrders = ordersState.orders.where((o) => o.status == 'in_transit' || o.status == 'assigned').toList();
 
     return SingleChildScrollView(

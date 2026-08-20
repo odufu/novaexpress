@@ -74,9 +74,6 @@ class _MockAuthRemoteDS implements AuthRemoteDataSource {
   Future<UserModel?> getCurrentUser() async => null;
 
   @override
-  Future<UserModel?> checkCurrentUser() async => null;
-
-  @override
   Future<UserModel> registerDeliveryAgent({
     required String email,
     required String password,
@@ -117,8 +114,6 @@ class _MockFinanceRemoteDS implements FinanceRemoteDataSource {
 class _MockStockRemoteDS implements StockRemoteDataSource {
   @override
   Future<List<StockItemModel>> getVehicleStockItems([String? agentId]) async => [];
-  @override
-  Future<List<StockItemModel>> getWarehouseStockItems() async => [];
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

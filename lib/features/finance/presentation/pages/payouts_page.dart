@@ -46,7 +46,6 @@ class PayoutsPage extends ConsumerStatefulWidget {
 
 class _PayoutsPageState extends ConsumerState<PayoutsPage> {
   String _selectedFilter = 'all'; // 'all', 'pending', 'approved', 'rejected'
-  double _availableBalance = 18500.0;
 
   final List<PayoutRequestItem> _payouts = [
     PayoutRequestItem(
@@ -217,7 +216,6 @@ class _PayoutsPageState extends ConsumerState<PayoutsPage> {
 
                         Navigator.pop(ctx);
                         setState(() {
-                          _availableBalance -= reqAmount;
                           _payouts.insert(
                             0,
                             PayoutRequestItem(

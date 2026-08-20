@@ -64,16 +64,6 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
   final _accountNumberController = TextEditingController();
   final _accountNameController = TextEditingController();
 
-  final List<String> _zones = [
-    'Wuse II & Zone 4',
-    'Maitama & Ministers Hill',
-    'Garki I & II',
-    'Utako & Jabi',
-    'Abuja Central Business District (CBD)',
-    'Asokoro & Guzape',
-    'Gwarinpa Estate',
-  ];
-
   final List<String> _banks = [
     'Kuda Microfinance Bank',
     'GTBank',

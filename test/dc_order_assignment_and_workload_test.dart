@@ -7,9 +7,7 @@ import 'package:novexps/features/dc_console/presentation/pages/dc_orders_page.da
 import 'package:novexps/features/dc_console/presentation/providers/dc_console_provider.dart';
 import 'package:novexps/features/orders/data/datasources/orders_remote_datasource.dart';
 import 'package:novexps/features/orders/data/models/order_model.dart';
-import 'package:novexps/features/orders/domain/entities/order.dart';
 import 'package:novexps/features/orders/presentation/providers/orders_provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() {
   setUpAll(() {

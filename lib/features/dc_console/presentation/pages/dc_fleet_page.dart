@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../../core/helpers/formatters.dart';
 import '../providers/dc_console_provider.dart';
 import '../widgets/dc_driver_manifest_table.dart';
 

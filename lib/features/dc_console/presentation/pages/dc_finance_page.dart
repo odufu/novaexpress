@@ -4,7 +4,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/helpers/formatters.dart';
 import '../../../../core/widgets/app_skeleton_loader.dart';
 import '../../../finance/presentation/providers/finance_provider.dart';
-import '../providers/dc_console_provider.dart';
 
 class DCFinancePage extends ConsumerStatefulWidget {
   const DCFinancePage({super.key});
