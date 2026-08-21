@@ -2214,3 +2214,9 @@ Instead:
 → maintains the historical truth.
 
 That architecture will allow NovaExpress to change its pricing, negotiate different client agreements, change a PDA's commission, move someone from commission to salary, introduce new products, add new HQs/DCs, and add new delivery personnel **without rebuilding the system.**
+
+---
+
+# 14. Technical Specifications & Implementations
+
+- **[Automated Geocoding, Proximity Dispatch & Rider Navigation](file:///c:/PROJECT/NoveXPS/DOCUMENTATION/TECHNICAL_IMPLEMENTATIONS/automated_geocoding_and_proximity_dispatch.md)**: Architecture for 3-tier address geocoding, Haversine/PostGIS nearest-rider auto-dispatch, zero-cost Google Maps turn-by-turn voice navigation on PDA, and WhatsApp location refinement.
