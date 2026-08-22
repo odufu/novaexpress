@@ -29,9 +29,9 @@ void main() {
     test('1. Live Remote Database: Auth Profile & Agent Resolution', () async {
       HttpOverrides.global = _UnrestrictedHttpOverrides();
       final authDatasource = AuthRemoteDataSourceImpl(client);
-      final user = await authDatasource.login('rider.emeka@novaexpress.com', 'Password123!');
+      final user = await authDatasource.login('emeka.rider@novaexpress.ng', 'Password123!');
 
-      expect(user.email, equals('rider.emeka@novaexpress.com'));
+      expect(user.email, equals('emeka.rider@novaexpress.ng'));
       expect(user.deliveryAgentCode, equals('PDA-7000'));
       expect(user.deliveryAgentId, equals('b1111111-1111-4111-8111-111111111111'));
       expect(user.distributionCenterName, contains('Wuse'));

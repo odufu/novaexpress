@@ -1,6 +1,6 @@
 -- ============================================================================
 -- NovaExpress Logistics Management System (NoveXPS)
--- Database Migration: Automated Geocoding, Proximity Dispatch & Rider Telemetry
+-- Database Migration: Automated Geocoding, Proximity Dispatch & Spatial Indexing
 -- ============================================================================
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -36,12 +36,44 @@ ALTER TABLE IF EXISTS delivery_agents ADD COLUMN IF NOT EXISTS max_active_orders
 ALTER TABLE IF EXISTS delivery_agents ADD COLUMN IF NOT EXISTS assigned_zones TEXT[] DEFAULT ARRAY[]::TEXT[];
 
 -- ----------------------------------------------------------------------------
--- 3. STORED FUNCTION: find_closest_available_rider
+-- 3. SPATIAL & PERFORMANCE INDEXES
+-- ----------------------------------------------------------------------------
+CREATE INDEX IF NOT EXISTS idx_orders_coordinates ON orders (latitude, longitude) WHERE latitude IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_orders_geocoding_status ON orders (geocoding_status);
+CREATE INDEX IF NOT EXISTS idx_delivery_agents_telemetry ON delivery_agents (current_latitude, current_longitude) WHERE current_latitude IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_delivery_agents_duty_status ON delivery_agents (is_on_duty, distribution_center_id);
+
+-- ----------------------------------------------------------------------------
+-- 4. PURE SQL SCALAR FUNCTION: calculate_haversine_distance_km
+-- Calculates great-circle distance between two (lat, lon) coordinates in Kilometers
+-- ----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION calculate_haversine_distance_km(
+  p_lat1 DOUBLE PRECISION,
+  p_lon1 DOUBLE PRECISION,
+  p_lat2 DOUBLE PRECISION,
+  p_lon2 DOUBLE PRECISION
+)
+RETURNS DOUBLE PRECISION
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+AS $$
+  SELECT (6371.0 * acos(
+    LEAST(1.0, GREATEST(-1.0,
+      cos(radians(p_lat1)) * cos(radians(p_lat2)) *
+      cos(radians(p_lon2) - radians(p_lon1)) +
+      sin(radians(p_lat1)) * sin(radians(p_lat2))
+    ))
+  ));
+$$;
+
+-- ----------------------------------------------------------------------------
+-- 5. STORED FUNCTION: find_closest_available_rider
 -- ----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION find_closest_available_rider(
   p_order_lat DOUBLE PRECISION,
   p_order_lng DOUBLE PRECISION,
-  p_distribution_center_id UUID,
+  p_distribution_center_id UUID DEFAULT NULL,
   p_max_distance_km DOUBLE PRECISION DEFAULT 25.0
 )
 RETURNS TABLE (
@@ -49,6 +81,8 @@ RETURNS TABLE (
   agent_code VARCHAR,
   full_name TEXT,
   phone TEXT,
+  current_lat DOUBLE PRECISION,
+  current_lng DOUBLE PRECISION,
   distance_km DOUBLE PRECISION,
   active_orders_count INT
 )
@@ -60,13 +94,14 @@ AS $$
     da.agent_code,
     COALESCE(u.first_name || ' ' || u.last_name, u.email, da.agent_code) AS full_name,
     COALESCE(u.phone_number, da.agent_code) AS phone,
-    (6371 * acos(
-      LEAST(1.0, GREATEST(-1.0,
-        cos(radians(p_order_lat)) * cos(radians(COALESCE(da.current_latitude, u.current_latitude))) *
-        cos(radians(COALESCE(da.current_longitude, u.current_longitude)) - radians(p_order_lng)) +
-        sin(radians(p_order_lat)) * sin(radians(COALESCE(da.current_latitude, u.current_latitude)))
-      ))
-    )) AS distance_km,
+    COALESCE(da.current_latitude, u.current_latitude) AS current_lat,
+    COALESCE(da.current_longitude, u.current_longitude) AS current_lng,
+    calculate_haversine_distance_km(
+      p_order_lat, 
+      p_order_lng, 
+      COALESCE(da.current_latitude, u.current_latitude), 
+      COALESCE(da.current_longitude, u.current_longitude)
+    ) AS distance_km,
     (
       SELECT COUNT(*)::INT 
       FROM orders o 
@@ -75,7 +110,7 @@ AS $$
     ) AS active_orders_count
   FROM delivery_agents da
   JOIN users u ON da.user_id = u.id
-  WHERE (da.distribution_center_id = p_distribution_center_id OR p_distribution_center_id IS NULL)
+  WHERE (p_distribution_center_id IS NULL OR da.distribution_center_id = p_distribution_center_id)
     AND COALESCE(da.is_on_duty, u.is_on_duty, true) = TRUE
     AND COALESCE(da.current_latitude, u.current_latitude) IS NOT NULL
     AND COALESCE(da.current_longitude, u.current_longitude) IS NOT NULL
@@ -85,19 +120,18 @@ AS $$
       WHERE o.delivery_agent_id = da.id 
         AND o.status IN ('accepted', 'in_transit', 'pending', 'assigned')
     ) < COALESCE(da.max_active_orders, u.max_active_orders, 15)
-    AND (6371 * acos(
-      LEAST(1.0, GREATEST(-1.0,
-        cos(radians(p_order_lat)) * cos(radians(COALESCE(da.current_latitude, u.current_latitude))) *
-        cos(radians(COALESCE(da.current_longitude, u.current_longitude)) - radians(p_order_lng)) +
-        sin(radians(p_order_lat)) * sin(radians(COALESCE(da.current_latitude, u.current_latitude)))
-      ))
-    )) <= p_max_distance_km
+    AND calculate_haversine_distance_km(
+      p_order_lat, 
+      p_order_lng, 
+      COALESCE(da.current_latitude, u.current_latitude), 
+      COALESCE(da.current_longitude, u.current_longitude)
+    ) <= p_max_distance_km
   ORDER BY distance_km ASC, active_orders_count ASC
   LIMIT 1;
 $$;
 
 -- ----------------------------------------------------------------------------
--- 4. STORED FUNCTION: auto_dispatch_order
+-- 6. STORED FUNCTION: auto_dispatch_order
 -- ----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION auto_dispatch_order(
   p_order_id UUID,
@@ -109,7 +143,6 @@ AS $$
 DECLARE
   v_order RECORD;
   v_rider RECORD;
-  v_result JSONB;
 BEGIN
   -- 1. Fetch target order
   SELECT * INTO v_order FROM orders WHERE id = p_order_id;
@@ -121,7 +154,7 @@ BEGIN
     RETURN jsonb_build_object('success', false, 'error', 'Order coordinates missing. Geocode order before dispatch.');
   END IF;
 
-  -- 2. Find closest rider
+  -- 2. Find closest rider using Haversine calculation
   SELECT * INTO v_rider FROM find_closest_available_rider(
     v_order.latitude,
     v_order.longitude,
@@ -193,7 +226,7 @@ END;
 $$;
 
 -- ----------------------------------------------------------------------------
--- 5. STORED FUNCTION: update_rider_gps_telemetry
+-- 7. STORED FUNCTION: update_rider_gps_telemetry
 -- ----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION update_rider_gps_telemetry(
   p_agent_id UUID,
@@ -223,7 +256,7 @@ END;
 $$;
 
 -- ----------------------------------------------------------------------------
--- 6. STORED FUNCTION: record_verified_gate_pin
+-- 8. STORED FUNCTION: record_verified_gate_pin
 -- ----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION record_verified_gate_pin(
   p_order_id UUID,
@@ -247,5 +280,66 @@ BEGIN
   WHERE id = p_order_id;
 END;
 $$;
+
+-- ----------------------------------------------------------------------------
+-- 9. SEED DATA REFINEMENT: REALISTIC GPS FIXES FOR RIDERS & ORDERS
+-- ----------------------------------------------------------------------------
+-- Update Rider PDA-7000 (Emeka Rider) location to Wuse 2
+UPDATE delivery_agents
+SET 
+  current_latitude = 9.0765,
+  current_longitude = 7.4832,
+  is_on_duty = TRUE,
+  max_active_orders = 15,
+  last_location_update = NOW()
+WHERE agent_code = 'PDA-7000';
+
+UPDATE users
+SET 
+  current_latitude = 9.0765,
+  current_longitude = 7.4832,
+  last_location_update = NOW()
+WHERE email = 'emeka.rider@novaexpress.ng';
+
+-- Update Sample Orders with Geocoded Locations & Verification
+UPDATE orders
+SET 
+  latitude = 9.0765,
+  longitude = 7.4832,
+  geocoding_status = 'exact_verified',
+  geocoded_address = 'Plot 402 Aminu Kano Crescent, Wuse 2, Abuja, Nigeria',
+  location_confidence = 0.95,
+  is_location_verified = true
+WHERE order_number = 'TRK-8924';
+
+UPDATE orders
+SET 
+  latitude = 9.0882,
+  longitude = 7.4933,
+  geocoding_status = 'landmark_match',
+  geocoded_address = 'Maitama District, Abuja, Nigeria',
+  location_confidence = 0.85,
+  is_location_verified = false
+WHERE order_number = 'TRK-8925';
+
+UPDATE orders
+SET 
+  latitude = 9.0345,
+  longitude = 7.4891,
+  geocoding_status = 'exact_verified',
+  geocoded_address = '22 Area 11, Garki, Abuja, Nigeria',
+  location_confidence = 0.90,
+  is_location_verified = true
+WHERE order_number = 'TRK-8926';
+
+UPDATE orders
+SET 
+  latitude = 9.0435,
+  longitude = 7.5255,
+  geocoding_status = 'landmark_match',
+  geocoded_address = '8 Yakubu Gowon Crescent, Asokoro, Abuja, Nigeria',
+  location_confidence = 0.80,
+  is_location_verified = false
+WHERE order_number = 'TRK-8927';
 
 NOTIFY pgrst, 'reload schema';

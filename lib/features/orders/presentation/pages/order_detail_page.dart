@@ -488,21 +488,29 @@ class OrderDetailPage extends ConsumerWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          Icon(Icons.person_outline_rounded, color: theme.colorScheme.onSurfaceVariant, size: 20),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Customer Information',
-                            style: GoogleFonts.inter(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: theme.colorScheme.onSurface,
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Icon(Icons.person_outline_rounded, color: theme.colorScheme.onSurfaceVariant, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Customer Information',
+                                style: GoogleFonts.inter(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: theme.colorScheme.onSurface,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
+                      const SizedBox(width: 8),
                       Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           IconButton.filled(
                             style: IconButton.styleFrom(

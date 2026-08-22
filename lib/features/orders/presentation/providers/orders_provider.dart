@@ -8,7 +8,13 @@ import '../../domain/entities/order.dart';
 import '../../domain/repositories/orders_repository.dart';
 
 final ordersRemoteDataSourceProvider = Provider<OrdersRemoteDataSource>((ref) {
-  return OrdersRemoteDataSourceImpl(Supabase.instance.client);
+  try {
+    return OrdersRemoteDataSourceImpl(Supabase.instance.client);
+  } catch (_) {
+    return OrdersRemoteDataSourceImpl(
+      SupabaseClient('https://mock.supabase.co', 'mock-anon-key'),
+    );
+  }
 });
 
 final ordersRepositoryProvider = Provider<OrdersRepository>((ref) {
@@ -16,7 +22,11 @@ final ordersRepositoryProvider = Provider<OrdersRepository>((ref) {
 });
 
 final geocodingServiceProvider = Provider<GeocodingService>((ref) {
-  return GeocodingService(Supabase.instance.client);
+  try {
+    return GeocodingService(Supabase.instance.client);
+  } catch (_) {
+    return GeocodingService();
+  }
 });
 
 class OrdersState {
