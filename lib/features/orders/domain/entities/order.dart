@@ -135,16 +135,28 @@ class OrderEntity {
     return clean.replaceAll('+', '');
   }
 
-  /// Generates the prefilled WhatsApp message URI requesting the customer to send their live location pin
-  Uri getWhatsAppLocationRequestUri({String? riderName}) {
+  /// Generates the prefilled message body requesting customer live location pin
+  String getWhatsAppLocationRequestText({String? riderName}) {
     final name = riderName != null && riderName.isNotEmpty ? riderName : 'your NovaExpress Dispatcher';
-    final message = '''Hello ${customerName.trim()}, this is $name from NovaExpress Logistics regarding your order ($orderNumber - $productName) 📦.
+    return '''Hello ${customerName.trim()}, this is $name from NovaExpress Logistics regarding your order ($orderNumber - $productName) 📦.
 
 I am currently en route / preparing your delivery to:
 "${deliveryAddress.trim()}".
 
 Kindly tap the "📎" attach button below and share your *Current Location / Live Pin* on WhatsApp so I can navigate straight to your gate without delay. Thank you! 🙏''';
+  }
 
+  /// Generates the direct native whatsapp:// application URI (bypasses 3rd party web interceptors)
+  Uri getWhatsAppNativeAppUri({String? riderName}) {
+    final message = getWhatsAppLocationRequestText(riderName: riderName);
+    final encodedMsg = Uri.encodeComponent(message);
+    final phone = formattedWhatsAppPhone;
+    return Uri.parse('whatsapp://send?phone=$phone&text=$encodedMsg');
+  }
+
+  /// Generates the web wa.me URI requesting the customer to send their live location pin
+  Uri getWhatsAppLocationRequestUri({String? riderName}) {
+    final message = getWhatsAppLocationRequestText(riderName: riderName);
     final encodedMsg = Uri.encodeComponent(message);
     final phone = formattedWhatsAppPhone;
     return Uri.parse('https://wa.me/$phone?text=$encodedMsg');

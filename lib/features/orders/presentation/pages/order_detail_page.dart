@@ -44,11 +44,13 @@ class OrderDetailPage extends ConsumerWidget {
         ? '${user.firstName} ${user.lastName}'.trim()
         : (user?.fullName.isNotEmpty == true ? user!.fullName : 'Dispatch Rider');
 
-    final uri = order.getWhatsAppLocationRequestUri(riderName: riderName);
+    final message = order.getWhatsAppLocationRequestText(riderName: riderName);
+    final fallbackUri = order.getWhatsAppLocationRequestUri(riderName: riderName);
     MapLauncherHelper.launchWhatsApp(
       context: context,
-      waUri: uri,
-      customerPhone: order.formattedWhatsAppPhone,
+      customerPhone: order.customerPhone,
+      message: message,
+      fallbackUri: fallbackUri,
     );
   }
 

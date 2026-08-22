@@ -106,28 +106,75 @@ class MapLauncherHelper {
     );
   }
 
-  /// Launches WhatsApp with pre-filled message using robust package/web routing
+  /// Launches WhatsApp with direct native whatsapp:// URI, falling back to web wa.me and clipboard
   static Future<void> launchWhatsApp({
     required BuildContext context,
-    required Uri waUri,
     required String customerPhone,
+    required String message,
+    Uri? fallbackUri,
   }) async {
     final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final cleanPhone = customerPhone.replaceAll(RegExp(r'[^\d+]'), '').replaceAll('+', '');
+    final formattedPhone = cleanPhone.startsWith('0')
+        ? '234${cleanPhone.substring(1)}'
+        : (cleanPhone.startsWith('234') ? cleanPhone : '234$cleanPhone');
+
+    final encodedMsg = Uri.encodeComponent(message);
+
+    // Tier 1: Direct native WhatsApp URI intent (whatsapp://send?phone=...&text=...)
+    // This goes straight to WhatsApp App and can NEVER be hijacked by OPay or other web handlers
+    final Uri nativeWaUri = Uri.parse('whatsapp://send?phone=$formattedPhone&text=$encodedMsg');
+
+    // Tier 2: Universal Web WhatsApp API
+    final Uri webWaUri = fallbackUri ?? Uri.parse('https://api.whatsapp.com/send?phone=$formattedPhone&text=$encodedMsg');
+
+    // Tier 3: wa.me short link
+    final Uri shortWaUri = Uri.parse('https://wa.me/$formattedPhone?text=$encodedMsg');
+
+    // 1. Try Native WhatsApp App Intent first
+    try {
+      final launchedNative = await launchUrl(nativeWaUri, mode: LaunchMode.externalNonBrowserApplication);
+      if (launchedNative) return;
+    } catch (_) {
+      // Fall through
+    }
 
     try {
-      final launched = await launchUrl(waUri, mode: LaunchMode.externalApplication);
-      if (launched) return;
+      final launchedNative2 = await launchUrl(nativeWaUri, mode: LaunchMode.externalApplication);
+      if (launchedNative2) return;
+    } catch (_) {
+      // Fall through
+    }
+
+    // 2. Try Web API with In-App Browser to isolate from third-party app hijackers
+    try {
+      final launchedInApp = await launchUrl(webWaUri, mode: LaunchMode.inAppBrowserView);
+      if (launchedInApp) return;
     } catch (_) {
       try {
-        final launchedInApp = await launchUrl(waUri, mode: LaunchMode.platformDefault);
-        if (launchedInApp) return;
+        final launchedShort = await launchUrl(shortWaUri, mode: LaunchMode.inAppBrowserView);
+        if (launchedShort) return;
       } catch (_) {}
     }
 
+    // 3. Fallback: Copy message to clipboard and display helpful notification
+    await Clipboard.setData(ClipboardData(text: message));
     scaffoldMessenger.showSnackBar(
       SnackBar(
-        backgroundColor: AppColors.warning,
-        content: Text('Could not open WhatsApp for $customerPhone. Make sure WhatsApp is installed.'),
+        backgroundColor: AppColors.primary,
+        duration: const Duration(seconds: 4),
+        content: Row(
+          children: [
+            const Icon(Icons.chat_bubble_outline_rounded, color: Colors.white, size: 18),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'WhatsApp message copied to clipboard! Open WhatsApp to send to $formattedPhone.',
+                style: const TextStyle(color: Colors.white, fontSize: 12),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

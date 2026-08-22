@@ -48,11 +48,13 @@ class _PdaNavigationCardState extends ConsumerState<PdaNavigationCard> {
         ? '${user.firstName} ${user.lastName}'.trim()
         : (user?.fullName.isNotEmpty == true ? user!.fullName : 'Dispatch Rider');
 
-    final waUri = widget.order.getWhatsAppLocationRequestUri(riderName: riderName);
+    final message = widget.order.getWhatsAppLocationRequestText(riderName: riderName);
+    final fallbackUri = widget.order.getWhatsAppLocationRequestUri(riderName: riderName);
     await MapLauncherHelper.launchWhatsApp(
       context: context,
-      waUri: waUri,
-      customerPhone: widget.order.formattedWhatsAppPhone,
+      customerPhone: widget.order.customerPhone,
+      message: message,
+      fallbackUri: fallbackUri,
     );
   }
 
