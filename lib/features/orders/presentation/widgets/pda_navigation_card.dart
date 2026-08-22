@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:url_launcher/url_launcher.dart';
+import '../../../../core/helpers/map_launcher_helper.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/entities/order.dart';
@@ -25,36 +25,15 @@ class _PdaNavigationCardState extends ConsumerState<PdaNavigationCard> {
 
   void _launchGoogleMapsNavigation(BuildContext context) async {
     setState(() => _isNavigating = true);
-    final navUri = widget.order.googleMapsNavUri;
-    final webUri = widget.order.googleMapsWebDirectionsUri;
-
     try {
-      if (await canLaunchUrl(navUri)) {
-        await launchUrl(navUri, mode: LaunchMode.externalApplication);
-      } else if (await canLaunchUrl(webUri)) {
-        await launchUrl(webUri, mode: LaunchMode.externalApplication);
-      } else {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              backgroundColor: AppColors.danger,
-              content: Text('Could not open map application on this device.'),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: AppColors.warning,
-            content: Text('Opening web maps directions ($e)'),
-          ),
-        );
-      }
-      try {
-        await launchUrl(webUri, mode: LaunchMode.externalApplication);
-      } catch (_) {}
+      final fullDestination = '${widget.order.deliveryAddress}, ${widget.order.deliveryCity}, ${widget.order.deliveryState}';
+      await MapLauncherHelper.launchTurnByTurnNavigation(
+        context: context,
+        latitude: widget.order.latitude,
+        longitude: widget.order.longitude,
+        destinationAddress: fullDestination,
+        customerName: widget.order.customerName,
+      );
     } finally {
       if (mounted) {
         setState(() => _isNavigating = false);
@@ -70,30 +49,11 @@ class _PdaNavigationCardState extends ConsumerState<PdaNavigationCard> {
         : (user?.fullName.isNotEmpty == true ? user!.fullName : 'Dispatch Rider');
 
     final waUri = widget.order.getWhatsAppLocationRequestUri(riderName: riderName);
-
-    try {
-      if (await canLaunchUrl(waUri)) {
-        await launchUrl(waUri, mode: LaunchMode.externalApplication);
-      } else {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              backgroundColor: AppColors.warning,
-              content: Text('Could not open WhatsApp for ${widget.order.formattedWhatsAppPhone}'),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: AppColors.danger,
-            content: Text('WhatsApp launch failed: $e'),
-          ),
-        );
-      }
-    }
+    await MapLauncherHelper.launchWhatsApp(
+      context: context,
+      waUri: waUri,
+      customerPhone: widget.order.formattedWhatsAppPhone,
+    );
   }
 
   void _showRefineGatePinModal(BuildContext context) {

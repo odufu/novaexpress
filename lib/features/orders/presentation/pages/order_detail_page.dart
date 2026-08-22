@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/helpers/formatters.dart';
+import '../../../../core/helpers/map_launcher_helper.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_logo_widget.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -22,32 +22,22 @@ class OrderDetailPage extends ConsumerWidget {
     required this.orderId,
   });
 
-  void _callCustomer(String phone) async {
-    final cleanPhone = phone.replaceAll(' ', '').trim();
-    if (cleanPhone.isEmpty) return;
-    final uri = Uri.parse('tel:$cleanPhone');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    }
+  void _callCustomer(BuildContext context, String phone) {
+    MapLauncherHelper.launchPhoneCall(context: context, phoneNumber: phone);
   }
 
-  void _openMap(OrderEntity order) async {
-    final navUri = order.googleMapsNavUri;
-    final webUri = order.googleMapsWebDirectionsUri;
-    try {
-      if (await canLaunchUrl(navUri)) {
-        await launchUrl(navUri, mode: LaunchMode.externalApplication);
-      } else if (await canLaunchUrl(webUri)) {
-        await launchUrl(webUri, mode: LaunchMode.externalApplication);
-      }
-    } catch (_) {
-      try {
-        await launchUrl(webUri, mode: LaunchMode.externalApplication);
-      } catch (_) {}
-    }
+  void _openMap(BuildContext context, OrderEntity order) {
+    final fullDest = '${order.deliveryAddress}, ${order.deliveryCity}, ${order.deliveryState}';
+    MapLauncherHelper.launchTurnByTurnNavigation(
+      context: context,
+      latitude: order.latitude,
+      longitude: order.longitude,
+      destinationAddress: fullDest,
+      customerName: order.customerName,
+    );
   }
 
-  void _openWhatsAppPrompt(OrderEntity order, WidgetRef ref) async {
+  void _openWhatsAppPrompt(BuildContext context, OrderEntity order, WidgetRef ref) {
     final authState = ref.read(authProvider);
     final user = authState.user;
     final riderName = user != null && (user.firstName.isNotEmpty || user.lastName.isNotEmpty)
@@ -55,9 +45,11 @@ class OrderDetailPage extends ConsumerWidget {
         : (user?.fullName.isNotEmpty == true ? user!.fullName : 'Dispatch Rider');
 
     final uri = order.getWhatsAppLocationRequestUri(riderName: riderName);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
+    MapLauncherHelper.launchWhatsApp(
+      context: context,
+      waUri: uri,
+      customerPhone: order.formattedWhatsAppPhone,
+    );
   }
 
   void _startDelivery(BuildContext context, WidgetRef ref, OrderEntity order) async {
@@ -519,7 +511,7 @@ class OrderDetailPage extends ConsumerWidget {
                             ),
                             icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
                             tooltip: 'WhatsApp Live Pin Request',
-                            onPressed: () => _openWhatsAppPrompt(order, ref),
+                            onPressed: () => _openWhatsAppPrompt(context, order, ref),
                           ),
                           const SizedBox(width: 8),
                           IconButton.filled(
@@ -529,7 +521,7 @@ class OrderDetailPage extends ConsumerWidget {
                             ),
                             icon: const Icon(Icons.call_rounded, size: 18),
                             tooltip: 'Call Customer',
-                            onPressed: () => _callCustomer(order.customerPhone),
+                            onPressed: () => _callCustomer(context, order.customerPhone),
                           ),
                         ],
                       ),
@@ -929,7 +921,7 @@ class OrderDetailPage extends ConsumerWidget {
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
-                      onPressed: () => _callCustomer(order.customerPhone),
+                      onPressed: () => _callCustomer(context, order.customerPhone),
                       icon: const Icon(Icons.phone_outlined, size: 18),
                       label: const Text('Call Customer', style: TextStyle(fontWeight: FontWeight.bold)),
                     ),
@@ -941,7 +933,7 @@ class OrderDetailPage extends ConsumerWidget {
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
-                      onPressed: () => _openMap(order),
+                      onPressed: () => _openMap(context, order),
                       icon: const Icon(Icons.map_outlined, size: 18),
                       label: const Text('Directions', style: TextStyle(fontWeight: FontWeight.bold)),
                     ),
@@ -998,7 +990,7 @@ class OrderDetailPage extends ConsumerWidget {
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
-                      onPressed: () => _callCustomer(order.customerPhone),
+                      onPressed: () => _callCustomer(context, order.customerPhone),
                       icon: const Icon(Icons.phone_outlined, size: 18),
                       label: const Text('Call Customer', style: TextStyle(fontWeight: FontWeight.bold)),
                     ),
@@ -1013,7 +1005,7 @@ class OrderDetailPage extends ConsumerWidget {
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
-                  onPressed: () => _openMap(order),
+                  onPressed: () => _openMap(context, order),
                   icon: const Icon(Icons.navigation_outlined, size: 18),
                   label: const Text('Navigate GPS', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
