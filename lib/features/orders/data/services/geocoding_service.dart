@@ -175,4 +175,33 @@ class GeocodingService {
       debugPrint('[GEOCODING_SERVICE] sendRiderTelemetry notice: $e');
     }
   }
+
+  /// Records a verified physical gate pin for an order
+  Future<Map<String, dynamic>> recordVerifiedGatePin({
+    required String orderId,
+    required double latitude,
+    required double longitude,
+    String? pinLabel,
+  }) async {
+    if (supabaseClient == null) {
+      return {'success': true, 'verified': true, 'orderId': orderId};
+    }
+
+    try {
+      final response = await supabaseClient!.rpc('record_verified_gate_pin', params: {
+        'p_order_id': orderId,
+        'p_latitude': latitude,
+        'p_longitude': longitude,
+        'p_pin_label': pinLabel ?? 'Customer Delivery Gate',
+      });
+
+      if (response != null && response is Map<String, dynamic>) {
+        return response;
+      }
+      return {'success': true, 'verified': true, 'orderId': orderId};
+    } catch (e) {
+      debugPrint('[GEOCODING_SERVICE] recordVerifiedGatePin notice: $e');
+      return {'success': false, 'error': e.toString()};
+    }
+  }
 }

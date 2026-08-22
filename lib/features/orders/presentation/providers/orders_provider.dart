@@ -537,6 +537,71 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
       longitude: longitude,
     );
   }
+
+  /// Records a verified physical gate pin for an order
+  Future<Map<String, dynamic>> recordVerifiedGatePin({
+    required String orderId,
+    required double latitude,
+    required double longitude,
+    String? pinLabel,
+  }) async {
+    final service = _geocodingService ?? GeocodingService(Supabase.instance.client);
+    final result = await service.recordVerifiedGatePin(
+      orderId: orderId,
+      latitude: latitude,
+      longitude: longitude,
+      pinLabel: pinLabel,
+    );
+
+    if (result['success'] == true) {
+      final updatedList = state.orders.map((o) {
+        if (o.id == orderId || o.orderNumber == orderId) {
+          return OrderEntity(
+            id: o.id,
+            orderNumber: o.orderNumber,
+            customerName: o.customerName,
+            customerPhone: o.customerPhone,
+            customerAltPhone: o.customerAltPhone,
+            deliveryAddress: o.deliveryAddress,
+            deliveryCity: o.deliveryCity,
+            deliveryState: o.deliveryState,
+            landmark: o.landmark,
+            lga: o.lga,
+            productName: o.productName,
+            status: o.status,
+            quantity: o.quantity,
+            paidQuantity: o.paidQuantity,
+            freeQuantity: o.freeQuantity,
+            basePrice: o.basePrice,
+            upsellAmount: o.upsellAmount,
+            totalAmount: o.totalAmount,
+            paymentType: o.paymentType,
+            paymentStatus: o.paymentStatus,
+            fulfillmentType: o.fulfillmentType,
+            clientName: o.clientName,
+            packageCustodyId: o.packageCustodyId,
+            clientDeliveryFee: o.clientDeliveryFee,
+            agentEntitlement: o.agentEntitlement,
+            deliveryNotes: o.deliveryNotes,
+            createdAt: o.createdAt,
+            deliveryAgentId: o.deliveryAgentId,
+            deliveryAgentName: o.deliveryAgentName,
+            deliveryAgentCode: o.deliveryAgentCode,
+            distributionCenterId: o.distributionCenterId,
+            latitude: latitude,
+            longitude: longitude,
+            isLocationVerified: true,
+            geocodedAddress: o.geocodedAddress ?? '${o.deliveryAddress} (Gate Pin Verified)',
+            locationConfidence: 'high',
+            geocodingStatus: 'exact_verified',
+          );
+        }
+        return o;
+      }).toList();
+      state = state.copyWith(orders: updatedList);
+    }
+    return result;
+  }
 }
 
 final ordersProvider = StateNotifierProvider<OrdersNotifier, OrdersState>((ref) {

@@ -296,12 +296,13 @@ class _PdaNavigationCardState extends ConsumerState<PdaNavigationCard> {
                       final lat = double.tryParse(latController.text.trim()) ?? widget.order.latitude ?? 6.4474;
                       final lng = double.tryParse(lngController.text.trim()) ?? widget.order.longitude ?? 3.4839;
 
-                      await ref.read(ordersProvider.notifier).updateOrderCoordinates(
+                      await ref.read(ordersProvider.notifier).recordVerifiedGatePin(
                             orderId: widget.order.id,
                             latitude: lat,
                             longitude: lng,
-                            isLocationVerified: true,
-                            geocodedAddress: '${widget.order.deliveryAddress} (${addressNotesController.text.trim()})',
+                            pinLabel: addressNotesController.text.trim().isNotEmpty
+                                ? addressNotesController.text.trim()
+                                : 'Customer Delivery Gate',
                           );
 
                       if (ctx.mounted) {
