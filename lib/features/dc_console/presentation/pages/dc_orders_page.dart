@@ -834,7 +834,16 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
 
     int assignedCount = 0;
     for (int i = 0; i < unassigned.length; i++) {
-      // Pick driver with lowest current workload
+      final order = unassigned[i];
+
+      // 1. Try server-side proximity auto-dispatch
+      final proximityResult = await ref.read(ordersProvider.notifier).autoDispatchToNearestRider(order.id);
+      if (proximityResult['success'] == true && proximityResult['riderId'] != null) {
+        assignedCount++;
+        continue;
+      }
+
+      // 2. Fallback: Pick driver with lowest current workload
       final sortedDrivers = [...dcState.drivers];
       sortedDrivers.sort((a, b) {
         final aCount = ordersState.orders.where((o) => o.deliveryAgentId == a.id || o.deliveryAgentCode == a.driverCode).length;
@@ -844,7 +853,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
 
       final targetDriver = sortedDrivers.first;
       await ref.read(ordersProvider.notifier).assignOrderToRider(
-        orderId: unassigned[i].id,
+        orderId: order.id,
         riderId: targetDriver.id,
         riderName: targetDriver.name,
         riderCode: targetDriver.driverCode,
@@ -855,7 +864,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('⚡ Auto-clustered and dispatched $assignedCount orders across ${dcState.drivers.length} active riders by workload.'),
+          content: Text('⚡ Auto-dispatched $assignedCount orders using proximity GIS and workload balancing.'),
           backgroundColor: const Color(0xFF10B981),
         ),
       );

@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/datasources/orders_remote_datasource.dart';
 import '../../data/models/order_model.dart';
 import '../../data/repositories/orders_repository_impl.dart';
+import '../../data/services/geocoding_service.dart';
 import '../../domain/entities/order.dart';
 import '../../domain/repositories/orders_repository.dart';
 
@@ -12,6 +13,10 @@ final ordersRemoteDataSourceProvider = Provider<OrdersRemoteDataSource>((ref) {
 
 final ordersRepositoryProvider = Provider<OrdersRepository>((ref) {
   return OrdersRepositoryImpl(ref.watch(ordersRemoteDataSourceProvider));
+});
+
+final geocodingServiceProvider = Provider<GeocodingService>((ref) {
+  return GeocodingService(Supabase.instance.client);
 });
 
 class OrdersState {
@@ -40,8 +45,9 @@ class OrdersState {
 
 class OrdersNotifier extends StateNotifier<OrdersState> {
   final OrdersRepository _repository;
+  final GeocodingService? _geocodingService;
 
-  OrdersNotifier(this._repository) : super(OrdersState()) {
+  OrdersNotifier(this._repository, [this._geocodingService]) : super(OrdersState()) {
     loadOrders();
   }
 
@@ -430,8 +436,102 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
       // Ignored
     }
   }
+
+  /// Geocodes an order address and updates state
+  Future<void> geocodeOrder(String orderId, {bool autoDispatch = false}) async {
+    final order = state.orders.firstWhere((o) => o.id == orderId, orElse: () => throw Exception('Order not found'));
+    final service = _geocodingService ?? GeocodingService(Supabase.instance.client);
+
+    final result = await service.resolveAddress(
+      address: order.deliveryAddress,
+      city: order.deliveryCity,
+      state: order.deliveryState,
+      orderId: orderId,
+      autoDispatch: autoDispatch,
+    );
+
+    await updateOrderCoordinates(
+      orderId: orderId,
+      latitude: result.latitude,
+      longitude: result.longitude,
+      isLocationVerified: result.geocodingStatus == 'exact_verified',
+      geocodedAddress: result.geocodedAddress,
+    );
+  }
+
+  /// Automatically assigns order to closest rider
+  Future<Map<String, dynamic>> autoDispatchToNearestRider(String orderId, {double maxDistanceKm = 25.0}) async {
+    final service = _geocodingService ?? GeocodingService(Supabase.instance.client);
+    final result = await service.autoDispatchOrder(orderId, maxDistanceKm: maxDistanceKm);
+
+    if (result['success'] == true && result['riderId'] != null) {
+      final updatedList = state.orders.map((o) {
+        if (o.id == orderId) {
+          return OrderEntity(
+            id: o.id,
+            orderNumber: o.orderNumber,
+            customerName: o.customerName,
+            customerPhone: o.customerPhone,
+            customerAltPhone: o.customerAltPhone,
+            deliveryAddress: o.deliveryAddress,
+            deliveryCity: o.deliveryCity,
+            deliveryState: o.deliveryState,
+            landmark: o.landmark,
+            lga: o.lga,
+            productName: o.productName,
+            status: 'assigned',
+            quantity: o.quantity,
+            paidQuantity: o.paidQuantity,
+            freeQuantity: o.freeQuantity,
+            basePrice: o.basePrice,
+            upsellAmount: o.upsellAmount,
+            totalAmount: o.totalAmount,
+            paymentType: o.paymentType,
+            paymentStatus: o.paymentStatus,
+            fulfillmentType: o.fulfillmentType,
+            clientName: o.clientName,
+            packageCustodyId: o.packageCustodyId,
+            clientDeliveryFee: o.clientDeliveryFee,
+            agentEntitlement: o.agentEntitlement,
+            deliveryNotes: o.deliveryNotes,
+            createdAt: o.createdAt,
+            deliveryAgentId: result['riderId']?.toString(),
+            deliveryAgentName: result['riderName']?.toString() ?? o.deliveryAgentName,
+            deliveryAgentCode: result['riderCode']?.toString() ?? o.deliveryAgentCode,
+            distributionCenterId: o.distributionCenterId,
+            latitude: o.latitude,
+            longitude: o.longitude,
+            isLocationVerified: o.isLocationVerified,
+            geocodedAddress: o.geocodedAddress,
+            locationConfidence: o.locationConfidence,
+            geocodingStatus: o.geocodingStatus,
+          );
+        }
+        return o;
+      }).toList();
+      state = state.copyWith(orders: updatedList);
+    }
+    return result;
+  }
+
+  /// Sends live GPS heartbeat for the current delivery agent
+  Future<void> sendRiderTelemetry({
+    required String agentId,
+    required double latitude,
+    required double longitude,
+  }) async {
+    final service = _geocodingService ?? GeocodingService(Supabase.instance.client);
+    await service.sendRiderTelemetry(
+      agentId: agentId,
+      latitude: latitude,
+      longitude: longitude,
+    );
+  }
 }
 
 final ordersProvider = StateNotifierProvider<OrdersNotifier, OrdersState>((ref) {
-  return OrdersNotifier(ref.watch(ordersRepositoryProvider));
+  return OrdersNotifier(
+    ref.watch(ordersRepositoryProvider),
+    ref.watch(geocodingServiceProvider),
+  );
 });
