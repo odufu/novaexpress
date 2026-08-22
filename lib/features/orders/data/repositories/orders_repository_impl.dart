@@ -86,4 +86,21 @@ class OrdersRepositoryImpl implements OrdersRepository {
       scheduledCallbackAt: scheduledCallbackAt,
     );
   }
+
+  @override
+  Future<void> updateOrderCoordinates({
+    required String orderId,
+    required double latitude,
+    required double longitude,
+    bool isLocationVerified = true,
+    String? geocodedAddress,
+  }) async {
+    await remoteDataSource.updateOrderCoordinates(
+      orderId: orderId,
+      latitude: latitude,
+      longitude: longitude,
+      isLocationVerified: isLocationVerified,
+      geocodedAddress: geocodedAddress,
+    );
+  }
 }

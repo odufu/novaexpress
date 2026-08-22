@@ -10,6 +10,7 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../stock/presentation/providers/stock_provider.dart';
 import '../../domain/entities/order.dart';
 import '../providers/orders_provider.dart';
+import '../widgets/pda_navigation_card.dart';
 import '../widgets/reschedule_callback_modal.dart';
 import '../widgets/upsell_selector_modal.dart';
 
@@ -30,9 +31,30 @@ class OrderDetailPage extends ConsumerWidget {
     }
   }
 
-  void _openMap(String address) async {
-    final encoded = Uri.encodeComponent(address);
-    final uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$encoded');
+  void _openMap(OrderEntity order) async {
+    final navUri = order.googleMapsNavUri;
+    final webUri = order.googleMapsWebDirectionsUri;
+    try {
+      if (await canLaunchUrl(navUri)) {
+        await launchUrl(navUri, mode: LaunchMode.externalApplication);
+      } else if (await canLaunchUrl(webUri)) {
+        await launchUrl(webUri, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {
+      try {
+        await launchUrl(webUri, mode: LaunchMode.externalApplication);
+      } catch (_) {}
+    }
+  }
+
+  void _openWhatsAppPrompt(OrderEntity order, WidgetRef ref) async {
+    final authState = ref.read(authProvider);
+    final user = authState.user;
+    final riderName = user != null && (user.firstName.isNotEmpty || user.lastName.isNotEmpty)
+        ? '${user.firstName} ${user.lastName}'.trim()
+        : (user?.fullName.isNotEmpty == true ? user!.fullName : 'Dispatch Rider');
+
+    final uri = order.getWhatsAppLocationRequestUri(riderName: riderName);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
@@ -480,13 +502,28 @@ class OrderDetailPage extends ConsumerWidget {
                           ),
                         ],
                       ),
-                      IconButton.filled(
-                        style: IconButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                        ),
-                        icon: const Icon(Icons.call_rounded, size: 18),
-                        onPressed: () => _callCustomer(order.customerPhone),
+                      Row(
+                        children: [
+                          IconButton.filled(
+                            style: IconButton.styleFrom(
+                              backgroundColor: const Color(0xFF25D366),
+                              foregroundColor: Colors.white,
+                            ),
+                            icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
+                            tooltip: 'WhatsApp Live Pin Request',
+                            onPressed: () => _openWhatsAppPrompt(order, ref),
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton.filled(
+                            style: IconButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                            ),
+                            icon: const Icon(Icons.call_rounded, size: 18),
+                            tooltip: 'Call Customer',
+                            onPressed: () => _callCustomer(order.customerPhone),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -518,82 +555,13 @@ class OrderDetailPage extends ConsumerWidget {
                       ),
                     ),
                   ],
-                  const SizedBox(height: 12),
-                  const Divider(height: 1),
-                  const SizedBox(height: 12),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(Icons.location_on_outlined, color: AppColors.orange, size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              order.deliveryAddress,
-                              style: TextStyle(
-                                fontSize: 13.5,
-                                color: theme.colorScheme.onSurface,
-                                height: 1.4,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 6,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                  decoration: BoxDecoration(
-                                    color: theme.colorScheme.surfaceContainer,
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    '${order.deliveryCity.toUpperCase()}, ${order.deliveryState.toUpperCase()}',
-                                    style: GoogleFonts.jetBrainsMono(
-                                      fontSize: 10.5,
-                                      fontWeight: FontWeight.bold,
-                                      color: theme.colorScheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ),
-                                InkWell(
-                                  onTap: () => _openMap(order.deliveryAddress),
-                                  borderRadius: BorderRadius.circular(6),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.orange.withValues(alpha: 0.12),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: const Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.map_outlined, color: AppColors.orange, size: 12),
-                                        SizedBox(width: 4),
-                                        Text(
-                                          'Navigate',
-                                          style: TextStyle(
-                                            fontSize: 10.5,
-                                            fontWeight: FontWeight.bold,
-                                            color: AppColors.orange,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
                 ],
               ),
             ),
+            const SizedBox(height: 14),
+
+            // 5. GPS Navigation, Geocoding Confidence & WhatsApp Live PIN Radar Card
+            PdaNavigationCard(order: order),
             const SizedBox(height: 14),
 
             // 5. Package & Fulfillment Details Card
@@ -965,7 +933,7 @@ class OrderDetailPage extends ConsumerWidget {
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
-                      onPressed: () => _openMap(order.deliveryAddress),
+                      onPressed: () => _openMap(order),
                       icon: const Icon(Icons.map_outlined, size: 18),
                       label: const Text('Directions', style: TextStyle(fontWeight: FontWeight.bold)),
                     ),
@@ -1037,9 +1005,9 @@ class OrderDetailPage extends ConsumerWidget {
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
-                  onPressed: () => _openMap(order.deliveryAddress),
-                  icon: const Icon(Icons.map_outlined, size: 18),
-                  label: const Text('Open Map', style: TextStyle(fontWeight: FontWeight.bold)),
+                  onPressed: () => _openMap(order),
+                  icon: const Icon(Icons.navigation_outlined, size: 18),
+                  label: const Text('Navigate GPS', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ),
             ] else if (order.status == 'delivered') ...[

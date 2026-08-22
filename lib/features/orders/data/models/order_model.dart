@@ -32,6 +32,12 @@ class OrderModel extends OrderEntity {
     super.deliveryAgentName,
     super.deliveryAgentCode,
     super.distributionCenterId,
+    super.latitude,
+    super.longitude,
+    super.geocodingStatus,
+    super.geocodedAddress,
+    super.locationConfidence,
+    super.isLocationVerified = false,
     required super.createdAt,
   });
 
@@ -56,6 +62,9 @@ class OrderModel extends OrderEntity {
       paid = 5;
       free = 1;
     }
+
+    final lat = (json['latitude'] as num?)?.toDouble() ?? (json['lat'] as num?)?.toDouble();
+    final lng = (json['longitude'] as num?)?.toDouble() ?? (json['lng'] as num?)?.toDouble();
 
     return OrderModel(
       id: json['id'] ?? '',
@@ -88,6 +97,12 @@ class OrderModel extends OrderEntity {
       deliveryAgentName: json['delivery_agent_name']?.toString(),
       deliveryAgentCode: json['delivery_agent_code']?.toString() ?? json['assigned_agent_code']?.toString(),
       distributionCenterId: json['distribution_center_id']?.toString(),
+      latitude: lat,
+      longitude: lng,
+      geocodingStatus: json['geocoding_status']?.toString(),
+      geocodedAddress: json['geocoded_address']?.toString(),
+      locationConfidence: json['location_confidence']?.toString() ?? (lat != null && lng != null ? 'high' : null),
+      isLocationVerified: json['is_location_verified'] == true || json['is_location_verified'] == 'true',
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])
           : DateTime.now(),
@@ -125,6 +140,12 @@ class OrderModel extends OrderEntity {
       'client_delivery_fee': clientDeliveryFee,
       'agent_entitlement': agentEntitlement,
       'delivery_notes': deliveryNotes,
+      'latitude': latitude,
+      'longitude': longitude,
+      'geocoding_status': geocodingStatus,
+      'geocoded_address': geocodedAddress,
+      'location_confidence': locationConfidence,
+      'is_location_verified': isLocationVerified,
     };
   }
 }

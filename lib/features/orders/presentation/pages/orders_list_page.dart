@@ -663,6 +663,35 @@ class _DeliveryOperationalCard extends ConsumerWidget {
     }
   }
 
+  void _openWhatsAppPrompt(WidgetRef ref) async {
+    final authState = ref.read(authProvider);
+    final user = authState.user;
+    final riderName = user != null && (user.firstName.isNotEmpty || user.lastName.isNotEmpty)
+        ? '${user.firstName} ${user.lastName}'.trim()
+        : (user?.fullName.isNotEmpty == true ? user!.fullName : 'Dispatch Rider');
+
+    final uri = order.getWhatsAppLocationRequestUri(riderName: riderName);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  void _openMap() async {
+    final navUri = order.googleMapsNavUri;
+    final webUri = order.googleMapsWebDirectionsUri;
+    try {
+      if (await canLaunchUrl(navUri)) {
+        await launchUrl(navUri, mode: LaunchMode.externalApplication);
+      } else if (await canLaunchUrl(webUri)) {
+        await launchUrl(webUri, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {
+      try {
+        await launchUrl(webUri, mode: LaunchMode.externalApplication);
+      } catch (_) {}
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
@@ -709,6 +738,28 @@ class _DeliveryOperationalCard extends ConsumerWidget {
         break;
     }
 
+    // Location Confidence Badge styling
+    Color confBg;
+    Color confTextColor;
+    String confShortLabel;
+    if (order.isLocationVerified) {
+      confBg = const Color(0xFFDCFCE7);
+      confTextColor = const Color(0xFF15803D);
+      confShortLabel = 'GATE PIN 🛡️';
+    } else if (order.locationConfidence == 'high') {
+      confBg = const Color(0xFFDCFCE7);
+      confTextColor = const Color(0xFF15803D);
+      confShortLabel = 'GPS PIN 📍';
+    } else if (order.locationConfidence == 'medium') {
+      confBg = const Color(0xFFFEF3C7);
+      confTextColor = const Color(0xFFD97706);
+      confShortLabel = 'LANDMARK 🧭';
+    } else {
+      confBg = const Color(0xFFFEE2E2);
+      confTextColor = const Color(0xFFB91C1C);
+      confShortLabel = 'NEED PIN ❓';
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
@@ -745,13 +796,13 @@ class _DeliveryOperationalCard extends ConsumerWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     child: Row(
                       children: [
-                        // Left: Customer Name, Status Badge, and Product
+                        // Left: Customer Name, Status Badge, Location Confidence, and Product
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              // Customer Name + Status Badge
+                              // Customer Name + Status Badge + Confidence Pill
                               Row(
                                 children: [
                                   Flexible(
@@ -766,20 +817,36 @@ class _DeliveryOperationalCard extends ConsumerWidget {
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
+                                  const SizedBox(width: 6),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
                                       color: statusBg,
-                                      borderRadius: BorderRadius.circular(6),
+                                      borderRadius: BorderRadius.circular(5),
                                     ),
                                     child: Text(
                                       statusLabel,
                                       style: GoogleFonts.jetBrainsMono(
-                                        fontSize: 9.5,
+                                        fontSize: 9,
                                         fontWeight: FontWeight.bold,
                                         color: statusTextColor,
-                                        letterSpacing: 0.3,
+                                        letterSpacing: 0.2,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: confBg,
+                                      borderRadius: BorderRadius.circular(5),
+                                    ),
+                                    child: Text(
+                                      confShortLabel,
+                                      style: GoogleFonts.jetBrainsMono(
+                                        fontSize: 8.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: confTextColor,
                                       ),
                                     ),
                                   ),
@@ -831,37 +898,88 @@ class _DeliveryOperationalCard extends ConsumerWidget {
                             ],
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 10),
 
-                        // Obvious, High-Contrast Call Action Button
-                        if (order.customerPhone.isNotEmpty)
-                          Material(
-                            color: const Color(0xFF16A34A),
-                            borderRadius: BorderRadius.circular(10),
-                            elevation: 1,
-                            child: InkWell(
-                              onTap: () => _callCustomer(order.customerPhone),
-                              borderRadius: BorderRadius.circular(10),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(Icons.phone_rounded, size: 15, color: Colors.white),
-                                    const SizedBox(width: 5),
-                                    Text(
-                                      'Call',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 12.5,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
-                                      ),
+                        // Action Buttons: WhatsApp Prompt & Call & Map
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // WhatsApp Live Pin Request
+                            if (order.customerPhone.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(right: 6),
+                                child: InkWell(
+                                  onTap: () => _openWhatsAppPrompt(ref),
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(7),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF25D366).withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: const Color(0xFF25D366).withValues(alpha: 0.3)),
                                     ),
-                                  ],
+                                    child: const Icon(
+                                      Icons.chat_bubble_outline_rounded,
+                                      size: 15,
+                                      color: Color(0xFF15803D),
+                                    ),
+                                  ),
+                                ),
+                              ),
+
+                            // Map Directions Shortcut
+                            Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: InkWell(
+                                onTap: _openMap,
+                                borderRadius: BorderRadius.circular(8),
+                                child: Container(
+                                  padding: const EdgeInsets.all(7),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0284C7).withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.3)),
+                                  ),
+                                  child: const Icon(
+                                    Icons.directions_rounded,
+                                    size: 15,
+                                    color: Color(0xFF0284C7),
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
+
+                            // Call Button
+                            if (order.customerPhone.isNotEmpty)
+                              Material(
+                                color: const Color(0xFF16A34A),
+                                borderRadius: BorderRadius.circular(8),
+                                elevation: 0.5,
+                                child: InkWell(
+                                  onTap: () => _callCustomer(order.customerPhone),
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.phone_rounded, size: 14, color: Colors.white),
+                                        SizedBox(width: 4),
+                                        Text(
+                                          'Call',
+                                          style: TextStyle(
+                                            fontSize: 11.5,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                       ],
                     ),
                   ),

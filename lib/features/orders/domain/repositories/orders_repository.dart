@@ -29,4 +29,11 @@ abstract class OrdersRepository {
     String? notes,
     String? scheduledCallbackAt,
   });
+  Future<void> updateOrderCoordinates({
+    required String orderId,
+    required double latitude,
+    required double longitude,
+    bool isLocationVerified = true,
+    String? geocodedAddress,
+  });
 }

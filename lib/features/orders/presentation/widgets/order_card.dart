@@ -114,6 +114,28 @@ class OrderCard extends StatelessWidget {
                       ),
                     ),
                   ),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: order.isLocationVerified || order.locationConfidence == 'high'
+                          ? const Color(0xFFDCFCE7)
+                          : (order.locationConfidence == 'medium' ? const Color(0xFFFEF3C7) : const Color(0xFFFEE2E2)),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      order.isLocationVerified
+                          ? 'GATE PIN'
+                          : (order.locationConfidence == 'high' ? 'GPS PIN' : 'LANDMARK'),
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                        color: order.isLocationVerified || order.locationConfidence == 'high'
+                            ? const Color(0xFF15803D)
+                            : (order.locationConfidence == 'medium' ? const Color(0xFFD97706) : const Color(0xFFB91C1C)),
+                      ),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 12),

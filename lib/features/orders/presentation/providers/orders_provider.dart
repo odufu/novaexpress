@@ -196,6 +196,16 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
             agentEntitlement: o.agentEntitlement,
             deliveryNotes: notes ?? o.deliveryNotes,
             createdAt: o.createdAt,
+            deliveryAgentId: o.deliveryAgentId,
+            deliveryAgentName: o.deliveryAgentName,
+            deliveryAgentCode: o.deliveryAgentCode,
+            distributionCenterId: o.distributionCenterId,
+            latitude: o.latitude,
+            longitude: o.longitude,
+            geocodingStatus: o.geocodingStatus,
+            geocodedAddress: o.geocodedAddress,
+            locationConfidence: o.locationConfidence,
+            isLocationVerified: o.isLocationVerified,
           );
         }
         return o;
@@ -259,6 +269,16 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
             agentEntitlement: o.agentEntitlement,
             deliveryNotes: notes ?? o.deliveryNotes,
             createdAt: o.createdAt,
+            deliveryAgentId: o.deliveryAgentId,
+            deliveryAgentName: o.deliveryAgentName,
+            deliveryAgentCode: o.deliveryAgentCode,
+            distributionCenterId: o.distributionCenterId,
+            latitude: o.latitude,
+            longitude: o.longitude,
+            geocodingStatus: o.geocodingStatus,
+            geocodedAddress: o.geocodedAddress,
+            locationConfidence: o.locationConfidence,
+            isLocationVerified: o.isLocationVerified,
           );
         }
         return o;
@@ -321,6 +341,16 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
             agentEntitlement: o.agentEntitlement,
             deliveryNotes: notes ?? o.deliveryNotes,
             createdAt: o.createdAt,
+            deliveryAgentId: o.deliveryAgentId,
+            deliveryAgentName: o.deliveryAgentName,
+            deliveryAgentCode: o.deliveryAgentCode,
+            distributionCenterId: o.distributionCenterId,
+            latitude: o.latitude,
+            longitude: o.longitude,
+            geocodingStatus: o.geocodingStatus,
+            geocodedAddress: o.geocodedAddress,
+            locationConfidence: o.locationConfidence,
+            isLocationVerified: o.isLocationVerified,
           );
         }
         return o;
@@ -331,6 +361,73 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     } catch (e) {
       state = state.copyWith(isLoading: false);
       return {'status': 'error', 'error': e.toString()};
+    }
+  }
+
+  Future<void> updateOrderCoordinates({
+    required String orderId,
+    required double latitude,
+    required double longitude,
+    bool isLocationVerified = true,
+    String? geocodedAddress,
+  }) async {
+    try {
+      await _repository.updateOrderCoordinates(
+        orderId: orderId,
+        latitude: latitude,
+        longitude: longitude,
+        isLocationVerified: isLocationVerified,
+        geocodedAddress: geocodedAddress,
+      );
+
+      final updatedList = state.orders.map((o) {
+        if (o.id == orderId || o.orderNumber == orderId) {
+          return OrderEntity(
+            id: o.id,
+            orderNumber: o.orderNumber,
+            customerName: o.customerName,
+            customerPhone: o.customerPhone,
+            customerAltPhone: o.customerAltPhone,
+            deliveryCity: o.deliveryCity,
+            deliveryState: o.deliveryState,
+            deliveryAddress: o.deliveryAddress,
+            landmark: o.landmark,
+            lga: o.lga,
+            productName: o.productName,
+            status: o.status,
+            quantity: o.quantity,
+            paidQuantity: o.paidQuantity,
+            freeQuantity: o.freeQuantity,
+            basePrice: o.basePrice,
+            upsellAmount: o.upsellAmount,
+            totalAmount: o.totalAmount,
+            paymentType: o.paymentType,
+            paymentStatus: o.paymentStatus,
+            fulfillmentType: o.fulfillmentType,
+            clientName: o.clientName,
+            packageCustodyId: o.packageCustodyId,
+            clientDeliveryFee: o.clientDeliveryFee,
+            agentEntitlement: o.agentEntitlement,
+            deliveryNotes: o.deliveryNotes,
+            createdAt: o.createdAt,
+            deliveryAgentId: o.deliveryAgentId,
+            deliveryAgentName: o.deliveryAgentName,
+            deliveryAgentCode: o.deliveryAgentCode,
+            distributionCenterId: o.distributionCenterId,
+            latitude: latitude,
+            longitude: longitude,
+            isLocationVerified: isLocationVerified,
+            geocodedAddress: geocodedAddress ?? o.geocodedAddress,
+            locationConfidence: isLocationVerified ? 'high' : 'medium',
+            geocodingStatus: isLocationVerified ? 'exact_verified' : 'rooftop',
+          );
+        }
+        return o;
+      }).toList();
+
+      state = state.copyWith(orders: updatedList);
+    } catch (e) {
+      // Ignored
     }
   }
 }
