@@ -496,7 +496,7 @@ class _MockOrdersRemoteDS implements OrdersRemoteDataSource {
   }
 
   @override
-  Future<void> updateOrderStatus(String orderId, String status, {String? paymentStatus, String? notes}) async {
+  Future<void> updateOrderStatus(String orderId, String status, {String? paymentStatus, String? paymentType, String? notes}) async {
     _statuses[orderId] = status;
     if (paymentStatus != null) {
       _paymentStatuses[orderId] = paymentStatus;

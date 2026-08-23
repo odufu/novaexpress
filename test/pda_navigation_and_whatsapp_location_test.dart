@@ -288,7 +288,7 @@ class MockOrdersRepository implements OrdersRepository {
   }
 
   @override
-  Future<void> updateOrderStatus(String orderId, String status, {String? paymentStatus, String? notes}) async {}
+  Future<void> updateOrderStatus(String orderId, String status, {String? paymentStatus, String? paymentType, String? notes}) async {}
 
   @override
   Future<Map<String, dynamic>> confirmDeliveryPod({

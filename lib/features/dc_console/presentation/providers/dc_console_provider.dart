@@ -5,6 +5,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/supabase_constants.dart';
 import '../../../../core/services/local_storage_service.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
+import '../../domain/entities/dc_payout_claim.dart';
+import '../../domain/entities/dc_transaction_record.dart';
 
 class DCWarehouseBatch {
   final String id;
@@ -177,6 +179,7 @@ class DCConsoleState {
   final List<DCFleetDriver> drivers;
   final List<DCWarehouseBatch> warehouseBatches;
   final List<DCReturnItem> returnItems;
+  final List<DCPayoutClaim> payoutClaims;
   final double avgDeliveryTimeMin;
   final double fuelEfficiencyKmPerL;
   final double onScheduleRate;
@@ -195,6 +198,10 @@ class DCConsoleState {
     this.drivers = const [],
     this.warehouseBatches = const [],
     this.returnItems = const [],
+    this.payoutClaims = const [],
+    this.transactions = const [],
+    this.transactionFilter = 'all',
+    this.transactionStatusFilter = 'all',
     this.avgDeliveryTimeMin = 24.5,
     this.fuelEfficiencyKmPerL = 9.2,
     this.onScheduleRate = 88.0,
@@ -202,6 +209,10 @@ class DCConsoleState {
     this.isLoading = false,
     this.selectedDriverId,
   });
+
+  final List<DCTransactionRecord> transactions;
+  final String transactionFilter; // 'all', 'paystack', 'cash', 'remittance', 'payout'
+  final String transactionStatusFilter; // 'all', 'verified', 'pending', 'disbursed'
 
   DCConsoleState copyWith({
     String? activeHubId,
@@ -214,6 +225,10 @@ class DCConsoleState {
     List<DCFleetDriver>? drivers,
     List<DCWarehouseBatch>? warehouseBatches,
     List<DCReturnItem>? returnItems,
+    List<DCPayoutClaim>? payoutClaims,
+    List<DCTransactionRecord>? transactions,
+    String? transactionFilter,
+    String? transactionStatusFilter,
     double? avgDeliveryTimeMin,
     double? fuelEfficiencyKmPerL,
     double? onScheduleRate,
@@ -232,6 +247,10 @@ class DCConsoleState {
       drivers: drivers ?? this.drivers,
       warehouseBatches: warehouseBatches ?? this.warehouseBatches,
       returnItems: returnItems ?? this.returnItems,
+      payoutClaims: payoutClaims ?? this.payoutClaims,
+      transactions: transactions ?? this.transactions,
+      transactionFilter: transactionFilter ?? this.transactionFilter,
+      transactionStatusFilter: transactionStatusFilter ?? this.transactionStatusFilter,
       avgDeliveryTimeMin: avgDeliveryTimeMin ?? this.avgDeliveryTimeMin,
       fuelEfficiencyKmPerL: fuelEfficiencyKmPerL ?? this.fuelEfficiencyKmPerL,
       onScheduleRate: onScheduleRate ?? this.onScheduleRate,
@@ -239,6 +258,43 @@ class DCConsoleState {
       isLoading: isLoading ?? this.isLoading,
       selectedDriverId: selectedDriverId ?? this.selectedDriverId,
     );
+  }
+
+  List<DCTransactionRecord> get filteredTransactions {
+    var list = transactions;
+    if (transactionFilter != 'all') {
+      if (transactionFilter == 'paystack') {
+        list = list.where((t) => t.isPaystack).toList();
+      } else if (transactionFilter == 'cash') {
+        list = list.where((t) => t.isCashPod).toList();
+      } else if (transactionFilter == 'remittance') {
+        list = list.where((t) => t.isRemittance).toList();
+      } else if (transactionFilter == 'payout') {
+        list = list.where((t) => t.isPayout).toList();
+      }
+    }
+
+    if (transactionStatusFilter != 'all') {
+      if (transactionStatusFilter == 'verified') {
+        list = list.where((t) => t.isVerified).toList();
+      } else if (transactionStatusFilter == 'pending') {
+        list = list.where((t) => t.isPending).toList();
+      }
+    }
+
+    if (searchQuery.trim().isNotEmpty) {
+      final q = searchQuery.toLowerCase().trim();
+      list = list.where((t) =>
+          t.transactionCode.toLowerCase().contains(q) ||
+          (t.orderNumber != null && t.orderNumber!.toLowerCase().contains(q)) ||
+          (t.productName != null && t.productName!.toLowerCase().contains(q)) ||
+          (t.customerName != null && t.customerName!.toLowerCase().contains(q)) ||
+          (t.customerPhone != null && t.customerPhone!.toLowerCase().contains(q)) ||
+          t.riderName.toLowerCase().contains(q) ||
+          t.riderCode.toLowerCase().contains(q) ||
+          (t.gatewayReference != null && t.gatewayReference!.toLowerCase().contains(q))).toList();
+    }
+    return list;
   }
 
   List<DCFleetDriver> get filteredDrivers {
@@ -272,15 +328,25 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     final cached = await _storageService.getCachedFleetDrivers();
     final cachedBatches = await _storageService.getCachedWarehouseBatches();
     final cachedReturns = await _storageService.getCachedReturnItems();
+    final cachedPayouts = await _storageService.getCachedPayoutClaims();
+    final cachedTxns = await _storageService.getCachedDcTransactions();
 
     state = state.copyWith(
       drivers: cached ?? state.drivers,
       warehouseBatches: cachedBatches ?? state.warehouseBatches,
       returnItems: cachedReturns ?? state.returnItems,
+      payoutClaims: cachedPayouts ?? state.payoutClaims,
+      transactions: cachedTxns ?? state.transactions,
     );
 
     if (cached != null && cached.isNotEmpty) {
       debugPrint('[DC_CONSOLE_PROVIDER] ⚡ Hydrated ${cached.length} drivers from local storage cache.');
+    }
+    if (cachedPayouts != null && cachedPayouts.isNotEmpty) {
+      debugPrint('[DC_CONSOLE_PROVIDER] ⚡ Hydrated ${cachedPayouts.length} payout claims from local storage cache.');
+    }
+    if (cachedTxns != null && cachedTxns.isNotEmpty) {
+      debugPrint('[DC_CONSOLE_PROVIDER] ⚡ Hydrated ${cachedTxns.length} DC transactions from local storage cache.');
     }
 
     // 2. Fetch fresh real data from live Supabase DB
@@ -292,6 +358,8 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     }
     if (!isTest) {
       await loadDriversFromDatabase();
+      await loadPayoutClaimsFromDatabase();
+      await loadTransactionsFromDatabase();
     }
   }
 
@@ -394,6 +462,316 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
       }
     } catch (e) {
       debugPrint('[DC_CONSOLE_PROVIDER] ℹ️ Supabase fleet fetch notice ($e). Local cached drivers retained.');
+    } finally {
+      dbClient?.dispose();
+    }
+  }
+
+  Future<void> loadPayoutClaimsFromDatabase() async {
+    bool isTest = false;
+    if (!kIsWeb) {
+      try {
+        isTest = Platform.environment.containsKey('FLUTTER_TEST');
+      } catch (_) {}
+    }
+    if (isTest) return;
+
+    SupabaseClient? dbClient;
+    try {
+      dbClient = SupabaseClient(
+        SupabaseConstants.supabaseUrl,
+        SupabaseConstants.supabaseServiceRoleKey,
+        authOptions: const AuthClientOptions(autoRefreshToken: false),
+      );
+
+      final response = await dbClient
+          .from('payout_requests')
+          .select('*, delivery_agents(agent_code, current_cod_balance, direct_transfer_balance, users(first_name, last_name, email, phone))')
+          .order('created_at', ascending: false);
+
+      final List<DCPayoutClaim> dbClaims = [];
+      for (final item in response as List) {
+        try {
+          final claim = DCPayoutClaim.fromJson(item as Map<String, dynamic>);
+          dbClaims.add(claim);
+        } catch (parseErr) {
+          debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ Parse notice for payout claim: $parseErr');
+        }
+      }
+
+      if (dbClaims.isNotEmpty) {
+        state = state.copyWith(payoutClaims: dbClaims);
+        await _storageService.cachePayoutClaims(dbClaims);
+        debugPrint('[DC_CONSOLE_PROVIDER] 💰 Loaded ${dbClaims.length} live payout claims from Supabase DB.');
+      }
+    } catch (e) {
+      debugPrint('[DC_CONSOLE_PROVIDER] ℹ️ Supabase payout claims fetch notice ($e).');
+    } finally {
+      dbClient?.dispose();
+    }
+  }
+
+  Future<void> approvePayoutClaim(String claimId, {String? disbursementRef}) async {
+    final ref = disbursementRef ?? 'DISB-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
+    
+    // 1. Optimistically update local state & cache
+    final updated = state.payoutClaims.map((c) {
+      if (c.id == claimId) {
+        return c.copyWith(status: 'approved', disbursementRef: ref);
+      }
+      return c;
+    }).toList();
+    state = state.copyWith(payoutClaims: updated);
+    await _storageService.cachePayoutClaims(updated);
+
+    // 2. Persist to live Supabase DB
+    SupabaseClient? dbClient;
+    try {
+      dbClient = SupabaseClient(
+        SupabaseConstants.supabaseUrl,
+        SupabaseConstants.supabaseServiceRoleKey,
+        authOptions: const AuthClientOptions(autoRefreshToken: false),
+      );
+
+      await dbClient
+          .from('payout_requests')
+          .update({
+            'status': 'approved',
+            'disbursement_ref': ref,
+          })
+          .eq('id', claimId);
+
+      // Find claim to notify rider
+      final claim = state.payoutClaims.firstWhere((c) => c.id == claimId, orElse: () => updated.first);
+      if (claim.riderId.isNotEmpty) {
+        try {
+          await dbClient.from('notifications').insert({
+            'company_id': '11111111-1111-4111-8111-111111111111',
+            'delivery_agent_id': claim.riderId,
+            'title': 'Payout Claim Approved ✓',
+            'message': 'Your withdrawal request of ₦${claim.requestedAmount.toStringAsFixed(0)} (Ref: $ref) has been approved for transfer to ${claim.bankName}.',
+            'category': 'finance',
+            'action_route': '/cash/history',
+            'is_read': false,
+            'created_at': DateTime.now().toIso8601String(),
+          });
+        } catch (_) {}
+      }
+
+      debugPrint('[DC_CONSOLE_PROVIDER] ✅ Payout claim $claimId approved in live Supabase DB (Ref: $ref).');
+    } catch (e) {
+      debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ Payout approval notice ($e).');
+    } finally {
+      dbClient?.dispose();
+    }
+  }
+
+  Future<void> rejectPayoutClaim(String claimId, {String? reason}) async {
+    final note = reason ?? 'Claim rejected by DC supervisor review.';
+
+    // 1. Optimistically update local state & cache
+    final updated = state.payoutClaims.map((c) {
+      if (c.id == claimId) {
+        return c.copyWith(status: 'rejected', dcNotes: note);
+      }
+      return c;
+    }).toList();
+    state = state.copyWith(payoutClaims: updated);
+    await _storageService.cachePayoutClaims(updated);
+
+    // 2. Persist to live Supabase DB
+    SupabaseClient? dbClient;
+    try {
+      dbClient = SupabaseClient(
+        SupabaseConstants.supabaseUrl,
+        SupabaseConstants.supabaseServiceRoleKey,
+        authOptions: const AuthClientOptions(autoRefreshToken: false),
+      );
+
+      await dbClient
+          .from('payout_requests')
+          .update({
+            'status': 'rejected',
+            'dc_notes': note,
+          })
+          .eq('id', claimId);
+
+      final claim = state.payoutClaims.firstWhere((c) => c.id == claimId, orElse: () => updated.first);
+      if (claim.riderId.isNotEmpty) {
+        try {
+          await dbClient.from('notifications').insert({
+            'company_id': '11111111-1111-4111-8111-111111111111',
+            'delivery_agent_id': claim.riderId,
+            'title': 'Payout Claim Returned ⚠️',
+            'message': 'Your withdrawal request of ₦${claim.requestedAmount.toStringAsFixed(0)} requires attention: $note',
+            'category': 'finance',
+            'action_route': '/cash/history',
+            'is_read': false,
+            'created_at': DateTime.now().toIso8601String(),
+          });
+        } catch (_) {}
+      }
+
+      debugPrint('[DC_CONSOLE_PROVIDER] ✅ Payout claim $claimId marked rejected in Supabase DB.');
+    } catch (e) {
+      debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ Payout rejection notice ($e).');
+    } finally {
+      dbClient?.dispose();
+    }
+  }
+
+  void setTransactionFilter(String filter) {
+    state = state.copyWith(transactionFilter: filter);
+  }
+
+  void setTransactionStatusFilter(String filter) {
+    state = state.copyWith(transactionStatusFilter: filter);
+  }
+
+  Future<void> loadTransactionsFromDatabase() async {
+    bool isTest = false;
+    if (!kIsWeb) {
+      try {
+        isTest = Platform.environment.containsKey('FLUTTER_TEST');
+      } catch (_) {}
+    }
+    if (isTest) return;
+
+    SupabaseClient? dbClient;
+    try {
+      dbClient = SupabaseClient(
+        SupabaseConstants.supabaseUrl,
+        SupabaseConstants.supabaseServiceRoleKey,
+        authOptions: const AuthClientOptions(autoRefreshToken: false),
+      );
+
+      final List<DCTransactionRecord> allTxns = [];
+
+      // 1. Fetch Paystack Transactions
+      try {
+        final pstkRes = await dbClient
+            .from(SupabaseConstants.paystackTransactionsTable)
+            .select('*, delivery_agents(agent_code, current_cod_balance, users(first_name, last_name)), orders(order_number, customer_name, customer_phone, delivery_city, delivery_state, products(name))')
+            .order('created_at', ascending: false)
+            .limit(50);
+
+        for (final row in (pstkRes as List)) {
+          try {
+            allTxns.add(DCTransactionRecord.fromJson(row));
+          } catch (_) {}
+        }
+      } catch (_) {}
+
+      // 2. Fetch Rider General Transactions
+      try {
+        final riderTxnRes = await dbClient
+            .from('rider_transactions')
+            .select('*, delivery_agents(agent_code, current_cod_balance, users(first_name, last_name))')
+            .order('created_at', ascending: false)
+            .limit(50);
+
+        for (final row in (riderTxnRes as List)) {
+          try {
+            allTxns.add(DCTransactionRecord.fromJson(row));
+          } catch (_) {}
+        }
+      } catch (_) {}
+
+      // 3. Fetch Cash Remittances
+      try {
+        final remRes = await dbClient
+            .from(SupabaseConstants.cashRemittancesTable)
+            .select('*, delivery_agents(agent_code, current_cod_balance, users(first_name, last_name))')
+            .order('created_at', ascending: false)
+            .limit(50);
+
+        for (final row in (remRes as List)) {
+          try {
+            final isVerified = row['is_verified'] == true || row['status'] == 'verified';
+            allTxns.add(DCTransactionRecord(
+              id: row['id']?.toString() ?? '',
+              transactionCode: row['remittance_number']?.toString() ?? 'REM-${row['id']?.toString().substring(0, 5)}',
+              riderId: row['delivery_agent_id']?.toString() ?? '',
+              riderName: (row['delivery_agents'] is Map && row['delivery_agents']['users'] is Map)
+                  ? '${row['delivery_agents']['users']['first_name'] ?? ''} ${row['delivery_agents']['users']['last_name'] ?? ''}'.trim()
+                  : 'Delivery Agent',
+              riderCode: (row['delivery_agents'] is Map) ? row['delivery_agents']['agent_code']?.toString() ?? 'PDA-7000' : 'PDA-7000',
+              amount: (row['amount'] as num?)?.toDouble() ?? 0.0,
+              category: 'remittance',
+              paymentMethod: row['payment_method']?.toString() ?? 'bank_transfer',
+              gatewayReference: row['reference_number']?.toString(),
+              channel: row['payment_method']?.toString() == 'paystack' ? 'Titan Trust / Paystack' : 'Bank Transfer Handover',
+              status: isVerified ? 'verified' : (row['status']?.toString() ?? 'pending'),
+              isCredit: false,
+              notes: row['notes']?.toString(),
+              createdAt: row['created_at'] != null ? DateTime.tryParse(row['created_at'].toString()) ?? DateTime.now() : DateTime.now(),
+            ));
+          } catch (_) {}
+        }
+      } catch (_) {}
+
+      // 4. Fetch Delivered / Prepaid Orders
+      try {
+        final ordersRes = await dbClient
+            .from(SupabaseConstants.ordersTable)
+            .select('*, products(name), delivery_agents(agent_code, users(first_name, last_name))')
+            .or('status.eq.delivered,payment_status.eq.paid')
+            .order('updated_at', ascending: false)
+            .limit(50);
+
+        for (final ord in (ordersRes as List)) {
+          final isPstk = (ord['payment_type']?.toString().contains('direct') == true) ||
+              (ord['delivery_notes']?.toString().contains('Paystack') == true) ||
+              (ord['delivery_notes']?.toString().contains('Monnify') == true);
+          final pMethod = isPstk ? 'paystack' : (ord['payment_type']?.toString() ?? 'cash');
+
+          allTxns.add(DCTransactionRecord(
+            id: 'ord-txn-${ord['id']}',
+            transactionCode: 'ORD-${ord['order_number']}',
+            orderNumber: ord['order_number']?.toString(),
+            orderId: ord['id']?.toString(),
+            productName: (ord['products'] is Map) ? ord['products']['name']?.toString() : 'Respira Health Formula',
+            customerName: ord['customer_name']?.toString(),
+            customerPhone: ord['customer_phone']?.toString(),
+            deliveryLocation: '${ord['delivery_city'] ?? ''}, ${ord['delivery_state'] ?? ''}'.trim(),
+            riderId: ord['delivery_agent_id']?.toString() ?? '',
+            riderName: (ord['delivery_agents'] is Map && ord['delivery_agents']['users'] is Map)
+                ? '${ord['delivery_agents']['users']['first_name'] ?? ''} ${ord['delivery_agents']['users']['last_name'] ?? ''}'.trim()
+                : 'Joel Rider',
+            riderCode: (ord['delivery_agents'] is Map) ? ord['delivery_agents']['agent_code']?.toString() ?? 'PDA-7000' : 'PDA-7000',
+            amount: (ord['total_amount'] as num?)?.toDouble() ?? 0.0,
+            commission: (ord['agent_commission'] as num?)?.toDouble() ?? 1000.0,
+            transportAllowance: (ord['agent_transport_allowance'] as num?)?.toDouble() ?? 1500.0,
+            category: isPstk ? 'paystack_direct' : 'cash_pod',
+            paymentMethod: pMethod,
+            gatewayReference: 'PSTK-${ord['order_number']}',
+            channel: isPstk ? 'Titan Trust / Paystack' : 'Cash in Hand (COD)',
+            status: ord['status']?.toString() == 'delivered' ? 'verified' : 'pending',
+            isCredit: true,
+            notes: ord['delivery_notes']?.toString(),
+            createdAt: ord['updated_at'] != null ? DateTime.tryParse(ord['updated_at'].toString()) ?? DateTime.now() : DateTime.now(),
+          ));
+        }
+      } catch (_) {}
+
+      // Deduplicate by transactionCode & sort chronologically descending
+      final seenCodes = <String>{};
+      final uniqueTxns = <DCTransactionRecord>[];
+      for (final txn in allTxns) {
+        if (!seenCodes.contains(txn.transactionCode)) {
+          seenCodes.add(txn.transactionCode);
+          uniqueTxns.add(txn);
+        }
+      }
+      uniqueTxns.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+      if (uniqueTxns.isNotEmpty) {
+        state = state.copyWith(transactions: uniqueTxns);
+        await _storageService.cacheDcTransactions(uniqueTxns);
+        debugPrint('[DC_CONSOLE_PROVIDER] ✅ Loaded ${uniqueTxns.length} consolidated DC transactions from live DB.');
+      }
+    } catch (e) {
+      debugPrint('[DC_CONSOLE_PROVIDER] ℹ️ Error loading DC transactions ($e).');
     } finally {
       dbClient?.dispose();
     }

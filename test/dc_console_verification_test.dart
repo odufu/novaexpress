@@ -247,7 +247,7 @@ void main() {
       ];
     }
 
-    testWidgets('1. DC Console Layout renders responsive collapsible sidebar and 7 business tabs', (tester) async {
+    testWidgets('1. DC Console Layout renders responsive collapsible sidebar and 8 business tabs', (tester) async {
       tester.view.physicalSize = const Size(1280, 800);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
@@ -270,6 +270,7 @@ void main() {
       expect(find.text('Deliveries & Orders'), findsOneWidget);
       expect(find.text('Inventory & Stock'), findsOneWidget);
       expect(find.text('Cash & Remittances'), findsOneWidget);
+      expect(find.text('Transactions & Ledger'), findsOneWidget);
       expect(find.text('Returns & QC Desk'), findsOneWidget);
       expect(find.text('Rider Payouts'), findsOneWidget);
       expect(find.text('Riders & Fleet'), findsOneWidget);

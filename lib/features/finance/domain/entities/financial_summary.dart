@@ -63,9 +63,9 @@ class FinancialSummary {
     final failedOrders = orders.where((o) => o.status == 'failed').toList();
     final todayDeliveredOrders = deliveredOrders.where((o) => _isSameDay(o.createdAt, now)).toList();
 
-    final deliveredCashOrders = deliveredOrders.where((o) => o.isPod && o.paymentType != 'prepaid').toList();
-    final todayDeliveredCashOrders = todayDeliveredOrders.where((o) => o.isPod && o.paymentType != 'prepaid').toList();
-    final deliveredPrepaidOrders = deliveredOrders.where((o) => !o.isPod || o.paymentType == 'prepaid').toList();
+    final deliveredCashOrders = deliveredOrders.where((o) => o.isCashPod).toList();
+    final todayDeliveredCashOrders = todayDeliveredOrders.where((o) => o.isCashPod).toList();
+    final deliveredPrepaidOrders = deliveredOrders.where((o) => o.isDirectTransfer || !o.isCashPod).toList();
 
     final double cashCollectedAllTime = deliveredCashOrders.fold(0.0, (acc, o) => acc + o.totalAmount);
     final double cashCollectedToday = todayDeliveredCashOrders.fold(0.0, (acc, o) => acc + o.totalAmount);
@@ -87,15 +87,25 @@ class FinancialSummary {
         ? (cashCollectedAllTime - totalVerifiedRemitted - totalPendingApprovalRemitted).clamp(0.0, double.infinity)
         : (cashCollectedAllTime - totalEarningRetained - totalVerifiedRemitted - totalPendingApprovalRemitted).clamp(0.0, double.infinity);
 
+    final double directTransfersEarnings = deliveredPrepaidOrders.fold<double>(
+      0.0,
+      (acc, o) => acc + (o.agentEntitlement > 0 ? o.agentEntitlement : totalEarningPerOrder),
+    );
+
     final double myDirectTransfersBalance = isSalaried
         ? 0.0
         : (manualEarnedBalance > 0
             ? manualEarnedBalance
-            : ((deliveredPrepaidOrders.length * totalEarningPerOrder) + totalFailedAllowanceEarned));
+            : (directTransfersEarnings + totalFailedAllowanceEarned));
+
+    final double totalDeliveredEarnings = deliveredOrders.fold<double>(
+      0.0,
+      (acc, o) => acc + (o.agentEntitlement > 0 ? o.agentEntitlement : totalEarningPerOrder),
+    );
 
     final double totalMonthEarnings = isSalaried
         ? (user?.baseSalary ?? 120000.0)
-        : ((deliveredOrders.length * totalEarningPerOrder) + totalFailedAllowanceEarned);
+        : (totalDeliveredEarnings + totalFailedAllowanceEarned);
 
     return FinancialSummary(
       cashCollectedAllTime: cashCollectedAllTime,

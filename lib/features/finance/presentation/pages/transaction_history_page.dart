@@ -156,7 +156,8 @@ class _TransactionHistoryPageState extends ConsumerState<TransactionHistoryPage>
     // Delivered Orders
     final deliveredOrders = ordersState.orders.where((o) => o.status == 'delivered').toList();
     for (final o in deliveredOrders) {
-      final isPrepaid = o.paymentType == 'prepaid' || !o.isPod;
+      final isPrepaid = o.isDirectTransfer || o.paymentType == 'prepaid' || !o.isPod;
+      final earningForOrder = o.agentEntitlement > 0 ? o.agentEntitlement : totalPerDelivered;
       derived.add(
         TransactionItem(
           id: 'TXN-${o.orderNumber}',
@@ -164,13 +165,13 @@ class _TransactionHistoryPageState extends ConsumerState<TransactionHistoryPage>
               ? 'Direct Transfer Credit (${o.orderNumber})'
               : 'Cash POD Collection (${o.orderNumber})',
           category: isPrepaid ? 'direct_transfer' : 'earnings',
-          amount: isPrepaid ? totalPerDelivered : o.totalAmount,
+          amount: isPrepaid ? earningForOrder : o.totalAmount,
           isCredit: isPrepaid,
           timestamp: o.createdAt,
           reference: o.orderNumber,
           status: isPrepaid ? 'settled' : 'pending',
           description: isPrepaid
-              ? 'Commission (${CurrencyFormatter.formatNaira(commRate)}) + Transport Allowance (${CurrencyFormatter.formatNaira(transportRate)}) credited to My Balance from customer prepaid transfer.'
+              ? 'Commission (${CurrencyFormatter.formatNaira(commRate)}) + Transport Allowance (${CurrencyFormatter.formatNaira(transportRate)}) credited to My Balance from customer direct transfer.'
               : 'Cash in physical custody for ${o.productName}. Added to To Remit ledger.',
         ),
       );

@@ -13,6 +13,7 @@ import 'dc_payouts_page.dart';
 import 'dc_returns_page.dart';
 import 'dc_riders_page.dart';
 import 'dc_stock_page.dart';
+import 'dc_transactions_page.dart';
 
 class DCConsoleLayout extends ConsumerStatefulWidget {
   const DCConsoleLayout({super.key});
@@ -49,6 +50,7 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
       const DCOrdersPage(),
       const DCStockPage(),
       const DCFinancePage(),
+      const DCTransactionsPage(),
       const DCReturnsPage(),
       const DCPayoutsPage(),
       const DCRidersPage(),
@@ -180,9 +182,10 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
                 _buildNavItem(1, 'Deliveries & Orders', Icons.local_shipping_rounded, state.activeTabIndex == 1, isCollapsed, isDrawer),
                 _buildNavItem(2, 'Inventory & Stock', Icons.inventory_2_rounded, state.activeTabIndex == 2, isCollapsed, isDrawer),
                 _buildNavItem(3, 'Cash & Remittances', Icons.account_balance_wallet_rounded, state.activeTabIndex == 3, isCollapsed, isDrawer),
-                _buildNavItem(4, 'Returns & QC Desk', Icons.assignment_return_rounded, state.activeTabIndex == 4, isCollapsed, isDrawer),
-                _buildNavItem(5, 'Rider Payouts', Icons.payments_rounded, state.activeTabIndex == 5, isCollapsed, isDrawer),
-                _buildNavItem(6, 'Riders & Fleet', Icons.badge_rounded, state.activeTabIndex == 6, isCollapsed, isDrawer),
+                _buildNavItem(4, 'Transactions & Ledger', Icons.receipt_long_rounded, state.activeTabIndex == 4, isCollapsed, isDrawer),
+                _buildNavItem(5, 'Returns & QC Desk', Icons.assignment_return_rounded, state.activeTabIndex == 5, isCollapsed, isDrawer),
+                _buildNavItem(6, 'Rider Payouts', Icons.payments_rounded, state.activeTabIndex == 6, isCollapsed, isDrawer),
+                _buildNavItem(7, 'Riders & Fleet', Icons.badge_rounded, state.activeTabIndex == 7, isCollapsed, isDrawer),
               ],
             ),
           ),

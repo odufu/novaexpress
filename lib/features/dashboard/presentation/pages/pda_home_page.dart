@@ -915,14 +915,55 @@ class _PdaHomePageState extends ConsumerState<PdaHomePage> {
                 ),
               ),
             ] else ...[
-              ...orders.take(3).toList().asMap().entries.map((entry) {
-                final idx = entry.key;
-                final o = entry.value;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _HomeDeliveryOperationalCard(order: o, index: idx),
-                );
-              }),
+              Builder(
+                builder: (context) {
+                  final sortedOrders = [...orders];
+                  sortedOrders.sort((a, b) {
+                    int getStatusPriority(String status) {
+                      switch (status.toLowerCase()) {
+                        case 'in_transit':
+                        case 'picked_up':
+                          return 0; // Top: Active in progress
+                        case 'pending':
+                        case 'assigned':
+                        case 'accepted':
+                        case 'new':
+                          return 1; // Next: Pending dispatch
+                        case 'call_back':
+                        case 'contacting':
+                        case 'upsell_pending':
+                          return 2; // Next: Call back
+                        case 'delivered':
+                          return 3; // Delivered (WhatsApp green)
+                        case 'failed':
+                        case 'cancelled':
+                        case 'returned':
+                          return 4; // Bottom
+                        default:
+                          return 2;
+                      }
+                    }
+
+                    final pA = getStatusPriority(a.status);
+                    final pB = getStatusPriority(b.status);
+                    if (pA != pB) {
+                      return pA.compareTo(pB);
+                    }
+                    return b.createdAt.compareTo(a.createdAt);
+                  });
+
+                  return Column(
+                    children: sortedOrders.take(3).toList().asMap().entries.map((entry) {
+                      final idx = entry.key;
+                      final o = entry.value;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _HomeDeliveryOperationalCard(order: o, index: idx),
+                      );
+                    }).toList(),
+                  );
+                },
+              ),
             ],
 
             const SizedBox(height: 6),
@@ -981,57 +1022,79 @@ class _HomeDeliveryOperationalCard extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    // Dynamic Left Accent Border Color
-    final isOrange = index % 2 == 0;
-    final dynamicLeftColor = isOrange
-        ? AppColors.orange
-        : (isDark ? const Color(0xFF38608F) : AppColors.primary);
+    final isDelivered = order.status == 'delivered';
+    final isFailed = order.status == 'failed' || order.status == 'cancelled';
 
-    // Status Badge Styling & Labels
+    // Status-specific Left Accent Border Color
+    Color statusLeftColor;
     Color statusBg;
     Color statusTextColor;
     String statusLabel;
+    IconData statusIcon;
 
     switch (order.status) {
       case 'delivered':
+        statusLeftColor = const Color(0xFF10B981); // WhatsApp Emerald
         statusBg = const Color(0xFFDCFCE7);
         statusTextColor = const Color(0xFF15803D);
         statusLabel = 'DELIVERED';
+        statusIcon = Icons.done_all_rounded; // WhatsApp double check
         break;
       case 'in_transit':
+        statusLeftColor = const Color(0xFF2563EB); // Electric Blue
         statusBg = const Color(0xFFE0F2FE);
         statusTextColor = const Color(0xFF0369A1);
         statusLabel = 'IN PROGRESS';
+        statusIcon = Icons.directions_bike_rounded;
         break;
       case 'failed':
+        statusLeftColor = const Color(0xFFEF4444); // Crimson
         statusBg = const Color(0xFFFEE2E2);
         statusTextColor = const Color(0xFFB91C1C);
         statusLabel = 'FAILED';
+        statusIcon = Icons.cancel_outlined;
         break;
       case 'call_back':
-        statusBg = const Color(0xFFFEF3C7);
-        statusTextColor = const Color(0xFFD97706);
+        statusLeftColor = const Color(0xFF8B5CF6); // Purple
+        statusBg = const Color(0xFFEDE9FE);
+        statusTextColor = const Color(0xFF6D28D9);
         statusLabel = 'CALL BACK';
+        statusIcon = Icons.phone_callback_rounded;
         break;
       case 'accepted':
       case 'pending':
       default:
-        statusBg = const Color(0xFFFDECDD);
+        statusLeftColor = AppColors.orange; // Amber Orange
+        statusBg = const Color(0xFFFEF3C7);
         statusTextColor = const Color(0xFFB45309);
         statusLabel = 'PENDING';
+        statusIcon = Icons.schedule_rounded;
         break;
     }
 
+    // Card background tint & border styling (WhatsApp read green for delivered)
+    final cardBgColor = isDelivered
+        ? (isDark ? const Color(0xFF064E3B).withValues(alpha: 0.22) : const Color(0xFFF0FDF4))
+        : (isFailed
+            ? (isDark ? const Color(0xFF450A0A).withValues(alpha: 0.15) : const Color(0xFFFEF2F2))
+            : theme.cardColor);
+
+    final cardBorder = isDelivered
+        ? Border.all(color: isDark ? const Color(0xFF059669).withValues(alpha: 0.4) : const Color(0xFF86EFAC).withValues(alpha: 0.7), width: 1.2)
+        : (isFailed
+            ? Border.all(color: isDark ? const Color(0xFF991B1B).withValues(alpha: 0.3) : const Color(0xFFFECACA))
+            : Border.all(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.15)));
+
     return Container(
       decoration: BoxDecoration(
-        color: theme.cardColor,
+        color: cardBgColor,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.15),
-        ),
+        border: cardBorder,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+            color: isDelivered
+                ? const Color(0xFF10B981).withValues(alpha: isDark ? 0.1 : 0.06)
+                : Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),
@@ -1043,10 +1106,10 @@ class _HomeDeliveryOperationalCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Dynamic Left Accent Border Bar
+              // Dynamic Status-Coded Left Accent Border Bar
               Container(
                 width: 4.5,
-                color: dynamicLeftColor,
+                color: statusLeftColor,
               ),
 
               // Main Card Content
@@ -1085,14 +1148,21 @@ class _HomeDeliveryOperationalCard extends StatelessWidget {
                                       color: statusBg,
                                       borderRadius: BorderRadius.circular(6),
                                     ),
-                                    child: Text(
-                                      statusLabel,
-                                      style: GoogleFonts.jetBrainsMono(
-                                        fontSize: 9.5,
-                                        fontWeight: FontWeight.bold,
-                                        color: statusTextColor,
-                                        letterSpacing: 0.3,
-                                      ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(statusIcon, size: isDelivered ? 13 : 11, color: statusTextColor),
+                                        const SizedBox(width: 3),
+                                        Text(
+                                          statusLabel,
+                                          style: GoogleFonts.jetBrainsMono(
+                                            fontSize: 9.5,
+                                            fontWeight: FontWeight.bold,
+                                            color: statusTextColor,
+                                            letterSpacing: 0.3,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ],

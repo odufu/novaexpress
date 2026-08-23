@@ -43,8 +43,8 @@ class OrdersRepositoryImpl implements OrdersRepository {
   }
 
   @override
-  Future<void> updateOrderStatus(String orderId, String status, {String? paymentStatus, String? notes}) async {
-    await remoteDataSource.updateOrderStatus(orderId, status, paymentStatus: paymentStatus, notes: notes);
+  Future<void> updateOrderStatus(String orderId, String status, {String? paymentStatus, String? paymentType, String? notes}) async {
+    await remoteDataSource.updateOrderStatus(orderId, status, paymentStatus: paymentStatus, paymentType: paymentType, notes: notes);
   }
 
   @override

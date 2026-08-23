@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../features/dc_console/domain/entities/dc_fleet_driver.dart';
+import '../../features/dc_console/domain/entities/dc_payout_claim.dart';
+import '../../features/dc_console/domain/entities/dc_transaction_record.dart';
 import '../../features/dc_console/presentation/providers/dc_console_provider.dart';
 import '../../features/finance/data/models/remittance_model.dart';
 import '../../features/finance/domain/entities/remittance.dart';
@@ -27,8 +29,14 @@ abstract class LocalStorageService {
   Future<void> cacheFleetDrivers(List<DCFleetDriver> drivers);
   Future<List<DCFleetDriver>?> getCachedFleetDrivers();
 
-  Future<void> cacheOrders(List<OrderEntity> orders);
-  Future<List<OrderEntity>?> getCachedOrders();
+  Future<void> cachePayoutClaims(List<DCPayoutClaim> claims);
+  Future<List<DCPayoutClaim>?> getCachedPayoutClaims();
+
+  Future<void> cacheDcTransactions(List<DCTransactionRecord> txns);
+  Future<List<DCTransactionRecord>?> getCachedDcTransactions();
+
+  Future<void> cacheOrders(List<OrderEntity> orders, [String? scopeKey]);
+  Future<List<OrderEntity>?> getCachedOrders([String? scopeKey]);
 
   Future<void> cacheWarehouseBatches(List<DCWarehouseBatch> batches);
   Future<List<DCWarehouseBatch>?> getCachedWarehouseBatches();
@@ -54,11 +62,13 @@ abstract class LocalStorageService {
 
 class LocalStorageServiceImpl implements LocalStorageService {
   static const String _fleetDriversKey = 'novexps_cache_fleet_drivers';
+  static const String _payoutClaimsKey = 'novexps_cache_payout_claims';
   static const String _ordersKey = 'novexps_cache_orders';
   static const String _batchesKey = 'novexps_cache_warehouse_batches';
   static const String _returnsKey = 'novexps_cache_return_items';
   static const String _remittancesKey = 'novexps_cache_remittances';
   static const String _transactionsKey = 'novexps_cache_transactions';
+  static const String _dcTransactionsKey = 'novexps_cache_dc_transactions';
   static const String _stockKey = 'novexps_cache_stock_items';
   static const String _notificationsPrefix = 'novexps_cache_notifications_';
   static const String _syncTimePrefix = 'novexps_sync_time_';
@@ -195,10 +205,62 @@ class LocalStorageServiceImpl implements LocalStorageService {
     return drivers.isNotEmpty ? drivers : null;
   }
 
+  // --- Payout Claims Caching ---
+
+  @override
+  Future<void> cachePayoutClaims(List<DCPayoutClaim> claims) async {
+    final list = claims.map((c) => c.toJson()).toList();
+    await saveJsonList(_payoutClaimsKey, list);
+    await setLastSyncTime('payout_claims');
+    debugPrint('[LOCAL_STORAGE] 💾 Cached ${claims.length} payout claims to local storage.');
+  }
+
+  @override
+  Future<List<DCPayoutClaim>?> getCachedPayoutClaims() async {
+    final rawList = await getJsonList(_payoutClaimsKey);
+    if (rawList == null || rawList.isEmpty) return null;
+
+    final claims = <DCPayoutClaim>[];
+    for (final map in rawList) {
+      try {
+        claims.add(DCPayoutClaim.fromJson(map));
+      } catch (e) {
+        debugPrint('[LOCAL_STORAGE] ⚠️ Error parsing cached payout claim: $e');
+      }
+    }
+    return claims.isNotEmpty ? claims : null;
+  }
+
+  // --- DC Transactions Caching ---
+
+  @override
+  Future<void> cacheDcTransactions(List<DCTransactionRecord> txns) async {
+    final list = txns.map((t) => t.toJson()).toList();
+    await saveJsonList(_dcTransactionsKey, list);
+    await setLastSyncTime('dc_transactions');
+    debugPrint('[LOCAL_STORAGE] 💾 Cached ${txns.length} DC transactions to local storage.');
+  }
+
+  @override
+  Future<List<DCTransactionRecord>?> getCachedDcTransactions() async {
+    final rawList = await getJsonList(_dcTransactionsKey);
+    if (rawList == null || rawList.isEmpty) return null;
+
+    final txns = <DCTransactionRecord>[];
+    for (final map in rawList) {
+      try {
+        txns.add(DCTransactionRecord.fromJson(map));
+      } catch (e) {
+        debugPrint('[LOCAL_STORAGE] ⚠️ Error parsing cached DC transaction: $e');
+      }
+    }
+    return txns.isNotEmpty ? txns : null;
+  }
+
   // --- Orders Caching ---
 
   @override
-  Future<void> cacheOrders(List<OrderEntity> orders) async {
+  Future<void> cacheOrders(List<OrderEntity> orders, [String? scopeKey]) async {
     final list = orders.map((o) {
       if (o is OrderModel) {
         return o.toJson();
@@ -206,14 +268,16 @@ class LocalStorageServiceImpl implements LocalStorageService {
       return OrderModel.fromEntity(o).toJson();
     }).toList();
 
-    await saveJsonList(_ordersKey, list);
-    await setLastSyncTime('orders');
-    debugPrint('[LOCAL_STORAGE] 💾 Cached ${orders.length} orders to local storage.');
+    final key = scopeKey != null && scopeKey.isNotEmpty ? '${_ordersKey}_$scopeKey' : _ordersKey;
+    await saveJsonList(key, list);
+    await setLastSyncTime('orders_${scopeKey ?? 'global'}');
+    debugPrint('[LOCAL_STORAGE] 💾 Cached ${orders.length} orders to local storage (key: $key).');
   }
 
   @override
-  Future<List<OrderEntity>?> getCachedOrders() async {
-    final rawList = await getJsonList(_ordersKey);
+  Future<List<OrderEntity>?> getCachedOrders([String? scopeKey]) async {
+    final key = scopeKey != null && scopeKey.isNotEmpty ? '${_ordersKey}_$scopeKey' : _ordersKey;
+    final rawList = await getJsonList(key);
     if (rawList == null || rawList.isEmpty) return null;
 
     final orders = <OrderEntity>[];

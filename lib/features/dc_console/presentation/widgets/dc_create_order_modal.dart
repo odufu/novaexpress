@@ -30,6 +30,7 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
   // Commercial & Order Values (Decoupled: Product, Seller Packages, Quantity, Price)
   String _selectedState = 'FCT - Abuja';
   String _selectedCity = 'Wuse 2';
+  String? _selectedProductId;
   String _selectedProductName = 'Grazer Tea';
   ProductPackage? _selectedPackage;
   final _productNameController = TextEditingController(text: 'Grazer Tea');
@@ -76,6 +77,7 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
     final packages = product.packages;
     final defaultPkg = packages.isNotEmpty ? packages.first : null;
     setState(() {
+      _selectedProductId = product.id;
       _selectedProductName = product.name;
       _productNameController.text = product.name;
       _clientName = product.clientName;
@@ -97,6 +99,7 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
   void _selectPackage(ProductPackage pkg) {
     setState(() {
       _selectedPackage = pkg;
+      _selectedProductId = pkg.productId;
       _quantity = pkg.quantity;
       _quantityController.text = '${pkg.quantity}';
       _unitPrice = pkg.packagePrice;
@@ -138,6 +141,7 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
     final orderPayload = <String, dynamic>{
       'id': 'ord-${DateTime.now().millisecondsSinceEpoch}',
       'order_number': orderNumber,
+      'product_id': _selectedProductId ?? _selectedPackage?.productId,
       'customer_name': _nameController.text.trim(),
       'customer_phone': _phoneController.text.trim(),
       'customer_alt_phone': _altPhoneController.text.trim().isNotEmpty ? _altPhoneController.text.trim() : null,

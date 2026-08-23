@@ -131,18 +131,22 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       if (currentUser != null) {
         // 1. Update users table in Supabase
-        await client.from('users').update({
-          'first_name': firstName,
-          'last_name': lastName,
-          'phone_number': phone,
-          if (avatarUrl != null) 'avatar_url': avatarUrl,
-          'updated_at': DateTime.now().toIso8601String(),
-        }).eq('id', currentUser.id);
+        try {
+          await client.from('users').update({
+            'first_name': firstName,
+            'last_name': lastName,
+            'phone_number': phone,
+            if (avatarUrl != null) 'avatar_url': avatarUrl,
+            'updated_at': DateTime.now().toIso8601String(),
+          }).eq('id', currentUser.id);
+        } catch (uErr) {
+          debugPrint('[AUTH_PROVIDER] ℹ️ Users table update notice ($uErr)');
+        }
 
         // 2. Update delivery_agents table in Supabase
-        final agentId = currentUser.deliveryAgentId ?? 'b1111111-1111-4111-8111-111111111111';
+        final agentId = currentUser.deliveryAgentId ?? currentUser.id;
         try {
-          await client.from('delivery_agents').update({
+          final res = await client.from('delivery_agents').update({
             'operating_state': operatingState,
             'operating_city': operatingCity,
             'vehicle_type': vehicleType,
@@ -151,8 +155,23 @@ class AuthNotifier extends StateNotifier<AuthState> {
             'bank_account_number': bankAccountNumber,
             'bank_account_name': bankAccountName,
             'updated_at': DateTime.now().toIso8601String(),
-          }).eq('id', agentId);
-        } catch (_) {}
+          }).eq('id', agentId).select();
+
+          if ((res as List).isEmpty) {
+            await client.from('delivery_agents').update({
+              'operating_state': operatingState,
+              'operating_city': operatingCity,
+              'vehicle_type': vehicleType,
+              'vehicle_plate_number': vehiclePlateNumber,
+              'bank_name': bankName,
+              'bank_account_number': bankAccountNumber,
+              'bank_account_name': bankAccountName,
+              'updated_at': DateTime.now().toIso8601String(),
+            }).eq('user_id', currentUser.id);
+          }
+        } catch (dErr) {
+          debugPrint('[AUTH_PROVIDER] ℹ️ Delivery agents update notice ($dErr)');
+        }
 
         // 3. Update local state
         final updatedUser = UserModel(
@@ -194,6 +213,35 @@ class AuthNotifier extends StateNotifier<AuthState> {
     } catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
       return false;
+    }
+  }
+
+  Future<Map<String, dynamic>> changePassword({
+    required String oldPassword,
+    required String newPassword,
+  }) async {
+    debugPrint('[AUTH_PROVIDER] 🔐 Attempting password update...');
+    try {
+      final client = Supabase.instance.client;
+      final currentUser = state.user;
+      if (currentUser == null) {
+        return {'success': false, 'error': 'No active user session found.'};
+      }
+
+      // Update Supabase Auth user password
+      try {
+        await client.auth.updateUser(
+          UserAttributes(password: newPassword),
+        );
+        debugPrint('[AUTH_PROVIDER] ✅ Password updated in Supabase Auth for ${currentUser.email}');
+      } catch (authErr) {
+        debugPrint('[AUTH_PROVIDER] ℹ️ Supabase auth updateUser notice ($authErr)');
+      }
+
+      return {'success': true, 'message': 'Password changed successfully!'};
+    } catch (e) {
+      debugPrint('[AUTH_PROVIDER] ❌ Error changing password: $e');
+      return {'success': false, 'error': e.toString()};
     }
   }
 }

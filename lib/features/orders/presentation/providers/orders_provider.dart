@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/services/local_storage_service.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/datasources/orders_remote_datasource.dart';
 import '../../data/models/order_model.dart';
 import '../../data/repositories/orders_repository_impl.dart';
@@ -59,23 +61,177 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
   final OrdersRepository _repository;
   final GeocodingService? _geocodingService;
   final LocalStorageService _storageService;
+  final Ref? _ref;
+  RealtimeChannel? _realtimeChannel;
+  Timer? _heartbeatTimer;
 
   OrdersNotifier(
     this._repository, [
     this._geocodingService,
     LocalStorageService? storageService,
+    this._ref,
   ])  : _storageService = storageService ?? LocalStorageServiceImpl(),
         super(OrdersState()) {
     _initOrders();
+    _setupRealtimeSubscription();
+    _startHeartbeatTimer();
+  }
+
+  bool _isRiderUser() {
+    if (_ref != null) {
+      final user = _ref.read(authProvider).user;
+      if (user == null) return false;
+      final role = user.role.toLowerCase();
+      return (role == 'rider' || role == 'delivery_agent') &&
+          (user.deliveryAgentId != null && user.deliveryAgentId!.isNotEmpty);
+    }
+    return false;
+  }
+
+  String _getActiveAgentId() {
+    if (_ref != null) {
+      final user = _ref.read(authProvider).user;
+      if (user != null && _isRiderUser()) {
+        return user.deliveryAgentId!;
+      }
+    }
+    return '';
+  }
+
+  String _getScopeKey() {
+    if (_isRiderUser()) {
+      final agentId = _getActiveAgentId();
+      return agentId.isNotEmpty ? 'rider_$agentId' : 'rider';
+    }
+    return 'dc';
+  }
+
+  List<OrderEntity> _sortOrdersByOperationalPriority(List<OrderEntity> rawOrders) {
+    final list = [...rawOrders];
+    list.sort((a, b) {
+      int getStatusPriority(String status) {
+        switch (status.toLowerCase()) {
+          case 'in_transit':
+          case 'picked_up':
+            return 0; // Top: Active in progress
+          case 'pending':
+          case 'assigned':
+          case 'accepted':
+          case 'new':
+            return 1; // Next: Pending dispatch
+          case 'call_back':
+          case 'contacting':
+          case 'upsell_pending':
+            return 2; // Next: Call back
+          case 'delivered':
+            return 3; // Delivered (WhatsApp green, moved down)
+          case 'failed':
+          case 'cancelled':
+          case 'returned':
+            return 4; // Bottom
+          default:
+            return 2;
+        }
+      }
+
+      final pA = getStatusPriority(a.status);
+      final pB = getStatusPriority(b.status);
+      if (pA != pB) {
+        return pA.compareTo(pB);
+      }
+      return b.createdAt.compareTo(a.createdAt);
+    });
+    return list;
+  }
+
+  void _setupRealtimeSubscription() {
+    try {
+      _realtimeChannel = Supabase.instance.client
+          .channel('public_orders_realtime_channel')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'orders',
+            callback: (payload) {
+              debugPrint('[ORDERS_REALTIME] 🔔 Realtime event on orders table: ${payload.eventType}');
+              final agentId = _getActiveAgentId();
+              if (agentId.isNotEmpty) {
+                _silentSyncOrders(agentId);
+              } else {
+                _silentSyncOrders();
+              }
+            },
+          )
+          .subscribe();
+      debugPrint('[ORDERS_PROVIDER] 📡 Orders Realtime stream active.');
+    } catch (e) {
+      debugPrint('[ORDERS_PROVIDER] ℹ️ Realtime channel notice: $e');
+    }
+  }
+
+  void _startHeartbeatTimer() {
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (!mounted) return;
+      final agentId = _getActiveAgentId();
+      if (agentId.isNotEmpty) {
+        _silentSyncOrders(agentId);
+      } else {
+        _silentSyncOrders();
+      }
+    });
+  }
+
+  Future<void> _silentSyncOrders([String? agentId]) async {
+    if (!mounted) return;
+    try {
+      final isRider = _isRiderUser();
+      final targetId = (agentId != null && agentId.isNotEmpty) ? agentId : _getActiveAgentId();
+      List<OrderEntity> fetchedList;
+      if (isRider && targetId.isNotEmpty) {
+        fetchedList = await _repository.getAssignedOrders(targetId);
+      } else {
+        fetchedList = await _repository.getDistributionCenterOrders('22222222-2222-4222-8222-222222222222');
+      }
+
+      final freshList = _sortOrdersByOperationalPriority(fetchedList);
+
+      if (!mounted) return;
+
+      // Check if list changed
+      bool hasChanges = freshList.length != state.orders.length;
+      if (!hasChanges) {
+        for (int i = 0; i < freshList.length; i++) {
+          if (freshList[i].id != state.orders[i].id || 
+              freshList[i].status != state.orders[i].status ||
+              freshList[i].deliveryAgentId != state.orders[i].deliveryAgentId) {
+            hasChanges = true;
+            break;
+          }
+        }
+      }
+
+      if (hasChanges && mounted) {
+        debugPrint('[ORDERS_PROVIDER] ⚡ Auto-synced ${freshList.length} orders in real time.');
+        state = state.copyWith(orders: freshList);
+        await _storageService.cacheOrders(freshList, _getScopeKey());
+      }
+    } catch (_) {}
   }
 
   Future<void> _initOrders() async {
-    final cached = await _storageService.getCachedOrders();
+    final cached = await _storageService.getCachedOrders(_getScopeKey());
     if (cached != null && cached.isNotEmpty) {
-      state = state.copyWith(orders: cached);
-      debugPrint('[ORDERS_PROVIDER] ⚡ Hydrated ${cached.length} orders from local cache.');
+      final sortedCached = _sortOrdersByOperationalPriority(cached);
+      state = state.copyWith(orders: sortedCached);
+      debugPrint('[ORDERS_PROVIDER] ⚡ Hydrated ${sortedCached.length} orders from local cache for scope (${_getScopeKey()}).');
     }
-    await loadOrders();
+    final agentId = _getActiveAgentId();
+    if (agentId.isNotEmpty && _isRiderUser()) {
+      await loadOrders(agentId);
+    } else {
+      await loadOrders();
+    }
   }
 
   Future<void> fetchOrders() async {
@@ -85,14 +241,18 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
   Future<void> loadOrders([String? agentId]) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      if (agentId != null && agentId.isNotEmpty) {
-        final orderEntities = await _repository.getAssignedOrders(agentId);
+      final isRider = _isRiderUser();
+      if (isRider && ((agentId != null && agentId.isNotEmpty) || _getActiveAgentId().isNotEmpty)) {
+        final idToLoad = (agentId != null && agentId.isNotEmpty) ? agentId : _getActiveAgentId();
+        final rawOrders = await _repository.getAssignedOrders(idToLoad);
+        final orderEntities = _sortOrdersByOperationalPriority(rawOrders);
         state = state.copyWith(isLoading: false, orders: orderEntities);
-        await _storageService.cacheOrders(orderEntities);
+        await _storageService.cacheOrders(orderEntities, _getScopeKey());
       } else {
-        final orderEntities = await _repository.getDistributionCenterOrders('22222222-2222-4222-8222-222222222222');
+        final rawOrders = await _repository.getDistributionCenterOrders('22222222-2222-4222-8222-222222222222');
+        final orderEntities = _sortOrdersByOperationalPriority(rawOrders);
         state = state.copyWith(isLoading: false, orders: orderEntities);
-        await _storageService.cacheOrders(orderEntities);
+        await _storageService.cacheOrders(orderEntities, _getScopeKey());
       }
     } catch (e) {
       state = state.copyWith(
@@ -105,9 +265,10 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
   Future<void> loadDcOrders([String? dcId]) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      final orderEntities = await _repository.getDistributionCenterOrders(dcId ?? '22222222-2222-4222-8222-222222222222');
+      final rawOrders = await _repository.getDistributionCenterOrders(dcId ?? '22222222-2222-4222-8222-222222222222');
+      final orderEntities = _sortOrdersByOperationalPriority(rawOrders);
       state = state.copyWith(isLoading: false, orders: orderEntities);
-      await _storageService.cacheOrders(orderEntities);
+      await _storageService.cacheOrders(orderEntities, 'dc');
     } catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: 'Failed to load DC orders: $e');
     }
@@ -117,10 +278,16 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
       final created = await _repository.createOrder(orderData);
+      final rawUpdated = [
+        created,
+        ...state.orders.where((o) => o.id != created.id && o.orderNumber != created.orderNumber),
+      ];
+      final updatedOrders = _sortOrdersByOperationalPriority(rawUpdated);
       state = state.copyWith(
         isLoading: false,
-        orders: [created, ...state.orders.where((o) => o.id != created.id && o.orderNumber != created.orderNumber)],
+        orders: updatedOrders,
       );
+      await _storageService.cacheOrders(updatedOrders, _getScopeKey());
       return true;
     } catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: 'Failed to create order: $e');
@@ -156,7 +323,7 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
             landmark: o.landmark,
             lga: o.lga,
             productName: o.productName,
-            status: 'assigned',
+            status: 'in_transit',
             quantity: o.quantity,
             paidQuantity: o.paidQuantity,
             freeQuantity: o.freeQuantity,
@@ -181,7 +348,9 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
         return o;
       }).toList();
 
-      state = state.copyWith(orders: updatedList);
+      final sortedList = _sortOrdersByOperationalPriority(updatedList);
+      state = state.copyWith(orders: sortedList);
+      await _storageService.cacheOrders(sortedList, _getScopeKey());
       return true;
     } catch (e) {
       return false;
@@ -192,6 +361,7 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     String orderId,
     String newStatus, {
     String? paymentStatus,
+    String? paymentType,
     String? notes,
   }) async {
     state = state.copyWith(isLoading: true);
@@ -200,6 +370,7 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
         orderId,
         newStatus,
         paymentStatus: paymentStatus,
+        paymentType: paymentType,
         notes: notes,
       );
       final updatedList = state.orders.map((o) {
@@ -223,7 +394,7 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
             basePrice: o.basePrice,
             upsellAmount: o.upsellAmount,
             totalAmount: o.totalAmount,
-            paymentType: o.paymentType,
+            paymentType: paymentType ?? o.paymentType,
             paymentStatus: paymentStatus ?? (newStatus == 'delivered' ? 'paid' : o.paymentStatus),
             fulfillmentType: o.fulfillmentType,
             clientName: o.clientName,
@@ -246,8 +417,9 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
         }
         return o;
       }).toList();
-      state = state.copyWith(isLoading: false, orders: updatedList);
-      _storageService.cacheOrders(updatedList);
+      final sortedList = _sortOrdersByOperationalPriority(updatedList);
+      state = state.copyWith(isLoading: false, orders: sortedList);
+      await _storageService.cacheOrders(sortedList, _getScopeKey());
     } catch (e) {
       state = state.copyWith(isLoading: false);
     }
@@ -265,10 +437,16 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
   }) async {
     state = state.copyWith(isLoading: true);
     try {
+      final isDirectTransfer = paymentMethod == 'bank_transfer' ||
+          paymentType == 'prepaid' ||
+          (notes != null && (notes.contains('Monnify') || notes.contains('Direct Transfer')));
+      final resolvedPaymentType = isDirectTransfer ? 'prepaid' : paymentType;
+      final resolvedPaymentStatus = isDirectTransfer ? 'paid' : 'collected';
+
       final result = await _repository.confirmDeliveryPod(
         orderId: orderId,
         agentId: agentId,
-        paymentType: paymentType,
+        paymentType: resolvedPaymentType,
         paymentMethod: paymentMethod,
         amountCollected: amountCollected,
         customerSignatureUrl: customerSignatureUrl,
@@ -297,8 +475,8 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
             basePrice: o.basePrice,
             upsellAmount: o.upsellAmount,
             totalAmount: o.totalAmount,
-            paymentType: paymentType,
-            paymentStatus: 'paid',
+            paymentType: resolvedPaymentType,
+            paymentStatus: resolvedPaymentStatus,
             fulfillmentType: o.fulfillmentType,
             clientName: o.clientName,
             packageCustodyId: o.packageCustodyId,
@@ -321,8 +499,9 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
         return o;
       }).toList();
 
-      state = state.copyWith(isLoading: false, orders: updatedList);
-      _storageService.cacheOrders(updatedList);
+      final sortedList = _sortOrdersByOperationalPriority(updatedList);
+      state = state.copyWith(isLoading: false, orders: sortedList);
+      await _storageService.cacheOrders(sortedList, _getScopeKey());
       return result;
     } catch (e) {
       state = state.copyWith(isLoading: false);
@@ -625,11 +804,28 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     }
     return result;
   }
+
+  @override
+  void dispose() {
+    _heartbeatTimer?.cancel();
+    try {
+      _realtimeChannel?.unsubscribe();
+    } catch (_) {}
+    super.dispose();
+  }
 }
 
 final ordersProvider = StateNotifierProvider<OrdersNotifier, OrdersState>((ref) {
+  // Re-bind whenever authenticated agent changes
+  ref.watch(authProvider.select((s) => s.user?.deliveryAgentId ?? s.user?.id));
+  final repository = ref.watch(ordersRepositoryProvider);
+  final geocoding = ref.watch(geocodingServiceProvider);
+  final storage = ref.watch(localStorageServiceProvider);
+
   return OrdersNotifier(
-    ref.watch(ordersRepositoryProvider),
-    ref.watch(geocodingServiceProvider),
+    repository,
+    geocoding,
+    storage,
+    ref,
   );
 });

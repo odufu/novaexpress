@@ -104,6 +104,39 @@
     <p class="system-status">Initializing Operational System...</p>
   </div>
 
+  <!-- Official Paystack Inline SDK -->
+  <script src="https://js.paystack.co/v1/inline.js"></script>
+  <script>
+    window.payWithPaystack = function(options, onSuccess, onClose) {
+      try {
+        if (typeof PaystackPop === 'undefined') {
+          console.warn('PaystackPop is not loaded');
+          if (onClose) onClose();
+          return;
+        }
+        var handler = PaystackPop.setup({
+          key: options.key,
+          email: options.email,
+          amount: options.amount,
+          currency: options.currency || 'NGN',
+          ref: options.ref,
+          metadata: options.metadata || {},
+          callback: function(response) {
+            if (onSuccess) onSuccess(response.reference);
+          },
+          onClose: function() {
+            if (onClose) onClose();
+          }
+        });
+        handler.openIframe();
+      } catch (err) {
+        console.error('Paystack launcher error:', err);
+        if (onClose) onClose();
+      }
+    };
+  </script>
+
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
+

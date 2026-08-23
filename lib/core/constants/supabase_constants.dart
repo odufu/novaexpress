@@ -16,4 +16,11 @@ class SupabaseConstants {
   static const String warehousesTable = 'warehouses';
   static const String cashRemittancesTable = 'cash_remittances';
   static const String stockTransfersTable = 'stock_transfers';
+  static const String paystackTransactionsTable = 'paystack_transactions';
+  static const String paystackVirtualAccountsTable = 'paystack_virtual_accounts';
+
+  // Paystack Credentials
+  static const String paystackSecretKey = 'sk_test_94f116e6e978f0e75dc42f8a789837931b487006';
+  static const String paystackPublicKey = 'pk_test_0ac140673685b32b2e9613b548991cd9563e917a';
+  static const String paystackWebhookUrl = 'https://vacyxnehxpqvwtaimkgc.supabase.co/functions/v1/paystack-webhook';
 }

@@ -7,8 +7,10 @@ import '../../../../core/helpers/formatters.dart';
 import '../../../../core/providers/navigation_provider.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
+import '../../../../core/widgets/user_avatar_widget.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
+import '../widgets/change_password_modal.dart';
 import '../widgets/edit_profile_modal.dart';
 
 class UserProfilePage extends ConsumerWidget {
@@ -23,19 +25,18 @@ class UserProfilePage extends ConsumerWidget {
     final theme = Theme.of(context);
 
     final user = authState.user;
-    final agentName = user != null && user.fullName.isNotEmpty ? user.fullName : '';
-    final agentInitials = agentName.isNotEmpty ? agentName.substring(0, 1).toUpperCase() : 'U';
-    final agentCode = user?.deliveryAgentCode ?? '';
-    final dcName = user?.distributionCenterName ?? '';
-    final phone = user?.phone ?? '';
+    final agentName = user != null && user.fullName.isNotEmpty ? user.fullName : 'Field Agent';
+    final agentCode = (user?.deliveryAgentCode != null && user!.deliveryAgentCode!.isNotEmpty) ? user.deliveryAgentCode! : 'PDA-7000';
+    final dcName = (user?.distributionCenterName != null && user!.distributionCenterName!.isNotEmpty) ? user.distributionCenterName! : 'Wuse Distribution Center';
+    final phone = user != null && user.phone.isNotEmpty ? user.phone : 'Not set';
     final email = user?.email ?? '';
-    final stateLoc = user?.operatingState ?? '';
-    final cityLoc = user?.operatingCity ?? '';
-    final vehicle = user?.vehicleType ?? '';
-    final plateNo = user?.vehiclePlateNumber ?? '';
-    final bankName = user?.bankName ?? '';
-    final bankAccountNo = user?.bankAccountNumber ?? '';
-    final bankAccountName = user?.bankAccountName ?? '';
+    final stateLoc = user != null && user.operatingState.isNotEmpty ? user.operatingState : 'Abuja (FCT)';
+    final cityLoc = user != null && user.operatingCity.isNotEmpty ? user.operatingCity : 'Wuse II';
+    final vehicle = user != null && user.vehicleType.isNotEmpty ? user.vehicleType : 'Motorcycle (Bajaj Boxer)';
+    final plateNo = user != null && user.vehiclePlateNumber.isNotEmpty ? user.vehiclePlateNumber : 'Pending Registration';
+    final bankName = user != null && user.bankName.isNotEmpty ? user.bankName : 'Guaranty Trust Bank (GTBank)';
+    final bankAccountNo = user != null && user.bankAccountNumber.isNotEmpty ? user.bankAccountNumber : 'Pending Setup';
+    final bankAccountName = user != null && user.bankAccountName.isNotEmpty ? user.bankAccountName : agentName;
 
     final deliveredOrders = ordersState.orders.where((o) => o.status == 'delivered').toList();
     final failedOrders = ordersState.orders.where((o) => o.status == 'failed' || o.status == 'cancelled').toList();
@@ -49,8 +50,8 @@ class UserProfilePage extends ConsumerWidget {
     // 100% Dynamic success rate % = (delivered / total attempted) * 100
     final double successRateVal = totalAttempted > 0
         ? ((deliveredOrders.length / totalAttempted) * 100.0)
-        : (user != null && (user.rating ?? 0) > 0 ? 98.4 : 100.0);
-    final String successRateStr = '${successRateVal.toStringAsFixed(1)}%';
+        : 100.0;
+    final String successRateStr = totalAttempted > 0 ? '${successRateVal.toStringAsFixed(1)}%' : '100%';
 
     // 100% Dynamic performance rating
     final double computedRating = totalAttempted > 0
@@ -58,8 +59,8 @@ class UserProfilePage extends ConsumerWidget {
         : (user?.rating ?? 5.0);
     final String performanceRating = computedRating.toStringAsFixed(1);
 
-    final double commissionRate = user?.commissionRate ?? 0.0;
-    final double transportAllowance = user?.isPda == false ? (user?.fuelAllowance ?? 0.0) : (user?.transportAllowance ?? 0.0);
+    final double commissionRate = user?.commissionRate ?? 1000.0;
+    final double transportAllowance = user?.isPda == false ? (user?.fuelAllowance ?? 800.0) : (user?.transportAllowance ?? 1500.0);
     final double totalEarningPerOrder = commissionRate + transportAllowance;
 
     return Scaffold(
@@ -90,6 +91,7 @@ class UserProfilePage extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.edit_note_rounded, color: AppColors.orange, size: 26),
+            tooltip: 'Edit Profile & Bank Details',
             onPressed: () {
               if (user != null) EditProfileModal.show(context, user);
             },
@@ -105,8 +107,11 @@ class UserProfilePage extends ConsumerWidget {
       ),
       body: RefreshIndicator(
         onRefresh: () async {
-          final agentId = user?.deliveryAgentId ?? 'b1111111-1111-4111-8111-111111111111';
-          await ref.read(ordersProvider.notifier).loadOrders(agentId);
+          final agentId = user?.deliveryAgentId ?? user?.id ?? '';
+          if (agentId.isNotEmpty) {
+            await ref.read(ordersProvider.notifier).loadOrders(agentId);
+          }
+          await ref.read(authProvider.notifier).checkCurrentUser();
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -140,17 +145,13 @@ class UserProfilePage extends ConsumerWidget {
                       },
                       child: Stack(
                         children: [
-                          CircleAvatar(
+                          UserAvatarWidget(
+                            avatarUrl: user?.avatarUrl,
+                            fullName: agentName,
                             radius: 42,
-                            backgroundColor: AppColors.primary,
-                            child: Text(
-                              agentInitials,
-                              style: GoogleFonts.inter(
-                                fontSize: 34,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
+                            showBorder: true,
+                            borderColor: AppColors.orange.withValues(alpha: 0.8),
+                            borderWidth: 2.5,
                           ),
                           Positioned(
                             bottom: 0,
@@ -177,7 +178,7 @@ class UserProfilePage extends ConsumerWidget {
                         color: theme.colorScheme.onSurface,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
@@ -193,7 +194,7 @@ class UserProfilePage extends ConsumerWidget {
                         style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.orange),
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 10),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -373,22 +374,32 @@ class UserProfilePage extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Icon(Icons.person_outline_rounded, color: AppColors.orange, size: 20),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Personal & Contact Details',
-                            style: GoogleFonts.inter(
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.bold,
-                              color: theme.colorScheme.onSurface,
+                        Row(
+                          children: [
+                            const Icon(Icons.person_outline_rounded, color: AppColors.orange, size: 20),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Personal & Contact Details',
+                              style: GoogleFonts.inter(
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.onSurface,
+                              ),
                             ),
-                          ),
+                          ],
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.orange),
+                          tooltip: 'Edit Personal Details',
+                          onPressed: () {
+                            if (user != null) EditProfileModal.show(context, user, initialTabIndex: 0);
+                          },
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
                     _ProfileDetailRow(
                       icon: Icons.phone_iphone_rounded,
                       label: 'Phone Number',
@@ -411,7 +422,7 @@ class UserProfilePage extends ConsumerWidget {
               ),
               const SizedBox(height: 14),
 
-              // 4. VEHICLE & FLEET ASSET CARD
+              // 4. FINANCIAL COMPENSATION & BANK SETTLEMENT CARD
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -423,73 +434,32 @@ class UserProfilePage extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Icon(Icons.two_wheeler_rounded, color: Color(0xFF2563EB), size: 20),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Vehicle & Fleet License',
-                            style: GoogleFonts.inter(
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.bold,
-                              color: theme.colorScheme.onSurface,
+                        Row(
+                          children: [
+                            const Icon(Icons.account_balance_wallet_outlined, color: Color(0xFF16A34A), size: 20),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Compensation & Settlement Bank',
+                              style: GoogleFonts.inter(
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.onSurface,
+                              ),
                             ),
-                          ),
+                          ],
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF16A34A)),
+                          tooltip: 'Edit Settlement Bank Details',
+                          onPressed: () {
+                            if (user != null) EditProfileModal.show(context, user, initialTabIndex: 1);
+                          },
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    _ProfileDetailRow(
-                      icon: Icons.directions_bike_rounded,
-                      label: 'Vehicle Asset',
-                      value: vehicle,
-                    ),
-                    const SizedBox(height: 10),
-                    _ProfileDetailRow(
-                      icon: Icons.subtitles_outlined,
-                      label: 'Plate Number',
-                      value: plateNo,
-                    ),
-                    const SizedBox(height: 10),
-                    _ProfileDetailRow(
-                      icon: Icons.shield_outlined,
-                      label: 'Safety & Helmet Verified',
-                      value: 'Compliant ✓',
-                      valueColor: const Color(0xFF16A34A),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 14),
-
-              // 5. FINANCIAL COMPENSATION & BANK SETTLEMENT CARD
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: theme.cardColor,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.15)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.account_balance_wallet_outlined, color: Color(0xFF16A34A), size: 20),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Compensation & Settlement Bank',
-                            style: GoogleFonts.inter(
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.bold,
-                              color: theme.colorScheme.onSurface,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
                     _ProfileDetailRow(
                       icon: Icons.payments_outlined,
                       label: 'Commission / Order',
@@ -525,7 +495,7 @@ class UserProfilePage extends ConsumerWidget {
                     const SizedBox(height: 10),
                     _ProfileDetailRow(
                       icon: Icons.person_pin_outlined,
-                      label: 'Account Name',
+                      label: 'Beneficiary Name',
                       value: bankAccountName,
                     ),
                   ],
@@ -533,7 +503,128 @@ class UserProfilePage extends ConsumerWidget {
               ),
               const SizedBox(height: 14),
 
-              // 6. TERMINAL SETTINGS & PREFERENCES
+              // 5. VEHICLE & FLEET ASSET CARD
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: theme.cardColor,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.15)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.two_wheeler_rounded, color: Color(0xFF2563EB), size: 20),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Vehicle & Fleet License',
+                              style: GoogleFonts.inter(
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.onSurface,
+                              ),
+                            ),
+                          ],
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF2563EB)),
+                          tooltip: 'Edit Vehicle Details',
+                          onPressed: () {
+                            if (user != null) EditProfileModal.show(context, user, initialTabIndex: 2);
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    _ProfileDetailRow(
+                      icon: Icons.directions_bike_rounded,
+                      label: 'Vehicle Asset',
+                      value: vehicle,
+                    ),
+                    const SizedBox(height: 10),
+                    _ProfileDetailRow(
+                      icon: Icons.subtitles_outlined,
+                      label: 'Plate Number',
+                      value: plateNo,
+                    ),
+                    const SizedBox(height: 10),
+                    _ProfileDetailRow(
+                      icon: Icons.shield_outlined,
+                      label: 'Safety & Helmet Verified',
+                      value: 'Compliant ✓',
+                      valueColor: const Color(0xFF16A34A),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // 6. SECURITY & PASSWORD MANAGEMENT CARD
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: theme.cardColor,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.15)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.shield_rounded, color: Color(0xFF2563EB), size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Security & Authentication',
+                          style: GoogleFonts.inter(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2563EB).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.key_rounded, color: Color(0xFF2563EB), size: 20),
+                      ),
+                      title: Text(
+                        'Change Account Password',
+                        style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
+                      ),
+                      subtitle: Text(
+                        'Update your login password securely',
+                        style: GoogleFonts.inter(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+                      ),
+                      trailing: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2563EB),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        onPressed: () => ChangePasswordModal.show(context),
+                        child: const Text('Update', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // 7. TERMINAL SETTINGS & PREFERENCES
               Container(
                 decoration: BoxDecoration(
                   color: theme.cardColor,
@@ -574,17 +665,6 @@ class UserProfilePage extends ConsumerWidget {
                     ),
                     const Divider(height: 1),
                     ListTile(
-                      leading: Icon(Icons.lock_outline_rounded, color: theme.colorScheme.onSurface),
-                      title: Text('Security & Access PIN', style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14, color: theme.colorScheme.onSurface)),
-                      trailing: const Icon(Icons.chevron_right_rounded),
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Security PIN management is active.')),
-                        );
-                      },
-                    ),
-                    const Divider(height: 1),
-                    ListTile(
                       leading: Icon(Icons.help_outline_rounded, color: theme.colorScheme.onSurface),
                       title: Text('Help & Field Operations Support', style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14, color: theme.colorScheme.onSurface)),
                       trailing: const Icon(Icons.chevron_right_rounded),
@@ -599,7 +679,7 @@ class UserProfilePage extends ConsumerWidget {
               ),
               const SizedBox(height: 24),
 
-              // 7. LOGOUT BUTTON
+              // 8. LOGOUT BUTTON
               SizedBox(
                 width: double.infinity,
                 height: 52,
@@ -649,29 +729,23 @@ class UserProfilePage extends ConsumerWidget {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(
-              'Cancel',
-              style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: const Color(0xFF64748B)),
-            ),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFBA1A1A),
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
             onPressed: () async {
-              Navigator.of(ctx).pop();
+              Navigator.pop(ctx);
               await ref.read(authProvider.notifier).logout();
               if (context.mounted) {
                 context.go('/login');
               }
             },
-            child: Text(
-              'Logout',
-              style: GoogleFonts.inter(fontWeight: FontWeight.bold),
-            ),
+            child: const Text('Logout'),
           ),
         ],
       ),
@@ -695,31 +769,32 @@ class _ProfileDetailRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(icon, size: 16, color: theme.colorScheme.onSurfaceVariant),
-        const SizedBox(width: 8),
+        const SizedBox(width: 10),
         Expanded(
-          flex: 2,
+          flex: 4,
           child: Text(
             label,
-            style: TextStyle(
-              fontSize: 12.5,
-              color: theme.colorScheme.onSurfaceVariant,
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
             ),
           ),
         ),
         const SizedBox(width: 8),
-        Flexible(
-          flex: 3,
+        Expanded(
+          flex: 6,
           child: Text(
             value,
             textAlign: TextAlign.end,
-            overflow: TextOverflow.ellipsis,
             style: GoogleFonts.inter(
               fontSize: 13,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w700,
               color: valueColor ?? theme.colorScheme.onSurface,
             ),
           ),

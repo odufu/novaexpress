@@ -44,7 +44,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
           ? agentId
           : 'b1111111-1111-4111-8111-111111111111';
 
-      final agentFilter = 'delivery_agent_id.eq.$validAgentUuid,delivery_agent_id.eq.b1111111-1111-4111-8111-111111111111,delivery_agent_id.is.null';
+      final agentFilter = 'distribution_center_id.eq.$validAgentUuid,delivery_agent_id.eq.$validAgentUuid,delivery_agent_id.eq.b1111111-1111-4111-8111-111111111111,delivery_agent_id.is.null';
 
       final response = await supabaseClient
           .from(SupabaseConstants.cashRemittancesTable)
@@ -79,7 +79,11 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     String? notes,
   }) async {
     final ref = referenceNumber ?? 'REM-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
-    final remittanceNotes = '[${paymentMethod.toUpperCase()}] Ref: $ref - ${notes ?? ""}';
+    final isPaystack = paymentMethod == 'paystack' || paymentMethod == 'paystack_transfer';
+    final initialStatus = isPaystack ? 'verified' : 'pending';
+    final remittanceNotes = isPaystack
+        ? '[PAYSTACK] Ref: $ref - Auto-verified instant remittance. ${notes ?? ""}'
+        : '[${paymentMethod.toUpperCase()}] Ref: $ref - ${notes ?? ""}';
 
     final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
     final validAgentUuid = (agentId.isNotEmpty && uuidRegex.hasMatch(agentId))
@@ -90,9 +94,11 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
         : '11111111-1111-4111-8111-111111111111';
 
     try {
-      final backendPaymentMethod = paymentMethod == 'cash_to_dc'
-          ? 'dc_handover'
-          : (paymentMethod == 'pos_deposit' ? 'pos_settlement' : 'bank_transfer');
+      final backendPaymentMethod = isPaystack
+          ? 'paystack'
+          : (paymentMethod == 'cash_to_dc'
+              ? 'dc_handover'
+              : (paymentMethod == 'pos_deposit' ? 'pos_settlement' : 'bank_transfer'));
 
       try {
         final edgeResponse = await supabaseClient.functions.invoke(
@@ -100,11 +106,12 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
           body: {
             'agentId': validAgentUuid,
             'companyId': validCompanyUuid,
+            'distributionCenterId': '22222222-2222-4222-8222-222222222222',
             'amount': amount,
             'paymentMethod': backendPaymentMethod,
             'depositReceiptUrl': depositReceiptUrl,
             'referenceNumber': ref,
-            'notes': notes,
+            'notes': remittanceNotes,
           },
         );
 
@@ -123,7 +130,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
             posFee: posFee,
             paymentMethod: paymentMethod,
             depositReceiptUrl: depositReceiptUrl,
-            status: rem['status'] ?? 'pending',
+            status: rem['status'] ?? initialStatus,
             notes: remittanceNotes,
             createdAt: DateTime.now(),
           );
@@ -131,32 +138,58 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       } catch (_) {}
 
       // Fallback to table insert if edge function returned non-200 or offline
+      final insertData = <String, dynamic>{
+        'company_id': validCompanyUuid,
+        'delivery_agent_id': validAgentUuid,
+        'distribution_center_id': '22222222-2222-4222-8222-222222222222',
+        'amount': amount,
+        'deposit_receipt_url': depositReceiptUrl,
+        'status': initialStatus,
+        'notes': remittanceNotes,
+        'payment_method': isPaystack ? 'paystack' : paymentMethod,
+        'created_at': DateTime.now().toIso8601String(),
+      };
+      if (isPaystack) {
+        insertData['verified_at'] = DateTime.now().toIso8601String();
+      }
+
       final response = await supabaseClient
           .from(SupabaseConstants.cashRemittancesTable)
-          .insert({
-            'company_id': validCompanyUuid,
-            'delivery_agent_id': validAgentUuid,
-            'amount': amount,
-            'deposit_receipt_url': depositReceiptUrl,
-            'status': 'pending',
-            'notes': remittanceNotes,
-            'created_at': DateTime.now().toIso8601String(),
-          })
+          .insert(insertData)
           .select()
           .single();
 
-      // Log into rider_transactions audit log
+      // Log into paystack_transactions and rider_transactions
+      if (isPaystack) {
+        try {
+          await supabaseClient.from(SupabaseConstants.paystackTransactionsTable).upsert({
+            'reference': ref,
+            'remittance_id': response['id'],
+            'delivery_agent_id': validAgentUuid,
+            'amount': amount,
+            'currency': 'NGN',
+            'transaction_type': 'remittance',
+            'channel': 'bank_transfer',
+            'verification_status': 'verified',
+            'payer_name': 'Rider Cash Remittance',
+            'created_at': DateTime.now().toIso8601String(),
+          }, onConflict: 'reference');
+        } catch (_) {}
+      }
+
       try {
         await supabaseClient.from('rider_transactions').insert({
           'delivery_agent_id': validAgentUuid,
           'transaction_code': ref,
-          'title': 'Cash Remittance Submitted',
+          'title': isPaystack ? 'Paystack Remittance Verified' : 'Cash Remittance Submitted',
           'category': 'remittance',
           'amount': amount,
           'is_credit': false,
           'reference': ref,
-          'status': 'pending',
-          'description': 'Remittance of ₦${amount.toStringAsFixed(2)} submitted via ${paymentMethod.toUpperCase()} with reference $ref.',
+          'status': initialStatus,
+          'description': isPaystack
+              ? 'Instant cash remittance of ₦${amount.toStringAsFixed(2)} verified via Paystack.'
+              : 'Remittance of ₦${amount.toStringAsFixed(2)} submitted via ${paymentMethod.toUpperCase()} with reference $ref.',
           'created_at': DateTime.now().toIso8601String(),
         });
       } catch (_) {}

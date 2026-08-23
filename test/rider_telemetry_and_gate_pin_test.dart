@@ -11,10 +11,12 @@ import 'package:novexps/features/orders/data/services/geocoding_service.dart';
 import 'package:novexps/features/orders/domain/entities/order.dart';
 import 'package:novexps/features/orders/domain/repositories/orders_repository.dart';
 import 'package:novexps/features/orders/presentation/providers/orders_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   setUpAll(() {
     TestWidgetsFlutterBinding.ensureInitialized();
+    SharedPreferences.setMockInitialValues({});
   });
 
   group('Rider Telemetry, Gate Pin & GIS Proximity Verification Suite', () {
@@ -114,6 +116,11 @@ void main() {
         ProviderScope(
           overrides: [
             ordersRemoteDataSourceProvider.overrideWithValue(mockOrdersDataSource),
+            ordersProvider.overrideWith((ref) {
+              final notifier = OrdersNotifier(_MockOrdersRepo([unassignedOrder]));
+              notifier.state = OrdersState(isLoading: false, orders: [unassignedOrder]);
+              return notifier;
+            }),
             dcConsoleProvider.overrideWith((ref) {
               final notifier = DCConsoleNotifier();
               notifier.state = notifier.state.copyWith(
@@ -192,7 +199,7 @@ class _MockOrdersRepo implements OrdersRepository {
   Future<OrderEntity> getOrderById(String orderId) async => list.firstWhere((o) => o.id == orderId);
 
   @override
-  Future<void> updateOrderStatus(String orderId, String status, {String? paymentStatus, String? notes}) async {}
+  Future<void> updateOrderStatus(String orderId, String status, {String? paymentStatus, String? paymentType, String? notes}) async {}
 
   @override
   Future<Map<String, dynamic>> confirmDeliveryPod({
@@ -250,7 +257,7 @@ class _MockOrdersRemoteDS implements OrdersRemoteDataSource {
   Future<OrderModel> getOrderById(String orderId) async => orders.firstWhere((o) => o.id == orderId);
 
   @override
-  Future<void> updateOrderStatus(String orderId, String status, {String? paymentStatus, String? notes}) async {}
+  Future<void> updateOrderStatus(String orderId, String status, {String? paymentStatus, String? paymentType, String? notes}) async {}
 
   @override
   Future<Map<String, dynamic>> confirmDeliveryPod({

@@ -144,7 +144,7 @@ class MockOrdersRepository implements OrdersRepository {
   Future<OrderEntity> getOrderById(String orderId) async => list.firstWhere((o) => o.id == orderId);
 
   @override
-  Future<void> updateOrderStatus(String orderId, String status, {String? paymentStatus, String? notes}) async {}
+  Future<void> updateOrderStatus(String orderId, String status, {String? paymentStatus, String? paymentType, String? notes}) async {}
 
   @override
   Future<Map<String, dynamic>> confirmDeliveryPod({

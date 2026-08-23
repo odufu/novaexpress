@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/constants/supabase_constants.dart';
 import '../../../../core/helpers/formatters.dart';
 import '../../../../core/providers/navigation_provider.dart';
+import '../../../../core/services/paystack_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_logo_widget.dart';
 import '../../../../core/widgets/signature_pad_widget.dart';
@@ -15,7 +16,7 @@ import '../../../notifications/presentation/providers/notifications_provider.dar
 import '../../../stock/presentation/providers/stock_provider.dart';
 import '../../domain/entities/order.dart';
 import '../providers/orders_provider.dart';
-import '../widgets/monnify_transfer_modal.dart';
+import '../widgets/paystack_transfer_modal.dart';
 
 class ConfirmDeliveryPodPage extends ConsumerStatefulWidget {
   final String orderId;
@@ -32,10 +33,10 @@ class ConfirmDeliveryPodPage extends ConsumerStatefulWidget {
 class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage> {
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _referenceController = TextEditingController();
-  String _selectedPaymentMethod = 'Cash'; // 'Cash', 'Direct Transfer (Monnify)', 'POS Terminal'
+  String _selectedPaymentMethod = 'Cash'; // 'Cash', 'Direct Transfer (Paystack)', 'POS Terminal'
   bool _hasConfirmedReceipt = true;
-  bool _isVerifyingMonnify = false;
-  bool _monnifyTransferVerified = false;
+  bool _isVerifyingPaystack = false;
+  bool _paystackTransferVerified = false;
   bool _isLoading = false;
   bool _isSuccess = false;
 
@@ -65,18 +66,21 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
     super.dispose();
   }
 
-  void _verifyMonnifyPayment() async {
-    setState(() => _isVerifyingMonnify = true);
-    await Future.delayed(const Duration(seconds: 2));
+  void _verifyPaystackPayment(String orderNumber) async {
+    setState(() => _isVerifyingPaystack = true);
+    final ref = 'PSTK-${orderNumber.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')}';
+    final result = await PaystackService().verifyTransaction(ref);
     if (mounted) {
       setState(() {
-        _isVerifyingMonnify = false;
-        _monnifyTransferVerified = true;
+        _isVerifyingPaystack = false;
+        _paystackTransferVerified = result.isSuccessful;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: Color(0xFF16A34A),
-          content: Text('✓ Monnify direct transfer confirmed! Funds received in company account.'),
+        SnackBar(
+          backgroundColor: result.isSuccessful ? const Color(0xFF16A34A) : const Color(0xFFEF4444),
+          content: Text(result.isSuccessful
+              ? '✓ Paystack direct transfer confirmed! Funds received in company account.'
+              : (result.gatewayResponse ?? 'Transfer verification pending. Please check again.')),
         ),
       );
     }
@@ -89,14 +93,19 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
 
     final authState = ref.read(authProvider);
     final agentId = authState.user?.deliveryAgentId ?? authState.user?.id ?? SupabaseConstants.defaultDeliveryAgentId;
-    final isDirectTransfer = _selectedPaymentMethod == 'Direct Transfer (Monnify)';
+    final isDirectTransfer = _selectedPaymentMethod == 'Direct Transfer (Paystack)' ||
+        _selectedPaymentMethod == 'Direct Transfer (Monnify)' ||
+        _selectedPaymentMethod == 'Bank Transfer' ||
+        _selectedPaymentMethod.toLowerCase().contains('transfer') ||
+        _selectedPaymentMethod.toLowerCase().contains('paystack');
     final isPos = _selectedPaymentMethod == 'POS Terminal';
     final paymentMethod = isDirectTransfer ? 'bank_transfer' : (isPos ? 'pos' : 'cash');
     final amount = double.tryParse(_amountController.text.trim()) ?? 0.0;
     final refNo = _referenceController.text.trim();
     final orderIdPrefix = (widget.orderId.length >= 4 ? widget.orderId.substring(0, 4) : widget.orderId).toUpperCase();
+    final paymentRef = refNo.isNotEmpty ? refNo : 'PSTK-$orderIdPrefix';
     final notes = isDirectTransfer
-        ? '[POD Paid via Monnify Direct Transfer • Ref: MNFY-$orderIdPrefix] ₦0 cash held by PDA. Commission credited to My Balance.'
+        ? '[POD Paid via Paystack Direct Transfer • Ref: $paymentRef] ₦0 cash held by PDA. Commission credited to My Balance.'
         : (refNo.isNotEmpty
             ? '[POD Collected via $_selectedPaymentMethod (Ref: $refNo)] Cash in custody.'
             : '[POD Collected via $_selectedPaymentMethod] Cash in custody.');
@@ -106,7 +115,7 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
           agentId: agentId,
           paymentType: isDirectTransfer ? 'prepaid' : 'pay_on_delivery',
           paymentMethod: paymentMethod,
-          amountCollected: amount,
+          amountCollected: isDirectTransfer ? 0.0 : amount,
           notes: notes,
         );
 
@@ -118,7 +127,9 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
 
     ref.read(notificationsProvider.notifier).emitNotification(
           title: 'Delivery POD Confirmed 🎉',
-          message: 'Order $displayOrderNo was successfully delivered. Net collection of ${CurrencyFormatter.formatNaira(amount)} recorded.',
+          message: isDirectTransfer
+              ? 'Order $displayOrderNo delivered via Paystack direct transfer. Earning credited to My Balance.'
+              : 'Order $displayOrderNo was successfully delivered. Net collection of ${CurrencyFormatter.formatNaira(amount)} recorded.',
           category: 'delivery',
           actionRoute: '/orders',
         );
@@ -463,14 +474,14 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                 Expanded(
                   flex: 2,
                   child: GestureDetector(
-                    onTap: () => setState(() => _selectedPaymentMethod = 'Direct Transfer (Monnify)'),
+                    onTap: () => setState(() => _selectedPaymentMethod = 'Direct Transfer (Paystack)'),
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 11),
                       decoration: BoxDecoration(
-                        color: _selectedPaymentMethod == 'Direct Transfer (Monnify)' ? const Color(0xFF2563EB) : theme.colorScheme.surfaceContainer,
+                        color: (_selectedPaymentMethod == 'Direct Transfer (Paystack)' || _selectedPaymentMethod == 'Direct Transfer (Monnify)') ? const Color(0xFF00A2D3) : theme.colorScheme.surfaceContainer,
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: _selectedPaymentMethod == 'Direct Transfer (Monnify)' ? const Color(0xFF2563EB) : Colors.transparent,
+                          color: (_selectedPaymentMethod == 'Direct Transfer (Paystack)' || _selectedPaymentMethod == 'Direct Transfer (Monnify)') ? const Color(0xFF00A2D3) : Colors.transparent,
                         ),
                       ),
                       child: Center(
@@ -480,9 +491,9 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                             const Icon(Icons.flash_on_rounded, size: 14, color: Colors.white),
                             const SizedBox(width: 3),
                             Text(
-                              'Direct Transfer (Monnify)',
+                              'Direct Transfer (Paystack)',
                               style: TextStyle(
-                                color: _selectedPaymentMethod == 'Direct Transfer (Monnify)' ? Colors.white : theme.colorScheme.onSurface,
+                                color: (_selectedPaymentMethod == 'Direct Transfer (Paystack)' || _selectedPaymentMethod == 'Direct Transfer (Monnify)') ? Colors.white : theme.colorScheme.onSurface,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 12,
                               ),
@@ -520,7 +531,7 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
             ),
             const SizedBox(height: 16),
 
-            // DYNAMIC SECTION A: DIRECT MONNIFY TRANSFER VIRTUAL ACCOUNT CARD
+            // DYNAMIC SECTION A: DIRECT PAYSTACK TRANSFER VIRTUAL ACCOUNT CARD
             if (isDirectTransfer) ...[
               Container(
                 width: double.infinity,
@@ -528,13 +539,13 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: isDark
-                        ? [const Color(0xFF1E3A8A), const Color(0xFF0F172A)]
-                        : [const Color(0xFFEFF6FF), const Color(0xFFDBEAFE)],
+                        ? [const Color(0xFF0F172A), const Color(0xFF1E293B)]
+                        : [const Color(0xFFE0F2FE), const Color(0xFFBAE6FD)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFF3B82F6)),
+                  border: Border.all(color: const Color(0xFF00C3F7)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -544,10 +555,10 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                         Container(
                           padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF2563EB).withValues(alpha: 0.2),
+                            color: const Color(0xFF00C3F7).withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: const Icon(Icons.account_balance_rounded, color: Color(0xFF2563EB), size: 18),
+                          child: const Icon(Icons.account_balance_rounded, color: Color(0xFF00A2D3), size: 18),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -555,12 +566,12 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'MONNIFY DYNAMIC ACCOUNT',
+                                'PAYSTACK DYNAMIC ACCOUNT',
                                 style: GoogleFonts.jetBrainsMono(
                                   fontSize: 10,
                                   fontWeight: FontWeight.w800,
                                   letterSpacing: 0.8,
-                                  color: const Color(0xFF2563EB),
+                                  color: const Color(0xFF00A2D3),
                                 ),
                               ),
                               Text(
@@ -580,7 +591,7 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                       decoration: BoxDecoration(
                         color: isDark ? const Color(0xFF1E293B) : Colors.white,
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFF93C5FD)),
+                        border: Border.all(color: const Color(0xFF38BDF8)),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -588,17 +599,17 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Wema Bank / Moniepoint', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
+                              Text('Titan Trust Bank / Paystack', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
                               const SizedBox(height: 2),
                               Text(
                                 virtualAccountNumber,
-                                style: GoogleFonts.jetBrainsMono(fontSize: 18, fontWeight: FontWeight.w900, color: const Color(0xFF2563EB)),
+                                style: GoogleFonts.jetBrainsMono(fontSize: 18, fontWeight: FontWeight.w900, color: const Color(0xFF00A2D3)),
                               ),
                               Text('NovaExpress / #${order.orderNumber}', style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B))),
                             ],
                           ),
                           IconButton(
-                            icon: const Icon(Icons.copy_rounded, color: Color(0xFF2563EB)),
+                            icon: const Icon(Icons.copy_rounded, color: Color(0xFF00A2D3)),
                             tooltip: 'Copy Account Number',
                             onPressed: () {
                               Clipboard.setData(ClipboardData(text: virtualAccountNumber));
@@ -617,26 +628,27 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                         Expanded(
                           child: OutlinedButton.icon(
                             onPressed: () {
-                              MonnifyTransferModal.show(
+                              PaystackTransferModal.show(
                                 context: context,
                                 orderNumber: order.orderNumber,
                                 amount: order.totalAmount,
+                                customerPhone: order.customerPhone,
                                 onPaymentConfirmed: () {
                                   setState(() {
-                                    _monnifyTransferVerified = true;
+                                    _paystackTransferVerified = true;
                                   });
                                 },
                               );
                             },
                             style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFF2563EB),
-                              side: const BorderSide(color: Color(0xFF2563EB)),
+                              foregroundColor: const Color(0xFF00A2D3),
+                              side: const BorderSide(color: Color(0xFF00A2D3)),
                               padding: const EdgeInsets.symmetric(vertical: 10),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                             ),
                             icon: const Icon(Icons.qr_code_scanner_rounded, size: 16),
                             label: Text(
-                              'Open Monnify Screen',
+                              'Open Paystack Screen',
                               style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
                             ),
                           ),
@@ -644,20 +656,20 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                         const SizedBox(width: 8),
                         Expanded(
                           child: ElevatedButton.icon(
-                            onPressed: _isVerifyingMonnify ? null : _verifyMonnifyPayment,
+                            onPressed: _isVerifyingPaystack ? null : () => _verifyPaystackPayment(order.orderNumber),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: _monnifyTransferVerified ? const Color(0xFF16A34A) : const Color(0xFF2563EB),
+                              backgroundColor: _paystackTransferVerified ? const Color(0xFF16A34A) : const Color(0xFF00A2D3),
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 10),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                             ),
-                            icon: _isVerifyingMonnify
+                            icon: _isVerifyingPaystack
                                 ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                                : Icon(_monnifyTransferVerified ? Icons.check_circle_rounded : Icons.sync_rounded, size: 16),
+                                : Icon(_paystackTransferVerified ? Icons.check_circle_rounded : Icons.sync_rounded, size: 16),
                             label: Text(
-                              _monnifyTransferVerified
+                              _paystackTransferVerified
                                   ? 'Verified ✓'
-                                  : (_isVerifyingMonnify ? 'Checking...' : 'Check Status'),
+                                  : (_isVerifyingPaystack ? 'Checking...' : 'Check Status'),
                               style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
                             ),
                           ),

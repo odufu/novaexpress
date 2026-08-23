@@ -11,7 +11,7 @@ abstract class OrdersRepository {
     required String riderCode,
   });
   Future<OrderEntity> getOrderById(String orderId);
-  Future<void> updateOrderStatus(String orderId, String status, {String? paymentStatus, String? notes});
+  Future<void> updateOrderStatus(String orderId, String status, {String? paymentStatus, String? paymentType, String? notes});
   Future<Map<String, dynamic>> confirmDeliveryPod({
     required String orderId,
     required String agentId,

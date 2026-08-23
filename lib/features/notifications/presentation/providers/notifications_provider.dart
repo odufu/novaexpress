@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/services/local_storage_service.dart';
@@ -8,9 +10,15 @@ import '../../domain/entities/app_notification.dart';
 import '../../domain/repositories/notifications_repository.dart';
 
 final notificationsRemoteDataSourceProvider = Provider<NotificationsRemoteDataSource>((ref) {
-  return NotificationsRemoteDataSourceImpl(
-    supabaseClient: Supabase.instance.client,
-  );
+  try {
+    return NotificationsRemoteDataSourceImpl(
+      supabaseClient: Supabase.instance.client,
+    );
+  } catch (_) {
+    return NotificationsRemoteDataSourceImpl(
+      supabaseClient: SupabaseClient('https://mock.supabase.co', 'mock-key'),
+    );
+  }
 });
 
 final notificationsRepositoryProvider = Provider<NotificationsRepository>((ref) {
@@ -69,6 +77,8 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
   final NotificationsRepository _repository;
   final LocalStorageService _storageService;
   final Ref _ref;
+  RealtimeChannel? _realtimeChannel;
+  Timer? _heartbeatTimer;
 
   NotificationsNotifier({
     required NotificationsRepository repository,
@@ -83,6 +93,66 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
       _initCache(agentId);
       fetchNotifications(agentId);
     }
+    _setupRealtimeSubscription();
+    _startHeartbeatTimer();
+  }
+
+  void _setupRealtimeSubscription() {
+    try {
+      _realtimeChannel = Supabase.instance.client
+          .channel('public_notifications_realtime_channel')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'notifications',
+            callback: (payload) {
+              debugPrint('[NOTIFICATIONS_REALTIME] 🔔 Realtime event on notifications table: ${payload.eventType}');
+              final agentId = _getAgentId();
+              if (agentId.isNotEmpty) {
+                _silentSyncNotifications(agentId);
+              }
+            },
+          )
+          .subscribe();
+      debugPrint('[NOTIFICATIONS_PROVIDER] 📡 Notifications Realtime stream active.');
+    } catch (e) {
+      debugPrint('[NOTIFICATIONS_PROVIDER] ℹ️ Realtime notification notice: $e');
+    }
+  }
+
+  void _startHeartbeatTimer() {
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (!mounted) return;
+      final agentId = _getAgentId();
+      if (agentId.isNotEmpty) {
+        _silentSyncNotifications(agentId);
+      }
+    });
+  }
+
+  Future<void> _silentSyncNotifications(String agentId) async {
+    if (!mounted) return;
+    try {
+      final list = await _repository.getNotifications(agentId);
+      if (!mounted) return;
+
+      bool hasChanges = list.length != state.notifications.length;
+      if (!hasChanges) {
+        for (int i = 0; i < list.length; i++) {
+          if (list[i].id != state.notifications[i].id || list[i].isRead != state.notifications[i].isRead) {
+            hasChanges = true;
+            break;
+          }
+        }
+      }
+
+      if (hasChanges && mounted) {
+        debugPrint('[NOTIFICATIONS_PROVIDER] ⚡ Auto-synced ${list.length} notifications in real time.');
+        state = state.copyWith(notifications: list);
+        _storageService.cacheNotifications(agentId, list);
+      }
+    } catch (_) {}
   }
 
   Future<void> _initCache(String agentId) async {
@@ -95,6 +165,15 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
   String _getAgentId() {
     final user = _ref.read(authProvider).user;
     return user?.deliveryAgentId ?? user?.id ?? '';
+  }
+
+  @override
+  void dispose() {
+    _heartbeatTimer?.cancel();
+    try {
+      _realtimeChannel?.unsubscribe();
+    } catch (_) {}
+    super.dispose();
   }
 
   Future<void> fetchNotifications([String? agentId]) async {

@@ -77,7 +77,30 @@ class OrderEntity {
     required this.createdAt,
   });
 
-  bool get isPod => paymentType == 'pay_on_delivery' || paymentType == 'pod';
+  bool get isDirectTransfer {
+    final pt = paymentType.toLowerCase();
+    if (pt == 'prepaid' || pt == 'direct_transfer' || pt == 'bank_transfer' || pt == 'monnify') {
+      return true;
+    }
+    if (deliveryNotes != null) {
+      final n = deliveryNotes!.toLowerCase();
+      if (n.contains('monnify') ||
+          n.contains('direct transfer') ||
+          n.contains('bank transfer') ||
+          n.contains('bank_transfer') ||
+          n.contains('credited to my balance')) {
+        return true;
+      }
+    }
+    final ps = paymentStatus.toLowerCase();
+    if (ps == 'transfer_verified' || ps == 'direct_transfer' || ps == 'paid_direct') {
+      return true;
+    }
+    return false;
+  }
+
+  bool get isPod => (paymentType == 'pay_on_delivery' || paymentType == 'pod') && !isDirectTransfer;
+  bool get isCashPod => (paymentType == 'pay_on_delivery' || paymentType == 'pod') && !isDirectTransfer;
   bool get isClientPackage => fulfillmentType == 'client_package';
   bool get isDistributedInventory => fulfillmentType == 'distributed_inventory';
   bool get isDelivered => status == 'delivered';

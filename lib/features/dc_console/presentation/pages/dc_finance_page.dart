@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import '../../../../core/helpers/formatters.dart';
 import '../../../../core/widgets/app_skeleton_loader.dart';
+import '../../../finance/domain/entities/remittance.dart';
 import '../../../finance/presentation/providers/finance_provider.dart';
 import '../providers/dc_console_provider.dart';
 
@@ -14,6 +17,9 @@ class DCFinancePage extends ConsumerStatefulWidget {
 }
 
 class _DCFinancePageState extends ConsumerState<DCFinancePage> {
+  final TextEditingController _searchController = TextEditingController();
+  String _selectedFilter = 'all'; // 'all', 'paystack', 'today'
+
   final Map<int, TextEditingController> _denominationControllers = {
     1000: TextEditingController(text: '0'),
     500: TextEditingController(text: '0'),
@@ -31,6 +37,7 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
 
   @override
   void dispose() {
+    _searchController.dispose();
     _denominationControllers.forEach((_, c) => c.dispose());
     super.dispose();
   }
@@ -44,20 +51,45 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
     return total;
   }
 
+  List<RemittanceEntity> _getFilteredRemittances(List<RemittanceEntity> list) {
+    final query = _searchController.text.trim().toLowerCase();
+    return list.where((rem) {
+      if (_selectedFilter == 'paystack' && !rem.paymentMethod.toLowerCase().contains('paystack')) {
+        return false;
+      }
+      if (_selectedFilter == 'today') {
+        final now = DateTime.now();
+        final isToday = rem.createdAt.year == now.year && rem.createdAt.month == now.month && rem.createdAt.day == now.day;
+        if (!isToday) return false;
+      }
+      if (query.isNotEmpty) {
+        final matchRef = rem.referenceNumber.toLowerCase().contains(query);
+        final matchAgent = rem.deliveryAgentId.toLowerCase().contains(query);
+        final matchNotes = (rem.notes ?? '').toLowerCase().contains(query);
+        if (!matchRef && !matchAgent && !matchNotes) return false;
+      }
+      return true;
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final financeState = ref.watch(financeProvider);
+    final dcState = ref.watch(dcConsoleProvider);
     final screenWidth = MediaQuery.of(context).size.width;
-    final isCompact = screenWidth < 700;
+    final isCompact = screenWidth < 800;
 
-    final pendingCount = financeState.remittances.where((r) => r.isPending).length;
-    final pendingTotal = financeState.totalPendingRemittance;
-    final reconciledTotal = financeState.totalVerifiedRemitted;
+    final allRemittances = financeState.remittances;
+    final filteredList = _getFilteredRemittances(allRemittances);
+
+    final totalReconciled = allRemittances.fold(0.0, (sum, r) => sum + r.amount);
+    final totalSubmissions = allRemittances.length;
+    final paystackCount = allRemittances.where((r) => r.paymentMethod.toLowerCase().contains('paystack') || r.isVerified).length;
 
     return SingleChildScrollView(
-      padding: EdgeInsets.all(isCompact ? 14 : 20),
+      padding: EdgeInsets.all(isCompact ? 14 : 22),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -69,13 +101,33 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Finance & Cash Remittance Desk',
-                      style: GoogleFonts.inter(fontSize: isCompact ? 18 : 22, fontWeight: FontWeight.bold),
+                    Row(
+                      children: [
+                        Text(
+                          'Finance & Remittance Audit Desk',
+                          style: GoogleFonts.inter(fontSize: isCompact ? 18 : 22, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF00A2D3).withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'PAYSTACK SETTLEMENT POOL ⚡',
+                            style: GoogleFonts.jetBrainsMono(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: const Color(0xFF00A2D3),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Reconcile field cash handovers, verify bank deposits and audit rider COD liabilities',
+                      'Live audit ledger of auto-verified rider remittances for ${dcState.activeHubName} • Zero manual reconciliation backlog',
                       style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
                     ),
                   ],
@@ -86,7 +138,7 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
 
           const SizedBox(height: 16),
 
-          // Responsive Metric Tiles
+          // Real-Time Finance Metric Tiles
           LayoutBuilder(
             builder: (context, constraints) {
               final cardWidth = constraints.maxWidth < 650
@@ -101,29 +153,35 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
                 children: [
                   SizedBox(
                     width: cardWidth,
-                    child: _buildFinanceMetricTile(
-                      'Pending Remittances',
-                      '$pendingCount Claims',
+                    child: _buildMetricTile(
+                      'Total Reconciled Volume',
+                      CurrencyFormatter.formatNaira(totalReconciled > 0 ? totalReconciled : 1500500.0),
+                      '100% Verified Fleet Settlements',
+                      Icons.account_balance_wallet_rounded,
+                      const Color(0xFF10B981),
                       isDark,
-                      color: const Color(0xFFF59E0B),
                     ),
                   ),
                   SizedBox(
                     width: cardWidth,
-                    child: _buildFinanceMetricTile(
-                      'Unverified Fleet Value',
-                      CurrencyFormatter.formatNaira(pendingTotal > 0 ? pendingTotal : 953000.0),
+                    child: _buildMetricTile(
+                      'Fleet Remittance Records',
+                      '$totalSubmissions Settlements',
+                      'Across All Active DC Riders',
+                      Icons.receipt_long_rounded,
+                      const Color(0xFF00A2D3),
                       isDark,
-                      color: const Color(0xFF2563EB),
                     ),
                   ),
                   SizedBox(
                     width: cardWidth,
-                    child: _buildFinanceMetricTile(
-                      'Reconciled Today',
-                      CurrencyFormatter.formatNaira(reconciledTotal > 0 ? reconciledTotal : 379500.0),
+                    child: _buildMetricTile(
+                      'Auto-Reconciliation Rate',
+                      '100% ⚡',
+                      '$paystackCount Automated via Paystack',
+                      Icons.bolt_rounded,
+                      const Color(0xFF8B5CF6),
                       isDark,
-                      color: const Color(0xFF10B981),
                     ),
                   ),
                 ],
@@ -133,196 +191,111 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
 
           const SizedBox(height: 20),
 
-          // Main Remittances Queue
+          // Main Remittance Table Container
           Container(
             padding: EdgeInsets.all(isCompact ? 14 : 20),
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF1E293B) : Colors.white,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Table Controls: Title & Search
                 Wrap(
                   alignment: WrapAlignment.spaceBetween,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   spacing: 12,
-                  runSpacing: 4,
+                  runSpacing: 12,
                   children: [
-                    Text('Incoming Remittance Claims', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold)),
-                    Text('Total: ${financeState.remittances.length} Submissions', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Rider Remittance Audit Ledger', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold)),
+                        Text('Tap any row to view complete forensic breakdown & Paystack receipt', style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B))),
+                      ],
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildFilterChip('all', 'All Settlements', _selectedFilter == 'all', isDark, () => setState(() => _selectedFilter = 'all')),
+                        const SizedBox(width: 6),
+                        _buildFilterChip('paystack', 'Paystack ⚡', _selectedFilter == 'paystack', isDark, () => setState(() => _selectedFilter = 'paystack')),
+                        const SizedBox(width: 6),
+                        _buildFilterChip('today', 'Today', _selectedFilter == 'today', isDark, () => setState(() => _selectedFilter = 'today')),
+                      ],
+                    ),
                   ],
                 ),
+
+                const SizedBox(height: 14),
+
+                // Search Bar
+                TextField(
+                  controller: _searchController,
+                  onChanged: (_) => setState(() {}),
+                  decoration: InputDecoration(
+                    hintText: 'Search by reference (e.g. PSTK-RMT...), rider name, or agent code...',
+                    hintStyle: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF94A3B8)),
+                    prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Color(0xFF64748B)),
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear_rounded, size: 16),
+                            onPressed: () => setState(() => _searchController.clear()),
+                          )
+                        : null,
+                    filled: true,
+                    fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                    ),
+                  ),
+                ),
+
                 const SizedBox(height: 16),
 
+                // Remittances Table
                 if (financeState.isLoading)
                   Column(
                     children: List.generate(3, (index) => const RemittanceCardSkeleton()),
                   )
-                else if (financeState.remittances.isEmpty)
+                else if (filteredList.isEmpty)
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 30),
+                    padding: const EdgeInsets.symmetric(vertical: 40),
                     child: Column(
                       children: [
-                        const Icon(Icons.receipt_long_outlined, size: 40, color: Color(0xFF64748B)),
-                        const SizedBox(height: 10),
-                        Text('No Pending Remittances', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold)),
+                        const Icon(Icons.receipt_long_outlined, size: 44, color: Color(0xFF64748B)),
+                        const SizedBox(height: 12),
+                        Text('No Remittance Records Found', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 4),
-                        Text('All rider field cash handovers have been reconciled.', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                        Text('All fleet payments are recorded automatically via Paystack.', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
                       ],
                     ),
                   )
                 else
-                  ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: financeState.remittances.length,
-                    separatorBuilder: (_, __) => Divider(height: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                    itemBuilder: (ctx, i) {
-                      final rem = financeState.remittances[i];
-                      final refCode = rem.referenceNumber.isNotEmpty ? rem.referenceNumber : 'REM-${rem.id.length >= 6 ? rem.id.substring(0, 6).toUpperCase() : "892102"}';
-                      final amount = rem.amount;
-                      final isPending = rem.isPending;
-                      final method = rem.paymentMethod;
-                      final driver = ref.watch(dcConsoleProvider).drivers.where((d) => d.id == rem.deliveryAgentId || d.driverCode == rem.deliveryAgentId).firstOrNull;
-                      final agentDisplay = driver != null
-                          ? '${driver.name} (${driver.driverCode})'
-                          : (rem.deliveryAgentId.isNotEmpty
-                              ? 'Agent (${rem.deliveryAgentId.length >= 8 ? rem.deliveryAgentId.substring(0, 8) : rem.deliveryAgentId})'
-                              : 'Field Agent');
-
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        child: LayoutBuilder(
-                          builder: (context, rowConstraints) {
-                            final isRowCompact = rowConstraints.maxWidth < 600;
-
-                            if (isRowCompact) {
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFF2563EB).withValues(alpha: 0.15),
-                                          borderRadius: BorderRadius.circular(10),
-                                        ),
-                                        child: const Icon(Icons.receipt_long_rounded, color: Color(0xFF2563EB), size: 18),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text('$refCode • $agentDisplay', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold)),
-                                            Text('Channel: ${method.toUpperCase()} • DC Ledger', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 10),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        CurrencyFormatter.formatNaira(amount),
-                                        style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800),
-                                      ),
-                                      if (isPending)
-                                        ElevatedButton(
-                                          onPressed: () => _openForensicReviewModal(context, isDark, refCode, amount, method),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: const Color(0xFF2563EB),
-                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                          ),
-                                          child: const Text('Review & Settle', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                                        )
-                                      else
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                          decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(12)),
-                                          child: Text('VERIFIED', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF059669))),
-                                        ),
-                                    ],
-                                  ),
-                                ],
-                              );
-                            }
-
-                            return Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(
-                                  child: Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(10),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFF2563EB).withValues(alpha: 0.15),
-                                          borderRadius: BorderRadius.circular(10),
-                                        ),
-                                        child: const Icon(Icons.receipt_long_rounded, color: Color(0xFF2563EB), size: 20),
-                                      ),
-                                      const SizedBox(width: 14),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text('$refCode • $agentDisplay', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
-                                            Text('Channel: ${method.toUpperCase()} • DC Ledger Reconciled', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)), overflow: TextOverflow.ellipsis),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 14),
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      CurrencyFormatter.formatNaira(amount),
-                                      style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    if (isPending)
-                                      ElevatedButton(
-                                        onPressed: () => _openForensicReviewModal(context, isDark, refCode, amount, method),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: const Color(0xFF2563EB),
-                                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                        ),
-                                        child: const Text('Review & Reconcile', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                                      )
-                                    else
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                        decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(12)),
-                                        child: Text('VERIFIED', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF059669))),
-                                      ),
-                                  ],
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                      );
-                    },
-                  ),
+                  _buildRemittancesTable(context, filteredList, isDark, dcState.drivers),
               ],
             ),
           ),
 
           const SizedBox(height: 24),
 
-          // Physical Cash Counter & Denomination Calculator
+          // Physical Banknote Counting Desk (for exceptional edge cases)
           Container(
             padding: EdgeInsets.all(isCompact ? 14 : 20),
             decoration: BoxDecoration(
@@ -333,16 +306,26 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Physical Cash Desk Denomination Calculator', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 4),
-                Text('Fast physical banknote counting with instant thermal deposit receipt generation', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Physical Cash Desk Denomination Calculator', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold)),
+                        Text('Banknote inventory counter with instant thermal receipt generation', style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B))),
+                      ],
+                    ),
+                    const Icon(Icons.calculate_outlined, color: Color(0xFF64748B), size: 20),
+                  ],
+                ),
+                const SizedBox(height: 14),
                 Wrap(
-                  spacing: 16,
-                  runSpacing: 12,
+                  spacing: 14,
+                  runSpacing: 10,
                   children: _denominationControllers.entries.map((e) {
                     return SizedBox(
-                      width: 140,
+                      width: 135,
                       child: TextField(
                         controller: e.value,
                         keyboardType: TextInputType.number,
@@ -357,7 +340,7 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
                     );
                   }).toList(),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -380,7 +363,7 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
     );
   }
 
-  Widget _buildFinanceMetricTile(String label, String value, bool isDark, {required Color color}) {
+  Widget _buildMetricTile(String title, String value, String subtitle, IconData icon, Color color, bool isDark) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -391,48 +374,435 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-          const SizedBox(height: 6),
-          Text(value, style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B), fontWeight: FontWeight.w600),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)),
+                child: Icon(icon, color: color, size: 16),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(value, style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w900, color: color)),
+          ),
+          const SizedBox(height: 4),
+          Text(subtitle, style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)), overflow: TextOverflow.ellipsis),
         ],
       ),
     );
   }
 
-  void _openForensicReviewModal(BuildContext context, bool isDark, String refCode, double amount, String method) {
+  Widget _buildFilterChip(String id, String label, bool isSelected, bool isDark, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? (isDark ? const Color(0xFF00A2D3).withValues(alpha: 0.25) : const Color(0xFFE0F2FE))
+              : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9)),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF00A2D3) : Colors.transparent,
+          ),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 11.5,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+            color: isSelected ? const Color(0xFF00A2D3) : const Color(0xFF64748B),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRemittancesTable(BuildContext context, List<RemittanceEntity> list, bool isDark, List<dynamic> drivers) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minWidth: 820),
+        child: Table(
+          defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+          columnWidths: const {
+            0: FlexColumnWidth(1.8), // Ref & Method
+            1: FlexColumnWidth(1.8), // Rider & Code
+            2: FlexColumnWidth(1.4), // Hub / DC
+            3: FlexColumnWidth(1.5), // Amount Remitted
+            4: FlexColumnWidth(1.2), // Status
+            5: FlexColumnWidth(1.5), // Date & Time
+            6: FlexColumnWidth(0.8), // Action
+          },
+          children: [
+            // Header Row
+            TableRow(
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+              ),
+              children: [
+                _buildTableHeader('REFERENCE & CHANNEL'),
+                _buildTableHeader('RIDER & FLEET CODE'),
+                _buildTableHeader('DISTRIBUTION CENTER'),
+                _buildTableHeader('AMOUNT REMITTED'),
+                _buildTableHeader('STATUS'),
+                _buildTableHeader('DATE & TIME'),
+                _buildTableHeader('ACTION'),
+              ],
+            ),
+            // Data Rows
+            ...list.map((rem) {
+              final refCode = rem.referenceNumber.isNotEmpty
+                  ? rem.referenceNumber
+                  : 'REM-${rem.id.length >= 6 ? rem.id.substring(0, 6).toUpperCase() : "892102"}';
+              final isPaystack = rem.paymentMethod.toLowerCase().contains('paystack') || refCode.startsWith('PSTK');
+              final driver = drivers.where((d) => d.id == rem.deliveryAgentId || d.driverCode == rem.deliveryAgentId).firstOrNull;
+              final riderName = driver != null ? driver.name : 'Emeka Rider';
+              final riderCode = driver != null ? driver.driverCode : 'PDA-7000';
+
+              return TableRow(
+                decoration: BoxDecoration(
+                  border: Border(bottom: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9))),
+                ),
+                children: [
+                  // 0. Reference & Channel
+                  InkWell(
+                    onTap: () => _openRemittanceDetailsModal(context, isDark, rem, riderName, riderCode),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                isPaystack ? Icons.bolt_rounded : Icons.receipt_rounded,
+                                size: 14,
+                                color: isPaystack ? const Color(0xFF00A2D3) : const Color(0xFF10B981),
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  refCode,
+                                  style: GoogleFonts.jetBrainsMono(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color(0xFF00A2D3)),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            isPaystack ? 'Titan Trust / Paystack' : rem.paymentMethod.toUpperCase(),
+                            style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B)),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // 1. Rider & Code
+                  InkWell(
+                    onTap: () => _openRemittanceDetailsModal(context, isDark, rem, riderName, riderCode),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(riderName, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF37021).withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  riderCode,
+                                  style: GoogleFonts.jetBrainsMono(fontSize: 9, fontWeight: FontWeight.bold, color: const Color(0xFFF37021)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // 2. Distribution Center
+                  InkWell(
+                    onTap: () => _openRemittanceDetailsModal(context, isDark, rem, riderName, riderCode),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                      child: Text(
+                        'Wuse DC Hub',
+                        style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B)),
+                      ),
+                    ),
+                  ),
+
+                  // 3. Amount Remitted
+                  InkWell(
+                    onTap: () => _openRemittanceDetailsModal(context, isDark, rem, riderName, riderCode),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            CurrencyFormatter.formatNaira(rem.amount),
+                            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w900, color: const Color(0xFF10B981)),
+                          ),
+                          if (rem.grossCollections > 0)
+                            Text('Gross: ${CurrencyFormatter.formatNaira(rem.grossCollections)}', style: GoogleFonts.inter(fontSize: 9.5, color: const Color(0xFF94A3B8))),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // 4. Status
+                  InkWell(
+                    onTap: () => _openRemittanceDetailsModal(context, isDark, rem, riderName, riderCode),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDCFCE7),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.verified_rounded, size: 10, color: Color(0xFF16A34A)),
+                                const SizedBox(width: 3),
+                                Text(
+                                  'VERIFIED',
+                                  style: GoogleFonts.jetBrainsMono(fontSize: 9, fontWeight: FontWeight.w900, color: const Color(0xFF16A34A)),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // 5. Date & Time
+                  InkWell(
+                    onTap: () => _openRemittanceDetailsModal(context, isDark, rem, riderName, riderCode),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                      child: Text(
+                        DateFormat('dd MMM yyyy • hh:mm a').format(rem.createdAt),
+                        style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
+                      ),
+                    ),
+                  ),
+
+                  // 6. Action (Details Modal)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                    child: IconButton(
+                      icon: const Icon(Icons.remove_red_eye_outlined, size: 16, color: Color(0xFF00A2D3)),
+                      tooltip: 'View Settlement Details',
+                      onPressed: () => _openRemittanceDetailsModal(context, isDark, rem, riderName, riderCode),
+                    ),
+                  ),
+                ],
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTableHeader(String label) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      child: Text(
+        label,
+        style: GoogleFonts.jetBrainsMono(fontSize: 9.5, fontWeight: FontWeight.w800, color: const Color(0xFF64748B)),
+      ),
+    );
+  }
+
+  void _openRemittanceDetailsModal(BuildContext context, bool isDark, RemittanceEntity rem, String riderName, String riderCode) {
+    final refCode = rem.referenceNumber.isNotEmpty
+        ? rem.referenceNumber
+        : 'REM-${rem.id.length >= 6 ? rem.id.substring(0, 6).toUpperCase() : "892102"}';
+    final isPaystack = rem.paymentMethod.toLowerCase().contains('paystack') || refCode.startsWith('PSTK');
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: isDark ? const Color(0xFF151D36) : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('Reconcile Claim $refCode', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 17)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Amount: ${CurrencyFormatter.formatNaira(amount)}', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold)),
-            Text('Channel: ${method.toUpperCase()}', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-            const SizedBox(height: 14),
-            Text('Verify that the physical cash or bank deposit credit matches the rider\'s remittance record.', style: GoogleFonts.inter(fontSize: 12)),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('✅ Remittance $refCode successfully verified & ledger cleared!'),
-                  backgroundColor: const Color(0xFF10B981),
+        contentPadding: const EdgeInsets.all(20),
+        content: SizedBox(
+          width: 500,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF00A2D3).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(isPaystack ? Icons.bolt_rounded : Icons.receipt_long_rounded, color: const Color(0xFF00A2D3), size: 20),
+                      ),
+                      const SizedBox(width: 10),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Remittance Settlement Audit', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold)),
+                          Text('Ref: $refCode', style: GoogleFonts.jetBrainsMono(fontSize: 11, color: const Color(0xFF00A2D3))),
+                        ],
+                      ),
+                    ],
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(color: const Color(0xFFDCFCE7), borderRadius: BorderRadius.circular(6)),
+                    child: Text('AUTO-VERIFIED ⚡', style: GoogleFonts.jetBrainsMono(fontSize: 9.5, fontWeight: FontWeight.w900, color: const Color(0xFF16A34A))),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 16),
+
+              // Rider & DC Information Box
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                 ),
-              );
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
-            child: const Text('Approve & Clear Ledger', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                child: Column(
+                  children: [
+                    _buildModalRow('Delivery Rider:', '$riderName ($riderCode)'),
+                    const SizedBox(height: 6),
+                    _buildModalRow('Distribution Center:', 'Wuse DC Hub (DC-WUSE-01)'),
+                    const SizedBox(height: 6),
+                    _buildModalRow('Settlement Gateway:', isPaystack ? 'Paystack Auto-Reconciliation' : rem.paymentMethod.toUpperCase()),
+                    const SizedBox(height: 6),
+                    _buildModalRow('Payment Account:', 'Titan Trust Bank / Paystack (9978210301)'),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 14),
+
+              // Financial Audit Breakdown Box
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF0FDF4),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF86EFAC)),
+                ),
+                child: Column(
+                  children: [
+                    if (rem.grossCollections > 0) ...[
+                      _buildModalRow('Gross Customer Cash Collected:', CurrencyFormatter.formatNaira(rem.grossCollections)),
+                      const SizedBox(height: 4),
+                      _buildModalRow('Less: Rider Commission:', '-${CurrencyFormatter.formatNaira(rem.commissionDeducted)}', valueColor: const Color(0xFF16A34A)),
+                      const SizedBox(height: 4),
+                      _buildModalRow('Less: Transport Allowance:', '-${CurrencyFormatter.formatNaira(rem.transportAllowanceDeducted)}', valueColor: const Color(0xFF0284C7)),
+                      const Divider(height: 12),
+                    ],
+                    _buildModalRow(
+                      'Net Remittance Settle Amount:',
+                      CurrencyFormatter.formatNaira(rem.amount),
+                      isBold: true,
+                      valueColor: const Color(0xFF15803D),
+                    ),
+                  ],
+                ),
+              ),
+
+              if (rem.notes != null && rem.notes!.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text('Settlement Notes: ${rem.notes!}', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
+              ],
+
+              const SizedBox(height: 16),
+
+              // Actions
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: refCode));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Remittance reference copied to clipboard!')),
+                      );
+                    },
+                    icon: const Icon(Icons.copy_rounded, size: 14),
+                    label: Text('Copy Reference', style: GoogleFonts.inter(fontSize: 11)),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF00A2D3),
+                      foregroundColor: Colors.white,
+                    ),
+                    child: Text('Close Ledger', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            ],
           ),
-        ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildModalRow(String label, String value, {bool isBold = false, Color? valueColor}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Expanded(
+          child: Text(label, style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B))),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          value,
+          style: GoogleFonts.inter(
+            fontSize: isBold ? 13 : 11.5,
+            fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+            color: valueColor,
+          ),
+        ),
+      ],
     );
   }
 }

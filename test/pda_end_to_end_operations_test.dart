@@ -152,7 +152,7 @@ class MockOrdersRemoteDataSource implements OrdersRemoteDataSource {
   @override
   Future<OrderModel> getOrderById(String orderId) async => orders.first;
   @override
-  Future<void> updateOrderStatus(String orderId, String status, {String? paymentStatus, String? notes}) async {}
+  Future<void> updateOrderStatus(String orderId, String status, {String? paymentStatus, String? paymentType, String? notes}) async {}
   @override
   Future<Map<String, dynamic>> confirmDeliveryPod({
     required String orderId,
