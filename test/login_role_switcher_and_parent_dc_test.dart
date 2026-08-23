@@ -194,9 +194,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('TEST LOGIN SELECTOR'), findsOneWidget);
-      expect(find.text('Emeka Rider (PDA-7000)'), findsOneWidget);
+      expect(find.text('Field Delivery Agent (PDA)'), findsOneWidget);
       expect(find.text('Parent DC: Wuse Distribution Center (DC-WUSE-01)'), findsOneWidget);
-      expect(find.text('Adekunle Supervisor (DC Manager)'), findsOneWidget);
+      expect(find.text('DC Operations Supervisor'), findsOneWidget);
       expect(find.text('Managing DC: Wuse Distribution Center (DC-WUSE-01)'), findsOneWidget);
       expect(find.text('Sign In to PDA App'), findsOneWidget);
     });
@@ -218,14 +218,14 @@ void main() {
       await tester.pumpAndSettle();
 
       // Tap the DC Supervisor card
-      await tester.tap(find.text('Adekunle Supervisor (DC Manager)'));
+      await tester.tap(find.text('DC Operations Supervisor'));
       await tester.pumpAndSettle();
 
       expect(find.text('dc.supervisor@novaexpress.ng'), findsOneWidget);
       expect(find.text('Sign In to DC Console'), findsOneWidget);
 
       // Tap back to Rider
-      await tester.tap(find.text('Emeka Rider (PDA-7000)'));
+      await tester.tap(find.text('Field Delivery Agent (PDA)'));
       await tester.pumpAndSettle();
 
       expect(find.text('emeka.rider@novaexpress.ng'), findsOneWidget);

@@ -539,29 +539,14 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
               .eq('email', cleanEmail)
               .maybeSingle();
         }
-        if (userRes == null) {
-          if (cleanEmail.contains('dc.') || cleanEmail.contains('supervisor') || cleanEmail.contains('adekunle')) {
-            userRes = await dbClient
-                .from(SupabaseConstants.usersTable)
-                .select()
-                .eq('id', 'a2222222-2222-4222-8222-222222222222')
-                .maybeSingle();
-          } else if (cleanEmail == 'emeka.rider@novaexpress.ng' || cleanEmail == 'rider@novaexpress.ng') {
-            userRes = await dbClient
-                .from(SupabaseConstants.usersTable)
-                .select()
-                .eq('id', 'a1111111-1111-4111-8111-111111111111')
-                .maybeSingle();
-          }
-        }
       } catch (e) {
         debugPrint('[AUTH_DATASOURCE] ℹ️ Users table query notice ($e)');
       }
 
-      final userRole = userRes?['role']?.toString().toLowerCase() ?? (cleanEmail.contains('dc.') ? 'dc_manager' : 'delivery_agent');
+      final userRole = userRes?['role']?.toString().toLowerCase() ?? (cleanEmail.contains('dc.') || cleanEmail.contains('supervisor') ? 'dc_manager' : 'delivery_agent');
       final isDcStaff = userRole == 'dc_manager' || userRole == 'dc_supervisor' || userRole == 'super_admin' || cleanEmail.contains('dc.');
 
-      final userId = userRes?['id'] ?? (isDcStaff ? 'a2222222-2222-4222-8222-222222222222' : 'u-${cleanEmail.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')}');
+      final userId = userRes?['id'] ?? (authUserId.isNotEmpty ? authUserId : 'u-${cleanEmail.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')}');
       Map<String, dynamic> merged = userRes != null ? Map<String, dynamic>.from(userRes) : {};
 
       String? deliveryAgentId;
@@ -574,13 +559,11 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
               .eq('user_id', userId)
               .maybeSingle();
 
-          if (agentRes == null && (cleanEmail == 'emeka.rider@novaexpress.ng' || cleanEmail == 'rider@novaexpress.ng')) {
-            agentRes = await dbClient
-                .from(SupabaseConstants.deliveryAgentsTable)
-                .select()
-                .eq('id', 'b1111111-1111-4111-8111-111111111111')
-                .maybeSingle();
-          }
+          agentRes ??= await dbClient
+              .from(SupabaseConstants.deliveryAgentsTable)
+              .select()
+              .eq('id', userId)
+              .maybeSingle();
         } catch (e) {
           debugPrint('[AUTH_DATASOURCE] ℹ️ Delivery agents query notice ($e)');
         }
@@ -619,8 +602,16 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         merged['email'] = email;
       }
 
-      if (userRes == null && merged.isEmpty) {
-        throw ServerException('User record not found in Supabase database.');
+      // If first name / last name are missing, infer dynamically from email prefix
+      if (merged['first_name'] == null || (merged['first_name'] as String).isEmpty) {
+        final prefix = cleanEmail.contains('@') ? cleanEmail.split('@').first : cleanEmail;
+        final parts = prefix.split(RegExp(r'[._-]'));
+        merged['first_name'] = parts.isNotEmpty && parts[0].isNotEmpty
+            ? (parts[0][0].toUpperCase() + (parts[0].length > 1 ? parts[0].substring(1) : ''))
+            : 'Delivery';
+        merged['last_name'] = parts.length > 1 && parts[1].isNotEmpty
+            ? (parts[1][0].toUpperCase() + (parts[1].length > 1 ? parts[1].substring(1) : ''))
+            : 'Agent';
       }
 
       final profile = UserModel.fromJson(

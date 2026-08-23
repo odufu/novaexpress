@@ -191,7 +191,7 @@ class _PayoutsPageState extends ConsumerState<PayoutsPage> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Beneficiary Name: Emeka Rider (Verified)',
+                    'Beneficiary Name: ${ref.read(authProvider).user?.bankAccountName ?? (ref.read(authProvider).user != null ? "${ref.read(authProvider).user!.firstName} ${ref.read(authProvider).user!.lastName}".trim() : "Field Agent")} (Verified)',
                     style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF16A34A), fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 20),
@@ -212,7 +212,7 @@ class _PayoutsPageState extends ConsumerState<PayoutsPage> {
 
                         final auth = ref.read(authProvider);
                         final agentId = auth.user?.deliveryAgentId ?? auth.user?.id ?? SupabaseConstants.defaultDeliveryAgentId;
-                        final riderName = auth.user != null ? '${auth.user!.firstName} ${auth.user!.lastName}'.trim() : 'Emeka Rider';
+                        final riderName = auth.user != null ? '${auth.user!.firstName} ${auth.user!.lastName}'.trim() : 'Field Agent';
 
                         Navigator.pop(ctx);
                         setState(() {
@@ -225,7 +225,7 @@ class _PayoutsPageState extends ConsumerState<PayoutsPage> {
                               date: DateTime.now(),
                               bankName: selectedBank,
                               accountNumber: accountController.text.trim(),
-                              accountName: riderName.isNotEmpty ? riderName : 'Emeka Rider',
+                              accountName: riderName.isNotEmpty ? riderName : 'Field Agent',
                               dcNotes: 'New request submitted for DC review',
                             ),
                           );
@@ -237,7 +237,7 @@ class _PayoutsPageState extends ConsumerState<PayoutsPage> {
                           amount: reqAmount,
                           bankName: selectedBank,
                           accountNumber: accountController.text.trim(),
-                          accountName: riderName.isNotEmpty ? riderName : 'Emeka Rider',
+                          accountName: riderName.isNotEmpty ? riderName : 'Field Agent',
                           notes: 'Mobile PDA withdrawal request',
                         );
 

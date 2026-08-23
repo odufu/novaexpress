@@ -51,19 +51,19 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> {
   final List<Map<String, String>> _avatarPresets = [
     {
       'label': 'Rider Standard',
-      'url': 'https://api.dicebear.com/7.x/bottts/svg?seed=EmekaRider',
+      'url': 'https://api.dicebear.com/7.x/bottts/svg?seed=RiderStd',
     },
     {
       'label': 'Rider Pro',
-      'url': 'https://api.dicebear.com/7.x/avataaars/png?seed=EmekaRider',
+      'url': 'https://api.dicebear.com/7.x/avataaars/png?seed=RiderPro',
     },
     {
       'label': 'Captain',
-      'url': 'https://api.dicebear.com/7.x/personas/png?seed=EmekaCaptain',
+      'url': 'https://api.dicebear.com/7.x/personas/png?seed=RiderCaptain',
     },
     {
       'label': 'Executive',
-      'url': 'https://api.dicebear.com/7.x/micah/png?seed=EmekaExec',
+      'url': 'https://api.dicebear.com/7.x/micah/png?seed=RiderExec',
     },
   ];
 
@@ -214,7 +214,7 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> {
                 onPressed: () {
                   // Simulate photo upload
                   setState(() {
-                    _selectedAvatarUrl = 'https://api.dicebear.com/7.x/bottts/svg?seed=EmekaCustomPhoto';
+                    _selectedAvatarUrl = 'https://api.dicebear.com/7.x/bottts/svg?seed=RiderCustomPhoto_${widget.user.id}';
                   });
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(

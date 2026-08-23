@@ -1203,7 +1203,7 @@ class _CashPageState extends ConsumerState<CashPage> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Beneficiary Name: Emeka Rider (Verified)',
+                    'Beneficiary Name: ${ref.read(authProvider).user?.bankAccountName ?? (ref.read(authProvider).user != null ? "${ref.read(authProvider).user!.firstName} ${ref.read(authProvider).user!.lastName}".trim() : "Field Agent")} (Verified)',
                     style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF16A34A), fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 20),

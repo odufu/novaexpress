@@ -284,7 +284,7 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('REQ-00482 • Emeka Rider (PDA-7000)', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold)),
+                            Text('REQ-00482 • Replenishment Handover', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold)),
                             Text('Requested: 20x Respira Detox Tea, 10x Grazer Herbal Tea', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
                           ],
                         ),
@@ -355,7 +355,7 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                   ref.read(stockProvider.notifier).completeStockHandover('REQ-00482');
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('✅ Physical stock handover verified! +30 units transferred to Emeka Rider vehicle custody.'),
+                      content: Text('✅ Physical stock handover verified! +30 units transferred to vehicle custody.'),
                       backgroundColor: Color(0xFF10B981),
                     ),
                   );

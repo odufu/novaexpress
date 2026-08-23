@@ -314,7 +314,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
                       paymentType: orders[i].paymentType == 'pay_on_delivery' ? 'POD Cash' : 'Prepaid Direct',
                       riderName: orders[i].deliveryAgentName != null
                           ? '${orders[i].deliveryAgentName} (${orders[i].deliveryAgentCode ?? "PDA"})'
-                          : (orders[i].deliveryAgentCode != null ? 'Agent: ${orders[i].deliveryAgentCode}' : 'Emeka Rider (PDA-7000)'),
+                          : (orders[i].deliveryAgentCode != null ? 'Agent: ${orders[i].deliveryAgentCode}' : 'Field Agent'),
                       statusPill: 'IN-TRANSIT',
                       isUnassigned: false,
                     ),
@@ -371,7 +371,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
                       paymentType: orders[i].paymentType == 'pay_on_delivery' ? 'POD Cash (Collected)' : 'Prepaid Verified',
                       riderName: orders[i].deliveryAgentName != null
                           ? '${orders[i].deliveryAgentName} (${orders[i].deliveryAgentCode ?? "PDA"})'
-                          : 'Emeka Rider (PDA-7000)',
+                          : (orders[i].deliveryAgentCode != null ? 'Agent: ${orders[i].deliveryAgentCode}' : 'Field Agent'),
                       statusPill: 'DELIVERED (POD)',
                     ),
                     if (i < orders.length - 1)
@@ -427,7 +427,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
                       paymentType: 'POD Cash',
                       riderName: orders[i].deliveryAgentName != null
                           ? '${orders[i].deliveryAgentName} (${orders[i].deliveryAgentCode ?? "PDA"})'
-                          : 'Emeka Rider (PDA-7000)',
+                          : (orders[i].deliveryAgentCode != null ? 'Agent: ${orders[i].deliveryAgentCode}' : 'Field Agent'),
                       statusPill: 'FAILED (RETURN PENDING)',
                     ),
                     if (i < orders.length - 1)

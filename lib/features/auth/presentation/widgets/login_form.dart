@@ -144,7 +144,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                 // Card 1: Delivery Agent (PDA Rider)
                 _buildRoleCard(
                   roleKey: 'rider',
-                  title: 'Emeka Rider (PDA-7000)',
+                  title: 'Field Delivery Agent (PDA)',
                   subtitle: 'Parent DC: Wuse Distribution Center (DC-WUSE-01)',
                   tag: 'PDA Mobile View',
                   icon: Icons.two_wheeler_rounded,
@@ -158,7 +158,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                 // Card 2: DC Operations Supervisor (Console Mode)
                 _buildRoleCard(
                   roleKey: 'dc_manager',
-                  title: 'Adekunle Supervisor (DC Manager)',
+                  title: 'DC Operations Supervisor',
                   subtitle: 'Managing DC: Wuse Distribution Center (DC-WUSE-01)',
                   tag: 'DC Console Mode',
                   icon: Icons.admin_panel_settings_rounded,

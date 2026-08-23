@@ -172,7 +172,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                               controller: _identifierController,
                               style: TextStyle(color: theme.colorScheme.onSurface),
                               decoration: InputDecoration(
-                                hintText: 'e.g. rider.emeka@novaexpress.com',
+                                hintText: 'e.g. rider.john@novaexpress.ng or PDA-7000',
                                 prefixIcon: const Icon(Icons.badge_outlined, color: AppColors.primary),
                                 fillColor: theme.cardColor,
                                 filled: true,

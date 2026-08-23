@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/helpers/formatters.dart';
 import '../../../../core/widgets/app_skeleton_loader.dart';
 import '../../../finance/presentation/providers/finance_provider.dart';
+import '../providers/dc_console_provider.dart';
 
 class DCFinancePage extends ConsumerStatefulWidget {
   const DCFinancePage({super.key});
@@ -181,10 +182,16 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
                     separatorBuilder: (_, __) => Divider(height: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                     itemBuilder: (ctx, i) {
                       final rem = financeState.remittances[i];
-                      final refCode = rem.referenceNumber.isNotEmpty ? rem.referenceNumber : 'REM-892102';
+                      final refCode = rem.referenceNumber.isNotEmpty ? rem.referenceNumber : 'REM-${rem.id.length >= 6 ? rem.id.substring(0, 6).toUpperCase() : "892102"}';
                       final amount = rem.amount;
                       final isPending = rem.isPending;
                       final method = rem.paymentMethod;
+                      final driver = ref.watch(dcConsoleProvider).drivers.where((d) => d.id == rem.deliveryAgentId || d.driverCode == rem.deliveryAgentId).firstOrNull;
+                      final agentDisplay = driver != null
+                          ? '${driver.name} (${driver.driverCode})'
+                          : (rem.deliveryAgentId.isNotEmpty
+                              ? 'Agent (${rem.deliveryAgentId.length >= 8 ? rem.deliveryAgentId.substring(0, 8) : rem.deliveryAgentId})'
+                              : 'Field Agent');
 
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 14),
@@ -211,8 +218,8 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            Text('$refCode • Emeka Rider (PDA-7000)', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold)),
-                                            Text('Channel: ${method.toUpperCase()} • GTBank', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
+                                            Text('$refCode • $agentDisplay', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold)),
+                                            Text('Channel: ${method.toUpperCase()} • DC Ledger', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
                                           ],
                                         ),
                                       ),
@@ -267,8 +274,8 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            Text('$refCode • Emeka Rider (PDA-7000)', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
-                                            Text('Channel: ${method.toUpperCase()} • GTBank Corporate', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)), overflow: TextOverflow.ellipsis),
+                                            Text('$refCode • $agentDisplay', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+                                            Text('Channel: ${method.toUpperCase()} • DC Ledger Reconciled', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)), overflow: TextOverflow.ellipsis),
                                           ],
                                         ),
                                       ),
