@@ -375,9 +375,22 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
       }
 
       if (dbDrivers.isNotEmpty) {
-        state = state.copyWith(drivers: dbDrivers, isLoading: false);
-        await _storageService.cacheFleetDrivers(dbDrivers);
-        debugPrint('[DC_CONSOLE_PROVIDER] 🚚 Loaded ${dbDrivers.length} active fleet drivers from live Supabase DB and updated local cache.');
+        final Map<String, DCFleetDriver> driverMap = {};
+        // 1. Keep any newly added local drivers that aren't yet loaded
+        for (final d in state.drivers) {
+          final key = d.email.isNotEmpty ? d.email.toLowerCase() : d.driverCode;
+          driverMap[key] = d;
+        }
+        // 2. Overlay / update with authoritative DB drivers
+        for (final d in dbDrivers) {
+          final key = d.email.isNotEmpty ? d.email.toLowerCase() : d.driverCode;
+          driverMap[key] = d;
+        }
+        final mergedList = driverMap.values.toList();
+
+        state = state.copyWith(drivers: mergedList, isLoading: false);
+        await _storageService.cacheFleetDrivers(mergedList);
+        debugPrint('[DC_CONSOLE_PROVIDER] 🚚 Loaded ${dbDrivers.length} active fleet drivers from live Supabase DB (Total active fleet: ${mergedList.length}) and updated local cache.');
       }
     } catch (e) {
       debugPrint('[DC_CONSOLE_PROVIDER] ℹ️ Supabase fleet fetch notice ($e). Local cached drivers retained.');

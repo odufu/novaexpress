@@ -354,7 +354,22 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     String agentId = _generateUuid();
 
     try {
-      // 1. Try to register with Supabase Auth via admin API (auto-confirms email)
+      // 1. Check if user with this email already exists in users table
+      try {
+        final existingUserRow = await dbClient
+            .from(SupabaseConstants.usersTable)
+            .select('id')
+            .eq('email', cleanEmail)
+            .maybeSingle();
+        if (existingUserRow != null && existingUserRow['id'] != null) {
+          userId = existingUserRow['id'].toString();
+          debugPrint('[AUTH_DATASOURCE] ℹ️ Found existing user in users table with id: $userId');
+        }
+      } catch (checkErr) {
+        debugPrint('[AUTH_DATASOURCE] ℹ️ User lookup notice: $checkErr');
+      }
+
+      // 2. Try to register with Supabase Auth via admin API (auto-confirms email)
       try {
         final adminRes = await dbClient.auth.admin.createUser(
           AdminUserAttributes(
@@ -375,7 +390,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         }
         debugPrint('[AUTH_DATASOURCE] ✅ Admin created Supabase Auth user: $authUserId');
       } catch (adminErr) {
-        debugPrint('[AUTH_DATASOURCE] ℹ️ Admin createUser notice ($adminErr). Falling back to signUp...');
+        debugPrint('[AUTH_DATASOURCE] ℹ️ Admin createUser notice ($adminErr). Falling back to signUp/existing user...');
         try {
           final signUpRes = await supabaseClient.auth.signUp(
             email: cleanEmail,
@@ -396,7 +411,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         }
       }
 
-      // 2. Insert into users table
+      // 3. Insert / upsert into public.users table (schema: id, company_id, email, phone_number, first_name, last_name, role)
       try {
         await dbClient.from(SupabaseConstants.usersTable).upsert({
           'id': userId,
@@ -406,20 +421,33 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           'first_name': firstName,
           'last_name': lastName,
           'role': 'delivery_agent',
-          'distribution_center_id': distributionCenterId,
-          'is_active': true,
         });
         debugPrint('[AUTH_DATASOURCE] ✅ Users table record upserted: $userId ($cleanEmail)');
       } catch (userErr) {
         debugPrint('[AUTH_DATASOURCE] ⚠️ Users table insert notice ($userErr)');
       }
 
-      // 3. Insert into delivery_agents table
+      // 4. Check if delivery agent record exists for this user
+      try {
+        final existingAgentRow = await dbClient
+            .from(SupabaseConstants.deliveryAgentsTable)
+            .select('id, agent_code')
+            .eq('user_id', userId)
+            .maybeSingle();
+        if (existingAgentRow != null && existingAgentRow['id'] != null) {
+          agentId = existingAgentRow['id'].toString();
+          debugPrint('[AUTH_DATASOURCE] ℹ️ Found existing delivery agent record: $agentId');
+        }
+      } catch (agentCheckErr) {
+        debugPrint('[AUTH_DATASOURCE] ℹ️ Agent lookup notice: $agentCheckErr');
+      }
+
+      // 5. Insert / upsert into delivery_agents table
       try {
         await dbClient.from(SupabaseConstants.deliveryAgentsTable).upsert({
           'id': agentId,
           'user_id': userId,
-          'distribution_center_id': distributionCenterId,
+          'distribution_center_id': distributionCenterId.isNotEmpty ? distributionCenterId : '22222222-2222-4222-8222-222222222222',
           'agent_code': agentCode,
           'vehicle_type': vehicleType,
           'vehicle_plate_number': vehiclePlateNumber,
@@ -431,7 +459,11 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           'bank_name': bankName,
           'bank_account_number': bankAccountNumber,
           'bank_account_name': bankAccountName,
-          'is_active': true,
+          'personnel_type': personnelType,
+          'commission_rate': commissionRate,
+          'transport_allowance': transportAllowance,
+          'fuel_allowance': fuelAllowance,
+          'base_salary': baseSalary,
         });
         debugPrint('[AUTH_DATASOURCE] ✅ Delivery agents table record upserted: $agentId ($agentCode)');
       } catch (agentErr) {
