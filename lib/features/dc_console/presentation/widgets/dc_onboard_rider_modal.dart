@@ -164,6 +164,7 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
     final upsell = double.tryParse(_upsellBonusController.text) ?? 10.0;
 
     String finalDriverCode = driverCode;
+    String finalDriverId = 'drv-${DateTime.now().millisecondsSinceEpoch}';
 
     // 1. Register rider in database & authentication system
     try {
@@ -190,13 +191,16 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
       if (createdUser.deliveryAgentCode?.isNotEmpty == true) {
         finalDriverCode = createdUser.deliveryAgentCode!;
       }
+      if (createdUser.deliveryAgentId?.isNotEmpty == true) {
+        finalDriverId = createdUser.deliveryAgentId!;
+      }
       debugPrint('[DC_ONBOARD] 🚀 Delivery agent registered: ${createdUser.email} ($finalDriverCode)');
     } catch (e) {
       debugPrint('[DC_ONBOARD] ⚠️ Registration notice: $e');
     }
 
     final newDriver = DCFleetDriver(
-      id: 'drv-${DateTime.now().millisecondsSinceEpoch}',
+      id: finalDriverId,
       driverCode: finalDriverCode,
       name: fullName,
       phone: phone,

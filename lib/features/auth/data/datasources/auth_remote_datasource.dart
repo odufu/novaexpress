@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/supabase_constants.dart';
@@ -306,6 +307,15 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     }
   }
 
+  String _generateUuid() {
+    final random = math.Random();
+    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+    bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant RFC4122
+    final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20, 32)}';
+  }
+
   @override
   Future<UserModel> registerDeliveryAgent({
     required String email,
@@ -338,10 +348,11 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     final isPda = personnelType.toLowerCase() == 'pda';
     final randomSuffix = (100 + (DateTime.now().millisecondsSinceEpoch % 899)).toString();
     final agentCode = isPda ? 'PDA-7$randomSuffix' : 'RDR-$randomSuffix';
-    final userId = 'u-${DateTime.now().millisecondsSinceEpoch}';
-    final agentId = 'a-${DateTime.now().millisecondsSinceEpoch}';
 
     String? authUserId;
+    String userId = _generateUuid();
+    String agentId = _generateUuid();
+
     try {
       // 1. Try to register with Supabase Auth via admin API (auto-confirms email)
       try {
@@ -359,6 +370,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           ),
         );
         authUserId = adminRes.user?.id;
+        if (authUserId != null) {
+          userId = authUserId;
+        }
         debugPrint('[AUTH_DATASOURCE] ✅ Admin created Supabase Auth user: $authUserId');
       } catch (adminErr) {
         debugPrint('[AUTH_DATASOURCE] ℹ️ Admin createUser notice ($adminErr). Falling back to signUp...');
@@ -374,6 +388,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
             },
           );
           authUserId = signUpRes.user?.id;
+          if (authUserId != null) {
+            userId = authUserId;
+          }
         } catch (authErr) {
           debugPrint('[AUTH_DATASOURCE] ℹ️ Supabase signUp notice ($authErr)');
         }
@@ -383,18 +400,18 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       try {
         await dbClient.from(SupabaseConstants.usersTable).upsert({
           'id': userId,
-          if (authUserId != null) 'auth_user_id': authUserId,
+          'company_id': '11111111-1111-4111-8111-111111111111',
           'email': cleanEmail,
+          'phone_number': phone,
           'first_name': firstName,
           'last_name': lastName,
-          'phone': phone,
-          'phone_number': phone,
           'role': 'delivery_agent',
-          'company_id': '11111111-1111-4111-8111-111111111111',
           'distribution_center_id': distributionCenterId,
+          'is_active': true,
         });
+        debugPrint('[AUTH_DATASOURCE] ✅ Users table record upserted: $userId ($cleanEmail)');
       } catch (userErr) {
-        debugPrint('[AUTH_DATASOURCE] ℹ️ Users table insert notice ($userErr)');
+        debugPrint('[AUTH_DATASOURCE] ⚠️ Users table insert notice ($userErr)');
       }
 
       // 3. Insert into delivery_agents table
@@ -402,23 +419,23 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         await dbClient.from(SupabaseConstants.deliveryAgentsTable).upsert({
           'id': agentId,
           'user_id': userId,
-          'agent_code': agentCode,
-          'personnel_type': personnelType,
-          'status': 'available',
           'distribution_center_id': distributionCenterId,
-          'company_id': '11111111-1111-4111-8111-111111111111',
-          'commission_rate': commissionRate,
-          'transport_allowance': transportAllowance,
-          'fuel_allowance': fuelAllowance,
-          'base_salary': baseSalary,
+          'agent_code': agentCode,
           'vehicle_type': vehicleType,
           'vehicle_plate_number': vehiclePlateNumber,
+          'operating_state': 'Abuja (FCT)',
+          'operating_city': assignedZone.isNotEmpty ? assignedZone : 'Wuse 2',
+          'current_status': 'available',
+          'current_cod_balance': 0.00,
+          'direct_transfer_balance': 0.00,
           'bank_name': bankName,
           'bank_account_number': bankAccountNumber,
           'bank_account_name': bankAccountName,
+          'is_active': true,
         });
+        debugPrint('[AUTH_DATASOURCE] ✅ Delivery agents table record upserted: $agentId ($agentCode)');
       } catch (agentErr) {
-        debugPrint('[AUTH_DATASOURCE] ℹ️ Delivery agents table insert notice ($agentErr)');
+        debugPrint('[AUTH_DATASOURCE] ⚠️ Delivery agents table insert notice ($agentErr)');
       }
     } catch (e) {
       debugPrint('[AUTH_DATASOURCE] ⚠️ Network notice during registration: $e');
@@ -453,7 +470,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     _registeredUsers[cleanEmail] = userModel;
     _registeredPasswords[cleanEmail] = password;
 
-    debugPrint('[AUTH_DATASOURCE] ✅ Delivery Agent $agentCode ($firstName $lastName) created successfully with compensation agreement: ${commissionRate.toInt()} Comm. + ${transportAllowance.toInt()} Transport.');
+    debugPrint('[AUTH_DATASOURCE] ✅ Delivery Agent $agentCode ($firstName $lastName) created successfully.');
     return userModel;
   }
 
