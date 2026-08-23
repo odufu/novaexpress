@@ -7,6 +7,7 @@ import '../../features/dc_console/presentation/providers/dc_console_provider.dar
 import '../../features/finance/data/models/remittance_model.dart';
 import '../../features/finance/domain/entities/remittance.dart';
 import '../../features/finance/domain/entities/transaction_item.dart';
+import '../../features/notifications/domain/entities/app_notification.dart';
 import '../../features/orders/data/models/order_model.dart';
 import '../../features/orders/domain/entities/order.dart';
 import '../../features/stock/data/models/stock_item_model.dart';
@@ -44,6 +45,9 @@ abstract class LocalStorageService {
   Future<void> cacheStockItems(List<StockItemEntity> items);
   Future<List<StockItemEntity>?> getCachedStockItems();
 
+  Future<void> cacheNotifications(String agentId, List<AppNotificationEntity> notifications);
+  Future<List<AppNotificationEntity>?> getCachedNotifications(String agentId);
+
   Future<void> setLastSyncTime(String moduleKey);
   Future<DateTime?> getLastSyncTime(String moduleKey);
 }
@@ -56,6 +60,7 @@ class LocalStorageServiceImpl implements LocalStorageService {
   static const String _remittancesKey = 'novexps_cache_remittances';
   static const String _transactionsKey = 'novexps_cache_transactions';
   static const String _stockKey = 'novexps_cache_stock_items';
+  static const String _notificationsPrefix = 'novexps_cache_notifications_';
   static const String _syncTimePrefix = 'novexps_sync_time_';
 
   // In-memory fallback if platform storage is unavailable
@@ -374,6 +379,32 @@ class LocalStorageServiceImpl implements LocalStorageService {
         items.add(StockItemModel.fromJson(map));
       } catch (e) {
         debugPrint('[LOCAL_STORAGE] ⚠️ Error parsing cached stock item: $e');
+      }
+    }
+    return items.isNotEmpty ? items : null;
+  }
+
+  @override
+  Future<void> cacheNotifications(String agentId, List<AppNotificationEntity> notifications) async {
+    final list = notifications.map((n) => n.toJson()).toList();
+    final key = '$_notificationsPrefix$agentId';
+    await saveJsonList(key, list);
+    await setLastSyncTime('notifications_$agentId');
+    debugPrint('[LOCAL_STORAGE] 💾 Cached ${notifications.length} notifications for agent ($agentId).');
+  }
+
+  @override
+  Future<List<AppNotificationEntity>?> getCachedNotifications(String agentId) async {
+    final key = '$_notificationsPrefix$agentId';
+    final rawList = await getJsonList(key);
+    if (rawList == null || rawList.isEmpty) return null;
+
+    final items = <AppNotificationEntity>[];
+    for (final map in rawList) {
+      try {
+        items.add(AppNotificationEntity.fromJson(map));
+      } catch (e) {
+        debugPrint('[LOCAL_STORAGE] ⚠️ Error parsing cached notification: $e');
       }
     }
     return items.isNotEmpty ? items : null;

@@ -70,4 +70,17 @@ class AppNotificationEntity {
       metadata: json['metadata'] as Map<String, dynamic>?,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'message': message,
+      'category': category.name,
+      'created_at': createdAt.toIso8601String(),
+      'is_read': isRead,
+      'action_route': actionRoute,
+      'metadata': metadata,
+    };
+  }
 }

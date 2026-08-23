@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../core/services/local_storage_service.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/datasources/notifications_remote_datasource.dart';
 import '../../data/repositories/notifications_repository_impl.dart';
@@ -66,28 +67,48 @@ class NotificationsState {
 
 class NotificationsNotifier extends StateNotifier<NotificationsState> {
   final NotificationsRepository _repository;
+  final LocalStorageService _storageService;
   final Ref _ref;
 
   NotificationsNotifier({
     required NotificationsRepository repository,
     required Ref ref,
+    LocalStorageService? storageService,
   })  : _repository = repository,
         _ref = ref,
+        _storageService = storageService ?? LocalStorageServiceImpl(),
         super(const NotificationsState()) {
     final agentId = _getAgentId();
-    fetchNotifications(agentId);
+    if (agentId.isNotEmpty) {
+      _initCache(agentId);
+      fetchNotifications(agentId);
+    }
+  }
+
+  Future<void> _initCache(String agentId) async {
+    final cached = await _storageService.getCachedNotifications(agentId);
+    if (cached != null && cached.isNotEmpty) {
+      state = state.copyWith(notifications: cached);
+    }
   }
 
   String _getAgentId() {
-    return _ref.read(authProvider).user?.deliveryAgentId ?? 'b1111111-1111-4111-8111-111111111111';
+    final user = _ref.read(authProvider).user;
+    return user?.deliveryAgentId ?? user?.id ?? '';
   }
 
   Future<void> fetchNotifications([String? agentId]) async {
-    state = state.copyWith(isLoading: true, errorMessage: null);
+    final targetId = (agentId != null && agentId.isNotEmpty) ? agentId : _getAgentId();
+    if (targetId.isEmpty) {
+      state = state.copyWith(notifications: [], isLoading: false);
+      return;
+    }
+
+    state = state.copyWith(isLoading: state.notifications.isEmpty, errorMessage: null);
     try {
-      final targetId = agentId ?? _getAgentId();
       final list = await _repository.getNotifications(targetId);
       state = state.copyWith(notifications: list, isLoading: false);
+      _storageService.cacheNotifications(targetId, list);
     } catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
     }
@@ -100,6 +121,8 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
     String? actionRoute,
   }) async {
     final agentId = _getAgentId();
+    if (agentId.isEmpty) return;
+
     await _repository.emitNotification(
       title: title,
       message: message,
@@ -120,17 +143,26 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
       return n;
     }).toList();
     state = state.copyWith(notifications: updated);
+    final agentId = _getAgentId();
+    if (agentId.isNotEmpty) {
+      _storageService.cacheNotifications(agentId, updated);
+    }
     await _repository.markAsRead(id);
   }
 
   Future<void> markAllAsRead() async {
     final updated = state.notifications.map((n) => n.copyWith(isRead: true)).toList();
     state = state.copyWith(notifications: updated);
+    final agentId = _getAgentId();
+    if (agentId.isNotEmpty) {
+      _storageService.cacheNotifications(agentId, updated);
+    }
     await _repository.markAllAsRead();
   }
 }
 
 final notificationsProvider = StateNotifierProvider<NotificationsNotifier, NotificationsState>((ref) {
   final repository = ref.watch(notificationsRepositoryProvider);
-  return NotificationsNotifier(repository: repository, ref: ref);
+  final storage = ref.watch(localStorageServiceProvider);
+  return NotificationsNotifier(repository: repository, ref: ref, storageService: storage);
 });

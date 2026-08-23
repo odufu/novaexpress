@@ -113,9 +113,12 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
     // Refresh finance, orders, stock & notifications state
     ref.read(financeProvider.notifier).loadRemittances(agentId);
     ref.read(stockProvider.notifier).fetchStockItems();
+    final orderObj = ref.read(ordersProvider).orders.where((o) => o.id == widget.orderId || o.orderNumber == widget.orderId).firstOrNull;
+    final displayOrderNo = orderObj?.orderNumber ?? (widget.orderId.length > 8 ? 'NX-${widget.orderId.substring(0, 4).toUpperCase()}' : widget.orderId);
+
     ref.read(notificationsProvider.notifier).emitNotification(
           title: 'Delivery POD Confirmed 🎉',
-          message: 'Order ${widget.orderId} was successfully delivered. Net cash collection recorded.',
+          message: 'Order $displayOrderNo was successfully delivered. Net collection of ${CurrencyFormatter.formatNaira(amount)} recorded.',
           category: 'delivery',
           actionRoute: '/orders',
         );

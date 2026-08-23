@@ -32,6 +32,7 @@ class _PdaHomePageState extends ConsumerState<PdaHomePage> {
       final agentId = user?.deliveryAgentId ?? user?.id ?? '';
       ref.read(ordersProvider.notifier).loadOrders(agentId);
       ref.read(financeProvider.notifier).loadRemittances(agentId);
+      ref.read(notificationsProvider.notifier).fetchNotifications(agentId);
     });
   }
 
