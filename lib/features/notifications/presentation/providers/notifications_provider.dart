@@ -164,5 +164,7 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
 final notificationsProvider = StateNotifierProvider<NotificationsNotifier, NotificationsState>((ref) {
   final repository = ref.watch(notificationsRepositoryProvider);
   final storage = ref.watch(localStorageServiceProvider);
+  // Re-instantiate when active user changes
+  ref.watch(authProvider.select((s) => s.user?.deliveryAgentId ?? s.user?.id));
   return NotificationsNotifier(repository: repository, ref: ref, storageService: storage);
 });
