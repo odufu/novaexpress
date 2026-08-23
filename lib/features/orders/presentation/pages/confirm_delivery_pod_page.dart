@@ -104,14 +104,14 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
     await ref.read(ordersProvider.notifier).confirmDeliveryPod(
           orderId: widget.orderId,
           agentId: agentId,
-          paymentType: 'pay_on_delivery',
+          paymentType: isDirectTransfer ? 'prepaid' : 'pay_on_delivery',
           paymentMethod: paymentMethod,
           amountCollected: amount,
           notes: notes,
         );
 
     // Refresh finance, orders, stock & notifications state
-    ref.read(financeProvider.notifier).fetchRemittances();
+    ref.read(financeProvider.notifier).loadRemittances(agentId);
     ref.read(stockProvider.notifier).fetchStockItems();
     ref.read(notificationsProvider.notifier).emitNotification(
           title: 'Delivery POD Confirmed 🎉',

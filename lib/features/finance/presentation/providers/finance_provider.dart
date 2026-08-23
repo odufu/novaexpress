@@ -7,6 +7,8 @@ import '../../domain/entities/remittance.dart';
 import '../../domain/entities/transaction_item.dart';
 import '../../domain/repositories/finance_repository.dart';
 
+import '../../../../core/services/local_storage_service.dart';
+
 final financeRemoteDataSourceProvider = Provider<FinanceRemoteDataSource>((ref) {
   return FinanceRemoteDataSourceImpl(Supabase.instance.client);
 });
@@ -74,9 +76,24 @@ class FinanceState {
 
 class FinanceNotifier extends StateNotifier<FinanceState> {
   final FinanceRepository _repository;
+  final LocalStorageService _storageService;
 
-  FinanceNotifier(this._repository) : super(FinanceState()) {
+  FinanceNotifier(this._repository, [LocalStorageService? storageService])
+      : _storageService = storageService ?? LocalStorageServiceImpl(),
+        super(FinanceState()) {
+    _initCache();
     loadRemittances();
+  }
+
+  Future<void> _initCache() async {
+    final cachedRem = await _storageService.getCachedRemittances();
+    final cachedTxns = await _storageService.getCachedTransactions();
+    if ((cachedRem != null && cachedRem.isNotEmpty) || (cachedTxns != null && cachedTxns.isNotEmpty)) {
+      state = state.copyWith(
+        remittances: cachedRem ?? state.remittances,
+        transactions: cachedTxns ?? state.transactions,
+      );
+    }
   }
 
   Future<void> fetchRemittances() async {
@@ -94,6 +111,8 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
         remittances: items,
         transactions: txns,
       );
+      _storageService.cacheRemittances(items);
+      _storageService.cacheTransactions(txns);
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
@@ -107,6 +126,7 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
       final targetAgentId = agentId ?? SupabaseConstants.defaultDeliveryAgentId;
       final txns = await _repository.getRiderTransactions(targetAgentId);
       state = state.copyWith(transactions: txns);
+      _storageService.cacheTransactions(txns);
     } catch (_) {}
   }
 
@@ -156,6 +176,7 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
 
       final updatedList = [newRemittance, ...state.remittances];
       state = state.copyWith(isLoading: false, remittances: updatedList);
+      _storageService.cacheRemittances(updatedList);
       loadRemittances(targetAgentId);
       return true;
     } catch (e) {
@@ -203,5 +224,7 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
 }
 
 final financeProvider = StateNotifierProvider<FinanceNotifier, FinanceState>((ref) {
-  return FinanceNotifier(ref.watch(financeRepositoryProvider));
+  final repo = ref.watch(financeRepositoryProvider);
+  final storage = ref.watch(localStorageServiceProvider);
+  return FinanceNotifier(repo, storage);
 });

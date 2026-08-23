@@ -17,7 +17,8 @@ class UserEntity {
   final String compensationType; // 'commission' | 'salary' | 'hybrid'
   final double commissionRate; // e.g. 1000.0 (PDA) or 500.0 (Rider)
   final double transportAllowance; // e.g. 1500.0 (PDA transport)
-  final double fuelAllowance; // e.g. 800.0 (Rider fuel)
+  final double fuelAllowance; // e.g. 800.0 (In-House Rider fuel)
+  final double failedDeliveryAllowance; // e.g. 500.0 (PDA) or 300.0 (Rider)
   final double baseSalary; // e.g. 150000.0
   final String vehicleType; // 'motorcycle' | 'van' | 'car'
   final String vehiclePlateNumber;
@@ -49,6 +50,7 @@ class UserEntity {
     this.commissionRate = 0.0,
     this.transportAllowance = 0.0,
     this.fuelAllowance = 0.0,
+    this.failedDeliveryAllowance = 500.0,
     this.baseSalary = 0.0,
     this.vehicleType = '',
     this.vehiclePlateNumber = '',

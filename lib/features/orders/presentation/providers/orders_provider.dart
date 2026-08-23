@@ -247,6 +247,7 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
         return o;
       }).toList();
       state = state.copyWith(isLoading: false, orders: updatedList);
+      _storageService.cacheOrders(updatedList);
     } catch (e) {
       state = state.copyWith(isLoading: false);
     }
@@ -321,6 +322,7 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
       }).toList();
 
       state = state.copyWith(isLoading: false, orders: updatedList);
+      _storageService.cacheOrders(updatedList);
       return result;
     } catch (e) {
       state = state.copyWith(isLoading: false);
@@ -393,6 +395,7 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
       }).toList();
 
       state = state.copyWith(isLoading: false, orders: updatedList);
+      _storageService.cacheOrders(updatedList);
       return result;
     } catch (e) {
       state = state.copyWith(isLoading: false);

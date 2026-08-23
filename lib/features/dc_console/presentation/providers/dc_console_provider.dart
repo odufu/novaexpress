@@ -39,6 +39,42 @@ class DCWarehouseBatch {
 
   int get availableQuantity => (currentQuantity - allocatedQuantity).clamp(0, currentQuantity);
   int get daysUntilExpiry => expiryDate.difference(DateTime.now()).inDays;
+
+  factory DCWarehouseBatch.fromJson(Map<String, dynamic> json) {
+    return DCWarehouseBatch(
+      id: json['id']?.toString() ?? '',
+      batchCode: json['batch_code']?.toString() ?? json['batchCode'] ?? 'LOT-001',
+      productName: json['product_name']?.toString() ?? json['productName'] ?? (json['products'] is Map ? json['products']['name']?.toString() : null) ?? 'Respira Detox Tea',
+      sku: json['sku']?.toString() ?? (json['products'] is Map ? json['products']['sku']?.toString() : null) ?? 'SKU-RESP-01',
+      clientName: json['client_name']?.toString() ?? json['clientName'] ?? 'NovaCare Labs',
+      waybillNumber: json['waybill_number']?.toString() ?? json['waybillNumber'] ?? 'WB-001',
+      initialQuantity: (json['initial_quantity'] as num?)?.toInt() ?? (json['initialQuantity'] as num?)?.toInt() ?? 100,
+      currentQuantity: (json['current_quantity'] as num?)?.toInt() ?? (json['currentQuantity'] as num?)?.toInt() ?? 100,
+      allocatedQuantity: (json['allocated_quantity'] as num?)?.toInt() ?? (json['allocatedQuantity'] as num?)?.toInt() ?? 0,
+      binLocation: json['bin_location']?.toString() ?? json['binLocation'] ?? 'A1-B2',
+      manufactureDate: json['manufacture_date'] != null ? DateTime.tryParse(json['manufacture_date'].toString()) ?? DateTime.now() : (json['manufactureDate'] != null ? DateTime.tryParse(json['manufactureDate'].toString()) ?? DateTime.now() : DateTime.now()),
+      expiryDate: json['expiry_date'] != null ? DateTime.tryParse(json['expiry_date'].toString()) ?? DateTime.now().add(const Duration(days: 365)) : (json['expiryDate'] != null ? DateTime.tryParse(json['expiryDate'].toString()) ?? DateTime.now().add(const Duration(days: 365)) : DateTime.now().add(const Duration(days: 365))),
+      status: json['status']?.toString() ?? 'good',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'batch_code': batchCode,
+      'product_name': productName,
+      'sku': sku,
+      'client_name': clientName,
+      'waybill_number': waybillNumber,
+      'initial_quantity': initialQuantity,
+      'current_quantity': currentQuantity,
+      'allocated_quantity': allocatedQuantity,
+      'bin_location': binLocation,
+      'manufacture_date': manufactureDate.toIso8601String(),
+      'expiry_date': expiryDate.toIso8601String(),
+      'status': status,
+    };
+  }
 }
 
 class DCReturnItem {
@@ -91,6 +127,42 @@ class DCReturnItem {
       targetBin: targetBin ?? this.targetBin,
       returnedAt: returnedAt,
     );
+  }
+
+  factory DCReturnItem.fromJson(Map<String, dynamic> json) {
+    return DCReturnItem(
+      id: json['id']?.toString() ?? '',
+      returnTicketNumber: json['return_ticket_number']?.toString() ?? json['returnTicketNumber'] ?? 'RET-001',
+      orderNumber: json['order_number']?.toString() ?? json['orderNumber'] ?? 'NX-001',
+      customerName: json['customer_name']?.toString() ?? json['customerName'] ?? 'Customer',
+      customerPhone: json['customer_phone']?.toString() ?? json['customerPhone'] ?? '',
+      productName: json['product_name']?.toString() ?? json['productName'] ?? 'Product',
+      quantity: (json['quantity'] as num?)?.toInt() ?? 1,
+      amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
+      riderName: json['rider_name']?.toString() ?? json['riderName'] ?? 'Rider',
+      returnReason: json['return_reason']?.toString() ?? json['returnReason'] ?? 'Customer unreachable',
+      qcStatus: json['qc_status']?.toString() ?? json['qcStatus'] ?? 'pending_qc',
+      targetBin: json['target_bin']?.toString() ?? json['targetBin'],
+      returnedAt: json['returned_at'] != null ? DateTime.tryParse(json['returned_at'].toString()) ?? DateTime.now() : (json['returnedAt'] != null ? DateTime.tryParse(json['returnedAt'].toString()) ?? DateTime.now() : DateTime.now()),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'return_ticket_number': returnTicketNumber,
+      'order_number': orderNumber,
+      'customer_name': customerName,
+      'customer_phone': customerPhone,
+      'product_name': productName,
+      'quantity': quantity,
+      'amount': amount,
+      'rider_name': riderName,
+      'return_reason': returnReason,
+      'qc_status': qcStatus,
+      'target_bin': targetBin,
+      'returned_at': returnedAt.toIso8601String(),
+    };
   }
 }
 
@@ -198,8 +270,16 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
   Future<void> _initDrivers() async {
     // 1. Instant hydration from persistent local cache
     final cached = await _storageService.getCachedFleetDrivers();
+    final cachedBatches = await _storageService.getCachedWarehouseBatches();
+    final cachedReturns = await _storageService.getCachedReturnItems();
+
+    state = state.copyWith(
+      drivers: cached ?? state.drivers,
+      warehouseBatches: cachedBatches ?? state.warehouseBatches,
+      returnItems: cachedReturns ?? state.returnItems,
+    );
+
     if (cached != null && cached.isNotEmpty) {
-      state = state.copyWith(drivers: cached);
       debugPrint('[DC_CONSOLE_PROVIDER] ⚡ Hydrated ${cached.length} drivers from local storage cache.');
     }
 
@@ -248,9 +328,9 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
   }
 
   void addBatch(DCWarehouseBatch batch) {
-    state = state.copyWith(
-      warehouseBatches: [batch, ...state.warehouseBatches],
-    );
+    final updated = [batch, ...state.warehouseBatches];
+    state = state.copyWith(warehouseBatches: updated);
+    _storageService.cacheWarehouseBatches(updated);
   }
 
   void addDriver(DCFleetDriver driver) {
@@ -314,9 +394,11 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
       return r;
     }).toList();
     state = state.copyWith(returnItems: updated);
+    _storageService.cacheReturnItems(updated);
   }
 }
 
 final dcConsoleProvider = StateNotifierProvider<DCConsoleNotifier, DCConsoleState>((ref) {
-  return DCConsoleNotifier();
+  final storage = ref.watch(localStorageServiceProvider);
+  return DCConsoleNotifier(storage);
 });

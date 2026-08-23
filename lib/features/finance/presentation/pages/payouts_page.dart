@@ -46,46 +46,46 @@ class PayoutsPage extends ConsumerStatefulWidget {
 
 class _PayoutsPageState extends ConsumerState<PayoutsPage> {
   String _selectedFilter = 'all'; // 'all', 'pending', 'approved', 'rejected'
+  List<PayoutRequestItem> _payouts = [];
 
-  final List<PayoutRequestItem> _payouts = [
-    PayoutRequestItem(
-      id: 'PAY-0082',
-      amount: 15000.0,
-      status: 'pending',
-      date: DateTime.now().subtract(const Duration(hours: 1, minutes: 20)),
-      bankName: 'Zenith Bank',
-      accountNumber: '0123456789',
-      accountName: 'Emeka Rider',
-      dcNotes: 'Under review by Wuse DC Finance desk',
-    ),
-    PayoutRequestItem(
-      id: 'PAY-0079',
-      amount: 20000.0,
-      status: 'approved',
-      date: DateTime.now().subtract(const Duration(days: 6)),
-      bankName: 'Zenith Bank',
-      accountNumber: '0123456789',
-      accountName: 'Emeka Rider',
-      disbursementRef: 'DISB-88374291',
-      dcNotes: 'Disbursed via Central Treasury',
-    ),
-    PayoutRequestItem(
-      id: 'PAY-0071',
-      amount: 25000.0,
-      status: 'approved',
-      date: DateTime.now().subtract(const Duration(days: 21)),
-      bankName: 'Zenith Bank',
-      accountNumber: '0123456789',
-      accountName: 'Emeka Rider',
-      disbursementRef: 'DISB-77291044',
-      dcNotes: 'Disbursed via Wuse DC Finance',
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _fetchPayouts();
+  }
+
+  Future<void> _fetchPayouts() async {
+    final user = ref.read(authProvider).user;
+    final agentId = user?.deliveryAgentId ?? user?.id ?? '';
+    if (agentId.isEmpty) return;
+
+    final raw = await ref.read(financeProvider.notifier).loadPayoutRequests(agentId);
+    if (mounted && raw.isNotEmpty) {
+      setState(() {
+        _payouts = raw.map((map) {
+          return PayoutRequestItem(
+            id: map['id']?.toString() ?? 'PAY-0001',
+            amount: (map['amount'] as num?)?.toDouble() ?? 0.0,
+            status: map['status']?.toString() ?? 'pending',
+            date: map['created_at'] != null ? DateTime.tryParse(map['created_at'].toString()) ?? DateTime.now() : DateTime.now(),
+            bankName: map['bank_name']?.toString() ?? 'Bank',
+            accountNumber: map['account_number']?.toString() ?? '0000000000',
+            accountName: map['account_name']?.toString() ?? 'Rider',
+            disbursementRef: map['disbursement_reference']?.toString(),
+            dcNotes: map['notes']?.toString(),
+          );
+        }).toList();
+      });
+    }
+  }
 
   void _showRequestPayoutModal(BuildContext context, double availableBalance) {
-    final amountController = TextEditingController(text: '10000');
-    final accountController = TextEditingController(text: '0123456789');
-    String selectedBank = 'Zenith Bank';
+    final user = ref.read(authProvider).user;
+    final defaultAccount = user?.bankAccountNumber.isNotEmpty == true ? user!.bankAccountNumber : '0123456789';
+    final defaultBank = user?.bankName.isNotEmpty == true ? user!.bankName : 'Zenith Bank';
+    final amountController = TextEditingController(text: availableBalance > 0 ? (availableBalance > 10000 ? '10000' : availableBalance.toInt().toString()) : '5000');
+    final accountController = TextEditingController(text: defaultAccount);
+    String selectedBank = defaultBank;
 
     showModalBottomSheet(
       context: context,

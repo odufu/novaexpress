@@ -100,6 +100,30 @@ class RemittanceModel extends RemittanceEntity {
     );
   }
 
+  factory RemittanceModel.fromEntity(RemittanceEntity entity) {
+    return RemittanceModel(
+      id: entity.id,
+      referenceNumber: entity.referenceNumber,
+      companyId: entity.companyId,
+      deliveryAgentId: entity.deliveryAgentId,
+      amount: entity.amount,
+      grossCollections: entity.grossCollections,
+      commissionDeducted: entity.commissionDeducted,
+      transportAllowanceDeducted: entity.transportAllowanceDeducted,
+      posFee: entity.posFee,
+      paymentMethod: entity.paymentMethod,
+      depositReceiptUrl: entity.depositReceiptUrl,
+      status: entity.status,
+      verifiedByUserId: entity.verifiedByUserId,
+      verifiedByName: entity.verifiedByName,
+      discrepancyAmount: entity.discrepancyAmount,
+      discrepancyReason: entity.discrepancyReason,
+      notes: entity.notes,
+      createdAt: entity.createdAt,
+      verifiedAt: entity.verifiedAt,
+    );
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -118,6 +142,8 @@ class RemittanceModel extends RemittanceEntity {
       'discrepancy_amount': discrepancyAmount,
       'discrepancy_reason': discrepancyReason,
       'notes': notes,
+      'created_at': createdAt.toIso8601String(),
+      'verified_at': verifiedAt?.toIso8601String(),
     };
   }
 }

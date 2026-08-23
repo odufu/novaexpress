@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../core/services/local_storage_service.dart';
 import '../../data/datasources/stock_remote_datasource.dart';
 import '../../data/repositories/stock_repository_impl.dart';
 import '../../domain/entities/stock_item.dart';
@@ -131,13 +132,29 @@ class StockState {
 
 class StockNotifier extends StateNotifier<StockState> {
   final StockRepository repository;
+  final LocalStorageService _storageService;
 
-  StockNotifier({required this.repository}) : super(const StockState()) {
+  StockNotifier({
+    required this.repository,
+    LocalStorageService? storageService,
+  })  : _storageService = storageService ?? LocalStorageServiceImpl(),
+        super(const StockState()) {
+    _initCache();
     fetchStockItems();
   }
 
+  Future<void> _initCache() async {
+    final cached = await _storageService.getCachedStockItems();
+    if (cached != null && cached.isNotEmpty) {
+      state = state.copyWith(
+        isLoading: false,
+        stockItems: cached,
+      );
+    }
+  }
+
   Future<void> fetchStockItems([String? agentId]) async {
-    state = state.copyWith(isLoading: true, errorMessage: null);
+    state = state.copyWith(isLoading: state.stockItems.isEmpty, errorMessage: null);
     try {
       final items = await repository.getVehicleStockItems(agentId);
       final defaultRequests = [
@@ -164,6 +181,7 @@ class StockNotifier extends StateNotifier<StockState> {
         lastAuditedTime: DateTime.now().subtract(const Duration(hours: 4)),
         isAuditRequired: false,
       );
+      _storageService.cacheStockItems(items);
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
@@ -380,5 +398,6 @@ final stockRepositoryProvider = Provider<StockRepository>((ref) {
 
 final stockProvider = StateNotifierProvider<StockNotifier, StockState>((ref) {
   final repo = ref.watch(stockRepositoryProvider);
-  return StockNotifier(repository: repo);
+  final storage = ref.watch(localStorageServiceProvider);
+  return StockNotifier(repository: repo, storageService: storage);
 });

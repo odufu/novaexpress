@@ -3,8 +3,14 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../features/dc_console/domain/entities/dc_fleet_driver.dart';
+import '../../features/dc_console/presentation/providers/dc_console_provider.dart';
+import '../../features/finance/data/models/remittance_model.dart';
+import '../../features/finance/domain/entities/remittance.dart';
+import '../../features/finance/domain/entities/transaction_item.dart';
 import '../../features/orders/data/models/order_model.dart';
 import '../../features/orders/domain/entities/order.dart';
+import '../../features/stock/data/models/stock_item_model.dart';
+import '../../features/stock/domain/entities/stock_item.dart';
 
 abstract class LocalStorageService {
   Future<void> saveJsonList(String key, List<Map<String, dynamic>> items);
@@ -23,6 +29,21 @@ abstract class LocalStorageService {
   Future<void> cacheOrders(List<OrderEntity> orders);
   Future<List<OrderEntity>?> getCachedOrders();
 
+  Future<void> cacheWarehouseBatches(List<DCWarehouseBatch> batches);
+  Future<List<DCWarehouseBatch>?> getCachedWarehouseBatches();
+
+  Future<void> cacheReturnItems(List<DCReturnItem> returns);
+  Future<List<DCReturnItem>?> getCachedReturnItems();
+
+  Future<void> cacheRemittances(List<RemittanceEntity> remittances);
+  Future<List<RemittanceEntity>?> getCachedRemittances();
+
+  Future<void> cacheTransactions(List<TransactionItem> transactions);
+  Future<List<TransactionItem>?> getCachedTransactions();
+
+  Future<void> cacheStockItems(List<StockItemEntity> items);
+  Future<List<StockItemEntity>?> getCachedStockItems();
+
   Future<void> setLastSyncTime(String moduleKey);
   Future<DateTime?> getLastSyncTime(String moduleKey);
 }
@@ -30,6 +51,11 @@ abstract class LocalStorageService {
 class LocalStorageServiceImpl implements LocalStorageService {
   static const String _fleetDriversKey = 'novexps_cache_fleet_drivers';
   static const String _ordersKey = 'novexps_cache_orders';
+  static const String _batchesKey = 'novexps_cache_warehouse_batches';
+  static const String _returnsKey = 'novexps_cache_return_items';
+  static const String _remittancesKey = 'novexps_cache_remittances';
+  static const String _transactionsKey = 'novexps_cache_transactions';
+  static const String _stockKey = 'novexps_cache_stock_items';
   static const String _syncTimePrefix = 'novexps_sync_time_';
 
   // In-memory fallback if platform storage is unavailable
@@ -194,6 +220,163 @@ class LocalStorageServiceImpl implements LocalStorageService {
       }
     }
     return orders.isNotEmpty ? orders : null;
+  }
+
+  // --- Warehouse Batches Caching ---
+
+  @override
+  Future<void> cacheWarehouseBatches(List<DCWarehouseBatch> batches) async {
+    final list = batches.map((b) => b.toJson()).toList();
+    await saveJsonList(_batchesKey, list);
+    await setLastSyncTime('warehouse_batches');
+    debugPrint('[LOCAL_STORAGE] 💾 Cached ${batches.length} warehouse batches to local storage.');
+  }
+
+  @override
+  Future<List<DCWarehouseBatch>?> getCachedWarehouseBatches() async {
+    final rawList = await getJsonList(_batchesKey);
+    if (rawList == null || rawList.isEmpty) return null;
+
+    final batches = <DCWarehouseBatch>[];
+    for (final map in rawList) {
+      try {
+        batches.add(DCWarehouseBatch.fromJson(map));
+      } catch (e) {
+        debugPrint('[LOCAL_STORAGE] ⚠️ Error parsing cached batch: $e');
+      }
+    }
+    return batches.isNotEmpty ? batches : null;
+  }
+
+  // --- Return Items Caching ---
+
+  @override
+  Future<void> cacheReturnItems(List<DCReturnItem> returns) async {
+    final list = returns.map((r) => r.toJson()).toList();
+    await saveJsonList(_returnsKey, list);
+    await setLastSyncTime('return_items');
+    debugPrint('[LOCAL_STORAGE] 💾 Cached ${returns.length} return items to local storage.');
+  }
+
+  @override
+  Future<List<DCReturnItem>?> getCachedReturnItems() async {
+    final rawList = await getJsonList(_returnsKey);
+    if (rawList == null || rawList.isEmpty) return null;
+
+    final returns = <DCReturnItem>[];
+    for (final map in rawList) {
+      try {
+        returns.add(DCReturnItem.fromJson(map));
+      } catch (e) {
+        debugPrint('[LOCAL_STORAGE] ⚠️ Error parsing cached return item: $e');
+      }
+    }
+    return returns.isNotEmpty ? returns : null;
+  }
+
+  // --- Remittances Caching ---
+
+  @override
+  Future<void> cacheRemittances(List<RemittanceEntity> remittances) async {
+    final list = remittances.map((r) {
+      if (r is RemittanceModel) return r.toJson();
+      return RemittanceModel.fromEntity(r).toJson();
+    }).toList();
+    await saveJsonList(_remittancesKey, list);
+    await setLastSyncTime('remittances');
+    debugPrint('[LOCAL_STORAGE] 💾 Cached ${remittances.length} remittances to local storage.');
+  }
+
+  @override
+  Future<List<RemittanceEntity>?> getCachedRemittances() async {
+    final rawList = await getJsonList(_remittancesKey);
+    if (rawList == null || rawList.isEmpty) return null;
+
+    final remittances = <RemittanceEntity>[];
+    for (final map in rawList) {
+      try {
+        remittances.add(RemittanceModel.fromJson(map));
+      } catch (e) {
+        debugPrint('[LOCAL_STORAGE] ⚠️ Error parsing cached remittance: $e');
+      }
+    }
+    return remittances.isNotEmpty ? remittances : null;
+  }
+
+  // --- Transactions Caching ---
+
+  @override
+  Future<void> cacheTransactions(List<TransactionItem> transactions) async {
+    final list = transactions.map((t) => t.toJson()).toList();
+    await saveJsonList(_transactionsKey, list);
+    await setLastSyncTime('transactions');
+    debugPrint('[LOCAL_STORAGE] 💾 Cached ${transactions.length} transactions to local storage.');
+  }
+
+  @override
+  Future<List<TransactionItem>?> getCachedTransactions() async {
+    final rawList = await getJsonList(_transactionsKey);
+    if (rawList == null || rawList.isEmpty) return null;
+
+    final txns = <TransactionItem>[];
+    for (final map in rawList) {
+      try {
+        txns.add(TransactionItem.fromJson(map));
+      } catch (e) {
+        debugPrint('[LOCAL_STORAGE] ⚠️ Error parsing cached transaction: $e');
+      }
+    }
+    return txns.isNotEmpty ? txns : null;
+  }
+
+  // --- Stock Items Caching ---
+
+  @override
+  Future<void> cacheStockItems(List<StockItemEntity> items) async {
+    final list = items.map((s) {
+      if (s is StockItemModel) return s.toJson();
+      return StockItemModel(
+        id: s.id,
+        sku: s.sku,
+        name: s.name,
+        description: s.description,
+        price: s.price,
+        ownerName: s.ownerName,
+        inventoryType: s.inventoryType,
+        totalInCustody: s.totalInCustody,
+        reservedCount: s.reservedCount,
+        assignedCount: s.assignedCount,
+        deliveredCount: s.deliveredCount,
+        availableCount: s.availableCount,
+        returnedCount: s.returnedCount,
+        awaitingReturnCount: s.awaitingReturnCount,
+        lowStockThreshold: s.lowStockThreshold,
+        reorderLevel: s.reorderLevel,
+        category: s.category,
+        imageAsset: s.imageAsset,
+        batchNumber: s.batchNumber,
+        lastAuditDate: s.lastAuditDate,
+      ).toJson();
+    }).toList();
+    await saveJsonList(_stockKey, list);
+    await setLastSyncTime('stock_items');
+    debugPrint('[LOCAL_STORAGE] 💾 Cached ${items.length} stock items to local storage.');
+  }
+
+  @override
+  Future<List<StockItemEntity>?> getCachedStockItems() async {
+    final rawList = await getJsonList(_stockKey);
+    if (rawList == null || rawList.isEmpty) return null;
+
+    final items = <StockItemEntity>[];
+    for (final map in rawList) {
+      try {
+        items.add(StockItemModel.fromJson(map));
+      } catch (e) {
+        debugPrint('[LOCAL_STORAGE] ⚠️ Error parsing cached stock item: $e');
+      }
+    }
+    return items.isNotEmpty ? items : null;
   }
 
   // --- Sync Metadata ---

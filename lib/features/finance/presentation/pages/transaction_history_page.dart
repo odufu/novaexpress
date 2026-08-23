@@ -120,10 +120,16 @@ class _TransactionHistoryPageState extends ConsumerState<TransactionHistoryPage>
   List<TransactionItem> _getLiveOrDerivedTransactions(
     FinanceState financeState,
     OrdersState ordersState,
+    dynamic user,
   ) {
     if (financeState.transactions.isNotEmpty) {
       return financeState.transactions;
     }
+
+    final double commRate = (user?.commissionRate as num?)?.toDouble() ?? 1000.0;
+    final double transportRate = (user?.transportAllowance as num?)?.toDouble() ?? 1500.0;
+    final double failedAllowance = (user?.failedDeliveryAllowance as num?)?.toDouble() ?? 500.0;
+    final double totalPerDelivered = commRate + transportRate;
 
     // Dynamic derivation from live state if table is syncing
     final List<TransactionItem> derived = [];
@@ -158,14 +164,32 @@ class _TransactionHistoryPageState extends ConsumerState<TransactionHistoryPage>
               ? 'Direct Transfer Credit (${o.orderNumber})'
               : 'Cash POD Collection (${o.orderNumber})',
           category: isPrepaid ? 'direct_transfer' : 'earnings',
-          amount: isPrepaid ? 2500.0 : o.totalAmount,
+          amount: isPrepaid ? totalPerDelivered : o.totalAmount,
           isCredit: isPrepaid,
           timestamp: o.createdAt,
           reference: o.orderNumber,
           status: isPrepaid ? 'settled' : 'pending',
           description: isPrepaid
-              ? 'Commission (₦1,000) + Transport Allowance (₦1,500) credited to My Balance from customer prepaid transfer.'
+              ? 'Commission (${CurrencyFormatter.formatNaira(commRate)}) + Transport Allowance (${CurrencyFormatter.formatNaira(transportRate)}) credited to My Balance from customer prepaid transfer.'
               : 'Cash in physical custody for ${o.productName}. Added to To Remit ledger.',
+        ),
+      );
+    }
+
+    // Failed Orders
+    final failedOrders = ordersState.orders.where((o) => o.status == 'failed').toList();
+    for (final o in failedOrders) {
+      derived.add(
+        TransactionItem(
+          id: 'FL-${o.orderNumber}',
+          title: 'Failed Delivery Allowance (${o.orderNumber})',
+          category: 'earnings',
+          amount: failedAllowance,
+          isCredit: true,
+          timestamp: o.createdAt,
+          reference: o.orderNumber,
+          status: 'settled',
+          description: 'Failed delivery attempt allowance (${CurrencyFormatter.formatNaira(failedAllowance)}) credited under agreement terms.',
         ),
       );
     }
@@ -189,7 +213,7 @@ class _TransactionHistoryPageState extends ConsumerState<TransactionHistoryPage>
       manualEarnedBalance: financeState.totalEarnedBalance,
     );
 
-    final transactionsList = _getLiveOrDerivedTransactions(financeState, ordersState);
+    final transactionsList = _getLiveOrDerivedTransactions(financeState, ordersState, authState.user);
 
     final filteredList = transactionsList.where((t) {
       if (_selectedCategory == 'all') return true;

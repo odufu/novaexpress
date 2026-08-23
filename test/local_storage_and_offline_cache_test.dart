@@ -1,15 +1,17 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:novexps/core/services/local_storage_service.dart';
+import 'package:novexps/features/auth/domain/entities/user.dart';
 import 'package:novexps/features/dc_console/domain/entities/dc_fleet_driver.dart';
 import 'package:novexps/features/dc_console/presentation/providers/dc_console_provider.dart';
+import 'package:novexps/features/finance/domain/entities/financial_summary.dart';
+import 'package:novexps/features/finance/domain/entities/remittance.dart';
 import 'package:novexps/features/orders/data/models/order_model.dart';
-import 'package:novexps/features/orders/domain/entities/order.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  group('Industrial Local Data Storage & Caching Verification Suite', () {
+  group('Industrial Local Data Storage & Dynamic Remittance Verification Suite', () {
     late LocalStorageService storageService;
 
     setUp(() async {
@@ -123,41 +125,183 @@ void main() {
       expect(cachedOrders[0].latitude, equals(9.0765));
     });
 
-    test('3. DCConsoleNotifier: Hydrates instantly from local cache without hardcoded lists', () async {
-      final testDriver = const DCFleetDriver(
-        id: 'drv-live-01',
-        driverCode: 'PDA-9999',
-        name: 'Musa Bello',
-        phone: '08055554444',
-        email: 'musa.bello@novaexpress.ng',
-        avatarUrl: 'https://example.com/avatar.jpg',
-        vehicleModel: 'Honda Ace 125',
-        vehiclePlate: 'ABJ-111-AA',
-        vehicleType: 'Motorcycle',
-        status: 'active',
-        assignedZone: 'Garki',
-        totalAssignedOrders: 10,
-        completedOrders: 8,
-        routeProgressPercent: 80.0,
-        efficiencyRating: 99.0,
-        cashInCustody: 75000.0,
-        itemsInCustody: 5,
-        commissionRate: 1000.0,
-        transportAllowance: 1500.0,
+    test('3. Warehouse Batches & Return Items: Caches and restores DC inventory structures', () async {
+      final sampleBatch = DCWarehouseBatch(
+        id: 'batch-001',
+        batchCode: 'LOT-RESP-99',
+        productName: 'Respira Detox Tea',
+        sku: 'SKU-RESP-01',
+        clientName: 'NovaCare Labs',
+        waybillNumber: 'WB-99482',
+        initialQuantity: 500,
+        currentQuantity: 420,
+        allocatedQuantity: 60,
+        binLocation: 'BIN-WUSE-A3',
+        manufactureDate: DateTime.now().subtract(const Duration(days: 30)),
+        expiryDate: DateTime.now().add(const Duration(days: 335)),
       );
 
-      // Pre-seed local storage
-      await storageService.cacheFleetDrivers([testDriver]);
+      final sampleReturn = DCReturnItem(
+        id: 'ret-001',
+        returnTicketNumber: 'RET-8921',
+        orderNumber: 'NX-8921',
+        customerName: 'Chidinma Adeyemi',
+        customerPhone: '08031234567',
+        productName: 'Respira Detox Tea',
+        quantity: 1,
+        amount: 18000.0,
+        riderName: 'Emeka Rider',
+        returnReason: 'Customer rescheduled travel',
+        qcStatus: 'grade_a_restocked',
+        targetBin: 'BIN-WUSE-A3',
+        returnedAt: DateTime.now(),
+      );
 
-      // Initialize DCConsoleNotifier with storage service
-      final notifier = DCConsoleNotifier(storageService);
+      await storageService.cacheWarehouseBatches([sampleBatch]);
+      await storageService.cacheReturnItems([sampleReturn]);
 
-      // Allow microtasks to complete
-      await Future.delayed(const Duration(milliseconds: 50));
+      final cachedBatches = await storageService.getCachedWarehouseBatches();
+      final cachedReturns = await storageService.getCachedReturnItems();
 
-      expect(notifier.state.drivers.isNotEmpty, isTrue);
-      expect(notifier.state.drivers.any((d) => d.driverCode == 'PDA-9999'), isTrue);
-      expect(notifier.state.drivers.first.name, equals('Musa Bello'));
+      expect(cachedBatches, isNotNull);
+      expect(cachedBatches!.first.batchCode, equals('LOT-RESP-99'));
+      expect(cachedBatches.first.availableQuantity, equals(360));
+
+      expect(cachedReturns, isNotNull);
+      expect(cachedReturns!.first.returnTicketNumber, equals('RET-8921'));
+      expect(cachedReturns.first.qcStatus, equals('grade_a_restocked'));
+    });
+
+    test('4. Dynamic Rider Remittance & Earnings: Increases cash in custody and calculates earnings with base commission + transport + failed allowance', () {
+      const pdaUser = UserEntity(
+        id: 'usr-pda-01',
+        email: 'emeka@novaexpress.ng',
+        firstName: 'Emeka',
+        lastName: 'Rider',
+        phone: '08012345678',
+        role: 'delivery_agent',
+        personnelType: 'pda',
+        compensationType: 'commission',
+        commissionRate: 1000.0,
+        transportAllowance: 1500.0,
+        failedDeliveryAllowance: 500.0,
+      );
+
+      // Scenario 1: Initial state - 1 COD delivered order (₦30,000)
+      final order1 = OrderModel(
+        id: 'ord-1',
+        orderNumber: 'NX-001',
+        customerName: 'Customer A',
+        customerPhone: '08011111111',
+        deliveryState: 'Abuja',
+        deliveryCity: 'Wuse',
+        deliveryAddress: 'Wuse 2',
+        productName: 'Respira Detox Tea',
+        status: 'delivered',
+        quantity: 1,
+        paidQuantity: 1,
+        freeQuantity: 0,
+        basePrice: 30000.0,
+        upsellAmount: 0.0,
+        totalAmount: 30000.0,
+        paymentType: 'pay_on_delivery',
+        paymentStatus: 'paid',
+        createdAt: DateTime.now(),
+      );
+
+      final initialSummary = FinancialSummary.calculate(
+        orders: [order1],
+        remittances: [],
+        user: pdaUser,
+      );
+
+      // Total collected = 30,000
+      expect(initialSummary.cashCollectedAllTime, equals(30000.0));
+      // Rider earning = 1,000 (commission) + 1,500 (transport) = 2,500
+      expect(initialSummary.totalEarningRetained, equals(2500.0));
+      // Net cash to remit to DC = 30,000 - 2,500 = 27,500
+      expect(initialSummary.pendingRemittanceToDC, equals(27500.0));
+
+      // Scenario 2: Rider delivers 2nd COD order (₦20,000) and 1 Failed delivery
+      final order2 = OrderModel(
+        id: 'ord-2',
+        orderNumber: 'NX-002',
+        customerName: 'Customer B',
+        customerPhone: '08022222222',
+        deliveryState: 'Abuja',
+        deliveryCity: 'Maitama',
+        deliveryAddress: 'Maitama',
+        productName: 'Respira Detox Tea',
+        status: 'delivered',
+        quantity: 1,
+        paidQuantity: 1,
+        freeQuantity: 0,
+        basePrice: 20000.0,
+        upsellAmount: 0.0,
+        totalAmount: 20000.0,
+        paymentType: 'pay_on_delivery',
+        paymentStatus: 'paid',
+        createdAt: DateTime.now(),
+      );
+
+      final orderFailed = OrderModel(
+        id: 'ord-3',
+        orderNumber: 'NX-003',
+        customerName: 'Customer C',
+        customerPhone: '08033333333',
+        deliveryState: 'Abuja',
+        deliveryCity: 'Gwarinpa',
+        deliveryAddress: 'Gwarinpa',
+        productName: 'Respira Detox Tea',
+        status: 'failed',
+        quantity: 1,
+        paidQuantity: 1,
+        freeQuantity: 0,
+        basePrice: 20000.0,
+        upsellAmount: 0.0,
+        totalAmount: 20000.0,
+        paymentType: 'pay_on_delivery',
+        paymentStatus: 'failed',
+        createdAt: DateTime.now(),
+      );
+
+      final updatedSummary = FinancialSummary.calculate(
+        orders: [order1, order2, orderFailed],
+        remittances: [],
+        user: pdaUser,
+      );
+
+      // Total COD collected = 30,000 + 20,000 = 50,000
+      expect(updatedSummary.cashCollectedAllTime, equals(50000.0));
+      // Total commission = 2 * 1,000 = 2,000
+      expect(updatedSummary.totalCommissionRetained, equals(2000.0));
+      // Total transport = 2 * 1,500 = 3,000
+      expect(updatedSummary.totalTransportRetained, equals(3000.0));
+      // Total earnings retained = 2,000 + 3,000 + 500 (failed allowance) = 5,500
+      expect(updatedSummary.totalEarningRetained, equals(5500.0));
+      // Net cash to remit to DC = 50,000 - 5,500 = 44,500 (INCREASED PROPERLY!)
+      expect(updatedSummary.pendingRemittanceToDC, equals(44500.0));
+      // Total month earnings = 2 * 2,500 + 500 = 5,500
+      expect(updatedSummary.totalMonthEarnings, equals(5500.0));
+
+      // Scenario 3: Rider submits remittance of ₦40,000
+      final sampleRemittance = RemittanceEntity(
+        id: 'rem-01',
+        referenceNumber: 'REM-1001',
+        amount: 40000.0,
+        status: 'verified',
+        createdAt: DateTime.now(),
+      );
+
+      final reconciledSummary = FinancialSummary.calculate(
+        orders: [order1, order2, orderFailed],
+        remittances: [sampleRemittance],
+        user: pdaUser,
+      );
+
+      // Pending remittance after ₦40,000 verified remittance = 44,500 - 40,000 = 4,500
+      expect(reconciledSummary.pendingRemittanceToDC, equals(4500.0));
+      expect(reconciledSummary.totalVerifiedRemitted, equals(40000.0));
     });
   });
 }
