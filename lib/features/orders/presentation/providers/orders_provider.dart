@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../core/services/local_storage_service.dart';
 import '../../data/datasources/orders_remote_datasource.dart';
 import '../../data/models/order_model.dart';
 import '../../data/repositories/orders_repository_impl.dart';
@@ -56,9 +58,24 @@ class OrdersState {
 class OrdersNotifier extends StateNotifier<OrdersState> {
   final OrdersRepository _repository;
   final GeocodingService? _geocodingService;
+  final LocalStorageService _storageService;
 
-  OrdersNotifier(this._repository, [this._geocodingService]) : super(OrdersState()) {
-    loadOrders();
+  OrdersNotifier(
+    this._repository, [
+    this._geocodingService,
+    LocalStorageService? storageService,
+  ])  : _storageService = storageService ?? LocalStorageServiceImpl(),
+        super(OrdersState()) {
+    _initOrders();
+  }
+
+  Future<void> _initOrders() async {
+    final cached = await _storageService.getCachedOrders();
+    if (cached != null && cached.isNotEmpty) {
+      state = state.copyWith(orders: cached);
+      debugPrint('[ORDERS_PROVIDER] ⚡ Hydrated ${cached.length} orders from local cache.');
+    }
+    await loadOrders();
   }
 
   Future<void> fetchOrders() async {
@@ -71,9 +88,11 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
       if (agentId != null && agentId.isNotEmpty) {
         final orderEntities = await _repository.getAssignedOrders(agentId);
         state = state.copyWith(isLoading: false, orders: orderEntities);
+        await _storageService.cacheOrders(orderEntities);
       } else {
         final orderEntities = await _repository.getDistributionCenterOrders('22222222-2222-4222-8222-222222222222');
         state = state.copyWith(isLoading: false, orders: orderEntities);
+        await _storageService.cacheOrders(orderEntities);
       }
     } catch (e) {
       state = state.copyWith(
@@ -88,6 +107,7 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     try {
       final orderEntities = await _repository.getDistributionCenterOrders(dcId ?? '22222222-2222-4222-8222-222222222222');
       state = state.copyWith(isLoading: false, orders: orderEntities);
+      await _storageService.cacheOrders(orderEntities);
     } catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: 'Failed to load DC orders: $e');
     }

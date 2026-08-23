@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/supabase_constants.dart';
+import '../../../../core/services/local_storage_service.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
 
 class DCWarehouseBatch {
@@ -111,108 +112,6 @@ class DCConsoleState {
   final bool isLoading;
   final String? selectedDriverId;
 
-  static const List<DCFleetDriver> defaultFleetDrivers = [
-    DCFleetDriver(
-      id: 'b1111111-1111-4111-8111-111111111111',
-      driverCode: 'PDA-7000',
-      name: 'Emeka Rider',
-      phone: '08012345678',
-      email: 'emeka.rider@novaexpress.ng',
-      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-      vehicleModel: 'Bajaj Boxer 100 (Personal)',
-      vehiclePlate: 'ABJ-204-XY',
-      vehicleType: 'Motorcycle',
-      status: 'active',
-      assignedZone: 'Wuse 2 & Abuja Central',
-      totalAssignedOrders: 6,
-      completedOrders: 4,
-      routeProgressPercent: 66.7,
-      efficiencyRating: 98.5,
-      cashInCustody: 55000.0,
-      itemsInCustody: 14,
-      currentLatitude: 9.0765,
-      currentLongitude: 7.4832,
-      personnelType: 'pda',
-      compensationType: 'commission',
-      commissionRate: 1000.0,
-      transportAllowance: 1500.0,
-      failedDeliveryAllowance: 500.0,
-      baseSalary: 0.0,
-      upsellBonusPercent: 10.0,
-      bankName: 'Kuda Microfinance Bank',
-      bankAccountNumber: '2019847291',
-      bankAccountName: 'Emeka Rider',
-      guarantorName: 'Chief Nnamdi Okafor',
-      guarantorPhone: '08034567890',
-    ),
-    DCFleetDriver(
-      id: 'b2222222-2222-4222-8222-222222222222',
-      driverCode: 'PDA-7588',
-      name: 'Sanni Abacha',
-      phone: '08098765432',
-      email: 'sanni.abacha@novaexpress.ng',
-      avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-      vehicleModel: 'TVS HLX Plus (Personal)',
-      vehiclePlate: 'ABJ-892-KT',
-      vehicleType: 'Motorcycle',
-      status: 'active',
-      assignedZone: 'Maitama & Garki',
-      totalAssignedOrders: 4,
-      completedOrders: 3,
-      routeProgressPercent: 75.0,
-      efficiencyRating: 99.1,
-      cashInCustody: 44000.0,
-      itemsInCustody: 8,
-      currentLatitude: 9.0882,
-      currentLongitude: 7.4933,
-      personnelType: 'pda',
-      compensationType: 'commission',
-      commissionRate: 1000.0,
-      transportAllowance: 1500.0,
-      failedDeliveryAllowance: 500.0,
-      baseSalary: 0.0,
-      upsellBonusPercent: 10.0,
-      bankName: 'GTBank',
-      bankAccountNumber: '0129847291',
-      bankAccountName: 'Sanni Abacha',
-      guarantorName: 'Alhaji Musa Abacha',
-      guarantorPhone: '08023456789',
-    ),
-    DCFleetDriver(
-      id: 'b3333333-3333-4333-8333-333333333333',
-      driverCode: 'RDR-102',
-      name: 'Babatunde Lawal',
-      phone: '08022223344',
-      email: 'babatunde.lawal@novaexpress.ng',
-      avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150',
-      vehicleModel: 'Haojue 125 (Company Fleet)',
-      vehiclePlate: 'ABJ-501-AB',
-      vehicleType: 'Motorcycle',
-      status: 'active',
-      assignedZone: 'Garki & Asokoro',
-      totalAssignedOrders: 5,
-      completedOrders: 5,
-      routeProgressPercent: 100.0,
-      efficiencyRating: 97.8,
-      cashInCustody: 68000.0,
-      itemsInCustody: 0,
-      currentLatitude: 9.0345,
-      currentLongitude: 7.4891,
-      personnelType: 'in_house_rider',
-      compensationType: 'salary',
-      commissionRate: 500.0,
-      transportAllowance: 800.0,
-      failedDeliveryAllowance: 300.0,
-      baseSalary: 120000.0,
-      upsellBonusPercent: 5.0,
-      bankName: 'Zenith Bank',
-      bankAccountNumber: '1019283746',
-      bankAccountName: 'Babatunde Lawal',
-      guarantorName: 'Mr. Femi Lawal',
-      guarantorPhone: '08098761234',
-    ),
-  ];
-
   const DCConsoleState({
     this.activeHubId = '22222222-2222-4222-8222-222222222222',
     this.activeHubName = 'Wuse Distribution Center',
@@ -221,7 +120,7 @@ class DCConsoleState {
     this.isSidebarCollapsed = false,
     this.searchQuery = '',
     this.fleetFilter = 'all',
-    this.drivers = defaultFleetDrivers,
+    this.drivers = const [],
     this.warehouseBatches = const [],
     this.returnItems = const [],
     this.avgDeliveryTimeMin = 24.5,
@@ -288,11 +187,23 @@ class DCConsoleState {
 }
 
 class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
-  DCConsoleNotifier() : super(const DCConsoleState()) {
+  final LocalStorageService _storageService;
+
+  DCConsoleNotifier([LocalStorageService? storageService])
+      : _storageService = storageService ?? LocalStorageServiceImpl(),
+        super(const DCConsoleState()) {
     _initDrivers();
   }
 
-  void _initDrivers() {
+  Future<void> _initDrivers() async {
+    // 1. Instant hydration from persistent local cache
+    final cached = await _storageService.getCachedFleetDrivers();
+    if (cached != null && cached.isNotEmpty) {
+      state = state.copyWith(drivers: cached);
+      debugPrint('[DC_CONSOLE_PROVIDER] ⚡ Hydrated ${cached.length} drivers from local storage cache.');
+    }
+
+    // 2. Fetch fresh real data from live Supabase DB
     bool isTest = false;
     if (!kIsWeb) {
       try {
@@ -300,7 +211,7 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
       } catch (_) {}
     }
     if (!isTest) {
-      loadDriversFromDatabase();
+      await loadDriversFromDatabase();
     }
   }
 
@@ -343,9 +254,12 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
   }
 
   void addDriver(DCFleetDriver driver) {
-    state = state.copyWith(
-      drivers: [driver, ...state.drivers.where((d) => d.id != driver.id && d.driverCode != driver.driverCode && (driver.email.isEmpty || d.email != driver.email))],
-    );
+    final updated = [
+      driver,
+      ...state.drivers.where((d) => d.id != driver.id && d.driverCode != driver.driverCode && (driver.email.isEmpty || d.email != driver.email)),
+    ];
+    state = state.copyWith(drivers: updated);
+    _storageService.cacheFleetDrivers(updated);
   }
 
   Future<void> loadDriversFromDatabase() async {
@@ -381,18 +295,12 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
       }
 
       if (dbDrivers.isNotEmpty) {
-        // Merge with existing drivers
-        final merged = [...dbDrivers];
-        for (final local in state.drivers) {
-          if (!merged.any((d) => d.id == local.id || d.driverCode == local.driverCode || (d.email.isNotEmpty && d.email == local.email))) {
-            merged.add(local);
-          }
-        }
-        state = state.copyWith(drivers: merged);
-        debugPrint('[DC_CONSOLE_PROVIDER] 🚚 Loaded ${dbDrivers.length} active fleet drivers from live Supabase DB.');
+        state = state.copyWith(drivers: dbDrivers, isLoading: false);
+        await _storageService.cacheFleetDrivers(dbDrivers);
+        debugPrint('[DC_CONSOLE_PROVIDER] 🚚 Loaded ${dbDrivers.length} active fleet drivers from live Supabase DB and updated local cache.');
       }
     } catch (e) {
-      debugPrint('[DC_CONSOLE_PROVIDER] ℹ️ Supabase fleet fetch notice ($e). Active local drivers retained.');
+      debugPrint('[DC_CONSOLE_PROVIDER] ℹ️ Supabase fleet fetch notice ($e). Local cached drivers retained.');
     } finally {
       dbClient?.dispose();
     }

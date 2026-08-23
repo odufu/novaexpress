@@ -109,6 +109,48 @@ class OrderModel extends OrderEntity {
     );
   }
 
+  factory OrderModel.fromEntity(OrderEntity entity) {
+    return OrderModel(
+      id: entity.id,
+      orderNumber: entity.orderNumber,
+      customerName: entity.customerName,
+      customerPhone: entity.customerPhone,
+      customerAltPhone: entity.customerAltPhone,
+      deliveryState: entity.deliveryState,
+      deliveryCity: entity.deliveryCity,
+      deliveryAddress: entity.deliveryAddress,
+      landmark: entity.landmark,
+      lga: entity.lga,
+      productName: entity.productName,
+      status: entity.status,
+      quantity: entity.quantity,
+      paidQuantity: entity.paidQuantity,
+      freeQuantity: entity.freeQuantity,
+      basePrice: entity.basePrice,
+      upsellAmount: entity.upsellAmount,
+      totalAmount: entity.totalAmount,
+      paymentType: entity.paymentType,
+      paymentStatus: entity.paymentStatus,
+      fulfillmentType: entity.fulfillmentType,
+      clientName: entity.clientName,
+      packageCustodyId: entity.packageCustodyId,
+      clientDeliveryFee: entity.clientDeliveryFee,
+      agentEntitlement: entity.agentEntitlement,
+      deliveryNotes: entity.deliveryNotes,
+      deliveryAgentId: entity.deliveryAgentId,
+      deliveryAgentName: entity.deliveryAgentName,
+      deliveryAgentCode: entity.deliveryAgentCode,
+      distributionCenterId: entity.distributionCenterId,
+      latitude: entity.latitude,
+      longitude: entity.longitude,
+      geocodingStatus: entity.geocodingStatus,
+      geocodedAddress: entity.geocodedAddress,
+      locationConfidence: entity.locationConfidence,
+      isLocationVerified: entity.isLocationVerified,
+      createdAt: entity.createdAt,
+    );
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,

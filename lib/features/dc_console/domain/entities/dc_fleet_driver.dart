@@ -189,4 +189,40 @@ class DCFleetDriver {
       guarantorPhone: json['guarantor_phone'] as String? ?? json['guarantorPhone'] as String? ?? '',
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'driver_code': driverCode,
+      'name': name,
+      'phone': phone,
+      'email': email,
+      'avatar_url': avatarUrl,
+      'vehicle_model': vehicleModel,
+      'vehicle_plate_number': vehiclePlate,
+      'vehicle_type': vehicleType,
+      'current_status': status,
+      'operating_city': assignedZone,
+      'total_assigned_orders': totalAssignedOrders,
+      'completed_orders': completedOrders,
+      'route_progress_percent': routeProgressPercent,
+      'efficiency_rating': efficiencyRating,
+      'current_cod_balance': cashInCustody,
+      'items_in_custody': itemsInCustody,
+      'current_latitude': currentLatitude,
+      'current_longitude': currentLongitude,
+      'personnel_type': personnelType,
+      'compensation_type': compensationType,
+      'commission_rate': commissionRate,
+      'transport_allowance': transportAllowance,
+      'failed_delivery_allowance': failedDeliveryAllowance,
+      'base_salary': baseSalary,
+      'upsell_bonus_percent': upsellBonusPercent,
+      'bank_name': bankName,
+      'bank_account_number': bankAccountNumber,
+      'bank_account_name': bankAccountName,
+      'guarantor_name': guarantorName,
+      'guarantor_phone': guarantorPhone,
+    };
+  }
 }
