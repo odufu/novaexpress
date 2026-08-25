@@ -145,6 +145,58 @@ void main() {
 
       expect(find.text('In-App Notice Dispatched ✓'), findsOneWidget);
     });
+
+    testWidgets('DCOrderPaymentMatchingPage switches between Card View and Table View smoothly', (tester) async {
+      tester.view.physicalSize = const Size(1280, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            ordersProvider.overrideWith((ref) => MockTestOrdersNotifier([orderDirectPaystack, orderCashAwaiting])),
+            financeProvider.overrideWith((ref) => MockTestFinanceNotifier([])),
+            authProvider.overrideWith((ref) => MockTestAuthNotifier(testSupervisor)),
+            notificationsProvider.overrideWith((ref) => MockTestNotificationsNotifier()),
+          ],
+          child: const MaterialApp(
+            home: DCOrderPaymentMatchingPage(),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Verify Table and Cards switch buttons exist
+      expect(find.text('Table'), findsOneWidget);
+      expect(find.text('Cards'), findsOneWidget);
+
+      // Switch to Table View
+      await tester.tap(find.text('Table'));
+      await tester.pumpAndSettle();
+
+      // Verify DataTable column headers
+      expect(find.text('SHIPMENT / ITEM'), findsOneWidget);
+      expect(find.text('CUSTOMER & LOCATION'), findsOneWidget);
+      expect(find.text('PAYABLE AMOUNT'), findsOneWidget);
+      expect(find.text('PAYMENT METHOD'), findsOneWidget);
+      expect(find.text('RECONCILIATION / NET REMITTANCE'), findsOneWidget);
+      expect(find.text('ASSIGNED RIDER'), findsOneWidget);
+      expect(find.text('ACTION'), findsOneWidget);
+
+      // Verify Table Rows
+      expect(find.text('Direct (Paystack)'), findsOneWidget);
+      expect(find.text('Cash POD'), findsOneWidget);
+      expect(find.text('Settled (₦0 Cash Held)'), findsOneWidget);
+      expect(find.textContaining('Net Due: ₦15,600.00'), findsOneWidget);
+
+      // Switch back to Cards View
+      await tester.tap(find.text('Cards'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('SHIPMENT / ITEM'), findsNothing);
+      expect(find.text('⚡ DIRECT TRANSFER (PAYSTACK PAID)'), findsOneWidget);
+    });
   });
 }
 

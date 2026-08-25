@@ -19,6 +19,7 @@ class _DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatch
   final TextEditingController _searchController = TextEditingController();
   String _selectedFilter = 'all'; // 'all', 'direct_paystack', 'cash_awaiting_remittance', 'remitted_verified', 'in_transit'
   String? _selectedRiderFilter; // Filter by specific rider code or null
+  bool _isTableView = false; // View mode: Table View vs Card View
 
   @override
   void initState() {
@@ -334,29 +335,67 @@ class _DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatch
                   ),
                   const SizedBox(height: 12),
 
-                  // Filter Chips / Tabs
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        _buildFilterChip('all', 'All Orders (${allOrders.length})', Icons.dashboard_rounded),
-                        const SizedBox(width: 8),
-                        _buildFilterChip('direct_paystack', '⚡ Direct Paystack (${directPaystackOrders.length})', Icons.bolt_rounded, color: const Color(0xFF00A2D3)),
-                        const SizedBox(width: 8),
-                        _buildFilterChip('cash_awaiting_remittance', '⚠️ Cash Awaiting Remittance (${cashAwaitingOrders.length})', Icons.warning_amber_rounded, color: const Color(0xFFF59E0B)),
-                        const SizedBox(width: 8),
-                        _buildFilterChip('remitted_verified', '✅ Remitted & Verified (${remittedOrders.length})', Icons.check_circle_rounded, color: const Color(0xFF10B981)),
-                        const SizedBox(width: 8),
-                        _buildFilterChip('in_transit', '⏳ In-Transit / Pending', Icons.local_shipping_rounded, color: const Color(0xFF64748B)),
-                      ],
-                    ),
+                  // Filter Chips / Tabs & View Switcher
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Filter Chips / Tabs
+                      Expanded(
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              _buildFilterChip('all', 'All Orders (${allOrders.length})', Icons.dashboard_rounded),
+                              const SizedBox(width: 8),
+                              _buildFilterChip('direct_paystack', '⚡ Direct Paystack (${directPaystackOrders.length})', Icons.bolt_rounded, color: const Color(0xFF00A2D3)),
+                              const SizedBox(width: 8),
+                              _buildFilterChip('cash_awaiting_remittance', '⚠️ Cash Awaiting Remittance (${cashAwaitingOrders.length})', Icons.warning_amber_rounded, color: const Color(0xFFF59E0B)),
+                              const SizedBox(width: 8),
+                              _buildFilterChip('remitted_verified', '✅ Remitted & Verified (${remittedOrders.length})', Icons.check_circle_rounded, color: const Color(0xFF10B981)),
+                              const SizedBox(width: 8),
+                              _buildFilterChip('in_transit', '⏳ In-Transit / Pending', Icons.local_shipping_rounded, color: const Color(0xFF64748B)),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+
+                      // View Mode Switcher: Cards vs Table
+                      Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(9),
+                          border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _buildViewToggleBtn(
+                              icon: Icons.table_chart_rounded,
+                              label: 'Table',
+                              isSelected: _isTableView,
+                              isDark: isDark,
+                              onTap: () => setState(() => _isTableView = true),
+                            ),
+                            _buildViewToggleBtn(
+                              icon: Icons.view_agenda_rounded,
+                              label: 'Cards',
+                              isSelected: !_isTableView,
+                              isDark: isDark,
+                              onTap: () => setState(() => _isTableView = false),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 16),
 
-            // Order-Payment Matching Matrix List
+            // Order-Payment Matching Matrix (Table View or Card View)
             if (filteredOrders.isEmpty)
               Container(
                 width: double.infinity,
@@ -383,6 +422,8 @@ class _DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatch
                   ],
                 ),
               )
+            else if (_isTableView)
+              _buildOrderPaymentTableView(filteredOrders, allRemittances, isDark, isMobile)
             else
               ListView.separated(
                 shrinkWrap: true,
@@ -396,6 +437,424 @@ class _DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatch
               ),
             const SizedBox(height: 30),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildViewToggleBtn({
+    required IconData icon,
+    required String label,
+    required bool isSelected,
+    required bool isDark,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFF37021) : Colors.transparent,
+          borderRadius: BorderRadius.circular(7),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 14,
+              color: isSelected ? Colors.white : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 11.5,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected ? Colors.white : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  DataColumn _buildTableColumnHeader(String label, IconData icon, bool isDark) {
+    return DataColumn(
+      label: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: const Color(0xFFF37021)),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: GoogleFonts.jetBrainsMono(
+              fontSize: 10.5,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.6,
+              color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOrderPaymentTableView(
+    List<OrderEntity> orders,
+    List<RemittanceEntity> remittances,
+    bool isDark,
+    bool isMobile,
+  ) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 1080),
+            child: DataTable(
+              headingRowHeight: 46,
+              dataRowMinHeight: 64,
+              dataRowMaxHeight: 76,
+              horizontalMargin: 16,
+              columnSpacing: 18,
+              headingRowColor: WidgetStateProperty.all(
+                isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+              ),
+              columns: [
+                _buildTableColumnHeader('SHIPMENT / ITEM', Icons.local_shipping_outlined, isDark),
+                _buildTableColumnHeader('CUSTOMER & LOCATION', Icons.location_on_outlined, isDark),
+                _buildTableColumnHeader('PAYABLE AMOUNT', Icons.payments_outlined, isDark),
+                _buildTableColumnHeader('PAYMENT METHOD', Icons.bolt_rounded, isDark),
+                _buildTableColumnHeader('RECONCILIATION / NET REMITTANCE', Icons.fact_check_outlined, isDark),
+                _buildTableColumnHeader('ASSIGNED RIDER', Icons.delivery_dining_rounded, isDark),
+                _buildTableColumnHeader('ACTION', Icons.support_agent_rounded, isDark),
+              ],
+              rows: orders.map((order) {
+                final paymentCategory = _getOrderPaymentCategory(order, remittances);
+                final netRemittanceDue = _calculateNetRemittanceDue(order);
+                final riderName = order.deliveryAgentName ?? (order.deliveryAgentCode != null ? 'Rider ${order.deliveryAgentCode}' : 'Unassigned Rider');
+                final riderCode = order.deliveryAgentCode ?? 'PDA-7182';
+                const riderPhone = '08031234567';
+                final isDirectPaystack = paymentCategory == 'direct_paystack';
+                final isCashAwaiting = paymentCategory == 'cash_awaiting_remittance';
+                final isRemitted = paymentCategory == 'remitted_verified';
+
+                return DataRow(
+                  color: WidgetStateProperty.resolveWith<Color?>((states) {
+                    if (states.contains(WidgetState.hovered)) {
+                      return isDark ? const Color(0xFF253349) : const Color(0xFFF8FAFC);
+                    }
+                    return null;
+                  }),
+                  cells: [
+                    // 1. Shipment / Item Cell
+                    DataCell(
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                '#${order.orderNumber}',
+                                style: GoogleFonts.jetBrainsMono(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF64748B).withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  '${order.quantity}x',
+                                  style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF64748B)),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 180),
+                            child: Text(
+                              order.productName,
+                              style: GoogleFonts.inter(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // 2. Customer & Location Cell
+                    DataCell(
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 180),
+                            child: Text(
+                              order.customerName,
+                              style: GoogleFonts.inter(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w600,
+                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              const Icon(Icons.place_outlined, size: 12, color: Color(0xFF64748B)),
+                              const SizedBox(width: 3),
+                              Text(
+                                order.deliveryCity,
+                                style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // 3. Payable Amount Cell
+                    DataCell(
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            CurrencyFormatter.formatNaira(order.totalAmount),
+                            style: GoogleFonts.jetBrainsMono(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w900,
+                              color: const Color(0xFFF37021),
+                            ),
+                          ),
+                          Text(
+                            order.statusDisplay,
+                            style: GoogleFonts.inter(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: order.status == 'delivered' ? const Color(0xFF10B981) : const Color(0xFF3B82F6),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // 4. Payment Method Cell
+                    DataCell(
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isDirectPaystack
+                              ? const Color(0xFF00A2D3).withValues(alpha: 0.15)
+                              : const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: isDirectPaystack
+                                ? const Color(0xFF00A2D3).withValues(alpha: 0.4)
+                                : const Color(0xFFF59E0B).withValues(alpha: 0.4),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isDirectPaystack ? Icons.bolt_rounded : Icons.payments_rounded,
+                              size: 13,
+                              color: isDirectPaystack ? const Color(0xFF00A2D3) : const Color(0xFFD97706),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              isDirectPaystack ? 'Direct (Paystack)' : 'Cash POD',
+                              style: GoogleFonts.jetBrainsMono(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: isDirectPaystack ? const Color(0xFF00A2D3) : const Color(0xFFD97706),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // 5. Reconciliation / Net Remittance Cell
+                    DataCell(
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (isDirectPaystack) ...[
+                            Row(
+                              children: [
+                                const Icon(Icons.check_circle_rounded, size: 13, color: Color(0xFF10B981)),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Settled (₦0 Cash Held)',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: const Color(0xFF10B981),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Text(
+                              'Earnings credited to My Balance',
+                              style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B)),
+                            ),
+                          ] else if (isCashAwaiting) ...[
+                            Row(
+                              children: [
+                                const Icon(Icons.warning_amber_rounded, size: 13, color: Color(0xFFD97706)),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Net Due: ${CurrencyFormatter.formatNaira(netRemittanceDue)}',
+                                  style: GoogleFonts.jetBrainsMono(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: const Color(0xFFD97706),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Text(
+                              'Gross: ${CurrencyFormatter.formatNaira(order.totalAmount)} in custody',
+                              style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B)),
+                            ),
+                          ] else if (isRemitted) ...[
+                            Row(
+                              children: [
+                                const Icon(Icons.verified_rounded, size: 13, color: Color(0xFF10B981)),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Remitted & Reconciled',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: const Color(0xFF10B981),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Text(
+                              'Cleared into DC Treasury',
+                              style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B)),
+                            ),
+                          ] else ...[
+                            Row(
+                              children: [
+                                const Icon(Icons.schedule_rounded, size: 13, color: Color(0xFF64748B)),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Payment Pending',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF64748B),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Text(
+                              'Awaiting delivery handover',
+                              style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B)),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+
+                    // 6. Assigned Rider Cell
+                    DataCell(
+                      Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 13,
+                            backgroundColor: const Color(0xFF00A2D3).withValues(alpha: 0.2),
+                            child: Text(
+                              riderName.isNotEmpty ? riderName.substring(0, 1).toUpperCase() : 'R',
+                              style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF00A2D3)),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                riderName,
+                                style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w600, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                              ),
+                              Text(
+                                riderCode,
+                                style: GoogleFonts.jetBrainsMono(fontSize: 10, color: const Color(0xFF64748B)),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // 7. Action Cell
+                    DataCell(
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          DCContactRiderModal.show(
+                            context: context,
+                            order: order,
+                            riderName: riderName,
+                            riderCode: riderCode,
+                            riderPhone: riderPhone,
+                            riderId: order.deliveryAgentId,
+                            amountAwaitingRemittance: netRemittanceDue,
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isCashAwaiting ? const Color(0xFFF37021) : const Color(0xFF031632),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                          elevation: 0,
+                          minimumSize: const Size(0, 32),
+                        ),
+                        icon: const Icon(Icons.support_agent_rounded, size: 14),
+                        label: Text(
+                          isCashAwaiting ? 'Remind' : 'Contact',
+                          style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
         ),
       ),
     );
