@@ -17,6 +17,8 @@ abstract class FinanceRemoteDataSource {
     String? referenceNumber,
     String? discrepancyReason,
     double? discrepancyAmount,
+    double? expectedAmount,
+    bool isPartial = false,
     String? notes,
   });
   Future<Map<String, dynamic>> requestPayout({
@@ -29,12 +31,28 @@ abstract class FinanceRemoteDataSource {
   });
   Future<List<Map<String, dynamic>>> getPayoutRequests(String agentId);
   Future<List<Map<String, dynamic>>> getRiderTransactions(String agentId);
+  Future<Map<String, dynamic>?> getPaystackTransactionDetails(String reference);
 }
 
 class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
   final SupabaseClient supabaseClient;
 
   FinanceRemoteDataSourceImpl(this.supabaseClient);
+
+  @override
+  Future<Map<String, dynamic>?> getPaystackTransactionDetails(String reference) async {
+    try {
+      final response = await supabaseClient
+          .from('paystack_transactions')
+          .select()
+          .eq('reference', reference)
+          .maybeSingle();
+
+      return response != null ? Map<String, dynamic>.from(response) : null;
+    } catch (_) {
+      return null;
+    }
+  }
 
   @override
   Future<List<RemittanceModel>> getAgentRemittances(String agentId) async {
@@ -44,13 +62,19 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
           ? agentId
           : 'b1111111-1111-4111-8111-111111111111';
 
-      final agentFilter = 'distribution_center_id.eq.$validAgentUuid,delivery_agent_id.eq.$validAgentUuid,delivery_agent_id.eq.b1111111-1111-4111-8111-111111111111,delivery_agent_id.is.null';
-
-      final response = await supabaseClient
-          .from(SupabaseConstants.cashRemittancesTable)
-          .select()
-          .or(agentFilter)
-          .order('created_at', ascending: false);
+      dynamic response;
+      try {
+        response = await supabaseClient
+            .from(SupabaseConstants.cashRemittancesTable)
+            .select()
+            .or('delivery_agent_id.eq.$validAgentUuid,delivery_agent_id.eq.b1111111-1111-4111-8111-111111111111')
+            .order('created_at', ascending: false);
+      } catch (_) {
+        response = await supabaseClient
+            .from(SupabaseConstants.cashRemittancesTable)
+            .select()
+            .order('created_at', ascending: false);
+      }
 
       final list = (response as List)
           .map((item) => RemittanceModel.fromJson(item))
@@ -76,13 +100,19 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     String? referenceNumber,
     String? discrepancyReason,
     double? discrepancyAmount,
+    double? expectedAmount,
+    bool isPartial = false,
     String? notes,
   }) async {
     final ref = referenceNumber ?? 'REM-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
     final isPaystack = paymentMethod == 'paystack' || paymentMethod == 'paystack_transfer';
     final initialStatus = isPaystack ? 'verified' : 'pending';
+    final actualIsPartial = isPartial || (expectedAmount != null && expectedAmount > amount && amount > 0);
+    final actualDiscrepancy = discrepancyAmount ?? (expectedAmount != null && expectedAmount > amount ? (amount - expectedAmount) : null);
     final remittanceNotes = isPaystack
-        ? '[PAYSTACK] Ref: $ref - Auto-verified instant remittance. ${notes ?? ""}'
+        ? (actualIsPartial
+            ? '[PAYSTACK PARTIAL] Ref: $ref - Paid ₦$amount of expected ₦$expectedAmount. ${notes ?? ""}'
+            : '[PAYSTACK] Ref: $ref - Auto-verified instant remittance. ${notes ?? ""}')
         : '[${paymentMethod.toUpperCase()}] Ref: $ref - ${notes ?? ""}';
 
     final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
@@ -111,6 +141,14 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
             'paymentMethod': backendPaymentMethod,
             'depositReceiptUrl': depositReceiptUrl,
             'referenceNumber': ref,
+            'grossCollections': grossCollections,
+            'commissionDeducted': commissionDeducted,
+            'transportAllowanceDeducted': transportAllowanceDeducted,
+            'posFee': posFee,
+            'expectedAmount': expectedAmount,
+            'isPartial': actualIsPartial,
+            'discrepancyAmount': actualDiscrepancy,
+            'discrepancyReason': discrepancyReason,
             'notes': remittanceNotes,
           },
         );
@@ -131,6 +169,10 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
             paymentMethod: paymentMethod,
             depositReceiptUrl: depositReceiptUrl,
             status: rem['status'] ?? initialStatus,
+            expectedAmount: expectedAmount,
+            isPartial: actualIsPartial,
+            discrepancyAmount: actualDiscrepancy,
+            discrepancyReason: discrepancyReason,
             notes: remittanceNotes,
             createdAt: DateTime.now(),
           );
@@ -147,6 +189,15 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
         'status': initialStatus,
         'notes': remittanceNotes,
         'payment_method': isPaystack ? 'paystack' : paymentMethod,
+        'reference_number': ref,
+        'gross_collections': grossCollections,
+        'commission_deducted': commissionDeducted,
+        'transport_allowance_deducted': transportAllowanceDeducted,
+        'pos_fee': posFee,
+        'expected_amount': expectedAmount,
+        'is_partial': actualIsPartial,
+        'discrepancy_amount': actualDiscrepancy,
+        'discrepancy_reason': discrepancyReason,
         'created_at': DateTime.now().toIso8601String(),
       };
       if (isPaystack) {

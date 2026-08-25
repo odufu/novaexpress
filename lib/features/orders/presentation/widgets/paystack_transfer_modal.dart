@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/constants/paystack_constants.dart';
 import '../../../../core/helpers/formatters.dart';
 import '../../../../core/services/paystack_service.dart';
+import '../../../../core/services/paystack_web_interop.dart';
 
 class PaystackTransferModal extends StatefulWidget {
   final String orderNumber;
@@ -106,6 +108,37 @@ class _PaystackTransferModalState extends State<PaystackTransferModal>
     );
   }
 
+  void _openPaystackInline() {
+    if (kIsWeb) {
+      final amountKobo = (widget.amount * 100).toInt();
+      launchPaystackInlineJs(
+        publicKey: PaystackConstants.publicKey,
+        email: widget.customerEmail,
+        amountKobo: amountKobo,
+        reference: _paymentReference,
+        metadata: {
+          'type': 'direct_transfer',
+          'order_number': widget.orderNumber,
+          'order_id': widget.orderId,
+          'agent_id': widget.agentId,
+        },
+        onSuccess: (String ref) async {
+          if (mounted) {
+            setState(() {
+              _isReceived = true;
+            });
+            await Future.delayed(const Duration(milliseconds: 500));
+            if (mounted) {
+              Navigator.pop(context);
+              widget.onPaymentConfirmed();
+            }
+          }
+        },
+        onClose: () {},
+      );
+    }
+  }
+
   @override
   void dispose() {
     _pulseController.dispose();
@@ -132,7 +165,7 @@ class _PaystackTransferModalState extends State<PaystackTransferModal>
     if (!mounted) return;
 
     if (res.isSuccessful) {
-      // Record transaction
+      // Record transaction in Supabase Paystack ledger
       await _paystackService.recordTransaction(
         reference: _paymentReference,
         amount: widget.amount,
@@ -150,7 +183,7 @@ class _PaystackTransferModalState extends State<PaystackTransferModal>
         _isReceived = true;
       });
 
-      Future.delayed(const Duration(milliseconds: 900), () {
+      Future.delayed(const Duration(milliseconds: 700), () {
         if (mounted) {
           Navigator.pop(context);
           widget.onPaymentConfirmed();
@@ -220,7 +253,7 @@ class _PaystackTransferModalState extends State<PaystackTransferModal>
                       style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                     Text(
-                      'Instant Bank Transfer & USSD Settlement',
+                      'Instant Bank Transfer, USSD & Card Settlement',
                       style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
                     ),
                   ],
@@ -348,6 +381,24 @@ class _PaystackTransferModalState extends State<PaystackTransferModal>
             ),
           ),
           const SizedBox(height: 14),
+
+          // Web inline trigger button if on web
+          if (kIsWeb) ...[
+            OutlinedButton.icon(
+              onPressed: _openPaystackInline,
+              icon: const Icon(Icons.bolt_rounded, size: 18, color: Color(0xFF00A2D3)),
+              label: Text(
+                'Open Paystack Interactive Checkout Popup',
+                style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF00A2D3)),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Color(0xFF00A2D3)),
+                padding: const EdgeInsets.symmetric(vertical: 11),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
 
           // Rider Earning Protection Banner
           Container(

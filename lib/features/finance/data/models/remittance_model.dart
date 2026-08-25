@@ -18,6 +18,18 @@ class RemittanceModel extends RemittanceEntity {
     super.verifiedByName,
     super.discrepancyAmount,
     super.discrepancyReason,
+    super.expectedAmount,
+    super.isPartial = false,
+    super.paystackChannel,
+    super.paystackBank,
+    super.paystackAuthCode,
+    super.paystackPaidAt,
+    super.payerEmail,
+    super.payerName,
+    super.gatewayResponse,
+    super.destinationBankName = 'NovaExpress Main Account (Zenith Bank)',
+    super.destinationAccountNumber = '1012398412',
+    super.destinationAccountName = 'NovaExpress Logistics Limited',
     super.notes,
     required super.createdAt,
     super.verifiedAt,
@@ -49,10 +61,19 @@ class RemittanceModel extends RemittanceEntity {
         ? rawPos.toDouble()
         : (double.tryParse(rawPos?.toString() ?? '') ?? 0.0);
 
+    final dynamic rawExpected = json['expected_amount'];
+    final double? expectedAmount = (rawExpected is num)
+        ? rawExpected.toDouble()
+        : (rawExpected != null ? double.tryParse(rawExpected.toString()) : null);
+
     final dynamic rawDiscrepancy = json['discrepancy_amount'];
     final double? discrepancyAmount = (rawDiscrepancy is num)
         ? rawDiscrepancy.toDouble()
         : (rawDiscrepancy != null ? double.tryParse(rawDiscrepancy.toString()) : null);
+
+    final bool isPartial = json['is_partial'] == true ||
+        (discrepancyAmount != null && discrepancyAmount < -0.01) ||
+        (expectedAmount != null && expectedAmount > amount && amount > 0);
 
     final id = json['id']?.toString() ?? '';
     final ref = json['reference_number']?.toString() ??
@@ -77,6 +98,15 @@ class RemittanceModel extends RemittanceEntity {
       parsedVerified = null;
     }
 
+    DateTime? parsedPaystackPaidAt;
+    try {
+      parsedPaystackPaidAt = json['paystack_paid_at'] != null
+          ? DateTime.parse(json['paystack_paid_at'].toString())
+          : null;
+    } catch (_) {
+      parsedPaystackPaidAt = null;
+    }
+
     return RemittanceModel(
       id: id,
       referenceNumber: ref,
@@ -91,9 +121,21 @@ class RemittanceModel extends RemittanceEntity {
       depositReceiptUrl: json['deposit_receipt_url']?.toString(),
       status: json['status']?.toString() ?? 'pending',
       verifiedByUserId: json['verified_by_finance_user_id']?.toString() ?? json['verified_by_user_id']?.toString(),
-      verifiedByName: json['verified_by_name']?.toString() ?? 'Wuse DC — Operations',
+      verifiedByName: json['verified_by_name']?.toString() ?? 'Paystack Settlement Gateway',
       discrepancyAmount: discrepancyAmount,
       discrepancyReason: json['discrepancy_reason']?.toString(),
+      expectedAmount: expectedAmount,
+      isPartial: isPartial,
+      paystackChannel: json['paystack_channel']?.toString() ?? json['channel']?.toString(),
+      paystackBank: json['paystack_bank']?.toString() ?? json['bank_name']?.toString(),
+      paystackAuthCode: json['paystack_auth_code']?.toString(),
+      paystackPaidAt: parsedPaystackPaidAt,
+      payerEmail: json['payer_email']?.toString(),
+      payerName: json['payer_name']?.toString(),
+      gatewayResponse: json['gateway_response']?.toString(),
+      destinationBankName: json['destination_bank_name']?.toString() ?? 'NovaExpress Main Account (Zenith Bank)',
+      destinationAccountNumber: json['destination_account_number']?.toString() ?? '1012398412',
+      destinationAccountName: json['destination_account_name']?.toString() ?? 'NovaExpress Logistics Limited',
       notes: json['notes']?.toString(),
       createdAt: parsedCreated,
       verifiedAt: parsedVerified,
@@ -118,6 +160,18 @@ class RemittanceModel extends RemittanceEntity {
       verifiedByName: entity.verifiedByName,
       discrepancyAmount: entity.discrepancyAmount,
       discrepancyReason: entity.discrepancyReason,
+      expectedAmount: entity.expectedAmount,
+      isPartial: entity.isPartial,
+      paystackChannel: entity.paystackChannel,
+      paystackBank: entity.paystackBank,
+      paystackAuthCode: entity.paystackAuthCode,
+      paystackPaidAt: entity.paystackPaidAt,
+      payerEmail: entity.payerEmail,
+      payerName: entity.payerName,
+      gatewayResponse: entity.gatewayResponse,
+      destinationBankName: entity.destinationBankName,
+      destinationAccountNumber: entity.destinationAccountNumber,
+      destinationAccountName: entity.destinationAccountName,
       notes: entity.notes,
       createdAt: entity.createdAt,
       verifiedAt: entity.verifiedAt,
@@ -141,6 +195,18 @@ class RemittanceModel extends RemittanceEntity {
       'verified_by_name': verifiedByName,
       'discrepancy_amount': discrepancyAmount,
       'discrepancy_reason': discrepancyReason,
+      'expected_amount': expectedAmount,
+      'is_partial': isPartial,
+      'paystack_channel': paystackChannel,
+      'paystack_bank': paystackBank,
+      'paystack_auth_code': paystackAuthCode,
+      'paystack_paid_at': paystackPaidAt?.toIso8601String(),
+      'payer_email': payerEmail,
+      'payer_name': payerName,
+      'gateway_response': gatewayResponse,
+      'destination_bank_name': destinationBankName,
+      'destination_account_number': destinationAccountNumber,
+      'destination_account_name': destinationAccountName,
       'notes': notes,
       'created_at': createdAt.toIso8601String(),
       'verified_at': verifiedAt?.toIso8601String(),

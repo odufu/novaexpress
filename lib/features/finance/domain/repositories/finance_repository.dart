@@ -16,6 +16,8 @@ abstract class FinanceRepository {
     String? referenceNumber,
     String? discrepancyReason,
     double? discrepancyAmount,
+    double? expectedAmount,
+    bool isPartial = false,
     String? notes,
   });
   Future<Map<String, dynamic>> requestPayout({
@@ -28,4 +30,5 @@ abstract class FinanceRepository {
   });
   Future<List<Map<String, dynamic>>> getPayoutRequests(String agentId);
   Future<List<TransactionItem>> getRiderTransactions(String agentId);
+  Future<Map<String, dynamic>?> getPaystackTransactionDetails(String reference);
 }

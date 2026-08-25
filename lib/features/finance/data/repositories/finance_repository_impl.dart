@@ -27,6 +27,8 @@ class FinanceRepositoryImpl implements FinanceRepository {
     String? referenceNumber,
     String? discrepancyReason,
     double? discrepancyAmount,
+    double? expectedAmount,
+    bool isPartial = false,
     String? notes,
   }) async {
     return await remoteDataSource.submitRemittance(
@@ -42,6 +44,8 @@ class FinanceRepositoryImpl implements FinanceRepository {
       referenceNumber: referenceNumber,
       discrepancyReason: discrepancyReason,
       discrepancyAmount: discrepancyAmount,
+      expectedAmount: expectedAmount,
+      isPartial: isPartial,
       notes: notes,
     );
   }
@@ -74,5 +78,10 @@ class FinanceRepositoryImpl implements FinanceRepository {
   Future<List<TransactionItem>> getRiderTransactions(String agentId) async {
     final rawList = await remoteDataSource.getRiderTransactions(agentId);
     return rawList.map((json) => TransactionItem.fromJson(json)).toList();
+  }
+
+  @override
+  Future<Map<String, dynamic>?> getPaystackTransactionDetails(String reference) async {
+    return await remoteDataSource.getPaystackTransactionDetails(reference);
   }
 }

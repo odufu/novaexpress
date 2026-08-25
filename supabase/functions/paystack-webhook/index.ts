@@ -141,6 +141,20 @@ serve(async (req: Request) => {
             description: `Commission & allowance credited from Paystack customer direct transfer on order ${targetOrder.order_number}.`,
             created_at: new Date().toISOString(),
           });
+
+          // Send real-time in-app notification to delivery agent
+          try {
+            await supabaseClient.from("notifications").insert({
+              company_id: targetOrder.company_id || "11111111-1111-4111-8111-111111111111",
+              delivery_agent_id: deliveryAgentId,
+              category: "delivery",
+              title: "Paystack Payment Received! ⚡",
+              message: `Payment of ₦${amount.toLocaleString()} for order ${targetOrder.order_number} confirmed via Paystack. Your ₦${entitlement.toLocaleString()} entitlement has been credited to My Balance.`,
+              action_route: `/orders/${targetOrder.id}`,
+              is_read: false,
+              created_at: new Date().toISOString(),
+            });
+          } catch (_) {}
         }
       }
     }
@@ -157,14 +171,48 @@ serve(async (req: Request) => {
         } catch (_) {}
       }
 
+      const expectedAmount = metadata.expected_amount ? Number(metadata.expected_amount) : amount;
+      const isPartial = amount < expectedAmount;
+      const discrepancyAmount = isPartial ? (amount - expectedAmount) : 0;
+      const discrepancyReason = isPartial 
+        ? (metadata.discrepancy_reason || "Partial Remittance via Paystack")
+        : (metadata.discrepancy_reason || null);
+
+      const remittanceNotes = isPartial
+        ? `[PAYSTACK PARTIAL] Paid ₦${amount.toLocaleString()} of expected ₦${expectedAmount.toLocaleString()}. Remaining balance: ₦${(expectedAmount - amount).toLocaleString()}. Ref: ${reference}`
+        : `Auto-verified via Paystack Instant Remittance (Ref: ${reference})`;
+
+      const paystackChannel = data.channel || "bank_transfer";
+      const paystackBank = data.authorization?.bank || "Titan Trust Bank / Paystack";
+      const paystackAuthCode = data.authorization?.authorization_code || "";
+      const paystackPaidAt = data.paid_at || new Date().toISOString();
+      const customerEmail = data.customer?.email || payerEmail || "";
+      const customerName = data.customer?.first_name 
+        ? `${data.customer.first_name} ${data.customer.last_name || ""}`.trim()
+        : (payerName || metadata.rider_name || "Joel Odufu");
+      const gatewayResponse = data.gateway_response || "Approved / Successful";
+
       if (remittanceId) {
         await supabaseClient.from("cash_remittances").update({
           status: "verified",
           is_verified: true,
+          amount: amount,
+          expected_amount: expectedAmount,
+          is_partial: isPartial,
+          discrepancy_amount: discrepancyAmount,
+          discrepancy_reason: discrepancyReason,
+          paystack_channel: paystackChannel,
+          paystack_bank: paystackBank,
+          paystack_auth_code: paystackAuthCode,
+          paystack_paid_at: paystackPaidAt,
+          payer_email: customerEmail,
+          payer_name: customerName,
+          gateway_response: gatewayResponse,
+          verified_by_name: "Paystack Settlement Gateway",
           verified_at: new Date().toISOString(),
           payment_method: "paystack",
           distribution_center_id: dcId,
-          notes: `Auto-verified via Paystack Instant Checkout (Ref: ${reference})`,
+          notes: remittanceNotes,
           updated_at: new Date().toISOString(),
         }).eq("id", remittanceId);
       } else if (agentId) {
@@ -172,10 +220,23 @@ serve(async (req: Request) => {
         const { data: updated } = await supabaseClient.from("cash_remittances").update({
           status: "verified",
           is_verified: true,
+          amount: amount,
+          expected_amount: expectedAmount,
+          is_partial: isPartial,
+          discrepancy_amount: discrepancyAmount,
+          discrepancy_reason: discrepancyReason,
+          paystack_channel: paystackChannel,
+          paystack_bank: paystackBank,
+          paystack_auth_code: paystackAuthCode,
+          paystack_paid_at: paystackPaidAt,
+          payer_email: customerEmail,
+          payer_name: customerName,
+          gateway_response: gatewayResponse,
+          verified_by_name: "Paystack Settlement Gateway",
           verified_at: new Date().toISOString(),
           payment_method: "paystack",
           distribution_center_id: dcId,
-          notes: `Auto-verified via Paystack Instant Checkout (Ref: ${reference})`,
+          notes: remittanceNotes,
           updated_at: new Date().toISOString(),
         }).eq("reference_number", reference).select();
 
@@ -187,12 +248,24 @@ serve(async (req: Request) => {
               delivery_agent_id: agentId,
               distribution_center_id: dcId,
               amount: amount,
+              expected_amount: expectedAmount,
+              is_partial: isPartial,
+              discrepancy_amount: discrepancyAmount,
+              discrepancy_reason: discrepancyReason,
+              paystack_channel: paystackChannel,
+              paystack_bank: paystackBank,
+              paystack_auth_code: paystackAuthCode,
+              paystack_paid_at: paystackPaidAt,
+              payer_email: customerEmail,
+              payer_name: customerName,
+              gateway_response: gatewayResponse,
+              verified_by_name: "Paystack Settlement Gateway",
               payment_method: "paystack",
               reference_number: reference,
               status: "verified",
               is_verified: true,
               verified_at: new Date().toISOString(),
-              notes: `Auto-verified via Paystack Instant Remittance (Ref: ${reference})`,
+              notes: remittanceNotes,
               created_at: new Date().toISOString(),
             });
           } catch (_) {}

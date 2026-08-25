@@ -17,8 +17,12 @@ class DCTransactionRecord {
   final String paymentMethod; // 'paystack', 'cash', 'bank_transfer', 'pos'
   final String? gatewayReference;
   final String channel; // 'Titan Trust / Paystack', 'Cash in Hand', 'GTBank NIP', 'POS Terminal'
-  final String status; // 'verified', 'collected', 'pending', 'disbursed', 'disputed'
+  final String status; // 'verified', 'collected', 'pending', 'partial', 'disbursed', 'disputed'
   final bool isCredit;
+  final bool isPartial;
+  final double? expectedAmount;
+  final double? discrepancyAmount;
+  final String? discrepancyReason;
   final String? notes;
   final DateTime createdAt;
   final Map<String, dynamic>? metadata;
@@ -44,6 +48,10 @@ class DCTransactionRecord {
     required this.channel,
     required this.status,
     required this.isCredit,
+    this.isPartial = false,
+    this.expectedAmount,
+    this.discrepancyAmount,
+    this.discrepancyReason,
     this.notes,
     required this.createdAt,
     this.metadata,
@@ -53,9 +61,32 @@ class DCTransactionRecord {
   bool get isCashPod => category == 'cash_pod' || paymentMethod == 'cash';
   bool get isRemittance => category == 'remittance';
   bool get isPayout => category == 'payout';
-  bool get isVerified => status == 'verified' || status == 'settled' || status == 'approved';
-  bool get isPending => status == 'pending' || status == 'pending_review';
+  bool get isVerified =>
+      status == 'verified' || status == 'settled' || status == 'approved' || status == 'complete' || status == 'completed';
+  bool get isPending => status == 'pending' || status == 'pending_review' || status == 'submitted';
+
+  bool get isPartialRemittance =>
+      isPartial ||
+      status.toLowerCase().contains('partial') ||
+      (metadata != null && (metadata!['is_partial'] == true || metadata!['isPartial'] == true)) ||
+      (notes != null && notes!.toLowerCase().contains('partial')) ||
+      (discrepancyAmount != null && discrepancyAmount! < -0.01) ||
+      (expectedAmount != null && expectedAmount! > amount && amount > 0);
+
+  bool get isCompleteRemittance =>
+      isRemittance && !isPartialRemittance && (isVerified || !isPending);
+
   double get totalRiderEntitlement => commission + transportAllowance;
+
+  double get remainingShortage {
+    if (expectedAmount != null && expectedAmount! > amount) {
+      return expectedAmount! - amount;
+    }
+    if (discrepancyAmount != null && discrepancyAmount! < 0) {
+      return discrepancyAmount!.abs();
+    }
+    return 0.0;
+  }
 
   String get categoryDisplay {
     switch (category.toLowerCase()) {
@@ -64,7 +95,7 @@ class DCTransactionRecord {
       case 'cash_pod':
         return 'Cash POD Collection';
       case 'remittance':
-        return 'Rider Cash Remittance';
+        return isPartialRemittance ? 'Partial Cash Remittance' : 'Rider Cash Remittance';
       case 'payout':
         return 'Rider Balance Payout';
       case 'allowance':
@@ -118,6 +149,12 @@ class DCTransactionRecord {
             ? 'Titan Trust / Paystack'
             : (pMethod == 'cash' ? 'Cash in Hand' : (pMethod == 'pos' ? 'POS Terminal' : 'Bank Transfer')));
 
+    final bool isPartialVal = json['is_partial'] == true ||
+        json['isPartial'] == true ||
+        (json['status']?.toString().toLowerCase().contains('partial') ?? false) ||
+        (json['metadata'] is Map && (json['metadata']['is_partial'] == true || json['metadata']['isPartial'] == true)) ||
+        (json['notes']?.toString().toLowerCase().contains('partial') ?? false);
+
     return DCTransactionRecord(
       id: json['id']?.toString() ?? 'txn-${DateTime.now().millisecondsSinceEpoch}',
       transactionCode: json['transaction_code']?.toString() ?? json['reference']?.toString() ?? 'TXN-0000',
@@ -137,8 +174,12 @@ class DCTransactionRecord {
       paymentMethod: pMethod,
       gatewayReference: json['gateway_reference']?.toString() ?? json['reference']?.toString(),
       channel: chan,
-      status: json['status']?.toString() ?? 'verified',
+      status: json['status']?.toString() ?? (isPartialVal ? 'partial' : 'verified'),
       isCredit: json['is_credit'] == true || json['isCredit'] == true,
+      isPartial: isPartialVal,
+      expectedAmount: (json['expected_amount'] as num?)?.toDouble(),
+      discrepancyAmount: (json['discrepancy_amount'] as num?)?.toDouble(),
+      discrepancyReason: json['discrepancy_reason']?.toString(),
       notes: json['notes']?.toString() ?? json['description']?.toString(),
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
@@ -169,6 +210,10 @@ class DCTransactionRecord {
       'channel': channel,
       'status': status,
       'is_credit': isCredit,
+      'is_partial': isPartial,
+      'expected_amount': expectedAmount,
+      'discrepancy_amount': discrepancyAmount,
+      'discrepancy_reason': discrepancyReason,
       'notes': notes,
       'created_at': createdAt.toIso8601String(),
       'metadata': metadata,

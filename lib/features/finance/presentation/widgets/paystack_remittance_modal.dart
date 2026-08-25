@@ -227,22 +227,30 @@ class _PaystackRemittanceModalState extends State<PaystackRemittanceModal>
             ),
             const SizedBox(height: 18),
 
-            // Header with Close (X) button
+            // Header with Top-Left Close (X) button
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Row(
                   children: [
+                    IconButton(
+                      icon: Icon(Icons.close_rounded, size: 22, color: isDark ? Colors.white70 : const Color(0xFF64748B)),
+                      onPressed: () => Navigator.pop(context),
+                      tooltip: 'Close',
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                    const SizedBox(width: 12),
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
                         color: const Color(0xFF00A2D3).withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(8),
                       ),
                       child: const Icon(
                         Icons.bolt_rounded,
                         color: Color(0xFF00A2D3),
-                        size: 22,
+                        size: 20,
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -252,7 +260,7 @@ class _PaystackRemittanceModalState extends State<PaystackRemittanceModal>
                         Text(
                           'Paystack Remittance',
                           style: GoogleFonts.inter(
-                            fontSize: 16,
+                            fontSize: 15.5,
                             fontWeight: FontWeight.bold,
                             color: isDark ? Colors.white : const Color(0xFF0F172A),
                           ),
@@ -269,33 +277,21 @@ class _PaystackRemittanceModalState extends State<PaystackRemittanceModal>
                     ),
                   ],
                 ),
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF00A2D3).withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        'PAYSTACK',
-                        style: GoogleFonts.jetBrainsMono(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.8,
-                          color: const Color(0xFF00A2D3),
-                        ),
-                      ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00A2D3).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    'PAYSTACK',
+                    style: GoogleFonts.jetBrainsMono(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.8,
+                      color: const Color(0xFF00A2D3),
                     ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      icon: Icon(Icons.close_rounded, size: 22, color: isDark ? Colors.white70 : const Color(0xFF64748B)),
-                      onPressed: () => Navigator.pop(context),
-                      tooltip: 'Close',
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                  ],
+                  ),
                 ),
               ],
             ),

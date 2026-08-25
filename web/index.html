@@ -108,30 +108,47 @@
   <script src="https://js.paystack.co/v1/inline.js"></script>
   <script>
     window.payWithPaystack = function(options, onSuccess, onClose) {
-      try {
-        if (typeof PaystackPop === 'undefined') {
-          console.warn('PaystackPop is not loaded');
-          if (onClose) onClose();
-          return;
-        }
-        var handler = PaystackPop.setup({
-          key: options.key,
-          email: options.email,
-          amount: options.amount,
-          currency: options.currency || 'NGN',
-          ref: options.ref,
-          metadata: options.metadata || {},
-          callback: function(response) {
-            if (onSuccess) onSuccess(response.reference);
-          },
-          onClose: function() {
+      function executePaystack() {
+        try {
+          if (typeof PaystackPop === 'undefined') {
+            console.error('[PAYSTACK] PaystackPop not available on window');
             if (onClose) onClose();
+            return;
           }
-        });
-        handler.openIframe();
-      } catch (err) {
-        console.error('Paystack launcher error:', err);
-        if (onClose) onClose();
+          var handler = PaystackPop.setup({
+            key: options.key,
+            email: options.email,
+            amount: options.amount,
+            currency: options.currency || 'NGN',
+            ref: options.ref,
+            metadata: options.metadata || {},
+            callback: function(response) {
+              console.log('[PAYSTACK] Payment successful callback:', response);
+              if (onSuccess) onSuccess(response && response.reference ? response.reference : options.ref);
+            },
+            onClose: function() {
+              console.log('[PAYSTACK] Popup dismissed by user');
+              if (onClose) onClose();
+            }
+          });
+          handler.openIframe();
+        } catch (err) {
+          console.error('[PAYSTACK] Paystack launch error:', err);
+          if (onClose) onClose();
+        }
+      }
+
+      if (typeof PaystackPop === 'undefined') {
+        var s = document.createElement('script');
+        s.src = 'https://js.paystack.co/v1/inline.js';
+        s.onload = executePaystack;
+        s.onerror = function() {
+          console.error('[PAYSTACK] Failed to fetch inline.js from CDN');
+          if (onClose) onClose();
+        };
+        document.head.appendChild(s);
+      } else {
+        executePaystack();
       }
     };
   </script>

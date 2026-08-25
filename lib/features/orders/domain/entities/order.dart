@@ -79,28 +79,48 @@ class OrderEntity {
 
   bool get isDirectTransfer {
     final pt = paymentType.toLowerCase();
-    if (pt == 'prepaid' || pt == 'direct_transfer' || pt == 'bank_transfer' || pt == 'monnify') {
+    if (pt == 'prepaid' ||
+        pt == 'direct_transfer' ||
+        pt == 'bank_transfer' ||
+        pt == 'paystack' ||
+        pt == 'monnify') {
       return true;
     }
     if (deliveryNotes != null) {
       final n = deliveryNotes!.toLowerCase();
-      if (n.contains('monnify') ||
+      if (n.contains('paystack') ||
           n.contains('direct transfer') ||
-          n.contains('bank transfer') ||
-          n.contains('bank_transfer') ||
+          n.contains('monnify direct transfer') ||
+          n.contains('transfer verified') ||
           n.contains('credited to my balance')) {
         return true;
       }
     }
     final ps = paymentStatus.toLowerCase();
-    if (ps == 'transfer_verified' || ps == 'direct_transfer' || ps == 'paid_direct') {
+    if (ps == 'transfer_verified' ||
+        ps == 'direct_transfer' ||
+        ps == 'paid_direct' ||
+        ps == 'paid') {
       return true;
     }
     return false;
   }
 
-  bool get isPod => (paymentType == 'pay_on_delivery' || paymentType == 'pod') && !isDirectTransfer;
-  bool get isCashPod => (paymentType == 'pay_on_delivery' || paymentType == 'pod') && !isDirectTransfer;
+  bool get isPod {
+    if (isDirectTransfer) return false;
+    final pt = paymentType.toLowerCase();
+    return pt == 'pay_on_delivery' ||
+        pt == 'pod' ||
+        pt == 'cash' ||
+        pt == 'cod' ||
+        pt == 'cash_pod' ||
+        pt == 'cash_on_delivery' ||
+        pt == 'pay_on_pickup' ||
+        pt == 'collected' ||
+        pt.isEmpty;
+  }
+
+  bool get isCashPod => isPod;
   bool get isClientPackage => fulfillmentType == 'client_package';
   bool get isDistributedInventory => fulfillmentType == 'distributed_inventory';
   bool get isDelivered => status == 'delivered';
@@ -203,6 +223,86 @@ Kindly tap the "📎" attach button below and share your *Current Location / Liv
       default:
         return status.replaceAll('_', ' ').toUpperCase();
     }
+  }
+
+  OrderEntity copyWith({
+    String? id,
+    String? orderNumber,
+    String? customerName,
+    String? customerPhone,
+    String? customerAltPhone,
+    String? deliveryState,
+    String? deliveryCity,
+    String? deliveryAddress,
+    String? landmark,
+    String? lga,
+    String? productName,
+    String? status,
+    int? quantity,
+    int? paidQuantity,
+    int? freeQuantity,
+    double? basePrice,
+    double? upsellAmount,
+    double? totalAmount,
+    String? paymentType,
+    String? paymentStatus,
+    String? fulfillmentType,
+    String? clientName,
+    String? packageCustodyId,
+    double? clientDeliveryFee,
+    double? agentEntitlement,
+    String? deliveryNotes,
+    String? deliveryAgentId,
+    String? deliveryAgentName,
+    String? deliveryAgentCode,
+    String? distributionCenterId,
+    double? latitude,
+    double? longitude,
+    String? geocodingStatus,
+    String? geocodedAddress,
+    String? locationConfidence,
+    bool? isLocationVerified,
+    DateTime? createdAt,
+  }) {
+    return OrderEntity(
+      id: id ?? this.id,
+      orderNumber: orderNumber ?? this.orderNumber,
+      customerName: customerName ?? this.customerName,
+      customerPhone: customerPhone ?? this.customerPhone,
+      customerAltPhone: customerAltPhone ?? this.customerAltPhone,
+      deliveryState: deliveryState ?? this.deliveryState,
+      deliveryCity: deliveryCity ?? this.deliveryCity,
+      deliveryAddress: deliveryAddress ?? this.deliveryAddress,
+      landmark: landmark ?? this.landmark,
+      lga: lga ?? this.lga,
+      productName: productName ?? this.productName,
+      status: status ?? this.status,
+      quantity: quantity ?? this.quantity,
+      paidQuantity: paidQuantity ?? this.paidQuantity,
+      freeQuantity: freeQuantity ?? this.freeQuantity,
+      basePrice: basePrice ?? this.basePrice,
+      upsellAmount: upsellAmount ?? this.upsellAmount,
+      totalAmount: totalAmount ?? this.totalAmount,
+      paymentType: paymentType ?? this.paymentType,
+      paymentStatus: paymentStatus ?? this.paymentStatus,
+      fulfillmentType: fulfillmentType ?? this.fulfillmentType,
+      clientName: clientName ?? this.clientName,
+      packageCustodyId: packageCustodyId ?? this.packageCustodyId,
+      clientDeliveryFee: clientDeliveryFee ?? this.clientDeliveryFee,
+      agentEntitlement: agentEntitlement ?? this.agentEntitlement,
+      deliveryNotes: deliveryNotes ?? this.deliveryNotes,
+      deliveryAgentId: deliveryAgentId ?? this.deliveryAgentId,
+      deliveryAgentName: deliveryAgentName ?? this.deliveryAgentName,
+      deliveryAgentCode: deliveryAgentCode ?? this.deliveryAgentCode,
+      distributionCenterId: distributionCenterId ?? this.distributionCenterId,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      geocodingStatus: geocodingStatus ?? this.geocodingStatus,
+      geocodedAddress: geocodedAddress ?? this.geocodedAddress,
+      locationConfidence: locationConfidence ?? this.locationConfidence,
+      isLocationVerified: isLocationVerified ?? this.isLocationVerified,
+      createdAt: createdAt ?? this.createdAt,
+    );
   }
 }
 

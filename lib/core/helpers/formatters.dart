@@ -36,3 +36,14 @@ class DateTimeFormatter {
     }
   }
 }
+
+class TransactionFeeCalculator {
+  /// Calculates dynamic transfer/transaction charge:
+  /// ₦100 per ₦5,000 transfer block (e.g. ₦5,000 -> ₦100; ₦5,200 -> ₦200; ₦35,000 -> ₦700).
+  static double calculateTransferFee(double amount) {
+    if (amount <= 0) return 0.0;
+    final blocks = (amount / 5000.0).ceil();
+    return (blocks * 100).toDouble();
+  }
+}
+

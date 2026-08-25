@@ -131,7 +131,7 @@ class RemittanceHistoryPage extends ConsumerWidget {
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: InkWell(
-                      onTap: () => context.push('/cash/remittance/${remit.id}'),
+                      onTap: () => context.push('/cash/remittance/${remit.id.isNotEmpty ? remit.id : remit.referenceNumber}'),
                       borderRadius: BorderRadius.circular(16),
                       child: Container(
                         padding: const EdgeInsets.all(16),
@@ -201,19 +201,26 @@ class RemittanceHistoryPage extends ConsumerWidget {
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                       decoration: BoxDecoration(
-                                        color: remit.isVerified
-                                            ? const Color(0xFFDCFCE7)
-                                            : (remit.isPending ? const Color(0xFFFFEDD5) : const Color(0xFFFFE4E6)),
+                                        color: remit.isPartialRemittance
+                                            ? const Color(0xFFFFF7ED)
+                                            : (remit.isVerified ? const Color(0xFFDCFCE7) : (remit.isPending ? const Color(0xFFFFEDD5) : const Color(0xFFFFE4E6))),
                                         borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                          color: remit.isPartialRemittance
+                                              ? const Color(0xFFFDBA74)
+                                              : (remit.isVerified ? const Color(0xFF86EFAC) : Colors.transparent),
+                                        ),
                                       ),
                                       child: Text(
                                         remit.statusDisplay.toUpperCase(),
                                         style: GoogleFonts.jetBrainsMono(
                                           fontSize: 9,
                                           fontWeight: FontWeight.bold,
-                                          color: remit.isVerified
-                                              ? const Color(0xFF16A34A)
-                                              : (remit.isPending ? const Color(0xFFEA580C) : const Color(0xFFE11D48)),
+                                          color: remit.isPartialRemittance
+                                              ? const Color(0xFFEA580C)
+                                              : (remit.isVerified
+                                                  ? const Color(0xFF16A34A)
+                                                  : (remit.isPending ? const Color(0xFFEA580C) : const Color(0xFFE11D48))),
                                         ),
                                       ),
                                     ),

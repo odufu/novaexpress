@@ -687,7 +687,16 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
 
         for (final row in (remRes as List)) {
           try {
-            final isVerified = row['is_verified'] == true || row['status'] == 'verified';
+            final isVerified = row['is_verified'] == true || row['status'] == 'verified' || row['status'] == 'settled' || row['status'] == 'approved';
+            final bool isPartial = row['is_partial'] == true ||
+                row['status'] == 'partial' ||
+                row['status'] == 'partial_remittance' ||
+                (row['discrepancy_amount'] != null && (row['discrepancy_amount'] as num) < -0.01) ||
+                (row['expected_amount'] != null && (row['expected_amount'] as num) > (row['amount'] as num? ?? 0));
+            final double? expectedAmt = (row['expected_amount'] as num?)?.toDouble();
+            final double? discrepancyAmt = (row['discrepancy_amount'] as num?)?.toDouble();
+            final String? discrepancyRsn = row['discrepancy_reason']?.toString();
+
             allTxns.add(DCTransactionRecord(
               id: row['id']?.toString() ?? '',
               transactionCode: row['remittance_number']?.toString() ?? 'REM-${row['id']?.toString().substring(0, 5)}',
@@ -701,8 +710,12 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
               paymentMethod: row['payment_method']?.toString() ?? 'bank_transfer',
               gatewayReference: row['reference_number']?.toString(),
               channel: row['payment_method']?.toString() == 'paystack' ? 'Titan Trust / Paystack' : 'Bank Transfer Handover',
-              status: isVerified ? 'verified' : (row['status']?.toString() ?? 'pending'),
+              status: isPartial ? 'partial' : (isVerified ? 'verified' : (row['status']?.toString() ?? 'pending')),
               isCredit: false,
+              isPartial: isPartial,
+              expectedAmount: expectedAmt,
+              discrepancyAmount: discrepancyAmt,
+              discrepancyReason: discrepancyRsn,
               notes: row['notes']?.toString(),
               createdAt: row['created_at'] != null ? DateTime.tryParse(row['created_at'].toString()) ?? DateTime.now() : DateTime.now(),
             ));

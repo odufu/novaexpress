@@ -7,6 +7,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_logo_widget.dart';
 import '../../../../core/widgets/app_skeleton_loader.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../notifications/presentation/providers/notifications_provider.dart';
 import '../../domain/entities/order.dart';
 import '../providers/orders_provider.dart';
 
@@ -49,6 +50,7 @@ class _OrdersListPageState extends ConsumerState<OrdersListPage> {
     final theme = Theme.of(context);
     final authState = ref.watch(authProvider);
     final ordersState = ref.watch(ordersProvider);
+    final notifState = ref.watch(notificationsProvider);
     final user = authState.user;
     final agentName = user?.firstName ?? '';
 
@@ -179,9 +181,40 @@ class _OrdersListPageState extends ConsumerState<OrdersListPage> {
             ),
             onPressed: () => _showFilterModalSheet(context),
           ),
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
-            onPressed: () => ref.read(ordersProvider.notifier).fetchOrders(),
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.notifications_none_rounded, color: Colors.white),
+                tooltip: 'Notifications',
+                onPressed: () => context.push('/notifications'),
+              ),
+              if (notifState.unreadCount > 0)
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFE11D48),
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: Text(
+                      '${notifState.unreadCount}',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
           GestureDetector(
             onTap: () => context.push('/profile'),
@@ -829,221 +862,222 @@ class _DeliveryOperationalCard extends ConsumerWidget {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(14),
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Dynamic Status-Coded Left Accent Border Bar
-              Container(
+        child: Stack(
+          children: [
+            // Dynamic Status-Coded Left Accent Border Bar
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              child: Container(
                 width: 4.5,
                 color: statusLeftColor,
               ),
+            ),
 
-              // Main Card Content
-              Expanded(
-                child: InkWell(
-                  onTap: () => context.push('/orders/${order.id}'),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    child: Row(
-                      children: [
-                        // Left: Customer Name, Status Badge, Location Confidence, and Product
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
+            // Main Card Content
+            InkWell(
+              onTap: () => context.push('/orders/${order.id}'),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Left: Customer Name, Status Badge, Location Confidence, and Product
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Customer Name + Status Badge + Confidence Pill
+                          Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 5,
+                            runSpacing: 4,
                             children: [
-                              // Customer Name + Status Badge + Confidence Pill
-                              Wrap(
-                                crossAxisAlignment: WrapCrossAlignment.center,
-                                spacing: 5,
-                                runSpacing: 3,
-                                children: [
-                                  Text(
-                                    order.customerName,
-                                    style: GoogleFonts.inter(
-                                      fontSize: 14.5,
-                                      fontWeight: FontWeight.w700,
-                                      color: theme.colorScheme.onSurface,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: statusBg,
-                                      borderRadius: BorderRadius.circular(5),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(statusIcon, size: isDelivered ? 13 : 11, color: statusTextColor),
-                                        const SizedBox(width: 3),
-                                        Text(
-                                          statusLabel,
-                                          style: GoogleFonts.jetBrainsMono(
-                                            fontSize: 9,
-                                            fontWeight: FontWeight.bold,
-                                            color: statusTextColor,
-                                            letterSpacing: 0.2,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: confBg,
-                                      borderRadius: BorderRadius.circular(5),
-                                    ),
-                                    child: Text(
-                                      confShortLabel,
+                              Text(
+                                order.customerName,
+                                style: GoogleFonts.inter(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: theme.colorScheme.onSurface,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: statusBg,
+                                  borderRadius: BorderRadius.circular(5),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(statusIcon, size: isDelivered ? 13 : 11, color: statusTextColor),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      statusLabel,
                                       style: GoogleFonts.jetBrainsMono(
-                                        fontSize: 8.5,
+                                        fontSize: 9,
                                         fontWeight: FontWeight.bold,
-                                        color: confTextColor,
+                                        color: statusTextColor,
+                                        letterSpacing: 0.2,
                                       ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                              const SizedBox(height: 5),
-
-                              // Address Info
-                              Row(
-                                children: [
-                                  const Icon(Icons.location_on_outlined, size: 14, color: Color(0xFF64748B)),
-                                  const SizedBox(width: 5),
-                                  Expanded(
-                                    child: Text(
-                                      order.deliveryAddress,
-                                      style: GoogleFonts.inter(
-                                        fontSize: 12,
-                                        color: const Color(0xFF64748B),
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: confBg,
+                                  borderRadius: BorderRadius.circular(5),
+                                ),
+                                child: Text(
+                                  confShortLabel,
+                                  style: GoogleFonts.jetBrainsMono(
+                                    fontSize: 8.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: confTextColor,
                                   ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-
-                              // Product Info
-                              Row(
-                                children: [
-                                  const Icon(Icons.inventory_2_outlined, size: 14, color: Color(0xFF64748B)),
-                                  const SizedBox(width: 5),
-                                  Expanded(
-                                    child: Text(
-                                      order.freeQuantity > 0
-                                          ? '${order.productName} x ${order.totalPhysicalQuantity}'
-                                          : '${order.productName} x ${order.quantity}',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                        color: theme.colorScheme.onSurfaceVariant,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
                             ],
                           ),
-                        ),
-                        const SizedBox(width: 10),
+                          const SizedBox(height: 5),
 
-                        // Action Buttons: WhatsApp Prompt & Call & Map
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            // WhatsApp Live Pin Request
-                            if (order.customerPhone.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(right: 6),
-                                child: InkWell(
-                                  onTap: () => _openWhatsAppPrompt(context, ref),
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(7),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF25D366).withValues(alpha: 0.12),
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: const Color(0xFF25D366).withValues(alpha: 0.3)),
-                                    ),
-                                    child: const Icon(
-                                      Icons.chat_bubble_outline_rounded,
-                                      size: 15,
-                                      color: Color(0xFF15803D),
-                                    ),
+                          // Address Info
+                          Row(
+                            children: [
+                              const Icon(Icons.location_on_outlined, size: 14, color: Color(0xFF64748B)),
+                              const SizedBox(width: 5),
+                              Expanded(
+                                child: Text(
+                                  order.deliveryAddress,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    color: const Color(0xFF64748B),
                                   ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
 
-                            // Map Directions Shortcut
-                            Padding(
-                              padding: const EdgeInsets.only(right: 6),
-                              child: InkWell(
-                                onTap: () => _openMap(context),
-                                borderRadius: BorderRadius.circular(8),
-                                child: Container(
-                                  padding: const EdgeInsets.all(7),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF0284C7).withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.3)),
+                          // Product Info
+                          Row(
+                            children: [
+                              const Icon(Icons.inventory_2_outlined, size: 14, color: Color(0xFF64748B)),
+                              const SizedBox(width: 5),
+                              Expanded(
+                                child: Text(
+                                  order.freeQuantity > 0
+                                      ? '${order.productName} x ${order.totalPhysicalQuantity}'
+                                      : '${order.productName} x ${order.quantity}',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: theme.colorScheme.onSurfaceVariant,
                                   ),
-                                  child: const Icon(
-                                    Icons.directions_rounded,
-                                    size: 15,
-                                    color: Color(0xFF0284C7),
-                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+
+                    // Action Buttons: WhatsApp Prompt & Call & Map
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // WhatsApp Live Pin Request
+                        if (order.customerPhone.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: InkWell(
+                              onTap: () => _openWhatsAppPrompt(context, ref),
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.all(7),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF25D366).withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: const Color(0xFF25D366).withValues(alpha: 0.3)),
+                                ),
+                                child: const Icon(
+                                  Icons.chat_bubble_outline_rounded,
+                                  size: 15,
+                                  color: Color(0xFF15803D),
                                 ),
                               ),
                             ),
+                          ),
 
-                            // Call Button
-                            if (order.customerPhone.isNotEmpty)
-                              Material(
-                                color: const Color(0xFF16A34A),
+                        // Map Directions Shortcut
+                        Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: InkWell(
+                            onTap: () => _openMap(context),
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              padding: const EdgeInsets.all(7),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0284C7).withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(8),
-                                elevation: 0.5,
-                                child: InkWell(
-                                  onTap: () => _callCustomer(context, order.customerPhone),
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                                    child: const Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.phone_rounded, size: 14, color: Colors.white),
-                                        SizedBox(width: 4),
-                                        Text(
-                                          'Call',
-                                          style: TextStyle(
-                                            fontSize: 11.5,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ],
+                                border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.3)),
+                              ),
+                              child: const Icon(
+                                Icons.directions_rounded,
+                                size: 15,
+                                color: Color(0xFF0284C7),
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        // Call Button
+                        if (order.customerPhone.isNotEmpty)
+                          Material(
+                            color: const Color(0xFF16A34A),
+                            borderRadius: BorderRadius.circular(8),
+                            elevation: 0.5,
+                            child: InkWell(
+                              onTap: () => _callCustomer(context, order.customerPhone),
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.phone_rounded, size: 14, color: Colors.white),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'Call',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
                                     ),
-                                  ),
+                                  ],
                                 ),
                               ),
-                          ],
-                        ),
+                            ),
+                          ),
                       ],
                     ),
-                  ),
+                  ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

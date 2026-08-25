@@ -188,7 +188,7 @@ class DCDashboardPage extends ConsumerWidget {
                     color: const Color(0xFF10B981),
                     isDark: isDark,
                     width: cardWidth,
-                    onTap: () => dcNotifier.setActiveTab(3),
+                    onTap: () => dcNotifier.setActiveTab(2),
                   ),
                   _buildMetricCard(
                     title: 'Returns Awaiting QC',
@@ -198,7 +198,7 @@ class DCDashboardPage extends ConsumerWidget {
                     color: const Color(0xFF8B5CF6),
                     isDark: isDark,
                     width: cardWidth,
-                    onTap: () => dcNotifier.setActiveTab(4),
+                    onTap: () => dcNotifier.setActiveTab(6),
                   ),
                 ],
               );

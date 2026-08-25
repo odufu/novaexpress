@@ -20,6 +20,7 @@ class CashPage extends ConsumerStatefulWidget {
 
 class _CashPageState extends ConsumerState<CashPage> {
   String _selectedFilter = 'all'; // 'all', 'approved', 'submitted', 'rejected'
+  int _selectedMetricTabIndex = 0; // 0: Cumulative, 1: Most Recent, 2: My Balance
 
   @override
   void initState() {
@@ -66,11 +67,37 @@ class _CashPageState extends ConsumerState<CashPage> {
         ? summary.todayDeliveredOrdersCount
         : summary.deliveredCashOrdersCount;
 
-    final double cashCollected = summary.cashCollectedToday > 0 ? summary.cashCollectedToday : summary.cashCollectedAllTime;
+    final double cashCollected = summary.cashCollectedAllTime > 0
+        ? summary.cashCollectedAllTime
+        : summary.cashCollectedToday;
     final double totalCommission = summary.totalCommissionRetained;
     final double totalTransport = summary.totalTransportRetained;
     final double toRemit = summary.pendingRemittanceToDC;
     final double riderBalance = summary.myDirectTransfersBalance;
+
+    // Detect if latest remittance was a partial settlement
+    final latestRemittance = financeState.remittances.isNotEmpty ? financeState.remittances.first : null;
+    final bool hasPartialSettlement = latestRemittance?.isPartialRemittance == true;
+
+    // Most Recent Delivered Transaction Metrics
+    final deliveredOrders = ordersState.orders
+        .where((o) => o.status.toLowerCase() == 'delivered')
+        .toList();
+    deliveredOrders.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    final mostRecentOrder = deliveredOrders.isNotEmpty ? deliveredOrders.first : null;
+
+    final double recentCollected = mostRecentOrder != null
+        ? (mostRecentOrder.isCashPod ? mostRecentOrder.totalAmount : 0.0)
+        : 0.0;
+    final double recentCommission = mostRecentOrder != null
+        ? (user?.commissionRate ?? (mostRecentOrder.agentEntitlement > 0 ? mostRecentOrder.agentEntitlement : 1000.0))
+        : 0.0;
+    final double recentTransport = mostRecentOrder != null
+        ? (user?.fuelAllowance ?? 1500.0)
+        : 0.0;
+    final double recentToRemit = mostRecentOrder != null && mostRecentOrder.isCashPod
+        ? (recentCollected - recentCommission - recentTransport).clamp(0.0, double.infinity)
+        : 0.0;
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0B132B) : const Color(0xFFF8FAFC),
@@ -180,204 +207,407 @@ class _CashPageState extends ConsumerState<CashPage> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 12),                        // Section Header & Tabs: 3 TABS TO TOGGLE METRICS CARDS
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(3),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF0F172A) : const Color(0xFF0F172A).withValues(alpha: 0.8),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFF334155)),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: _buildMetricTabPill(
+                                  index: 0,
+                                  title: 'Cumulative',
+                                  icon: Icons.pie_chart_outline_rounded,
+                                  isSelected: _selectedMetricTabIndex == 0,
+                                  activeColor: const Color(0xFF00A2D3),
+                                ),
+                              ),
+                              const SizedBox(width: 3),
+                              Expanded(
+                                child: _buildMetricTabPill(
+                                  index: 1,
+                                  title: 'Most Recent',
+                                  icon: Icons.flash_on_rounded,
+                                  isSelected: _selectedMetricTabIndex == 1,
+                                  activeColor: const Color(0xFF00A2D3),
+                                ),
+                              ),
+                              const SizedBox(width: 3),
+                              Expanded(
+                                child: _buildMetricTabPill(
+                                  index: 2,
+                                  title: 'My Balance',
+                                  icon: Icons.account_balance_wallet_outlined,
+                                  isSelected: _selectedMetricTabIndex == 2,
+                                  activeColor: const Color(0xFF2563EB),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
 
-                        // Section Header: REMITTANCE OVERVIEW (Daily Only)
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'REMITTANCE OVERVIEW',
-                              style: GoogleFonts.inter(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 0.8,
-                                color: const Color(0xFF94A3B8),
-                              ),
+                        // CONDITIONALLY RENDER ONLY THE SELECTED CARD BELOW
+                        if (_selectedMetricTabIndex == 0) ...[
+                          // 1. CUMULATIVE SUMMARY CARD (ALL DELIVERIES)
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF0F172A) : const Color(0xFF1E293B),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: const Color(0xFF334155)),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.15),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                             ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    'Today',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 10.5,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.white,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 4, bottom: 6),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          'CUMULATIVE OVERVIEW',
+                                          style: GoogleFonts.jetBrainsMono(
+                                            fontSize: 8.5,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: 0.6,
+                                            color: const Color(0xFF94A3B8),
+                                          ),
+                                        ),
+                                        if (hasPartialSettlement && toRemit > 0)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFF97316).withValues(alpha: 0.2),
+                                              borderRadius: BorderRadius.circular(10),
+                                              border: Border.all(color: const Color(0xFFF97316).withValues(alpha: 0.4)),
+                                            ),
+                                            child: Text(
+                                              'PARTIAL • BAL: ${CurrencyFormatter.formatNaira(toRemit)}',
+                                              style: GoogleFonts.inter(fontSize: 8, fontWeight: FontWeight.bold, color: const Color(0xFFFB923C)),
+                                            ),
+                                          )
+                                        else if (toRemit == 0 && (approvedRemittances.isNotEmpty || financeState.remittances.isNotEmpty))
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            child: Text(
+                                              'REMITTANCES CLEARED ✓',
+                                              style: GoogleFonts.inter(fontSize: 8.5, fontWeight: FontWeight.bold, color: const Color(0xFF4ADE80)),
+                                            ),
+                                          )
+                                        else
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white.withValues(alpha: 0.1),
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            child: Text(
+                                              'All Deliveries',
+                                              style: GoogleFonts.inter(fontSize: 8.5, fontWeight: FontWeight.bold, color: Colors.white70),
+                                            ),
+                                          ),
+                                      ],
                                     ),
                                   ),
-                                  const SizedBox(width: 4),
-                                  const Icon(Icons.calendar_today_outlined, size: 11, color: Color(0xFFCBD5E1)),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: _buildCompactMetricColumn(
+                                          icon: Icons.account_balance_wallet_outlined,
+                                          iconColor: const Color(0xFF60A5FA),
+                                          label: 'Collected',
+                                          amount: cashCollected,
+                                        ),
+                                      ),
+                                      _buildVerticalSeparator(),
+                                      Expanded(
+                                        child: _buildCompactMetricColumn(
+                                          icon: Icons.near_me_outlined,
+                                          iconColor: const Color(0xFFFB923C),
+                                          amountColor: const Color(0xFFFB923C),
+                                          label: (hasPartialSettlement && toRemit > 0) ? 'To Remit (Bal)' : 'To Remit',
+                                          amount: toRemit,
+                                        ),
+                                      ),
+                                      _buildVerticalSeparator(),
+                                      Expanded(
+                                        child: _buildCompactMetricColumn(
+                                          icon: Icons.payments_outlined,
+                                          iconColor: const Color(0xFF4ADE80),
+                                          amountColor: const Color(0xFF4ADE80),
+                                          label: 'Commission',
+                                          amount: totalCommission,
+                                        ),
+                                      ),
+                                      _buildVerticalSeparator(),
+                                      Expanded(
+                                        child: _buildCompactMetricColumn(
+                                          icon: Icons.directions_car_outlined,
+                                          iconColor: const Color(0xFF38BDF8),
+                                          amountColor: const Color(0xFF38BDF8),
+                                          label: 'Transport',
+                                          amount: totalTransport,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ],
                               ),
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-
-                        // ALL 4 METRICS IN ONE SINGLE UNIFIED CARD (NON-SLIDABLE, BALANCED ROW)
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF0F172A) : const Color(0xFF1E293B),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: const Color(0xFF334155)),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.15),
-                                blurRadius: 6,
-                                offset: const Offset(0, 2),
+                          ] else if (_selectedMetricTabIndex == 1) ...[
+                            // 2. MOST RECENT TRANSACTION CARD (INDIVIDUAL TRANSACTION BREAKDOWN)
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF111E38) : const Color(0xFF1E293B).withValues(alpha: 0.95),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: const Color(0xFF00A2D3).withValues(alpha: 0.4)),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.12),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: _buildCompactMetricColumn(
-                                  icon: Icons.account_balance_wallet_outlined,
-                                  iconColor: const Color(0xFF60A5FA),
-                                  label: 'Collected',
-                                  amount: cashCollected,
-                                ),
-                              ),
-                              _buildVerticalSeparator(),
-                              Expanded(
-                                child: _buildCompactMetricColumn(
-                                  icon: Icons.near_me_outlined,
-                                  iconColor: const Color(0xFFFB923C),
-                                  amountColor: const Color(0xFFFB923C),
-                                  label: 'To Remit',
-                                  amount: toRemit,
-                                ),
-                              ),
-                              _buildVerticalSeparator(),
-                              Expanded(
-                                child: _buildCompactMetricColumn(
-                                  icon: Icons.payments_outlined,
-                                  iconColor: const Color(0xFF4ADE80),
-                                  amountColor: const Color(0xFF4ADE80),
-                                  label: 'Commission',
-                                  amount: totalCommission,
-                                ),
-                              ),
-                              _buildVerticalSeparator(),
-                              Expanded(
-                                child: _buildCompactMetricColumn(
-                                  icon: Icons.directions_car_outlined,
-                                  iconColor: const Color(0xFF38BDF8),
-                                  amountColor: const Color(0xFF38BDF8),
-                                  label: 'Transport',
-                                  amount: totalTransport,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-
-                        // MY BALANCE CARD (DIRECT TRANSFER EARNINGS & PAYOUT REQUEST)
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF1E3A8A), Color(0xFF1E293B)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFF3B82F6).withValues(alpha: 0.4)),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(7),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF3B82F6).withValues(alpha: 0.25),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Icon(Icons.account_balance_rounded, size: 18, color: Color(0xFF60A5FA)),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 4, bottom: 6),
+                                    child: Row(
                                       children: [
-                                        Text(
-                                          'MY BALANCE',
-                                          style: GoogleFonts.inter(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.w800,
-                                            letterSpacing: 0.5,
-                                            color: const Color(0xFF93C5FD),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF00A2D3).withValues(alpha: 0.2),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(Icons.flash_on_rounded, size: 10, color: Color(0xFF38BDF8)),
+                                              const SizedBox(width: 3),
+                                              Text(
+                                                'MOST RECENT TRANSACTION',
+                                                style: GoogleFonts.jetBrainsMono(
+                                                  fontSize: 8.5,
+                                                  fontWeight: FontWeight.w900,
+                                                  letterSpacing: 0.5,
+                                                  color: const Color(0xFF38BDF8),
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
-                                        const SizedBox(width: 4),
-                                        Flexible(
-                                          child: Text(
-                                            '(Direct Transfers)',
-                                            style: GoogleFonts.inter(
-                                              fontSize: 9.5,
+                                        if (mostRecentOrder != null) ...[
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            mostRecentOrder.orderNumber,
+                                            style: GoogleFonts.jetBrainsMono(
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.w600,
                                               color: const Color(0xFF94A3B8),
                                             ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
                                           ),
-                                        ),
+                                          const SizedBox(width: 4),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                            decoration: BoxDecoration(
+                                              color: (mostRecentOrder.isPod ? const Color(0xFFF59E0B) : const Color(0xFF10B981)).withValues(alpha: 0.2),
+                                              borderRadius: BorderRadius.circular(3),
+                                            ),
+                                            child: Text(
+                                              mostRecentOrder.isPod ? 'CASH POD' : 'DIRECT TRANSFER',
+                                              style: GoogleFonts.inter(
+                                                fontSize: 7.5,
+                                                fontWeight: FontWeight.bold,
+                                                color: mostRecentOrder.isPod ? const Color(0xFFFBBF24) : const Color(0xFF4ADE80),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                        if (latestRemittance != null && latestRemittance.isPartialRemittance) ...[
+                                          const SizedBox(width: 4),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFF97316).withValues(alpha: 0.25),
+                                              borderRadius: BorderRadius.circular(3),
+                                            ),
+                                            child: Text(
+                                              'PARTIAL PAID (${CurrencyFormatter.formatNaira(latestRemittance.amount)})',
+                                              style: GoogleFonts.inter(
+                                                fontSize: 7.5,
+                                                fontWeight: FontWeight.bold,
+                                                color: const Color(0xFFFB923C),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ],
                                     ),
-                                    const SizedBox(height: 1),
-                                    Text(
-                                      CurrencyFormatter.formatNaira(riderBalance),
-                                      style: GoogleFonts.inter(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w900,
-                                        color: Colors.white,
+                                  ),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: _buildCompactMetricColumn(
+                                        icon: Icons.account_balance_wallet_outlined,
+                                        iconColor: const Color(0xFF60A5FA),
+                                        label: 'Collected',
+                                        amount: recentCollected,
+                                      ),
+                                    ),
+                                    _buildVerticalSeparator(),
+                                    Expanded(
+                                      child: _buildCompactMetricColumn(
+                                        icon: Icons.near_me_outlined,
+                                        iconColor: const Color(0xFFFB923C),
+                                        amountColor: const Color(0xFFFB923C),
+                                        label: 'To Remit',
+                                        amount: recentToRemit,
+                                      ),
+                                    ),
+                                    _buildVerticalSeparator(),
+                                    Expanded(
+                                      child: _buildCompactMetricColumn(
+                                        icon: Icons.payments_outlined,
+                                        iconColor: const Color(0xFF4ADE80),
+                                        amountColor: const Color(0xFF4ADE80),
+                                        label: 'Commission',
+                                        amount: recentCommission,
+                                      ),
+                                    ),
+                                    _buildVerticalSeparator(),
+                                    Expanded(
+                                      child: _buildCompactMetricColumn(
+                                        icon: Icons.directions_car_outlined,
+                                        iconColor: const Color(0xFF38BDF8),
+                                        amountColor: const Color(0xFF38BDF8),
+                                        label: 'Transport',
+                                        amount: recentTransport,
                                       ),
                                     ),
                                   ],
                                 ),
+                              ],
+                            ),
+                          ),
+                        ] else if (_selectedMetricTabIndex == 2) ...[
+                          // 3. MY BALANCE CARD (DIRECT TRANSFER EARNINGS & PAYOUT REQUEST)
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF1E3A8A), Color(0xFF1E293B)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
                               ),
-                              ElevatedButton(
-                                onPressed: () => _showRequestPayoutModal(context, riderBalance),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF2563EB),
-                                  foregroundColor: Colors.white,
-                                  elevation: 0,
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                                  shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFF3B82F6).withValues(alpha: 0.4)),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(7),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF3B82F6).withValues(alpha: 0.25),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
+                                  child: const Icon(Icons.account_balance_rounded, size: 18, color: Color(0xFF60A5FA)),
                                 ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(Icons.payments_outlined, size: 13, color: Colors.white),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      'Request Payout',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Text(
+                                            'MY BALANCE',
+                                            style: GoogleFonts.inter(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w800,
+                                              letterSpacing: 0.5,
+                                              color: const Color(0xFF93C5FD),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Flexible(
+                                            child: Text(
+                                              '(Direct Transfers)',
+                                              style: GoogleFonts.inter(
+                                                fontSize: 10,
+                                                color: Colors.white60,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                    ),
-                                  ],
+                                      const SizedBox(height: 1),
+                                      Text(
+                                        CurrencyFormatter.formatNaira(riderBalance),
+                                        style: GoogleFonts.inter(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w900,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            ],
+                                ElevatedButton(
+                                  onPressed: () => _showRequestPayoutModal(context, riderBalance),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF2563EB),
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.payments_outlined, size: 13, color: Colors.white),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Request Payout',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
+                        ],
                         const SizedBox(height: 10),
 
                         // COMPACT QUICK ACTIONS (NO "QUICK ACTIONS" HEADER)
@@ -455,27 +685,27 @@ class _CashPageState extends ConsumerState<CashPage> {
                                   Row(
                                     crossAxisAlignment: CrossAxisAlignment.center,
                                     children: [
-                                      // Red left vertical indicator
+                                      // Left vertical indicator
                                       Container(
                                         width: 4,
                                         height: 44,
                                         decoration: BoxDecoration(
-                                          color: const Color(0xFFEF4444),
+                                          color: hasPartialSettlement ? const Color(0xFFF97316) : const Color(0xFFEF4444),
                                           borderRadius: BorderRadius.circular(2),
                                         ),
                                       ),
                                       const SizedBox(width: 8),
 
-                                      // Warning Triangle Icon
+                                      // Warning / Status Icon
                                       Container(
                                         padding: const EdgeInsets.all(8),
                                         decoration: BoxDecoration(
-                                          color: const Color(0xFFEF4444).withValues(alpha: 0.12),
+                                          color: (hasPartialSettlement ? const Color(0xFFF97316) : const Color(0xFFEF4444)).withValues(alpha: 0.12),
                                           shape: BoxShape.circle,
                                         ),
-                                        child: const Icon(
-                                          Icons.warning_amber_rounded,
-                                          color: Color(0xFFEF4444),
+                                        child: Icon(
+                                          hasPartialSettlement ? Icons.published_with_changes_rounded : Icons.warning_amber_rounded,
+                                          color: hasPartialSettlement ? const Color(0xFFFB923C) : const Color(0xFFEF4444),
                                           size: 22,
                                         ),
                                       ),
@@ -487,16 +717,38 @@ class _CashPageState extends ConsumerState<CashPage> {
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            Text(
-                                              'PENDING REMITTANCE',
-                                              style: GoogleFonts.inter(
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.w800,
-                                                letterSpacing: 0.6,
-                                                color: const Color(0xFFEF4444),
-                                              ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
+                                            Row(
+                                              children: [
+                                                Flexible(
+                                                  child: Text(
+                                                    hasPartialSettlement
+                                                        ? 'PARTIAL REMITTANCE REMAINING'
+                                                        : 'PENDING REMITTANCE',
+                                                    style: GoogleFonts.inter(
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.w800,
+                                                      letterSpacing: 0.6,
+                                                      color: hasPartialSettlement ? const Color(0xFFFB923C) : const Color(0xFFEF4444),
+                                                    ),
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                                if (hasPartialSettlement) ...[
+                                                  const SizedBox(width: 4),
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                                    decoration: BoxDecoration(
+                                                      color: const Color(0xFFF97316).withValues(alpha: 0.2),
+                                                      borderRadius: BorderRadius.circular(3),
+                                                    ),
+                                                    child: Text(
+                                                      'SHORTAGE',
+                                                      style: GoogleFonts.inter(fontSize: 7.5, fontWeight: FontWeight.bold, color: const Color(0xFFFB923C)),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
                                             ),
                                             const SizedBox(height: 2),
                                             FittedBox(
@@ -532,7 +784,7 @@ class _CashPageState extends ConsumerState<CashPage> {
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
                                             Text(
-                                              'Remit Now',
+                                              hasPartialSettlement ? 'Clear Balance' : 'Remit Now',
                                               style: GoogleFonts.inter(
                                                 fontSize: 11.5,
                                                 fontWeight: FontWeight.bold,
@@ -752,6 +1004,60 @@ class _CashPageState extends ConsumerState<CashPage> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMetricTabPill({
+    required int index,
+    required String title,
+    required IconData icon,
+    required bool isSelected,
+    required Color activeColor,
+  }) {
+    return InkWell(
+      onTap: () => setState(() => _selectedMetricTabIndex = index),
+      borderRadius: BorderRadius.circular(9),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? activeColor : Colors.transparent,
+          borderRadius: BorderRadius.circular(9),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: activeColor.withValues(alpha: 0.35),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 13,
+              color: isSelected ? Colors.white : const Color(0xFF94A3B8),
+            ),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                title,
+                style: GoogleFonts.inter(
+                  fontSize: 10.5,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                  color: isSelected ? Colors.white : const Color(0xFF94A3B8),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
       ),
     );

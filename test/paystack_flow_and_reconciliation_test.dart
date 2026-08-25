@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:novexps/core/constants/paystack_constants.dart';
 import 'package:novexps/core/constants/supabase_constants.dart';
 import 'package:novexps/core/services/paystack_service.dart';
 import 'package:novexps/features/auth/data/models/user_model.dart';
 import 'package:novexps/features/finance/domain/entities/financial_summary.dart';
 import 'package:novexps/features/finance/domain/entities/remittance.dart';
+import 'package:novexps/features/finance/data/models/remittance_model.dart';
+import 'package:novexps/features/finance/presentation/pages/remittance_details_page.dart';
 import 'package:novexps/features/orders/domain/entities/order.dart';
 import 'package:novexps/features/orders/presentation/widgets/paystack_transfer_modal.dart';
 import 'package:novexps/features/finance/presentation/widgets/paystack_remittance_modal.dart';
@@ -193,6 +196,274 @@ void main() {
       expect(find.text('USSD 📱'), findsOneWidget);
       expect(find.text('I Have Transferred • Verify Settlement'), findsOneWidget);
       expect(confirmedRef, isNull);
+    });
+
+    test('7. Partial Remittance properly reconciles actual amount and maintains remaining balance liability', () {
+      final now = DateTime.now();
+
+      // Order with gross collections: ₦78,500 across 3 deliveries
+      final order1 = OrderEntity(
+        id: 'ord-01',
+        orderNumber: 'ORD-01',
+        customerName: 'Customer A',
+        customerPhone: '08011111111',
+        deliveryState: 'FCT - Abuja',
+        deliveryCity: 'Wuse 2',
+        deliveryAddress: 'Wuse 2 Hub St',
+        productName: 'Pack A',
+        status: 'delivered',
+        quantity: 1,
+        paidQuantity: 1,
+        freeQuantity: 0,
+        basePrice: 78500.0,
+        upsellAmount: 0.0,
+        totalAmount: 78500.0,
+        paymentType: 'pay_on_delivery',
+        paymentStatus: 'collected',
+        agentEntitlement: 7500.0,
+        createdAt: now,
+      );
+
+      // Rider owed ₦71,000, but paid ₦50,000 via Paystack
+      final partialRemittance = RemittanceEntity(
+        id: 'rem-partial-01',
+        referenceNumber: 'PSTK-RMT-PARTIAL-01',
+        companyId: '11111111-1111-4111-8111-111111111111',
+        deliveryAgentId: testRider.deliveryAgentId ?? 'b1111111-1111-4111-8111-111111111111',
+        amount: 50000.0,
+        paymentMethod: 'paystack',
+        status: 'verified',
+        discrepancyAmount: -21000.0,
+        discrepancyReason: 'Partial Remittance via Paystack',
+        notes: '[PAYSTACK PARTIAL] Paid ₦50,000 of expected ₦71,000.',
+        createdAt: now,
+      );
+
+      final summary = FinancialSummary.calculate(
+        orders: [order1],
+        remittances: [partialRemittance],
+        user: testRider,
+      );
+
+      expect(summary.cashCollectedAllTime, equals(78500.0));
+      expect(summary.totalEarningRetained, equals(2500.0));
+      expect(summary.totalVerifiedRemitted, equals(50000.0));
+      // Remaining pending remittance is exactly ₦24,400 (78500 - 2500 - 1600 transfer fee - 50000)
+      expect(summary.pendingRemittanceToDC, equals(24400.0));
+    });
+
+    test('8. RemittanceModel correctly serializes and deserializes partial fields & remaining shortage', () {
+      final now = DateTime.now();
+      final jsonPayload = {
+        'id': 'rem-json-01',
+        'reference_number': 'REM-PARTIAL-JSON',
+        'company_id': 'comp-01',
+        'delivery_agent_id': 'agent-01',
+        'amount': 50000.0,
+        'expected_amount': 71000.0,
+        'is_partial': true,
+        'discrepancy_amount': -21000.0,
+        'discrepancy_reason': 'Rider partial payment',
+        'status': 'verified',
+        'payment_method': 'paystack',
+        'created_at': now.toIso8601String(),
+      };
+
+      final model = RemittanceModel.fromJson(jsonPayload);
+      expect(model.amount, equals(50000.0));
+      expect(model.expectedAmount, equals(71000.0));
+      expect(model.isPartialRemittance, isTrue);
+      expect(model.remainingShortage, equals(21000.0));
+      expect(model.discrepancyReason, equals('Rider partial payment'));
+
+      final backToJson = model.toJson();
+      expect(backToJson['expected_amount'], equals(71000.0));
+      expect(backToJson['is_partial'], isTrue);
+      expect(backToJson['discrepancy_amount'], equals(-21000.0));
+    });
+
+    test('9. RemittanceModel preserves Paystack transaction channels, processor banks, and auth codes', () {
+      final now = DateTime.now();
+      final jsonPayload = {
+        'id': 'rem-paystack-full',
+        'reference_number': 'PSTK-RMT-PDA7182-835804',
+        'company_id': 'comp-01',
+        'delivery_agent_id': 'agent-01',
+        'amount': 20000.0,
+        'expected_amount': 20000.0,
+        'gross_collections': 128500.0,
+        'commission_deducted': 5000.0,
+        'transport_allowance_deducted': 7500.0,
+        'is_partial': false,
+        'status': 'verified',
+        'payment_method': 'paystack',
+        'paystack_channel': 'Dedicated Virtual Account (NUBAN)',
+        'paystack_bank': 'Titan Trust Bank / Paystack',
+        'paystack_auth_code': 'AUTH_PSTK_991823',
+        'payer_name': 'Joel Odufu',
+        'payer_email': 'joel.odufu@novaexpress.ng',
+        'gateway_response': 'Approved / Successful (200 OK)',
+        'destination_bank_name': 'Zenith Bank',
+        'destination_account_number': '1012398412',
+        'destination_account_name': 'NovaExpress Logistics Limited',
+        'created_at': now.toIso8601String(),
+        'paystack_paid_at': now.toIso8601String(),
+      };
+
+      final model = RemittanceModel.fromJson(jsonPayload);
+      expect(model.referenceNumber, equals('PSTK-RMT-PDA7182-835804'));
+      expect(model.paystackChannel, equals('Dedicated Virtual Account (NUBAN)'));
+      expect(model.paystackBank, equals('Titan Trust Bank / Paystack'));
+      expect(model.paystackAuthCode, equals('AUTH_PSTK_991823'));
+      expect(model.payerName, equals('Joel Odufu'));
+      expect(model.payerEmail, equals('joel.odufu@novaexpress.ng'));
+      expect(model.gatewayResponse, equals('Approved / Successful (200 OK)'));
+      expect(model.destinationBankName, equals('Zenith Bank'));
+
+      final json = model.toJson();
+      expect(json['paystack_channel'], equals('Dedicated Virtual Account (NUBAN)'));
+      expect(json['paystack_bank'], equals('Titan Trust Bank / Paystack'));
+      expect(json['paystack_auth_code'], equals('AUTH_PSTK_991823'));
+      expect(json['payer_name'], equals('Joel Odufu'));
+      expect(json['payer_email'], equals('joel.odufu@novaexpress.ng'));
+    });
+
+    testWidgets('10. RemittanceDetailsPage renders reconciliation matrix and Paystack audit metadata', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(
+            home: RemittanceDetailsPage(
+              remittanceId: 'PSTK-RMT-PDA7182-835804',
+            ),
+          ),
+        ),
+      );
+
+      await tester.pump();
+
+      expect(find.text('Remittance Receipt'), findsOneWidget);
+      expect(find.text('PSTK-RMT-PDA7182-835804'), findsWidgets);
+      expect(find.text('SETTLEMENT RECONCILIATION'), findsOneWidget);
+      expect(find.text('AUDIT & TRANSACTION DETAILS'), findsOneWidget);
+      expect(find.text('Customer Collections (POD)'), findsOneWidget);
+      expect(find.text('Less: Delivery Commission'), findsOneWidget);
+      expect(find.text('Less: Transport Allowance'), findsOneWidget);
+      expect(find.text('Expected Remittance'), findsOneWidget);
+      expect(find.text('Actual Remitted Amount'), findsOneWidget);
+      expect(find.text('Remitted To'), findsOneWidget);
+      expect(find.text('Payment Method'), findsOneWidget);
+      expect(find.text('Transaction Reference'), findsOneWidget);
+      expect(find.text('Paystack Channel'), findsOneWidget);
+      expect(find.text('Bank / Processor'), findsOneWidget);
+      expect(find.text('Share Receipt'), findsOneWidget);
+      expect(find.text('Download Statement (PDF)'), findsOneWidget);
+    });
+
+    test('11. Multiple delivered cash orders accumulate cash in custody and pending remittance correctly', () {
+      final now = DateTime.now();
+
+      final order1 = OrderEntity(
+        id: 'ord-cash-1',
+        orderNumber: 'ORD-CASH-001',
+        customerName: 'Customer One',
+        customerPhone: '08011111111',
+        deliveryState: 'FCT - Abuja',
+        deliveryCity: 'Garki',
+        deliveryAddress: 'Area 11',
+        productName: 'Herbal Pack 1',
+        status: 'delivered',
+        quantity: 1,
+        paidQuantity: 1,
+        freeQuantity: 0,
+        basePrice: 25000.0,
+        upsellAmount: 0.0,
+        totalAmount: 25000.0,
+        paymentType: 'pay_on_delivery',
+        paymentStatus: 'collected',
+        createdAt: now.subtract(const Duration(hours: 4)),
+      );
+
+      final order2 = OrderEntity(
+        id: 'ord-cash-2',
+        orderNumber: 'ORD-CASH-002',
+        customerName: 'Customer Two',
+        customerPhone: '08022222222',
+        deliveryState: 'FCT - Abuja',
+        deliveryCity: 'Wuse',
+        deliveryAddress: 'Wuse 2',
+        productName: 'Herbal Pack 2',
+        status: 'delivered',
+        quantity: 1,
+        paidQuantity: 1,
+        freeQuantity: 0,
+        basePrice: 35000.0,
+        upsellAmount: 0.0,
+        totalAmount: 35000.0,
+        paymentType: 'cash',
+        paymentStatus: 'collected',
+        createdAt: now.subtract(const Duration(hours: 2)),
+      );
+
+      final order3 = OrderEntity(
+        id: 'ord-cash-3',
+        orderNumber: 'ORD-CASH-003',
+        customerName: 'Customer Three',
+        customerPhone: '08033333333',
+        deliveryState: 'FCT - Abuja',
+        deliveryCity: 'Maitama',
+        deliveryAddress: 'Maitama Main',
+        productName: 'Herbal Pack 3',
+        status: 'delivered',
+        quantity: 1,
+        paidQuantity: 1,
+        freeQuantity: 0,
+        basePrice: 20000.0,
+        upsellAmount: 0.0,
+        totalAmount: 20000.0,
+        paymentType: 'cod',
+        paymentStatus: 'collected',
+        createdAt: now,
+      );
+
+      // Accumulation after 3 orders
+      final summaryAfter3Orders = FinancialSummary.calculate(
+        orders: [order1, order2, order3],
+        remittances: <RemittanceEntity>[],
+        user: testRider,
+      );
+
+      // Gross: 25k + 35k + 20k = 80k
+      expect(summaryAfter3Orders.cashCollectedAllTime, equals(80000.0));
+      expect(summaryAfter3Orders.deliveredCashOrdersCount, equals(3));
+      // Earning retained: 3 orders * (1000 commission + 1500 transport) = 7,500
+      expect(summaryAfter3Orders.totalEarningRetained, equals(7500.0));
+      // Transfer charges: 500 + 700 + 400 = 1,600
+      expect(summaryAfter3Orders.totalTransferFeesRetained, equals(1600.0));
+      // Pending Remittance to DC: 80,000 - 7,500 - 1,600 = 70,900
+      expect(summaryAfter3Orders.pendingRemittanceToDC, equals(70900.0));
+
+      // After partial remittance of 40,000
+      final partialRemittance = RemittanceEntity(
+        id: 'rem-partial-88',
+        referenceNumber: 'PSTK-RMT-PART-88',
+        companyId: '11111111-1111-4111-8111-111111111111',
+        deliveryAgentId: testRider.deliveryAgentId ?? 'b1111111-1111-4111-8111-111111111111',
+        amount: 40000.0,
+        paymentMethod: 'paystack',
+        status: 'verified',
+        isPartial: true,
+        discrepancyAmount: -30900.0,
+        createdAt: now,
+      );
+
+      final summaryAfterPartialRemittance = FinancialSummary.calculate(
+        orders: [order1, order2, order3],
+        remittances: [partialRemittance],
+        user: testRider,
+      );
+
+      // Remaining pending remittance is: 70,900 - 40,000 = 30,900
+      expect(summaryAfterPartialRemittance.pendingRemittanceToDC, equals(30900.0));
     });
   });
 }

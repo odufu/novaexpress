@@ -7,6 +7,7 @@ class FinancialSummary {
   final double cashCollectedToday;
   final double totalCommissionRetained;
   final double totalTransportRetained;
+  final double totalTransferFeesRetained;
   final double totalEarningRetained;
   final double totalVerifiedRemitted;
   final double totalPendingApprovalRemitted;
@@ -23,6 +24,7 @@ class FinancialSummary {
     required this.cashCollectedToday,
     required this.totalCommissionRetained,
     required this.totalTransportRetained,
+    required this.totalTransferFeesRetained,
     required this.totalEarningRetained,
     required this.totalVerifiedRemitted,
     required this.totalPendingApprovalRemitted,
@@ -72,20 +74,24 @@ class FinancialSummary {
 
     final double totalCommissionRetained = deliveredCashOrders.length * commissionPerOrder;
     final double totalTransportRetained = deliveredCashOrders.length * transportPerOrder;
+    final double totalTransferFeesRetained = deliveredCashOrders.fold(
+      0.0,
+      (acc, o) => acc + ((o.totalAmount > 0) ? ((o.totalAmount / 5000.0).ceil() * 100.0) : 0.0),
+    );
     final double totalFailedAllowanceEarned = failedOrders.length * failedPerOrder;
-    final double totalEarningRetained = totalCommissionRetained + totalTransportRetained + totalFailedAllowanceEarned;
+    final double totalEarningRetained = totalCommissionRetained + totalTransportRetained;
 
     final double totalVerifiedRemitted = remittances
-        .where((r) => r.isVerified || r.status.toLowerCase() == 'approved')
+        .where((r) => r.isVerified)
         .fold(0.0, (acc, r) => acc + r.amount);
 
     final double totalPendingApprovalRemitted = remittances
-        .where((r) => r.isPending || r.status.toLowerCase() == 'submitted')
+        .where((r) => r.isPending && !r.isVerified)
         .fold(0.0, (acc, r) => acc + r.amount);
 
     final double pendingRemittanceToDC = isSalaried
         ? (cashCollectedAllTime - totalVerifiedRemitted - totalPendingApprovalRemitted).clamp(0.0, double.infinity)
-        : (cashCollectedAllTime - totalEarningRetained - totalVerifiedRemitted - totalPendingApprovalRemitted).clamp(0.0, double.infinity);
+        : (cashCollectedAllTime - totalEarningRetained - totalTransferFeesRetained - totalVerifiedRemitted - totalPendingApprovalRemitted).clamp(0.0, double.infinity);
 
     final double directTransfersEarnings = deliveredPrepaidOrders.fold<double>(
       0.0,
@@ -112,6 +118,7 @@ class FinancialSummary {
       cashCollectedToday: cashCollectedToday,
       totalCommissionRetained: totalCommissionRetained,
       totalTransportRetained: totalTransportRetained,
+      totalTransferFeesRetained: totalTransferFeesRetained,
       totalEarningRetained: totalEarningRetained,
       totalVerifiedRemitted: totalVerifiedRemitted,
       totalPendingApprovalRemitted: totalPendingApprovalRemitted,

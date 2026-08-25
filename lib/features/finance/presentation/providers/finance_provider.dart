@@ -104,15 +104,30 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
       final targetAgentId = agentId ?? SupabaseConstants.defaultDeliveryAgentId;
-      final items = await _repository.getAgentRemittances(targetAgentId);
+      final remoteItems = await _repository.getAgentRemittances(targetAgentId);
       final txns = await _repository.getRiderTransactions(targetAgentId);
+
+      // Merge remote items with current state/cache to avoid wiping out fresh settlements
+      final Map<String, RemittanceEntity> mergedMap = {};
+      for (final r in state.remittances) {
+        final key = r.referenceNumber.isNotEmpty ? r.referenceNumber : r.id;
+        if (key.isNotEmpty) mergedMap[key] = r;
+      }
+      for (final r in remoteItems) {
+        final key = r.referenceNumber.isNotEmpty ? r.referenceNumber : r.id;
+        if (key.isNotEmpty) mergedMap[key] = r;
+      }
+
+      final finalItems = mergedMap.values.toList();
+      finalItems.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
       state = state.copyWith(
         isLoading: false,
-        remittances: items,
-        transactions: txns,
+        remittances: finalItems,
+        transactions: txns.isNotEmpty ? txns : state.transactions,
       );
-      _storageService.cacheRemittances(items);
-      _storageService.cacheTransactions(txns);
+      _storageService.cacheRemittances(finalItems);
+      if (txns.isNotEmpty) _storageService.cacheTransactions(txns);
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
@@ -147,6 +162,8 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
     String? referenceNumber,
     String? discrepancyReason,
     double? discrepancyAmount,
+    double? expectedAmount,
+    bool isPartial = false,
     String? notes,
   }) async {
     state = state.copyWith(isLoading: true);
@@ -171,13 +188,19 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
         referenceNumber: referenceNumber,
         discrepancyReason: discrepancyReason,
         discrepancyAmount: discrepancyAmount,
+        expectedAmount: expectedAmount,
+        isPartial: isPartial,
         notes: notes,
       );
 
-      final updatedList = [newRemittance, ...state.remittances];
+      final otherRemittances = state.remittances.where((r) =>
+        r.referenceNumber != newRemittance.referenceNumber &&
+        (r.id.isEmpty || r.id != newRemittance.id)
+      ).toList();
+
+      final updatedList = [newRemittance, ...otherRemittances];
       state = state.copyWith(isLoading: false, remittances: updatedList);
       _storageService.cacheRemittances(updatedList);
-      loadRemittances(targetAgentId);
       return true;
     } catch (e) {
       state = state.copyWith(

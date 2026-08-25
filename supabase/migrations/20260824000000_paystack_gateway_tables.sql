@@ -39,8 +39,19 @@ CREATE TABLE IF NOT EXISTS paystack_transactions (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Ensure cash_remittances has distribution_center_id
+-- Ensure cash_remittances has distribution_center_id, is_partial, expected_amount, and discrepancy tracking
 ALTER TABLE cash_remittances ADD COLUMN IF NOT EXISTS distribution_center_id UUID REFERENCES distribution_centers(id) ON DELETE SET NULL;
+ALTER TABLE cash_remittances ADD COLUMN IF NOT EXISTS is_partial BOOLEAN DEFAULT FALSE;
+ALTER TABLE cash_remittances ADD COLUMN IF NOT EXISTS expected_amount NUMERIC(14, 2);
+ALTER TABLE cash_remittances ADD COLUMN IF NOT EXISTS discrepancy_amount NUMERIC(14, 2) DEFAULT 0.00;
+ALTER TABLE cash_remittances ADD COLUMN IF NOT EXISTS discrepancy_reason TEXT;
+ALTER TABLE cash_remittances ADD COLUMN IF NOT EXISTS paystack_channel VARCHAR(50) DEFAULT 'bank_transfer';
+ALTER TABLE cash_remittances ADD COLUMN IF NOT EXISTS paystack_bank VARCHAR(100) DEFAULT 'Titan Trust Bank / Paystack';
+ALTER TABLE cash_remittances ADD COLUMN IF NOT EXISTS paystack_auth_code VARCHAR(100);
+ALTER TABLE cash_remittances ADD COLUMN IF NOT EXISTS paystack_paid_at TIMESTAMPTZ;
+ALTER TABLE cash_remittances ADD COLUMN IF NOT EXISTS payer_email VARCHAR(255);
+ALTER TABLE cash_remittances ADD COLUMN IF NOT EXISTS payer_name VARCHAR(255);
+ALTER TABLE cash_remittances ADD COLUMN IF NOT EXISTS gateway_response VARCHAR(255) DEFAULT 'Approved / Successful';
 
 -- 3. INDEXES FOR HIGH-THROUGHPUT WEBHOOK & QUERY PERFORMANCE
 CREATE INDEX IF NOT EXISTS idx_paystack_va_account_ref ON paystack_virtual_accounts(account_reference);

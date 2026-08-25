@@ -8,6 +8,7 @@ import '../../../notifications/presentation/providers/notifications_provider.dar
 import '../providers/dc_console_provider.dart';
 import 'dc_dashboard_page.dart';
 import 'dc_finance_page.dart';
+import 'dc_order_payment_matching_page.dart';
 import 'dc_orders_page.dart';
 import 'dc_payouts_page.dart';
 import 'dc_returns_page.dart';
@@ -48,6 +49,7 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
     final pages = [
       const DCDashboardPage(),
       const DCOrdersPage(),
+      const DCOrderPaymentMatchingPage(),
       const DCStockPage(),
       const DCFinancePage(),
       const DCTransactionsPage(),
@@ -180,12 +182,13 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
               children: [
                 _buildNavItem(0, 'Dashboard', Icons.dashboard_rounded, state.activeTabIndex == 0, isCollapsed, isDrawer),
                 _buildNavItem(1, 'Deliveries & Orders', Icons.local_shipping_rounded, state.activeTabIndex == 1, isCollapsed, isDrawer),
-                _buildNavItem(2, 'Inventory & Stock', Icons.inventory_2_rounded, state.activeTabIndex == 2, isCollapsed, isDrawer),
-                _buildNavItem(3, 'Cash & Remittances', Icons.account_balance_wallet_rounded, state.activeTabIndex == 3, isCollapsed, isDrawer),
-                _buildNavItem(4, 'Transactions & Ledger', Icons.receipt_long_rounded, state.activeTabIndex == 4, isCollapsed, isDrawer),
-                _buildNavItem(5, 'Returns & QC Desk', Icons.assignment_return_rounded, state.activeTabIndex == 5, isCollapsed, isDrawer),
-                _buildNavItem(6, 'Rider Payouts', Icons.payments_rounded, state.activeTabIndex == 6, isCollapsed, isDrawer),
-                _buildNavItem(7, 'Riders & Fleet', Icons.badge_rounded, state.activeTabIndex == 7, isCollapsed, isDrawer),
+                _buildNavItem(2, 'Order-Payment Match', Icons.price_check_rounded, state.activeTabIndex == 2, isCollapsed, isDrawer),
+                _buildNavItem(3, 'Inventory & Stock', Icons.inventory_2_rounded, state.activeTabIndex == 3, isCollapsed, isDrawer),
+                _buildNavItem(4, 'Cash & Remittances', Icons.account_balance_wallet_rounded, state.activeTabIndex == 4, isCollapsed, isDrawer),
+                _buildNavItem(5, 'Transactions & Ledger', Icons.receipt_long_rounded, state.activeTabIndex == 5, isCollapsed, isDrawer),
+                _buildNavItem(6, 'Returns & QC Desk', Icons.assignment_return_rounded, state.activeTabIndex == 6, isCollapsed, isDrawer),
+                _buildNavItem(7, 'Rider Payouts', Icons.payments_rounded, state.activeTabIndex == 7, isCollapsed, isDrawer),
+                _buildNavItem(8, 'Riders & Fleet', Icons.badge_rounded, state.activeTabIndex == 8, isCollapsed, isDrawer),
               ],
             ),
           ),

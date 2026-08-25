@@ -10,7 +10,7 @@ interface ConfirmDeliveryPayload {
   orderId: string;
   agentId: string;
   paymentType: "pay_on_delivery" | "prepaid";
-  paymentMethod: "cash" | "bank_transfer" | "pos";
+  paymentMethod: "cash" | "bank_transfer" | "paystack";
   amountCollected: number;
   customerSignatureUrl?: string;
   photoProofUrl?: string;
@@ -110,10 +110,11 @@ serve(async (req: Request) => {
     const isCashPod = payload.paymentType === "pay_on_delivery" && payload.paymentMethod === "cash";
 
     if (isCashPod) {
-      // Rider collected cash. Rider retains their earning (commission + transport) directly from cash.
-      // Cash to remit increases by: (amountCollected - riderEarning)
+      // Rider collected cash. Rider retains their earning (commission + transport) and transfer charge directly from cash.
+      // Dynamic transfer charge: ₦100 per ₦5,000 transfer block (e.g. ₦5,000 -> ₦100, ₦5,200 -> ₦200, ₦35,000 -> ₦700)
       const cashCollected = payload.amountCollected || order.total_amount || 0;
-      const netToRemit = Math.max(0, cashCollected - riderEarning);
+      const transferCharge = cashCollected > 0 ? Math.ceil(cashCollected / 5000) * 100 : 0;
+      const netToRemit = Math.max(0, cashCollected - riderEarning - transferCharge);
       updatedCodBalance = updatedCodBalance + netToRemit;
 
       await supabaseClient

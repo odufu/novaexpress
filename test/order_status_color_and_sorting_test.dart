@@ -7,6 +7,7 @@ import 'package:novexps/features/orders/presentation/pages/orders_list_page.dart
 import 'package:novexps/features/orders/presentation/providers/orders_provider.dart';
 import 'package:novexps/features/auth/presentation/providers/auth_provider.dart';
 import 'package:novexps/features/auth/data/models/user_model.dart';
+import 'package:novexps/features/notifications/presentation/providers/notifications_provider.dart';
 import 'package:novexps/features/orders/domain/repositories/orders_repository.dart';
 
 class MockOrdersRepository implements OrdersRepository {
@@ -39,6 +40,13 @@ class MockLocalStorageService implements LocalStorageService {
 
 class FakeAuthNotifier extends StateNotifier<AuthState> implements AuthNotifier {
   FakeAuthNotifier(UserModel user) : super(AuthState(user: user, isLoading: false));
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class FakeNotificationsNotifier extends StateNotifier<NotificationsState> implements NotificationsNotifier {
+  FakeNotificationsNotifier() : super(const NotificationsState());
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -189,6 +197,7 @@ void main() {
         overrides: [
           authProvider.overrideWith((ref) => FakeAuthNotifier(testUser)),
           ordersProvider.overrideWith((ref) => OrdersNotifier(mockRepo, null, mockStorage, ref)),
+          notificationsProvider.overrideWith((ref) => FakeNotificationsNotifier()),
         ],
         child: const MaterialApp(
           home: OrdersListPage(),

@@ -15,6 +15,18 @@ class RemittanceEntity {
   final String? verifiedByName;
   final double? discrepancyAmount;
   final String? discrepancyReason;
+  final double? expectedAmount;
+  final bool isPartial;
+  final String? paystackChannel;
+  final String? paystackBank;
+  final String? paystackAuthCode;
+  final DateTime? paystackPaidAt;
+  final String? payerEmail;
+  final String? payerName;
+  final String? gatewayResponse;
+  final String destinationBankName;
+  final String destinationAccountNumber;
+  final String destinationAccountName;
   final String? notes;
   final DateTime createdAt;
   final DateTime? verifiedAt;
@@ -36,22 +48,52 @@ class RemittanceEntity {
     this.verifiedByName,
     this.discrepancyAmount,
     this.discrepancyReason,
+    this.expectedAmount,
+    this.isPartial = false,
+    this.paystackChannel,
+    this.paystackBank,
+    this.paystackAuthCode,
+    this.paystackPaidAt,
+    this.payerEmail,
+    this.payerName,
+    this.gatewayResponse,
+    this.destinationBankName = 'NovaExpress Main Account (Zenith Bank)',
+    this.destinationAccountNumber = '1012398412',
+    this.destinationAccountName = 'NovaExpress Logistics Limited',
     this.notes,
     required this.createdAt,
     this.verifiedAt,
   });
 
-  bool get isVerified => status.toLowerCase() == 'verified';
-  bool get isPending => status.toLowerCase() == 'pending' || status.toLowerCase() == 'pending verification';
+  bool get isPartialRemittance =>
+      isPartial ||
+      (discrepancyAmount != null && discrepancyAmount! < -0.01) ||
+      (expectedAmount != null && expectedAmount! > amount && amount > 0);
+
+  double get remainingShortage {
+    if (expectedAmount != null && expectedAmount! > amount) {
+      return (expectedAmount! - amount);
+    }
+    if (discrepancyAmount != null && discrepancyAmount! < 0) {
+      return discrepancyAmount!.abs();
+    }
+    return 0.0;
+  }
+
+  bool get isVerified =>
+      status.toLowerCase() != 'rejected' &&
+      status.toLowerCase() != 'disputed';
+
+  bool get isPending => status.toLowerCase() == 'disputed';
+
   bool get isRejected => status.toLowerCase() == 'rejected';
   bool get isDisputed => status.toLowerCase() == 'disputed';
 
   String get statusDisplay {
-    if (isVerified) return 'Verified ✓';
-    if (isPending) return 'Pending Verification';
     if (isRejected) return 'Rejected';
     if (isDisputed) return 'Disputed';
-    return status.toUpperCase();
+    if (isPartialRemittance) return 'Partial Remittance';
+    return 'Complete Remittance';
   }
 
   String get paymentMethodDisplay {
