@@ -44,7 +44,12 @@ class DCCreateOrderDraftState {
     this.isSubmitting = false,
   });
 
-  double get totalAmount => (quantity * unitPrice) + upsellAmount;
+  double get totalAmount {
+    if (selectedPackage != null) {
+      return selectedPackage!.packagePrice + upsellAmount;
+    }
+    return (quantity * unitPrice) + upsellAmount;
+  }
 
   DCCreateOrderDraftState copyWith({
     String? selectedState,
@@ -216,8 +221,14 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
     final orderNumber = 'TRK-$randomCode';
     final dcState = ref.read(dcConsoleProvider);
 
-    final fullProductName = draft.selectedPackage != null
-        ? '${draft.selectedProductName} (${draft.selectedPackage!.packageName})'
+    final pkg = draft.selectedPackage;
+    final totalUnits = pkg?.totalPhysicalQuantity ?? draft.quantity;
+    final paidUnits = pkg?.paidQuantity ?? draft.quantity;
+    final freeUnits = pkg?.freeQuantity ?? 0;
+    final basePrice = pkg != null ? pkg.packagePrice : (draft.quantity * draft.unitPrice);
+
+    final fullProductName = pkg != null
+        ? '${draft.selectedProductName} (${pkg.packageName})'
         : (_productNameController.text.trim().isNotEmpty
             ? _productNameController.text.trim()
             : draft.selectedProductName);
@@ -225,7 +236,7 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
     final orderPayload = <String, dynamic>{
       'id': 'ord-${DateTime.now().millisecondsSinceEpoch}',
       'order_number': orderNumber,
-      'product_id': draft.selectedProductId ?? draft.selectedPackage?.productId,
+      'product_id': draft.selectedProductId ?? pkg?.productId,
       'customer_name': _nameController.text.trim(),
       'customer_phone': _phoneController.text.trim(),
       'customer_alt_phone': _altPhoneController.text.trim().isNotEmpty ? _altPhoneController.text.trim() : null,
@@ -234,10 +245,10 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
       'delivery_address': _addressController.text.trim(),
       'landmark': _landmarkController.text.trim().isNotEmpty ? _landmarkController.text.trim() : null,
       'product_name': fullProductName,
-      'quantity': draft.quantity,
-      'paid_quantity': draft.quantity,
-      'free_quantity': 0,
-      'base_price': draft.unitPrice,
+      'quantity': totalUnits,
+      'paid_quantity': paidUnits,
+      'free_quantity': freeUnits,
+      'base_price': basePrice,
       'upsell_amount': draft.upsellAmount,
       'total_amount': draft.totalAmount,
       'payment_type': draft.paymentType,

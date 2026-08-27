@@ -7,6 +7,7 @@ import '../../../stock/domain/entities/rider_stock_allocation.dart';
 import '../../../stock/presentation/providers/stock_provider.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
 import '../providers/dc_console_provider.dart';
+import '../widgets/dc_product_detail_modal.dart';
 
 class DCStockPage extends ConsumerStatefulWidget {
   const DCStockPage({super.key});
@@ -748,52 +749,6 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
     );
   }
 
-  Widget _buildDetailRow(String label, String value, bool isDark, {Color? valueColor, bool isBold = false}) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 140,
-          child: Text(
-            label,
-            style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: GoogleFonts.inter(
-              fontSize: 12,
-              fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
-              color: valueColor ?? (isDark ? Colors.white : const Color(0xFF0F172A)),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStockStatTile(String title, String val, String sub, Color color, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: isDark ? 0.15 : 0.08),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
-          const SizedBox(height: 4),
-          Text(val, style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w900, color: color)),
-          const SizedBox(height: 2),
-          Text(sub, style: GoogleFonts.inter(fontSize: 9.5, color: const Color(0xFF94A3B8))),
-        ],
-      ),
-    );
-  }
-
   Widget _buildStatusBadge(StockItemEntity item) {
     if (item.availableCount <= 0) {
       return Container(
@@ -842,218 +797,15 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
     List<RiderStockAllocation> allAllocations,
   ) {
     final stockState = ref.read(stockProvider);
-    final productAllocations = allAllocations.where((a) =>
-        (a.productId == item.id ||
-            a.sku.toLowerCase() == item.sku.toLowerCase() ||
-            a.productName.toLowerCase() == item.name.toLowerCase()) &&
-        a.inCustodyUnits > 0).toList();
 
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        contentPadding: const EdgeInsets.all(20),
-        title: Row(
-          children: [
-            CircleAvatar(
-              radius: 18,
-              backgroundColor: const Color(0xFF2563EB).withValues(alpha: 0.15),
-              child: const Icon(Icons.inventory_2_rounded, color: Color(0xFF2563EB), size: 18),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(item.name, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
-                  Text('${item.sku} • ${item.category}', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
-                ],
-              ),
-            ),
-            _buildStatusBadge(item),
-          ],
-        ),
-        content: SizedBox(
-          width: 550,
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // 1. Company & Merchant Details Card
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                  ),
-                  child: Column(
-                    children: [
-                      _buildDetailRow('🏢 Merchant / Company:', item.ownerName, isDark, isBold: true),
-                      const SizedBox(height: 6),
-                      _buildDetailRow('💰 Unit Selling Price:', CurrencyFormatter.formatNaira(item.price), isDark, valueColor: const Color(0xFF10B981), isBold: true),
-                      const SizedBox(height: 6),
-                      _buildDetailRow('📍 Storage Bin Location:', item.binLocation ?? 'BIN-A1-01', isDark),
-                      const SizedBox(height: 6),
-                      _buildDetailRow('🏷️ Batch / Lot Code:', item.batchNumber ?? 'LOT-2026-08', isDark),
-                      const SizedBox(height: 6),
-                      _buildDetailRow('📝 Description:', item.description, isDark),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-                Text('📊 Inventory & Custody Accounting', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13)),
-                const SizedBox(height: 8),
-
-                // 2. The 4 Essential Stock Numbers (2x2 Grid)
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildStockStatTile(
-                        '🏢 In DC Possession',
-                        '${item.availableCount} Units',
-                        'Available to assign',
-                        const Color(0xFF10B981),
-                        isDark,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _buildStockStatTile(
-                        '🛵 In Rider Custody',
-                        '${item.inRiderCustodyCount} Units',
-                        'In transit with riders',
-                        const Color(0xFF8B5CF6),
-                        isDark,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildStockStatTile(
-                        '✅ Delivered Units',
-                        '${item.deliveredCount} Units',
-                        'Fulfilled to buyers',
-                        const Color(0xFF2563EB),
-                        isDark,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _buildStockStatTile(
-                        '⚠️ Reported / Damaged',
-                        '${item.complaintCount} Units',
-                        'Reported during syncing',
-                        item.complaintCount > 0 ? const Color(0xFFEF4444) : const Color(0xFF64748B),
-                        isDark,
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('🛵 Riders in Custody (${productAllocations.length})', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13)),
-                  ],
-                ),
-                const SizedBox(height: 8),
-
-                // 3. Which riders hold this product
-                if (productAllocations.isEmpty)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text('No riders currently hold this product in vehicle custody.', style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B))),
-                  )
-                else
-                  ...productAllocations.map((alloc) {
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 6),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.two_wheeler_rounded, size: 16, color: Color(0xFF8B5CF6)),
-                              const SizedBox(width: 8),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(alloc.riderName, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12)),
-                                  Text(alloc.riderCode, style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B))),
-                                ],
-                              ),
-                            ],
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              '${alloc.inCustodyUnits} Units in Vehicle',
-                              style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF8B5CF6)),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Close')),
-          OutlinedButton.icon(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _showRecordDamageModal(context, isDark, item, drivers);
-            },
-            icon: const Icon(Icons.report_problem_outlined, size: 14, color: Color(0xFFEF4444)),
-            label: const Text('Report Damage / Loss', style: TextStyle(color: Color(0xFFEF4444), fontSize: 11.5)),
-          ),
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _showReceiveStockDialog(context, isDark, stockState, preselectedItem: item);
-            },
-            icon: const Icon(Icons.arrow_downward_rounded, size: 14, color: Colors.white),
-            label: const Text('Receive More Stock', style: TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.bold)),
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
-          ),
-          ElevatedButton.icon(
-            onPressed: item.availableCount > 0
-                ? () {
-                    Navigator.of(ctx).pop();
-                    _showAssignToRiderDialog(context, isDark, item, drivers);
-                  }
-                : null,
-            icon: const Icon(Icons.person_add_alt_1_rounded, size: 14, color: Colors.white),
-            label: const Text('Assign to Rider', style: TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.bold)),
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
-          ),
-        ],
-      ),
+    DCProductDetailModal.show(
+      context,
+      item: item,
+      drivers: drivers,
+      allocations: allAllocations,
+      onReceiveMoreStock: () => _showReceiveStockDialog(context, isDark, stockState, preselectedItem: item),
+      onAssignToRider: () => _showAssignToRiderDialog(context, isDark, item, drivers),
+      onReportDamage: () => _showRecordDamageModal(context, isDark, item, drivers),
     );
   }
 

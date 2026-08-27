@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:novexps/features/dc_console/presentation/providers/product_catalog_provider.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('Product & Package Catalog Tests', () {
     late ProviderContainer container;
 

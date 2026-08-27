@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../features/dc_console/domain/entities/dc_fleet_driver.dart';
 import '../../features/dc_console/domain/entities/dc_payout_claim.dart';
 import '../../features/dc_console/domain/entities/dc_transaction_record.dart';
+import '../../features/dc_console/domain/entities/product_package.dart';
 import '../../features/dc_console/presentation/providers/dc_console_provider.dart';
 import '../../features/finance/data/models/remittance_model.dart';
 import '../../features/finance/domain/entities/remittance.dart';
@@ -60,6 +61,9 @@ abstract class LocalStorageService {
   Future<void> cacheNotifications(String agentId, List<AppNotificationEntity> notifications);
   Future<List<AppNotificationEntity>?> getCachedNotifications(String agentId);
 
+  Future<void> cacheProductCatalog(List<CatalogProduct> products);
+  Future<List<CatalogProduct>?> getCachedProductCatalog();
+
   Future<void> setLastSyncTime(String moduleKey);
   Future<DateTime?> getLastSyncTime(String moduleKey);
 }
@@ -75,6 +79,7 @@ class LocalStorageServiceImpl implements LocalStorageService {
   static const String _dcTransactionsKey = 'novexps_cache_dc_transactions';
   static const String _stockKey = 'novexps_cache_stock_items';
   static const String _riderAllocationsKey = 'novexps_cache_rider_stock_allocations';
+  static const String _productCatalogKey = 'novexps_cache_product_catalog';
   static const String _notificationsPrefix = 'novexps_cache_notifications_';
   static const String _syncTimePrefix = 'novexps_sync_time_';
 
@@ -500,6 +505,29 @@ class LocalStorageServiceImpl implements LocalStorageService {
         items.add(AppNotificationEntity.fromJson(map));
       } catch (e) {
         debugPrint('[LOCAL_STORAGE] ⚠️ Error parsing cached notification: $e');
+      }
+    }
+    return items.isNotEmpty ? items : null;
+  }
+
+  // --- Product & Package Catalog ---
+
+  @override
+  Future<void> cacheProductCatalog(List<CatalogProduct> products) async {
+    final list = products.map((p) => p.toJson()).toList();
+    await saveJsonList(_productCatalogKey, list);
+  }
+
+  @override
+  Future<List<CatalogProduct>?> getCachedProductCatalog() async {
+    final rawList = await getJsonList(_productCatalogKey);
+    if (rawList == null) return null;
+    final items = <CatalogProduct>[];
+    for (final map in rawList) {
+      try {
+        items.add(CatalogProduct.fromJson(map));
+      } catch (e) {
+        debugPrint('[LOCAL_STORAGE] ⚠️ Error parsing cached product catalog: $e');
       }
     }
     return items.isNotEmpty ? items : null;
