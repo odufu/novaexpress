@@ -95,6 +95,11 @@ class StockItemEntity {
     }
   }
 
+  bool get isLowStock => status == StockStatus.lowStock;
+  bool get isOutOfStock => status == StockStatus.outOfStock;
+  int get inRiderCustodyCount => (assignedCount - deliveredCount - returnedCount).clamp(0, 999999);
+  int get warehouseAvailableCount => availableCount;
+
   String get inventoryTypeLabel {
     switch (inventoryType) {
       case InventoryType.distributedInventory:
@@ -102,5 +107,51 @@ class StockItemEntity {
       case InventoryType.novaExpressInventory:
         return 'NovaExpress Inventory';
     }
+  }
+
+  StockItemEntity copyWith({
+    String? id,
+    String? sku,
+    String? name,
+    String? description,
+    double? price,
+    String? ownerName,
+    InventoryType? inventoryType,
+    int? totalInCustody,
+    int? reservedCount,
+    int? assignedCount,
+    int? deliveredCount,
+    int? availableCount,
+    int? returnedCount,
+    int? awaitingReturnCount,
+    int? lowStockThreshold,
+    int? reorderLevel,
+    String? category,
+    String? imageAsset,
+    String? batchNumber,
+    String? lastAuditDate,
+  }) {
+    return StockItemEntity(
+      id: id ?? this.id,
+      sku: sku ?? this.sku,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      price: price ?? this.price,
+      ownerName: ownerName ?? this.ownerName,
+      inventoryType: inventoryType ?? this.inventoryType,
+      totalInCustody: totalInCustody ?? this.totalInCustody,
+      reservedCount: reservedCount ?? this.reservedCount,
+      assignedCount: assignedCount ?? this.assignedCount,
+      deliveredCount: deliveredCount ?? this.deliveredCount,
+      availableCount: availableCount ?? this.availableCount,
+      returnedCount: returnedCount ?? this.returnedCount,
+      awaitingReturnCount: awaitingReturnCount ?? this.awaitingReturnCount,
+      lowStockThreshold: lowStockThreshold ?? this.lowStockThreshold,
+      reorderLevel: reorderLevel ?? this.reorderLevel,
+      category: category ?? this.category,
+      imageAsset: imageAsset ?? this.imageAsset,
+      batchNumber: batchNumber ?? this.batchNumber,
+      lastAuditDate: lastAuditDate ?? this.lastAuditDate,
+    );
   }
 }

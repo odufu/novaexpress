@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/services/local_storage_service.dart';
 import '../../data/datasources/stock_remote_datasource.dart';
 import '../../data/repositories/stock_repository_impl.dart';
+import '../../domain/entities/rider_stock_allocation.dart';
 import '../../domain/entities/stock_item.dart';
 import '../../domain/repositories/stock_repository.dart';
 
@@ -34,6 +35,7 @@ class InboundStockRequest {
 class StockState {
   final bool isLoading;
   final List<StockItemEntity> stockItems;
+  final List<RiderStockAllocation> riderAllocations;
   final List<InboundStockRequest> inboundRequests;
   final String searchQuery;
   final StockFilter activeFilter;
@@ -44,6 +46,7 @@ class StockState {
   const StockState({
     this.isLoading = true,
     this.stockItems = const [],
+    this.riderAllocations = const [],
     this.inboundRequests = const [],
     this.searchQuery = '',
     this.activeFilter = StockFilter.all,
@@ -51,6 +54,30 @@ class StockState {
     this.lastAuditedTime,
     this.isAuditRequired = false,
   });
+
+  // --- Connected Stock Accounting Properties ---
+
+  /// Warehouse shelf stock currently available in DC storage bins
+  int get totalWarehouseAvailable {
+    return stockItems.fold(0, (acc, item) => acc + item.availableCount);
+  }
+
+  /// Total physical units currently held in custody across all riders' vehicles
+  int get totalInRiderCustody {
+    final allocationsSum = riderAllocations.fold(0, (acc, item) => acc + item.inCustodyUnits);
+    final assignedOrdersSum = stockItems.fold(0, (acc, item) => acc + (item.assignedCount - item.deliveredCount - item.returnedCount).clamp(0, 999999));
+    return allocationsSum > assignedOrdersSum ? allocationsSum : assignedOrdersSum;
+  }
+
+  /// Total DC Stock = Warehouse Shelf Available + In Rider Custody
+  int get totalDCStock {
+    return totalWarehouseAvailable + totalInRiderCustody;
+  }
+
+  /// Total monetary valuation of all stock in DC custody
+  double get totalDCStockValuation {
+    return stockItems.fold(0.0, (acc, item) => acc + ((item.availableCount + item.assignedCount) * item.price));
+  }
 
   int get totalInCustody {
     return stockItems.fold(0, (acc, item) => acc + item.assignedCount);
@@ -71,10 +98,18 @@ class StockState {
   int get totalUnitsHeld => totalAvailable;
 
   int get availableCountFiltered => stockItems.where((i) => i.status == StockStatus.available).length;
-  int get lowStockCountFiltered => stockItems.where((i) => i.status == StockStatus.lowStock).length;
-  int get outOfStockCountFiltered => stockItems.where((i) => i.status == StockStatus.outOfStock).length;
+  int get lowStockCountFiltered => stockItems.where((i) => i.status == StockStatus.lowStock || (i.availableCount <= i.lowStockThreshold && i.availableCount > 0)).length;
+  int get outOfStockCountFiltered => stockItems.where((i) => i.status == StockStatus.outOfStock || i.availableCount <= 0).length;
 
-  List<StockItemEntity> get lowStockItems => stockItems.where((i) => i.status == StockStatus.lowStock).toList();
+  List<StockItemEntity> get lowStockItems => stockItems.where((i) => i.status == StockStatus.lowStock || (i.availableCount <= i.lowStockThreshold && i.availableCount > 0)).toList();
+
+  List<RiderStockAllocation> getAllocationsForRider(String riderId, [String? riderCode]) {
+    return riderAllocations.where((a) {
+      final matchesId = a.riderId.isNotEmpty && a.riderId == riderId;
+      final matchesCode = riderCode != null && riderCode.isNotEmpty && a.riderCode == riderCode;
+      return (matchesId || matchesCode) && a.inCustodyUnits > 0;
+    }).toList();
+  }
 
   List<StockItemEntity> get filteredStockItems {
     var list = stockItems;
@@ -84,13 +119,13 @@ class StockState {
       case StockFilter.all:
         break;
       case StockFilter.available:
-        list = list.where((i) => i.status == StockStatus.available).toList();
+        list = list.where((i) => i.availableCount > i.lowStockThreshold).toList();
         break;
       case StockFilter.lowStock:
-        list = list.where((i) => i.status == StockStatus.lowStock).toList();
+        list = list.where((i) => i.status == StockStatus.lowStock || (i.availableCount <= i.lowStockThreshold && i.availableCount > 0)).toList();
         break;
       case StockFilter.outOfStock:
-        list = list.where((i) => i.status == StockStatus.outOfStock).toList();
+        list = list.where((i) => i.status == StockStatus.outOfStock || i.availableCount <= 0).toList();
         break;
     }
 
@@ -100,7 +135,8 @@ class StockState {
       list = list.where((item) {
         return item.name.toLowerCase().contains(q) ||
             item.sku.toLowerCase().contains(q) ||
-            item.category.toLowerCase().contains(q);
+            item.category.toLowerCase().contains(q) ||
+            item.ownerName.toLowerCase().contains(q);
       }).toList();
     }
 
@@ -110,6 +146,7 @@ class StockState {
   StockState copyWith({
     bool? isLoading,
     List<StockItemEntity>? stockItems,
+    List<RiderStockAllocation>? riderAllocations,
     List<InboundStockRequest>? inboundRequests,
     String? searchQuery,
     StockFilter? activeFilter,
@@ -120,6 +157,7 @@ class StockState {
     return StockState(
       isLoading: isLoading ?? this.isLoading,
       stockItems: stockItems ?? this.stockItems,
+      riderAllocations: riderAllocations ?? this.riderAllocations,
       inboundRequests: inboundRequests ?? this.inboundRequests,
       searchQuery: searchQuery ?? this.searchQuery,
       activeFilter: activeFilter ?? this.activeFilter,
@@ -145,10 +183,12 @@ class StockNotifier extends StateNotifier<StockState> {
 
   Future<void> _initCache() async {
     final cached = await _storageService.getCachedStockItems();
-    if (cached != null && cached.isNotEmpty) {
+    final cachedAllocations = await _storageService.getCachedRiderStockAllocations();
+    if ((cached != null && cached.isNotEmpty) || (cachedAllocations != null && cachedAllocations.isNotEmpty)) {
       state = state.copyWith(
         isLoading: false,
-        stockItems: cached,
+        stockItems: cached ?? state.stockItems,
+        riderAllocations: cachedAllocations ?? state.riderAllocations,
       );
     }
   }
@@ -283,6 +323,246 @@ class StockNotifier extends StateNotifier<StockState> {
       lastAuditedTime: DateTime.now(),
       isAuditRequired: false,
     );
+  }
+
+  // ==========================================
+  // INVENTORY MUTATIONS & CONNECTED DC WORKFLOWS
+  // ==========================================
+
+  /// Register a brand new product in the DC inventory catalogue
+  Future<StockItemEntity> addNewProduct({
+    required String name,
+    required String sku,
+    required String category,
+    required double price,
+    String ownerName = 'Novacare Limited',
+    int initialQuantity = 0,
+    int lowStockThreshold = 3,
+    String description = '',
+    String? binLocation,
+  }) async {
+    final newId = 'prod_${DateTime.now().millisecondsSinceEpoch}';
+    final newItem = StockItemEntity(
+      id: newId,
+      sku: sku.trim().toUpperCase(),
+      name: name.trim(),
+      description: description.trim().isNotEmpty ? description.trim() : '$name - Distributed Inventory',
+      price: price,
+      ownerName: ownerName.trim().isNotEmpty ? ownerName.trim() : 'Novacare Limited',
+      inventoryType: InventoryType.distributedInventory,
+      totalInCustody: initialQuantity,
+      assignedCount: 0,
+      deliveredCount: 0,
+      availableCount: initialQuantity,
+      returnedCount: 0,
+      lowStockThreshold: lowStockThreshold,
+      category: category.trim().isNotEmpty ? category.trim() : 'General',
+      batchNumber: 'LOT-${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}',
+      lastAuditDate: DateTime.now().toIso8601String().split('T').first,
+    );
+
+    final updatedItems = [newItem, ...state.stockItems];
+    state = state.copyWith(stockItems: updatedItems);
+    await _storageService.cacheStockItems(updatedItems);
+    return newItem;
+  }
+
+  /// Receive incoming shipment / waybill and increase available warehouse stock
+  Future<bool> receiveStock({
+    required String productIdOrSku,
+    required int quantity,
+    String? waybillNumber,
+    String? supplierName,
+    String? binLocation,
+  }) async {
+    if (quantity <= 0) return false;
+
+    bool found = false;
+    final updatedItems = state.stockItems.map((item) {
+      if (item.id == productIdOrSku ||
+          item.sku.toLowerCase() == productIdOrSku.toLowerCase() ||
+          item.name.toLowerCase() == productIdOrSku.toLowerCase()) {
+        found = true;
+        return item.copyWith(
+          availableCount: item.availableCount + quantity,
+          totalInCustody: item.totalInCustody + quantity,
+        );
+      }
+      return item;
+    }).toList();
+
+    if (found) {
+      state = state.copyWith(stockItems: updatedItems);
+      await _storageService.cacheStockItems(updatedItems);
+      return true;
+    }
+    return false;
+  }
+
+  /// Assign stock directly from DC warehouse to a rider's custody
+  Future<Map<String, dynamic>> assignStockToRider({
+    required String productIdOrSku,
+    required String riderId,
+    required String riderName,
+    required String riderCode,
+    required int quantity,
+  }) async {
+    if (quantity <= 0) {
+      return {'success': false, 'message': 'Quantity must be greater than 0'};
+    }
+
+    final targetIdx = state.stockItems.indexWhere((i) =>
+        i.id == productIdOrSku ||
+        i.sku.toLowerCase() == productIdOrSku.toLowerCase() ||
+        i.name.toLowerCase() == productIdOrSku.toLowerCase());
+
+    if (targetIdx == -1) {
+      return {'success': false, 'message': 'Product not found in DC warehouse catalogue'};
+    }
+
+    final target = state.stockItems[targetIdx];
+    if (target.availableCount < quantity) {
+      return {
+        'success': false,
+        'message': 'Insufficient warehouse stock. Available: ${target.availableCount} units, Requested: $quantity units',
+      };
+    }
+
+    // 1. Deduct from warehouse available stock, increment assigned count
+    final updatedTarget = target.copyWith(
+      availableCount: target.availableCount - quantity,
+      assignedCount: target.assignedCount + quantity,
+    );
+    final updatedItems = List<StockItemEntity>.from(state.stockItems);
+    updatedItems[targetIdx] = updatedTarget;
+
+    // 2. Add or update RiderStockAllocation
+    final existingAllocIdx = state.riderAllocations.indexWhere((a) =>
+        (a.riderId == riderId || a.riderCode == riderCode) &&
+        (a.productId == target.id ||
+            a.sku.toLowerCase() == target.sku.toLowerCase() ||
+            a.productName.toLowerCase() == target.name.toLowerCase()));
+
+    List<RiderStockAllocation> updatedAllocations = List<RiderStockAllocation>.from(state.riderAllocations);
+    if (existingAllocIdx != -1) {
+      final existing = updatedAllocations[existingAllocIdx];
+      updatedAllocations[existingAllocIdx] = existing.copyWith(
+        allocatedUnits: existing.allocatedUnits + quantity,
+        inCustodyUnits: existing.inCustodyUnits + quantity,
+        allocatedAt: DateTime.now(),
+      );
+    } else {
+      final newAlloc = RiderStockAllocation(
+        id: 'alloc_${DateTime.now().millisecondsSinceEpoch}',
+        riderId: riderId,
+        riderName: riderName,
+        riderCode: riderCode,
+        productId: target.id,
+        productName: target.name,
+        sku: target.sku,
+        clientName: target.ownerName,
+        allocatedUnits: quantity,
+        deliveredUnits: 0,
+        inCustodyUnits: quantity,
+        unitPrice: target.price,
+        allocatedAt: DateTime.now(),
+        fulfillmentType: 'distributed_inventory',
+      );
+      updatedAllocations.add(newAlloc);
+    }
+
+    state = state.copyWith(
+      stockItems: updatedItems,
+      riderAllocations: updatedAllocations,
+    );
+
+    await _storageService.cacheStockItems(updatedItems);
+    await _storageService.cacheRiderStockAllocations(updatedAllocations);
+
+    return {
+      'success': true,
+      'message': 'Successfully assigned $quantity units of ${target.name} to $riderName. Remaining in warehouse: ${updatedTarget.availableCount} units.',
+      'remainingWarehouseStock': updatedTarget.availableCount,
+      'allocatedUnits': quantity,
+    };
+  }
+
+  /// Increase/Top-Up stock for a rider from warehouse inventory
+  Future<Map<String, dynamic>> increaseRiderStock({
+    required String skuOrName,
+    required String riderId,
+    required String riderName,
+    required String riderCode,
+    required int additionalUnits,
+  }) async {
+    return assignStockToRider(
+      productIdOrSku: skuOrName,
+      riderId: riderId,
+      riderName: riderName,
+      riderCode: riderCode,
+      quantity: additionalUnits,
+    );
+  }
+
+  /// Return physical stock from rider custody back to DC warehouse storage bin
+  Future<Map<String, dynamic>> returnStockFromRider({
+    required String skuOrName,
+    required String riderId,
+    required int quantity,
+  }) async {
+    if (quantity <= 0) {
+      return {'success': false, 'message': 'Quantity must be greater than 0'};
+    }
+
+    final allocIdx = state.riderAllocations.indexWhere((a) =>
+        a.riderId == riderId &&
+        (a.sku.toLowerCase() == skuOrName.toLowerCase() ||
+            a.productName.toLowerCase() == skuOrName.toLowerCase()));
+
+    if (allocIdx == -1) {
+      return {'success': false, 'message': 'Allocation record not found for this rider'};
+    }
+
+    final alloc = state.riderAllocations[allocIdx];
+    if (alloc.inCustodyUnits < quantity) {
+      return {'success': false, 'message': 'Cannot return more than units held in custody (${alloc.inCustodyUnits} units)'};
+    }
+
+    // 1. Decrement rider custody
+    final updatedAlloc = alloc.copyWith(
+      inCustodyUnits: alloc.inCustodyUnits - quantity,
+    );
+    final updatedAllocations = List<RiderStockAllocation>.from(state.riderAllocations);
+    updatedAllocations[allocIdx] = updatedAlloc;
+
+    // 2. Increment warehouse available stock
+    final prodIdx = state.stockItems.indexWhere((i) =>
+        i.id == alloc.productId ||
+        i.sku.toLowerCase() == alloc.sku.toLowerCase() ||
+        i.name.toLowerCase() == alloc.productName.toLowerCase());
+
+    List<StockItemEntity> updatedItems = List<StockItemEntity>.from(state.stockItems);
+    if (prodIdx != -1) {
+      final prod = updatedItems[prodIdx];
+      updatedItems[prodIdx] = prod.copyWith(
+        availableCount: prod.availableCount + quantity,
+        assignedCount: (prod.assignedCount - quantity).clamp(0, 999999),
+        returnedCount: prod.returnedCount + quantity,
+      );
+    }
+
+    state = state.copyWith(
+      stockItems: updatedItems,
+      riderAllocations: updatedAllocations,
+    );
+
+    await _storageService.cacheStockItems(updatedItems);
+    await _storageService.cacheRiderStockAllocations(updatedAllocations);
+
+    return {
+      'success': true,
+      'message': 'Successfully returned $quantity units of ${alloc.productName} back to DC warehouse.',
+    };
   }
 
   Future<Map<String, dynamic>> requestStockTransfer({

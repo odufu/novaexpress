@@ -13,6 +13,7 @@ import '../../features/notifications/domain/entities/app_notification.dart';
 import '../../features/orders/data/models/order_model.dart';
 import '../../features/orders/domain/entities/order.dart';
 import '../../features/stock/data/models/stock_item_model.dart';
+import '../../features/stock/domain/entities/rider_stock_allocation.dart';
 import '../../features/stock/domain/entities/stock_item.dart';
 
 abstract class LocalStorageService {
@@ -53,6 +54,9 @@ abstract class LocalStorageService {
   Future<void> cacheStockItems(List<StockItemEntity> items);
   Future<List<StockItemEntity>?> getCachedStockItems();
 
+  Future<void> cacheRiderStockAllocations(List<RiderStockAllocation> allocations);
+  Future<List<RiderStockAllocation>?> getCachedRiderStockAllocations();
+
   Future<void> cacheNotifications(String agentId, List<AppNotificationEntity> notifications);
   Future<List<AppNotificationEntity>?> getCachedNotifications(String agentId);
 
@@ -70,6 +74,7 @@ class LocalStorageServiceImpl implements LocalStorageService {
   static const String _transactionsKey = 'novexps_cache_transactions';
   static const String _dcTransactionsKey = 'novexps_cache_dc_transactions';
   static const String _stockKey = 'novexps_cache_stock_items';
+  static const String _riderAllocationsKey = 'novexps_cache_rider_stock_allocations';
   static const String _notificationsPrefix = 'novexps_cache_notifications_';
   static const String _syncTimePrefix = 'novexps_sync_time_';
 
@@ -446,6 +451,32 @@ class LocalStorageServiceImpl implements LocalStorageService {
       }
     }
     return items.isNotEmpty ? items : null;
+  }
+
+  // --- Rider Stock Allocations Caching ---
+
+  @override
+  Future<void> cacheRiderStockAllocations(List<RiderStockAllocation> allocations) async {
+    final list = allocations.map((a) => a.toJson()).toList();
+    await saveJsonList(_riderAllocationsKey, list);
+    await setLastSyncTime('rider_stock_allocations');
+    debugPrint('[LOCAL_STORAGE] 💾 Cached ${allocations.length} rider stock allocations to local storage.');
+  }
+
+  @override
+  Future<List<RiderStockAllocation>?> getCachedRiderStockAllocations() async {
+    final rawList = await getJsonList(_riderAllocationsKey);
+    if (rawList == null || rawList.isEmpty) return null;
+
+    final allocations = <RiderStockAllocation>[];
+    for (final map in rawList) {
+      try {
+        allocations.add(RiderStockAllocation.fromJson(map));
+      } catch (e) {
+        debugPrint('[LOCAL_STORAGE] ⚠️ Error parsing cached rider stock allocation: $e');
+      }
+    }
+    return allocations.isNotEmpty ? allocations : null;
   }
 
   @override

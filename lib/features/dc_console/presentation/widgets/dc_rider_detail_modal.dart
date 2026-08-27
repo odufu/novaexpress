@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/helpers/formatters.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
+import '../../../stock/domain/entities/rider_stock_allocation.dart';
 import '../../../stock/domain/entities/stock_item.dart';
 import '../../../stock/presentation/providers/stock_provider.dart';
 import '../../domain/entities/dc_finance_settings.dart';
@@ -157,8 +158,9 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
               t.riderName.toLowerCase() == driver.name.toLowerCase());
     }).toList();
 
-    // 3. Compute real stocks in custody for this driver
-    final custodyStockMap = _computeDriverStockCustody(assignedOrders, stockState.stockItems);
+    // 3. Compute real stocks in custody for this driver (merging orders & direct warehouse allocations)
+    final riderAllocations = stockState.getAllocationsForRider(driver.id, driver.driverCode);
+    final custodyStockMap = _computeDriverStockCustody(assignedOrders, stockState.stockItems, riderAllocations);
 
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
@@ -1252,7 +1254,7 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
   }
 
   // ==========================================
-  // TAB 3: STOCKS IN CUSTODY
+  // TAB 4: STOCKS IN CUSTODY & VEHICLE ALLOCATION
   // ==========================================
   Widget _buildStocksTab(
     bool isDark,
@@ -1260,12 +1262,15 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
     List<OrderEntity> orders,
     DCFleetDriver driver,
   ) {
+    final stockState = ref.watch(stockProvider);
+
     // 1. Compute real dynamic KPI aggregators
     final totalUnitsHeld = custodyItems.fold<int>(0, (s, item) => s + item.inCustodyUnits);
     final shelfUnits = custodyItems.where((i) => i.fulfillmentType == 'distributed_inventory').fold<int>(0, (s, i) => s + i.inCustodyUnits);
     final clientPackages = custodyItems.where((i) => i.fulfillmentType == 'client_package').fold<int>(0, (s, i) => s + i.inCustodyUnits);
     final awaitingReturnUnits = custodyItems.fold<int>(0, (s, i) => s + i.awaitingReturnUnits);
     final totalStockValue = custodyItems.fold<double>(0.0, (s, i) => s + (i.inCustodyUnits * i.unitPrice));
+    final lowStockCount = custodyItems.where((i) => i.isLowStock).length;
 
     final stockSearchQuery = ref.watch(riderStockSearchProvider);
     final stockFilter = ref.watch(riderStockFilterProvider);
@@ -1274,6 +1279,7 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
     // 2. Filter
     var filtered = custodyItems.where((item) {
       if (stockFilter != 'all') {
+        if (stockFilter == 'low_stock' && !item.isLowStock) return false;
         if (stockFilter == 'shelf' && item.fulfillmentType != 'distributed_inventory') return false;
         if (stockFilter == 'client_package' && item.fulfillmentType != 'client_package') return false;
         if (stockFilter == 'awaiting_return' && item.awaitingReturnUnits <= 0) return false;
@@ -1341,10 +1347,10 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
                   SizedBox(
                     width: cardWidth,
                     child: _buildKpiCard(
-                      '📦 Client Packages',
-                      '$clientPackages Packages',
-                      'Direct merchant package custody',
-                      const Color(0xFF8B5CF6),
+                      '⚠️ Low Stock Items',
+                      '$lowStockCount Items',
+                      lowStockCount > 0 ? 'Requires vehicle top up' : 'Vehicle stock healthy ✓',
+                      lowStockCount > 0 ? const Color(0xFFF59E0B) : const Color(0xFF059669),
                       isDark,
                     ),
                   ),
@@ -1365,7 +1371,32 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
 
           const SizedBox(height: 18),
 
-          // 2. Search Bar, Filters & Sorting
+          // 2. Action Header: Assign New Product Button & Search / Filter Controls
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Vehicle Stock Inventory',
+                style: GoogleFonts.inter(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                ),
+              ),
+              ElevatedButton.icon(
+                onPressed: () => _showAssignProductToThisRiderDialog(context, isDark, driver, stockState.stockItems),
+                icon: const Icon(Icons.add_rounded, size: 16, color: Colors.white),
+                label: const Text('Assign New Product', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2563EB),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+
           _buildSearchAndFilterControls(
             isDark: isDark,
             searchController: _stockSearchController,
@@ -1373,9 +1404,10 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
             onSearchChanged: (val) => ref.read(riderStockSearchProvider.notifier).state = val,
             filterChips: [
               _buildFilterButton('All (${custodyItems.length})', 'all', stockFilter, (val) => ref.read(riderStockFilterProvider.notifier).state = val),
-              _buildFilterButton('🏢 DC Shelf Stock', 'shelf', stockFilter, (val) => ref.read(riderStockFilterProvider.notifier).state = val, activeColor: const Color(0xFF10B981)),
-              _buildFilterButton('📦 Client Packages', 'client_package', stockFilter, (val) => ref.read(riderStockFilterProvider.notifier).state = val, activeColor: const Color(0xFF8B5CF6)),
-              _buildFilterButton('🔄 Awaiting Return', 'awaiting_return', stockFilter, (val) => ref.read(riderStockFilterProvider.notifier).state = val, activeColor: const Color(0xFFEF4444)),
+              _buildFilterButton('⚠️ Low Stock ($lowStockCount)', 'low_stock', stockFilter, (val) => ref.read(riderStockFilterProvider.notifier).state = val, activeColor: const Color(0xFFF59E0B)),
+              _buildFilterButton('🏢 DC Shelf Stock ($shelfUnits)', 'shelf', stockFilter, (val) => ref.read(riderStockFilterProvider.notifier).state = val, activeColor: const Color(0xFF10B981)),
+              _buildFilterButton('📦 Client Packages ($clientPackages)', 'client_package', stockFilter, (val) => ref.read(riderStockFilterProvider.notifier).state = val, activeColor: const Color(0xFF8B5CF6)),
+              _buildFilterButton('🔄 Awaiting Return ($awaitingReturnUnits)', 'awaiting_return', stockFilter, (val) => ref.read(riderStockFilterProvider.notifier).state = val, activeColor: const Color(0xFFEF4444)),
             ],
             sortWidget: _buildSortDropdown(
               value: stockSort,
@@ -1393,15 +1425,15 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
 
           // 3. Minimalist Stock Table
           if (filtered.isEmpty)
-            _buildEmptyState('No physical stock or packages currently in this rider\'s custody.', isDark)
+            _buildEmptyState('No physical stock or packages currently matching criteria.', isDark)
           else
-            _buildMinimalistStockTable(filtered, isDark),
+            _buildMinimalistStockTable(filtered, isDark, driver),
         ],
       ),
     );
   }
 
-  Widget _buildMinimalistStockTable(List<_DriverCustodyStockItem> items, bool isDark) {
+  Widget _buildMinimalistStockTable(List<_DriverCustodyStockItem> items, bool isDark, DCFleetDriver driver) {
     return Container(
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
@@ -1410,7 +1442,7 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final isNarrow = constraints.maxWidth < 750;
+          final isNarrow = constraints.maxWidth < 850;
 
           if (isNarrow) {
             return ListView.separated(
@@ -1418,7 +1450,7 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
               physics: const NeverScrollableScrollPhysics(),
               itemCount: items.length,
               separatorBuilder: (_, __) => Divider(height: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-              itemBuilder: (ctx, i) => _buildMobileStockCard(items[i], isDark),
+              itemBuilder: (ctx, i) => _buildMobileStockCard(items[i], isDark, driver),
             );
           }
 
@@ -1427,7 +1459,7 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
             child: ConstrainedBox(
               constraints: BoxConstraints(minWidth: constraints.maxWidth),
               child: DataTable(
-                columnSpacing: 20,
+                columnSpacing: 18,
                 horizontalMargin: 16,
                 headingRowHeight: 40,
                 headingRowColor: WidgetStateProperty.all(
@@ -1446,7 +1478,9 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
                   DataColumn(label: Text('ASSIGNED')),
                   DataColumn(label: Text('DELIVERED')),
                   DataColumn(label: Text('IN CUSTODY')),
+                  DataColumn(label: Text('STATUS')),
                   DataColumn(label: Text('EST. VALUE')),
+                  DataColumn(label: Text('ACTIONS')),
                 ],
                 rows: items.map((item) {
                   final totalValue = item.inCustodyUnits * item.unitPrice;
@@ -1523,14 +1557,47 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF2563EB).withValues(alpha: 0.12),
+                            color: item.isLowStock
+                                ? const Color(0xFFF59E0B).withValues(alpha: 0.15)
+                                : const Color(0xFF2563EB).withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
                             '${item.inCustodyUnits} units',
-                            style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
+                            style: GoogleFonts.inter(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.bold,
+                              color: item.isLowStock ? const Color(0xFFD97706) : const Color(0xFF2563EB),
+                            ),
                           ),
                         ),
+                      ),
+
+                      // Status Badge
+                      DataCell(
+                        item.isLowStock
+                            ? Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  '⚠️ LOW STOCK',
+                                  style: GoogleFonts.inter(fontSize: 9.5, fontWeight: FontWeight.w800, color: const Color(0xFFD97706)),
+                                ),
+                              )
+                            : Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  'IN CUSTODY',
+                                  style: GoogleFonts.inter(fontSize: 9.5, fontWeight: FontWeight.w800, color: const Color(0xFF059669)),
+                                ),
+                              ),
                       ),
 
                       // Estimated Value
@@ -1538,6 +1605,20 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
                         Text(
                           CurrencyFormatter.formatNaira(totalValue),
                           style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+
+                      // Actions: Increase Stock
+                      DataCell(
+                        ElevatedButton.icon(
+                          onPressed: () => _showTopUpRiderStockDialog(context, isDark, driver, item),
+                          icon: const Icon(Icons.add_circle_outline_rounded, size: 14, color: Colors.white),
+                          label: const Text('Top Up', style: TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF10B981),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            minimumSize: Size.zero,
+                          ),
                         ),
                       ),
                     ],
@@ -1551,7 +1632,7 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
     );
   }
 
-  Widget _buildMobileStockCard(_DriverCustodyStockItem item, bool isDark) {
+  Widget _buildMobileStockCard(_DriverCustodyStockItem item, bool isDark, DCFleetDriver driver) {
     final totalValue = item.inCustodyUnits * item.unitPrice;
     return Padding(
       padding: const EdgeInsets.all(14),
@@ -1562,13 +1643,27 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(item.sku, style: GoogleFonts.firaCode(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB))),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2563EB).withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text('${item.inCustodyUnits} in custody', style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB))),
+              Wrap(
+                spacing: 6,
+                children: [
+                  if (item.isLowStock)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text('⚠️ LOW (${item.inCustodyUnits})', style: GoogleFonts.inter(fontSize: 9.5, fontWeight: FontWeight.w800, color: const Color(0xFFD97706))),
+                    ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2563EB).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text('${item.inCustodyUnits} in custody', style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB))),
+                  ),
+                ],
               ),
             ],
           ),
@@ -1583,7 +1678,304 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
               Text(CurrencyFormatter.formatNaira(totalValue), style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold)),
             ],
           ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              ElevatedButton.icon(
+                onPressed: () => _showTopUpRiderStockDialog(context, isDark, driver, item),
+                icon: const Icon(Icons.add_rounded, size: 14, color: Colors.white),
+                label: const Text('Top Up Stock', style: TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF10B981),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  minimumSize: Size.zero,
+                ),
+              ),
+            ],
+          ),
         ],
+      ),
+    );
+  }
+
+  void _showAssignProductToThisRiderDialog(BuildContext context, bool isDark, DCFleetDriver driver, List<StockItemEntity> stockItems) {
+    if (stockItems.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('⚠️ No products found in DC inventory catalogue.'), backgroundColor: Color(0xFFEF4444)),
+      );
+      return;
+    }
+
+    String selectedProdId = stockItems.first.id;
+    final qtyCtrl = TextEditingController(text: '5');
+    final messenger = ScaffoldMessenger.of(context);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          final targetProd = stockItems.firstWhere((p) => p.id == selectedProdId, orElse: () => stockItems.first);
+
+          return AlertDialog(
+            backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Row(
+              children: [
+                const Icon(Icons.inventory_2_rounded, color: Color(0xFF2563EB), size: 22),
+                const SizedBox(width: 8),
+                Text('Assign Product to ${driver.name}', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
+              ],
+            ),
+            content: SizedBox(
+              width: 480,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    DropdownButtonFormField<String>(
+                      value: selectedProdId,
+                      decoration: const InputDecoration(labelText: 'Select Product *'),
+                      items: stockItems.map((p) {
+                        return DropdownMenuItem(
+                          value: p.id,
+                          child: Text('${p.name} (${p.sku}) • Avail: ${p.availableCount}'),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          setDialogState(() => selectedProdId = val);
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withValues(alpha: isDark ? 0.15 : 0.08),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.store_rounded, color: Color(0xFF10B981), size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'DC Warehouse Shelf Available: ${targetProd.availableCount} units',
+                              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF059669)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: qtyCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Quantity to Allocate (Units) *',
+                        hintText: 'e.g. 5',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        _buildQuickQtyPill('+1', () => qtyCtrl.text = '1'),
+                        const SizedBox(width: 6),
+                        _buildQuickQtyPill('+5', () => qtyCtrl.text = '5'),
+                        const SizedBox(width: 6),
+                        _buildQuickQtyPill('+10', () => qtyCtrl.text = '10'),
+                        const SizedBox(width: 6),
+                        _buildQuickQtyPill('All (${targetProd.availableCount})', () => qtyCtrl.text = '${targetProd.availableCount}'),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
+              ElevatedButton(
+                onPressed: () async {
+                  final qty = int.tryParse(qtyCtrl.text) ?? 0;
+                  if (qty <= 0) {
+                    messenger.showSnackBar(
+                      const SnackBar(content: Text('⚠️ Please enter a quantity greater than 0.'), backgroundColor: Color(0xFFEF4444)),
+                    );
+                    return;
+                  }
+
+                  if (qty > targetProd.availableCount) {
+                    messenger.showSnackBar(
+                      SnackBar(content: Text('⚠️ Cannot allocate $qty units. Only ${targetProd.availableCount} units available in DC warehouse.'), backgroundColor: const Color(0xFFEF4444)),
+                    );
+                    return;
+                  }
+
+                  final res = await ref.read(stockProvider.notifier).assignStockToRider(
+                        productIdOrSku: targetProd.id,
+                        riderId: driver.id,
+                        riderName: driver.name,
+                        riderCode: driver.driverCode,
+                        quantity: qty,
+                      );
+
+                  if (ctx.mounted) {
+                    Navigator.of(ctx).pop();
+                  }
+                  messenger.showSnackBar(
+                    SnackBar(
+                      content: Text(res['message']?.toString() ?? '✅ Stock assigned to ${driver.name}!'),
+                      backgroundColor: res['success'] == true ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
+                child: const Text('Allocate to Vehicle', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  void _showTopUpRiderStockDialog(BuildContext context, bool isDark, DCFleetDriver driver, _DriverCustodyStockItem item) {
+    final stockState = ref.read(stockProvider);
+    final targetProd = stockState.stockItems.firstWhere(
+      (p) => p.sku.toLowerCase() == item.sku.toLowerCase() || p.name.toLowerCase() == item.productName.toLowerCase(),
+      orElse: () => stockState.stockItems.isNotEmpty ? stockState.stockItems.first : const StockItemEntity(id: '', sku: '', name: '', description: '', price: 0, assignedCount: 0, deliveredCount: 0, availableCount: 0, returnedCount: 0, category: ''),
+    );
+
+    final qtyCtrl = TextEditingController(text: '5');
+    final messenger = ScaffoldMessenger.of(context);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.add_circle_outline_rounded, color: Color(0xFF10B981), size: 22),
+            const SizedBox(width: 8),
+            Text('Top Up: ${item.productName}', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
+          ],
+        ),
+        content: SizedBox(
+          width: 450,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Current in Custody', style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B))),
+                        Text('${item.inCustodyUnits} Units', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB))),
+                      ],
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text('Warehouse Shelf Stock', style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B))),
+                        Text('${targetProd.availableCount} Units', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF10B981))),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: qtyCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Units to Top Up *',
+                  hintText: 'e.g. 5',
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  _buildQuickQtyPill('+5', () => qtyCtrl.text = '5'),
+                  const SizedBox(width: 8),
+                  _buildQuickQtyPill('+10', () => qtyCtrl.text = '10'),
+                  const SizedBox(width: 8),
+                  _buildQuickQtyPill('+20', () => qtyCtrl.text = '20'),
+                  const SizedBox(width: 8),
+                  _buildQuickQtyPill('All (${targetProd.availableCount})', () => qtyCtrl.text = '${targetProd.availableCount}'),
+                ],
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              final qty = int.tryParse(qtyCtrl.text) ?? 0;
+              if (qty <= 0) {
+                messenger.showSnackBar(
+                  const SnackBar(content: Text('⚠️ Please enter a quantity greater than 0.'), backgroundColor: Color(0xFFEF4444)),
+                );
+                return;
+              }
+
+              if (targetProd.availableCount > 0 && qty > targetProd.availableCount) {
+                messenger.showSnackBar(
+                  SnackBar(content: Text('⚠️ Cannot top up $qty units. Only ${targetProd.availableCount} available in warehouse.'), backgroundColor: const Color(0xFFEF4444)),
+                );
+                return;
+              }
+
+              final res = await ref.read(stockProvider.notifier).increaseRiderStock(
+                    skuOrName: item.sku.isNotEmpty ? item.sku : item.productName,
+                    riderId: driver.id,
+                    riderName: driver.name,
+                    riderCode: driver.driverCode,
+                    additionalUnits: qty,
+                  );
+
+              if (ctx.mounted) {
+                Navigator.of(ctx).pop();
+              }
+              messenger.showSnackBar(
+                SnackBar(
+                  content: Text(res['message']?.toString() ?? '✅ +$qty units transferred to ${driver.name}!'),
+                  backgroundColor: res['success'] == true ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
+            child: const Text('Confirm Top Up', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickQtyPill(String label, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: const Color(0xFF2563EB).withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(label, style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB))),
       ),
     );
   }
@@ -2788,9 +3180,27 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
   List<_DriverCustodyStockItem> _computeDriverStockCustody(
     List<OrderEntity> orders,
     List<StockItemEntity> systemStocks,
+    List<RiderStockAllocation> riderAllocations,
   ) {
     final Map<String, _DriverCustodyStockItem> itemsMap = {};
 
+    // 1. Process direct warehouse allocations for this rider
+    for (final alloc in riderAllocations) {
+      final key = '${alloc.productName}_${alloc.fulfillmentType}';
+      itemsMap[key] = _DriverCustodyStockItem(
+        sku: alloc.sku,
+        productName: alloc.productName,
+        clientName: alloc.clientName,
+        fulfillmentType: alloc.fulfillmentType,
+        assignedUnits: alloc.allocatedUnits,
+        deliveredUnits: alloc.deliveredUnits,
+        inCustodyUnits: alloc.inCustodyUnits,
+        awaitingReturnUnits: 0,
+        unitPrice: alloc.unitPrice,
+      );
+    }
+
+    // 2. Process order-based packages and assignments
     for (final order in orders) {
       final key = '${order.productName}_${order.fulfillmentType}';
       final isDelivered = order.status == 'delivered';
@@ -2825,7 +3235,7 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
           deliveredUnits: existing.deliveredUnits + (isDelivered ? order.quantity : 0),
           inCustodyUnits: existing.inCustodyUnits + inCustody,
           awaitingReturnUnits: existing.awaitingReturnUnits + awaitingReturn,
-          unitPrice: existing.unitPrice,
+          unitPrice: existing.unitPrice > 0 ? existing.unitPrice : price,
         );
       }
     }
@@ -2856,4 +3266,6 @@ class _DriverCustodyStockItem {
     required this.awaitingReturnUnits,
     required this.unitPrice,
   });
+
+  bool get isLowStock => inCustodyUnits <= 2 && inCustodyUnits > 0;
 }

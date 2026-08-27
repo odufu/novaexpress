@@ -350,7 +350,8 @@ void main() {
       // Verify Stocks KPIs & table
       expect(find.text('📦 Units in Custody'), findsOneWidget);
       expect(find.text('🏢 Shelf Stock Items'), findsOneWidget);
-      expect(find.text('📦 Client Packages'), findsWidgets);
+      expect(find.text('⚠️ Low Stock Items'), findsOneWidget);
+      expect(find.textContaining('Client Packages'), findsWidgets);
       expect(find.text('Client Glow Serum'), findsOneWidget);
     });
   });
