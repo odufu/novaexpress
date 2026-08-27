@@ -199,17 +199,17 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
               child: TabBarView(
                 controller: _tabController,
                 children: [
-                  // Tab 1: Orders
+                  // Tab 1: Details, Live KPIs & Personal Terms
+                  _buildProfileAndTermsTab(isDark, driver, assignedOrders, driverTransactions),
+
+                  // Tab 2: Orders
                   _buildOrdersTab(isDark, assignedOrders, driver),
 
-                  // Tab 2: Remittance & Finance
+                  // Tab 3: Remittance & Finance
                   _buildRemittanceTab(isDark, driverTransactions, assignedOrders, driver, dcState.financeSettings),
 
-                  // Tab 3: Stocks in Custody
+                  // Tab 4: Stocks in Custody
                   _buildStocksTab(isDark, custodyStockMap, assignedOrders, driver),
-
-                  // Tab 4: Details & Personal Terms
-                  _buildProfileAndTermsTab(isDark, driver),
                 ],
               ),
             ),
@@ -435,6 +435,16 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
         labelStyle: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold),
         unselectedLabelStyle: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w500),
         tabs: [
+          const Tab(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.manage_accounts_outlined, size: 15),
+                SizedBox(width: 6),
+                Text('Details & Terms'),
+              ],
+            ),
+          ),
           Tab(
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -462,16 +472,6 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
                 const Icon(Icons.layers_outlined, size: 15),
                 const SizedBox(width: 6),
                 Text('Stock ($stockCount)'),
-              ],
-            ),
-          ),
-          const Tab(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.manage_accounts_outlined, size: 15),
-                SizedBox(width: 6),
-                Text('Details & Terms'),
               ],
             ),
           ),
@@ -1865,12 +1865,41 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
   }
 
   // ==========================================
-  // TAB 4: PROFILE, TERMS & ACCOUNT CONTROLS
+  // TAB 1: PROFILE, TERMS & ACCOUNT CONTROLS
   // ==========================================
-  Widget _buildProfileAndTermsTab(bool isDark, DCFleetDriver driver) {
+  Widget _buildProfileAndTermsTab(
+    bool isDark,
+    DCFleetDriver driver,
+    List<OrderEntity> assignedOrders,
+    List<DCTransactionRecord> driverTransactions,
+  ) {
     final commRate = double.tryParse(_commissionRateController.text.replaceAll(',', '')) ?? driver.commissionRate;
     final transRate = double.tryParse(_transportAllowanceController.text.replaceAll(',', '')) ?? driver.transportAllowance;
     final totalEntitlement = commRate + transRate;
+
+    // 1. Performance / Fulfillment Rate
+    final totalAssigned = assignedOrders.length;
+    final deliveredOrders = assignedOrders.where((o) => o.status == 'delivered').toList();
+    final deliveredCount = deliveredOrders.length;
+    final fulfillmentRate = totalAssigned > 0 ? (deliveredCount / totalAssigned) * 100 : 0.0;
+
+    // 2. Amount Waiting to be Remitted (To Remit)
+    final deliveredCashOrders = deliveredOrders.where((o) => !o.isDirectTransfer).toList();
+    final deliveredDirectOrders = deliveredOrders.where((o) => o.isDirectTransfer).toList();
+
+    final totalCashCollected = deliveredCashOrders.fold<double>(0.0, (s, o) => s + o.totalAmount);
+    final cashCommissionRetained = deliveredCashOrders.length * commRate;
+    final cashTransportRetained = deliveredCashOrders.length * transRate;
+    final cashEarningsRetained = cashCommissionRetained + cashTransportRetained;
+
+    final totalRemittedCash = driverTransactions
+        .where((t) => t.isRemittance && t.isVerified)
+        .fold<double>(0.0, (s, t) => s + t.amount);
+
+    final pendingToRemit = (totalCashCollected - cashEarningsRetained - totalRemittedCash).clamp(0.0, double.infinity);
+
+    // 3. His Balance (Withdrawable Direct Transfers / Paystack Earnings)
+    final hisBalance = deliveredDirectOrders.length * totalEntitlement;
 
     final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
     final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
@@ -1880,6 +1909,57 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 0. Major Rider KPIs (Fulfillment %, Waiting to Remit, His Balance)
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final is3Col = constraints.maxWidth > 700;
+              final is2Col = constraints.maxWidth > 480 && !is3Col;
+              final cardWidth = is3Col
+                  ? (constraints.maxWidth - 24) / 3
+                  : is2Col
+                      ? (constraints.maxWidth - 12) / 2
+                      : constraints.maxWidth;
+
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  SizedBox(
+                    width: cardWidth,
+                    child: _buildKpiCard(
+                      '🎯 Delivery Performance',
+                      '${fulfillmentRate.toStringAsFixed(1)}%',
+                      '$deliveredCount of $totalAssigned delivered',
+                      const Color(0xFF10B981),
+                      isDark,
+                    ),
+                  ),
+                  SizedBox(
+                    width: cardWidth,
+                    child: _buildKpiCard(
+                      '⏳ Waiting to Remit',
+                      '₦${CurrencyFormatter.formatNaira(pendingToRemit)}',
+                      'Cash POD in custody',
+                      const Color(0xFFF59E0B),
+                      isDark,
+                    ),
+                  ),
+                  SizedBox(
+                    width: cardWidth,
+                    child: _buildKpiCard(
+                      '🏦 His Balance',
+                      '₦${CurrencyFormatter.formatNaira(hisBalance)}',
+                      'Direct transfers & earnings',
+                      const Color(0xFF2563EB),
+                      isDark,
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 20),
+
           // 1. Account Status & Quick Control Card
           Container(
             padding: const EdgeInsets.all(18),
@@ -1894,59 +1974,68 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
                     : const Color(0xFFEF4444).withValues(alpha: 0.3),
               ),
             ),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 24,
-                  backgroundColor: _isActive ? const Color(0xFF10B981) : const Color(0xFFEF4444),
-                  child: Icon(
-                    _isActive ? Icons.check_circle_outline : Icons.block_outlined,
-                    color: Colors.white,
-                    size: 26,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isNarrow = constraints.maxWidth < 600;
+
+                final statusInfo = Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CircleAvatar(
+                      radius: 22,
+                      backgroundColor: _isActive ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                      child: Icon(
+                        _isActive ? Icons.check_circle_outline : Icons.block_outlined,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            _isActive ? 'Rider Status: ACTIVE & DISPATCH READY' : 'Rider Status: DEACTIVATED / BLOCKED',
-                            style: GoogleFonts.inter(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w900,
-                              color: _isActive ? const Color(0xFF10B981) : const Color(0xFFEF4444),
-                            ),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Text(
+                                _isActive ? 'Rider Status: ACTIVE & DISPATCH READY' : 'Rider Status: DEACTIVATED / BLOCKED',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w900,
+                                  color: _isActive ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: isDark ? const Color(0xFF0F172A) : Colors.white,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: borderColor),
+                                ),
+                                child: Text(
+                                  driver.driverCode,
+                                  style: GoogleFonts.firaCode(fontSize: 11, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF0F172A) : Colors.white,
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: borderColor),
-                            ),
-                            child: Text(
-                              driver.driverCode,
-                              style: GoogleFonts.firaCode(fontSize: 11, fontWeight: FontWeight.bold),
-                            ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _isActive
+                                ? 'This rider is active and will appear on the dispatch manifest to receive orders.'
+                                : 'Deactivated riders are blocked from dispatch and cannot accept new orders.',
+                            style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _isActive
-                            ? 'This rider is active and will appear on the dispatch manifest to receive orders.'
-                            : 'Deactivated riders are blocked from dispatch and cannot accept new orders.',
-                        style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                ElevatedButton.icon(
+                    ),
+                  ],
+                );
+
+                final actionBtn = ElevatedButton.icon(
                   onPressed: () {
                     _toggleRiderStatusConfirmation(context, driver);
                   },
@@ -1958,8 +2047,30 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
-                ),
-              ],
+                );
+
+                if (isNarrow) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      statusInfo,
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: actionBtn,
+                      ),
+                    ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    Expanded(child: statusInfo),
+                    const SizedBox(width: 12),
+                    actionBtn,
+                  ],
+                );
+              },
             ),
           ),
           const SizedBox(height: 20),
@@ -1983,6 +2094,7 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
                       padding: const EdgeInsets.all(8),
@@ -1997,13 +2109,15 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
                               Text(
                                 'Personal Compensation Terms',
                                 style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w900),
                               ),
-                              const SizedBox(width: 8),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                 decoration: BoxDecoration(
@@ -2021,6 +2135,7 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
                               ),
                             ],
                           ),
+                          const SizedBox(height: 4),
                           Text(
                             'Rates configured here directly override generic DC settings in order earnings and remittance deductions.',
                             style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
@@ -2041,6 +2156,7 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
                     border: Border.all(color: const Color(0xFF2563EB).withValues(alpha: 0.2)),
                   ),
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Icon(Icons.auto_graph_rounded, color: Color(0xFF2563EB), size: 20),
                       const SizedBox(width: 10),
@@ -2050,6 +2166,7 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
                           style: GoogleFonts.inter(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
+                            height: 1.35,
                             color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8),
                           ),
                         ),
@@ -2077,9 +2194,7 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
                             isDark: isDark,
                             prefixIcon: Icons.percent_rounded,
                             keyboardType: TextInputType.number,
-                            onChanged: (_) {
-                              // Triggers entitlement recalculation preview
-                            },
+                            onChanged: (_) {},
                           ),
                         ),
                         SizedBox(
@@ -2448,8 +2563,10 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
           const SizedBox(height: 24),
 
           // 7. Save Action Button Bar
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+          Wrap(
+            alignment: WrapAlignment.end,
+            spacing: 12,
+            runSpacing: 10,
             children: [
               OutlinedButton(
                 onPressed: () => Navigator.of(context).pop(),
@@ -2460,7 +2577,6 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
                 ),
                 child: Text('Close', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
               ),
-              const SizedBox(width: 12),
               ElevatedButton.icon(
                 onPressed: _isSaving ? null : () => _saveDriverProfileAndTerms(context, driver),
                 icon: _isSaving

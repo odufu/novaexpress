@@ -206,7 +206,7 @@ void main() {
       expect(find.text('Emeka Rider'), findsOneWidget);
     });
 
-    testWidgets('2. DCRidersPage opens DCRiderDetailModal upon row tap and renders profile header', (tester) async {
+    testWidgets('2. DCRidersPage opens DCRiderDetailModal upon row tap and renders profile header & major KPIs', (tester) async {
       await tester.binding.setSurfaceSize(const Size(1280, 900));
 
       await tester.pumpWidget(
@@ -237,6 +237,12 @@ void main() {
       expect(find.text('PDA (Personal)'), findsWidgets);
       expect(find.text('08012345678'), findsWidgets);
       expect(find.textContaining('Wuse II & Abuja Central'), findsWidgets);
+
+      // Verify Details & Terms Major KPIs on first tab
+      expect(find.text('🎯 Delivery Performance'), findsOneWidget);
+      expect(find.text('66.7%'), findsOneWidget);
+      expect(find.text('⏳ Waiting to Remit'), findsOneWidget);
+      expect(find.text('🏦 His Balance'), findsOneWidget);
     });
 
     testWidgets('3. DCRiderDetailModal Orders tab displays 1-row KPI aggregators and minimalist table', (tester) async {
@@ -257,6 +263,12 @@ void main() {
         ),
       );
 
+      await tester.pumpAndSettle();
+
+      // Switch to Orders Tab
+      final ordersTab = find.text('Orders (3)');
+      expect(ordersTab, findsOneWidget);
+      await tester.tap(ordersTab);
       await tester.pumpAndSettle();
 
       // Verify Orders Tab KPIs
