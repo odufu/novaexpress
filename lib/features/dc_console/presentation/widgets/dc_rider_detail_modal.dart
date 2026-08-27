@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -241,25 +242,19 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
           final isCompact = constraints.maxWidth < 650;
 
           final vehicleInfo = driver.vehiclePlate.isNotEmpty
-              ? (driver.vehicleModel.contains(driver.vehiclePlate)
-                  ? driver.vehicleModel
+              ? (driver.vehicleModel.isNotEmpty
+                  ? (driver.vehicleModel.contains(driver.vehiclePlate)
+                      ? driver.vehicleModel
+                      : '${driver.vehicleModel} (${driver.vehiclePlate})')
                   : '${driver.vehicleType} (${driver.vehiclePlate})')
-              : driver.vehicleType;
+              : (driver.vehicleModel.isNotEmpty ? driver.vehicleModel : driver.vehicleType);
 
           return Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(
+              _buildDriverAvatar(
+                driver,
                 radius: isCompact ? 22 : 26,
-                backgroundColor: const Color(0xFF2563EB).withValues(alpha: 0.15),
-                child: Text(
-                  driver.name.isNotEmpty ? driver.name.substring(0, 1).toUpperCase() : 'R',
-                  style: GoogleFonts.inter(
-                    fontSize: isCompact ? 18 : 22,
-                    fontWeight: FontWeight.w900,
-                    color: const Color(0xFF2563EB),
-                  ),
-                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -354,21 +349,69 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
     );
   }
 
+  Widget _buildDriverAvatar(
+    DCFleetDriver driver, {
+    double radius = 24,
+    Color? backgroundColor,
+    Color? textColor,
+  }) {
+    final avatar = driver.avatarUrl.trim();
+    final hasNetworkAvatar = avatar.isNotEmpty && (avatar.startsWith('http://') || avatar.startsWith('https://'));
+    final hasDataAvatar = avatar.isNotEmpty && avatar.startsWith('data:image');
+
+    ImageProvider? imageProvider;
+    if (hasNetworkAvatar) {
+      imageProvider = NetworkImage(avatar);
+    } else if (hasDataAvatar) {
+      try {
+        final commaIdx = avatar.indexOf(',');
+        if (commaIdx != -1) {
+          final bytes = base64Decode(avatar.substring(commaIdx + 1));
+          imageProvider = MemoryImage(bytes);
+        }
+      } catch (_) {}
+    }
+
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: backgroundColor ?? const Color(0xFF2563EB).withValues(alpha: 0.15),
+      backgroundImage: imageProvider,
+      onBackgroundImageError: imageProvider != null ? (_, __) {} : null,
+      child: imageProvider == null
+          ? Text(
+              driver.name.isNotEmpty ? driver.name.substring(0, 1).toUpperCase() : 'R',
+              style: GoogleFonts.inter(
+                fontSize: radius * 0.85,
+                fontWeight: FontWeight.w900,
+                color: textColor ?? const Color(0xFF2563EB),
+              ),
+            )
+          : null,
+    );
+  }
+
   Widget _buildHeaderMetaChip(IconData icon, String label, bool isDark) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 13, color: const Color(0xFF64748B)),
-        const SizedBox(width: 4),
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 11.5,
-            fontWeight: FontWeight.w500,
-            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 200),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: const Color(0xFF64748B)),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w500,
+                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -439,9 +482,9 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.manage_accounts_outlined, size: 15),
+                Icon(Icons.person_outline_rounded, size: 15),
                 SizedBox(width: 6),
-                Text('Details & Terms'),
+                Text('Profile'),
               ],
             ),
           ),
@@ -1938,7 +1981,7 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
                     width: cardWidth,
                     child: _buildKpiCard(
                       '⏳ Waiting to Remit',
-                      '₦${CurrencyFormatter.formatNaira(pendingToRemit)}',
+                      CurrencyFormatter.formatNaira(pendingToRemit),
                       'Cash POD in custody',
                       const Color(0xFFF59E0B),
                       isDark,
@@ -1948,7 +1991,7 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
                     width: cardWidth,
                     child: _buildKpiCard(
                       '🏦 His Balance',
-                      '₦${CurrencyFormatter.formatNaira(hisBalance)}',
+                      CurrencyFormatter.formatNaira(hisBalance),
                       'Direct transfers & earnings',
                       const Color(0xFF2563EB),
                       isDark,
@@ -2162,7 +2205,7 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'Total Entitlement per Delivered Cash POD: ₦${CurrencyFormatter.formatNaira(totalEntitlement)} (₦${CurrencyFormatter.formatNaira(commRate)} Commission + ₦${CurrencyFormatter.formatNaira(transRate)} Transport/Fuel)',
+                          'Total Entitlement per Delivered Cash POD: ${CurrencyFormatter.formatNaira(totalEntitlement)} (${CurrencyFormatter.formatNaira(commRate)} Commission + ${CurrencyFormatter.formatNaira(transRate)} Transport/Fuel)',
                           style: GoogleFonts.inter(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
@@ -2683,7 +2726,7 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  '✅ ${updated.name} updated! Personal Terms: ₦${CurrencyFormatter.formatNaira(comm)} commission + ₦${CurrencyFormatter.formatNaira(trans)} transport.',
+                  '✅ ${updated.name} updated! Personal Terms: ${CurrencyFormatter.formatNaira(comm)} commission + ${CurrencyFormatter.formatNaira(trans)} transport.',
                   style: GoogleFonts.inter(fontWeight: FontWeight.bold),
                 ),
               ),
