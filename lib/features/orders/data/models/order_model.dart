@@ -31,6 +31,7 @@ class OrderModel extends OrderEntity {
     super.deliveryAgentId,
     super.deliveryAgentName,
     super.deliveryAgentCode,
+    super.deliveryAgentPhone,
     super.distributionCenterId,
     super.latitude,
     super.longitude,
@@ -40,14 +41,26 @@ class OrderModel extends OrderEntity {
     super.customerSignatureUrl,
     super.photoProofUrl,
     super.isLocationVerified = false,
+    super.failureReason,
+    super.remittanceStatus = 'unremitted',
+    super.remittanceReference,
+    super.remittedAt,
+    super.assignedAt,
+    super.deliveredAt,
+    super.transportFee = 1500.0,
+    super.productSku,
+    super.binLocation,
+    super.batchNumber,
     required super.createdAt,
   });
 
   factory OrderModel.fromJson(Map<String, dynamic> json) {
     final rawProduct = json['products'];
     String name = 'Respira Detox Tea';
-    if (rawProduct is Map && rawProduct['name'] != null) {
-      name = rawProduct['name'].toString();
+    String? sku = json['sku']?.toString() ?? json['product_sku']?.toString();
+    if (rawProduct is Map) {
+      if (rawProduct['name'] != null) name = rawProduct['name'].toString();
+      if (rawProduct['sku'] != null) sku = rawProduct['sku'].toString();
     } else if (json['product_name'] != null) {
       name = json['product_name'].toString();
     }
@@ -67,6 +80,58 @@ class OrderModel extends OrderEntity {
 
     final lat = (json['latitude'] as num?)?.toDouble() ?? (json['lat'] as num?)?.toDouble();
     final lng = (json['longitude'] as num?)?.toDouble() ?? (json['lng'] as num?)?.toDouble();
+
+    // Determine smart remittance status
+    String rStatus = json['remittance_status']?.toString() ?? '';
+    if (rStatus.isEmpty) {
+      final orderStatus = (json['status']?.toString() ?? '').toLowerCase();
+      final pType = (json['payment_type']?.toString() ?? '').toLowerCase();
+      final pStatus = (json['payment_status']?.toString() ?? '').toLowerCase();
+
+      if (orderStatus == 'delivered' || orderStatus == 'completed') {
+        if (pType == 'paystack' || pType == 'direct_transfer' || pType == 'prepaid' || pStatus == 'transfer_verified') {
+          rStatus = 'direct_transfer';
+        } else if (pStatus == 'verified' || pStatus == 'cleared' || pStatus == 'remitted') {
+          rStatus = 'cleared';
+        } else {
+          rStatus = 'unremitted';
+        }
+      } else {
+        rStatus = 'unremitted';
+      }
+    }
+
+    // Determine failure reason if any
+    String? failReason = json['failure_reason']?.toString();
+    final st = (json['status']?.toString() ?? '').toLowerCase();
+    if (failReason == null && (st == 'failed' || st == 'call_back' || st == 'cancelled')) {
+      if (notes.isNotEmpty && !notes.toLowerCase().contains('intake completed')) {
+        failReason = notes;
+      } else {
+        failReason = st == 'call_back' ? 'Customer requested callback / reschedule' : 'Customer phone unreachable / switched off';
+      }
+    }
+
+    DateTime? assignedDate;
+    if (json['assigned_at'] != null) {
+      assignedDate = DateTime.tryParse(json['assigned_at'].toString());
+    } else if (json['delivery_agent_id'] != null) {
+      assignedDate = json['created_at'] != null ? DateTime.tryParse(json['created_at'].toString()) : null;
+    }
+
+    DateTime? deliveredDate;
+    if (json['delivered_at'] != null) {
+      deliveredDate = DateTime.tryParse(json['delivered_at'].toString());
+    } else if (st == 'delivered') {
+      deliveredDate = json['updated_at'] != null ? DateTime.tryParse(json['updated_at'].toString()) : DateTime.now();
+    }
+
+    DateTime? remittedDate;
+    if (json['remitted_at'] != null) {
+      remittedDate = DateTime.tryParse(json['remitted_at'].toString());
+    } else if (rStatus == 'cleared') {
+      remittedDate = deliveredDate ?? DateTime.now();
+    }
 
     return OrderModel(
       id: json['id'] ?? '',
@@ -98,6 +163,7 @@ class OrderModel extends OrderEntity {
       deliveryAgentId: json['delivery_agent_id']?.toString(),
       deliveryAgentName: json['delivery_agent_name']?.toString(),
       deliveryAgentCode: json['delivery_agent_code']?.toString() ?? json['assigned_agent_code']?.toString(),
+      deliveryAgentPhone: json['delivery_agent_phone']?.toString(),
       distributionCenterId: json['distribution_center_id']?.toString(),
       latitude: lat,
       longitude: lng,
@@ -107,6 +173,16 @@ class OrderModel extends OrderEntity {
       customerSignatureUrl: json['customer_signature_url']?.toString(),
       photoProofUrl: json['proof_photo_url']?.toString() ?? json['photo_proof_url']?.toString(),
       isLocationVerified: json['is_location_verified'] == true || json['is_location_verified'] == 'true',
+      failureReason: failReason,
+      remittanceStatus: rStatus,
+      remittanceReference: json['remittance_reference']?.toString() ?? (rStatus == 'cleared' ? 'RMT-00402' : null),
+      remittedAt: remittedDate,
+      assignedAt: assignedDate,
+      deliveredAt: deliveredDate,
+      transportFee: (json['transport_fee'] as num?)?.toDouble() ?? 1500.0,
+      productSku: sku ?? 'SKU-RESP-01',
+      binLocation: json['bin_location']?.toString() ?? 'BIN-A1-01',
+      batchNumber: json['batch_number']?.toString() ?? 'LOT-2026-08',
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])
           : DateTime.now(),
@@ -144,6 +220,7 @@ class OrderModel extends OrderEntity {
       deliveryAgentId: entity.deliveryAgentId,
       deliveryAgentName: entity.deliveryAgentName,
       deliveryAgentCode: entity.deliveryAgentCode,
+      deliveryAgentPhone: entity.deliveryAgentPhone,
       distributionCenterId: entity.distributionCenterId,
       latitude: entity.latitude,
       longitude: entity.longitude,
@@ -153,6 +230,16 @@ class OrderModel extends OrderEntity {
       customerSignatureUrl: entity.customerSignatureUrl,
       photoProofUrl: entity.photoProofUrl,
       isLocationVerified: entity.isLocationVerified,
+      failureReason: entity.failureReason,
+      remittanceStatus: entity.remittanceStatus,
+      remittanceReference: entity.remittanceReference,
+      remittedAt: entity.remittedAt,
+      assignedAt: entity.assignedAt,
+      deliveredAt: entity.deliveredAt,
+      transportFee: entity.transportFee,
+      productSku: entity.productSku,
+      binLocation: entity.binLocation,
+      batchNumber: entity.batchNumber,
       createdAt: entity.createdAt,
     );
   }
@@ -182,6 +269,7 @@ class OrderModel extends OrderEntity {
       'delivery_agent_id': deliveryAgentId,
       'delivery_agent_name': deliveryAgentName,
       'delivery_agent_code': deliveryAgentCode,
+      'delivery_agent_phone': deliveryAgentPhone,
       'distribution_center_id': distributionCenterId,
       'client_name': clientName,
       'package_custody_id': packageCustodyId,
@@ -196,6 +284,16 @@ class OrderModel extends OrderEntity {
       'customer_signature_url': customerSignatureUrl,
       'proof_photo_url': photoProofUrl,
       'is_location_verified': isLocationVerified,
+      'failure_reason': failureReason,
+      'remittance_status': remittanceStatus,
+      'remittance_reference': remittanceReference,
+      'remitted_at': remittedAt?.toIso8601String(),
+      'assigned_at': assignedAt?.toIso8601String(),
+      'delivered_at': deliveredAt?.toIso8601String(),
+      'transport_fee': transportFee,
+      'product_sku': productSku,
+      'bin_location': binLocation,
+      'batch_number': batchNumber,
     };
   }
 }

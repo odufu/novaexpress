@@ -37,6 +37,17 @@ class OrderEntity {
   final String? customerSignatureUrl;
   final String? photoProofUrl;
   final bool isLocationVerified;
+  final String? failureReason;
+  final String remittanceStatus; // 'cleared', 'unremitted', 'pending_verification', 'direct_transfer', 'prepaid'
+  final String? remittanceReference;
+  final DateTime? remittedAt;
+  final DateTime? assignedAt;
+  final DateTime? deliveredAt;
+  final double transportFee;
+  final String? productSku;
+  final String? binLocation;
+  final String? batchNumber;
+  final String? deliveryAgentPhone;
   final DateTime createdAt;
 
   const OrderEntity({
@@ -61,7 +72,7 @@ class OrderEntity {
     required this.paymentType,
     required this.paymentStatus,
     this.fulfillmentType = 'distributed_inventory',
-    this.clientName = 'NovaCare',
+    this.clientName = 'Novacare Limited',
     this.packageCustodyId,
     this.clientDeliveryFee = 5000.0,
     this.agentEntitlement = 2500.0,
@@ -69,6 +80,7 @@ class OrderEntity {
     this.deliveryAgentId,
     this.deliveryAgentName,
     this.deliveryAgentCode,
+    this.deliveryAgentPhone,
     this.distributionCenterId,
     this.latitude,
     this.longitude,
@@ -78,6 +90,16 @@ class OrderEntity {
     this.customerSignatureUrl,
     this.photoProofUrl,
     this.isLocationVerified = false,
+    this.failureReason,
+    this.remittanceStatus = 'unremitted',
+    this.remittanceReference,
+    this.remittedAt,
+    this.assignedAt,
+    this.deliveredAt,
+    this.transportFee = 1500.0,
+    this.productSku,
+    this.binLocation,
+    this.batchNumber,
     required this.createdAt,
   });
 
@@ -136,7 +158,32 @@ class OrderEntity {
   bool get isClientPackage => fulfillmentType == 'client_package';
   bool get isDistributedInventory => fulfillmentType == 'distributed_inventory';
   bool get isDelivered => status.toLowerCase() == 'delivered' || status.toLowerCase() == 'completed';
-  bool get isFailed => status.toLowerCase() == 'failed' || status.toLowerCase() == 'failed_attempt' || status.toLowerCase() == 'call_back';
+  bool get isFailed => status.toLowerCase() == 'failed' || status.toLowerCase() == 'failed_attempt' || status.toLowerCase() == 'call_back' || status.toLowerCase() == 'cancelled';
+  bool get isUnassigned => deliveryAgentId == null || deliveryAgentId!.isEmpty;
+  bool get isAssignedInTransit => !isUnassigned && !isDelivered && !isFailed;
+
+  bool get isRemitted {
+    if (isDirectTransfer) return true;
+    final rs = remittanceStatus.toLowerCase();
+    return rs == 'cleared' || rs == 'remitted';
+  }
+
+  bool get isUnremitted {
+    if (!isDelivered) return false;
+    if (isDirectTransfer) return false;
+    final rs = remittanceStatus.toLowerCase();
+    return rs == 'unremitted' || rs == 'pending' || rs.isEmpty;
+  }
+
+  bool get isPendingVerification {
+    return remittanceStatus.toLowerCase() == 'pending_verification';
+  }
+
+  double get netMerchantSettlement {
+    final net = totalAmount - agentEntitlement - transportFee;
+    return net > 0 ? net : 0.0;
+  }
+
   int get totalPhysicalQuantity => paidQuantity + freeQuantity > 0 ? paidQuantity + freeQuantity : quantity;
   bool get hasCoordinates => latitude != null && longitude != null && latitude != 0.0 && longitude != 0.0;
 
@@ -268,6 +315,7 @@ Kindly tap the "📎" attach button below and share your *Current Location / Liv
     String? deliveryAgentId,
     String? deliveryAgentName,
     String? deliveryAgentCode,
+    String? deliveryAgentPhone,
     String? distributionCenterId,
     double? latitude,
     double? longitude,
@@ -275,6 +323,16 @@ Kindly tap the "📎" attach button below and share your *Current Location / Liv
     String? geocodedAddress,
     String? locationConfidence,
     bool? isLocationVerified,
+    String? failureReason,
+    String? remittanceStatus,
+    String? remittanceReference,
+    DateTime? remittedAt,
+    DateTime? assignedAt,
+    DateTime? deliveredAt,
+    double? transportFee,
+    String? productSku,
+    String? binLocation,
+    String? batchNumber,
     DateTime? createdAt,
   }) {
     return OrderEntity(
@@ -307,6 +365,7 @@ Kindly tap the "📎" attach button below and share your *Current Location / Liv
       deliveryAgentId: deliveryAgentId ?? this.deliveryAgentId,
       deliveryAgentName: deliveryAgentName ?? this.deliveryAgentName,
       deliveryAgentCode: deliveryAgentCode ?? this.deliveryAgentCode,
+      deliveryAgentPhone: deliveryAgentPhone ?? this.deliveryAgentPhone,
       distributionCenterId: distributionCenterId ?? this.distributionCenterId,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
@@ -314,6 +373,16 @@ Kindly tap the "📎" attach button below and share your *Current Location / Liv
       geocodedAddress: geocodedAddress ?? this.geocodedAddress,
       locationConfidence: locationConfidence ?? this.locationConfidence,
       isLocationVerified: isLocationVerified ?? this.isLocationVerified,
+      failureReason: failureReason ?? this.failureReason,
+      remittanceStatus: remittanceStatus ?? this.remittanceStatus,
+      remittanceReference: remittanceReference ?? this.remittanceReference,
+      remittedAt: remittedAt ?? this.remittedAt,
+      assignedAt: assignedAt ?? this.assignedAt,
+      deliveredAt: deliveredAt ?? this.deliveredAt,
+      transportFee: transportFee ?? this.transportFee,
+      productSku: productSku ?? this.productSku,
+      binLocation: binLocation ?? this.binLocation,
+      batchNumber: batchNumber ?? this.batchNumber,
       createdAt: createdAt ?? this.createdAt,
     );
   }
