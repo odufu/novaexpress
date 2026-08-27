@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:novexps/features/dc_console/domain/entities/dc_fleet_driver.dart';
 import 'package:novexps/features/dc_console/domain/entities/product_package.dart';
+import 'package:novexps/features/dc_console/presentation/providers/product_catalog_provider.dart';
 import 'package:novexps/features/dc_console/presentation/widgets/dc_product_detail_modal.dart';
 import 'package:novexps/features/stock/domain/entities/rider_stock_allocation.dart';
 import 'package:novexps/features/stock/domain/entities/stock_item.dart';
@@ -93,6 +94,42 @@ void main() {
       expect(fromJson.packagePrice, 60000.0);
       expect(fromJson.isCustom, true);
     });
+    test('4. ProductCatalogNotifier.updatePackage modifies existing package attributes correctly', () {
+      final container = ProviderContainer();
+      final notifier = container.read(productCatalogProvider.notifier);
+
+      // Add a package first
+      final pkg = notifier.addPackageToProduct(
+        productName: 'Grazer Tea',
+        packageName: '3-Pack Standard Set',
+        quantity: 3,
+        paidQuantity: 3,
+        freeQuantity: 0,
+        packagePrice: 50000.0,
+      );
+
+      expect(pkg.packageName, '3-Pack Standard Set');
+      expect(pkg.packagePrice, 50000.0);
+
+      // Now edit/update the package
+      final updated = notifier.updatePackage(
+        productName: 'Grazer Tea',
+        packageId: pkg.id,
+        packageName: '3-Pack Mega Promo (Buy 2 Get 1 Free)',
+        quantity: 3,
+        paidQuantity: 2,
+        freeQuantity: 1,
+        packagePrice: 42000.0,
+        description: 'Special promo deal',
+      );
+
+      expect(updated, isNotNull);
+      expect(updated!.packageName, '3-Pack Mega Promo (Buy 2 Get 1 Free)');
+      expect(updated.packagePrice, 42000.0);
+      expect(updated.paidQuantity, 2);
+      expect(updated.freeQuantity, 1);
+      expect(updated.description, 'Special promo deal');
+    });
   });
 
   group('DCProductDetailModal Widget Tests', () {
@@ -100,7 +137,7 @@ void main() {
       id: 'prod_grazer',
       sku: 'SKU-GRZ-001',
       name: 'Grazer Tea',
-      description: 'Organic Herbal Slimming & Detox Tea',
+      description: 'Organic Herbal Slimming & Detox Tea with premium herbal ingredients and antioxidants',
       price: 22000.0,
       ownerName: 'Novacare Limited',
       inventoryType: InventoryType.distributedInventory,
@@ -196,6 +233,9 @@ void main() {
       expect(find.textContaining('5 Packs Mega Deal (5 for ₦55,000)'), findsOneWidget);
       expect(find.text('₦55,000.00'), findsWidgets);
 
+      // Verify Edit Deal buttons are present
+      expect(find.text('Edit Deal'), findsWidgets);
+
       // Verify Riders in Custody
       expect(find.textContaining('Riders Holding Vehicle Stock'), findsOneWidget);
       expect(find.text('Emeka Okafor'), findsOneWidget);
@@ -240,6 +280,43 @@ void main() {
 
       // Dialog is dismissed
       expect(find.text('Create Package for Grazer Tea'), findsNothing);
+    });
+
+    testWidgets('3. Tapping Edit Deal opens edit modal and allows updating package price and description', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1000, 900));
+
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: DCProductDetailModal(
+                item: mockStockItem,
+                drivers: mockDrivers,
+                allocations: mockAllocations,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Find and tap the first 'Edit Deal' button
+      final editBtn = find.text('Edit Deal').first;
+      expect(editBtn, findsOneWidget);
+      await tester.tap(editBtn);
+      await tester.pumpAndSettle();
+
+      // Verify Edit Dialog opens with existing package details
+      expect(find.textContaining('Edit Package:'), findsOneWidget);
+      expect(find.text('Update Package'), findsOneWidget);
+
+      // Tap 'Update Package'
+      await tester.tap(find.text('Update Package'));
+      await tester.pumpAndSettle();
+
+      // Edit Dialog is dismissed
+      expect(find.textContaining('Edit Package:'), findsNothing);
     });
   });
 }

@@ -215,27 +215,25 @@ class _DCProductDetailModalState extends ConsumerState<DCProductDetailModal> {
                   const SizedBox(height: 20),
 
                   // 4. COMMERCIAL PACKAGES SECTION
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
-                      Expanded(
-                        child: Row(
-                          children: [
-                            const Icon(Icons.local_offer_rounded, size: 16, color: Color(0xFFF37021)),
-                            const SizedBox(width: 6),
-                            Flexible(
-                              child: Text(
-                                '📦 Commercial Packages & Bundles (${packages.length})',
-                                style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13.5),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.local_offer_rounded, size: 16, color: Color(0xFFF37021)),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Commercial Packages & Bundles (${packages.length})',
+                            style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13.5),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 8),
                       ElevatedButton.icon(
-                        onPressed: () => _showCreatePackageDialog(context, isDark, item),
+                        onPressed: () => _showCreateOrEditPackageDialog(context, isDark, item),
                         icon: const Icon(Icons.add_rounded, size: 14, color: Colors.white),
                         label: const Text('+ Create Package Deal', style: TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.bold)),
                         style: ElevatedButton.styleFrom(
@@ -488,9 +486,23 @@ class _DCProductDetailModalState extends ConsumerState<DCProductDetailModal> {
           ],
 
           const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            alignment: WrapAlignment.end,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
+              // Edit Package Deal Button
+              OutlinedButton.icon(
+                onPressed: () => _showCreateOrEditPackageDialog(context, isDark, item, existingPackage: pkg),
+                icon: const Icon(Icons.edit_outlined, size: 13, color: Color(0xFF2563EB)),
+                label: const Text('Edit Deal', style: TextStyle(color: Color(0xFF2563EB), fontSize: 11, fontWeight: FontWeight.w600)),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  side: const BorderSide(color: Color(0xFF93C5FD)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
               if (pkg.isCustom)
                 TextButton.icon(
                   onPressed: () {
@@ -505,7 +517,6 @@ class _DCProductDetailModalState extends ConsumerState<DCProductDetailModal> {
                   icon: const Icon(Icons.delete_outline_rounded, size: 14, color: Color(0xFFEF4444)),
                   label: const Text('Remove', style: TextStyle(color: Color(0xFFEF4444), fontSize: 11)),
                 ),
-              const SizedBox(width: 8),
               ElevatedButton.icon(
                 onPressed: () {
                   Navigator.of(context).pop();
@@ -529,13 +540,31 @@ class _DCProductDetailModalState extends ConsumerState<DCProductDetailModal> {
     );
   }
 
-  void _showCreatePackageDialog(BuildContext context, bool isDark, StockItemEntity item) {
-    final nameCtrl = TextEditingController(text: '${item.name} 5-Pack Special Deal');
-    final qtyCtrl = TextEditingController(text: '5');
-    final paidQtyCtrl = TextEditingController(text: '5');
-    final freeQtyCtrl = TextEditingController(text: '0');
-    final priceCtrl = TextEditingController(text: (item.price * 5 * 0.85).toStringAsFixed(0));
-    final descCtrl = TextEditingController(text: 'Save with this bulk package deal');
+  void _showCreateOrEditPackageDialog(
+    BuildContext context,
+    bool isDark,
+    StockItemEntity item, {
+    ProductPackage? existingPackage,
+  }) {
+    final isEditing = existingPackage != null;
+    final nameCtrl = TextEditingController(
+      text: isEditing ? existingPackage.packageName : '${item.name} 5-Pack Special Deal',
+    );
+    final qtyCtrl = TextEditingController(
+      text: isEditing ? '${existingPackage.quantity}' : '5',
+    );
+    final paidQtyCtrl = TextEditingController(
+      text: isEditing ? '${existingPackage.paidQuantity}' : '5',
+    );
+    final freeQtyCtrl = TextEditingController(
+      text: isEditing ? '${existingPackage.freeQuantity}' : '0',
+    );
+    final priceCtrl = TextEditingController(
+      text: isEditing ? existingPackage.packagePrice.toStringAsFixed(0) : (item.price * 5 * 0.85).toStringAsFixed(0),
+    );
+    final descCtrl = TextEditingController(
+      text: isEditing ? (existingPackage.description ?? '') : 'Save with this bulk package deal',
+    );
 
     showDialog(
       context: context,
@@ -553,11 +582,15 @@ class _DCProductDetailModalState extends ConsumerState<DCProductDetailModal> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             title: Row(
               children: [
-                const Icon(Icons.local_offer_rounded, color: Color(0xFFF37021), size: 22),
+                Icon(
+                  isEditing ? Icons.edit_note_rounded : Icons.local_offer_rounded,
+                  color: const Color(0xFFF37021),
+                  size: 22,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Create Package for ${item.name}',
+                    isEditing ? 'Edit Package: ${existingPackage.packageName}' : 'Create Package for ${item.name}',
                     style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 15),
                   ),
                 ),
@@ -589,7 +622,9 @@ class _DCProductDetailModalState extends ConsumerState<DCProductDetailModal> {
                               hintText: '5',
                             ),
                             onChanged: (_) => setDialogState(() {
-                              paidQtyCtrl.text = qtyCtrl.text;
+                              if (!isEditing || paidQtyCtrl.text == qtyCtrl.text) {
+                                paidQtyCtrl.text = qtyCtrl.text;
+                              }
                             }),
                           ),
                         ),
@@ -710,28 +745,41 @@ class _DCProductDetailModalState extends ConsumerState<DCProductDetailModal> {
 
                   if (pkgName.isEmpty || pkgPrice <= 0) return;
 
-                  ref.read(productCatalogProvider.notifier).addPackageToProduct(
-                        productName: item.name,
-                        packageName: pkgName,
-                        quantity: totalUnits,
-                        paidQuantity: paidUnits,
-                        freeQuantity: freeUnits,
-                        packagePrice: pkgPrice,
-                        clientName: item.ownerName,
-                        productSku: item.sku,
-                        description: desc.isNotEmpty ? desc : null,
-                      );
+                  if (isEditing) {
+                    ref.read(productCatalogProvider.notifier).updatePackage(
+                          productName: item.name,
+                          packageId: existingPackage.id,
+                          packageName: pkgName,
+                          quantity: totalUnits,
+                          paidQuantity: paidUnits,
+                          freeQuantity: freeUnits,
+                          packagePrice: pkgPrice,
+                          description: desc.isNotEmpty ? desc : null,
+                        );
+                  } else {
+                    ref.read(productCatalogProvider.notifier).addPackageToProduct(
+                          productName: item.name,
+                          packageName: pkgName,
+                          quantity: totalUnits,
+                          paidQuantity: paidUnits,
+                          freeQuantity: freeUnits,
+                          packagePrice: pkgPrice,
+                          clientName: item.ownerName,
+                          productSku: item.sku,
+                          description: desc.isNotEmpty ? desc : null,
+                        );
+                  }
 
                   Navigator.of(ctx).pop();
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       backgroundColor: const Color(0xFF10B981),
-                      content: Text('Package "$pkgName" created successfully!'),
+                      content: Text(isEditing ? 'Package "$pkgName" updated successfully!' : 'Package "$pkgName" created successfully!'),
                     ),
                   );
                 },
                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF37021)),
-                child: const Text('Save Package', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                child: Text(isEditing ? 'Update Package' : 'Save Package', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               ),
             ],
           );
@@ -742,15 +790,20 @@ class _DCProductDetailModalState extends ConsumerState<DCProductDetailModal> {
 
   Widget _buildDetailRow(String label, String value, bool isDark, {Color? valueColor, bool isBold = false}) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label, style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-        Text(
-          value,
-          style: GoogleFonts.inter(
-            fontSize: 12,
-            fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
-            color: valueColor ?? (isDark ? Colors.white : const Color(0xFF0F172A)),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
+              color: valueColor ?? (isDark ? Colors.white : const Color(0xFF0F172A)),
+            ),
           ),
         ),
       ],

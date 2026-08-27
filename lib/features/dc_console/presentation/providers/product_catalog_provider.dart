@@ -256,6 +256,54 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
     return true;
   }
 
+  /// Updates an existing commercial package (modifying name, pricing, quantities, description)
+  ProductPackage? updatePackage({
+    required String productName,
+    required String packageId,
+    required String packageName,
+    required int quantity,
+    int? paidQuantity,
+    int? freeQuantity,
+    required double packagePrice,
+    String? description,
+  }) {
+    final existingProduct = state.findProductByName(productName);
+    if (existingProduct == null) return null;
+
+    final totalUnits = quantity > 0 ? quantity : 1;
+    final paidUnits = paidQuantity ?? totalUnits;
+    final freeUnits = freeQuantity ?? 0;
+
+    ProductPackage? updatedPkg;
+
+    final updatedPackages = existingProduct.packages.map((pkg) {
+      if (pkg.id == packageId) {
+        updatedPkg = pkg.copyWith(
+          packageName: packageName.trim(),
+          quantity: totalUnits,
+          paidQuantity: paidUnits,
+          freeQuantity: freeUnits,
+          packagePrice: packagePrice,
+          description: description?.trim().isNotEmpty == true ? description!.trim() : null,
+          isCustom: true,
+        );
+        return updatedPkg!;
+      }
+      return pkg;
+    }).toList();
+
+    if (updatedPkg == null) return null;
+
+    final updatedProduct = existingProduct.copyWith(packages: updatedPackages);
+    final updatedProductList = state.products.map((p) {
+      return p.id == existingProduct.id ? updatedProduct : p;
+    }).toList();
+
+    state = state.copyWith(products: updatedProductList);
+    _persistCatalog();
+    return updatedPkg;
+  }
+
   static final List<CatalogProduct> _initialProducts = [
     CatalogProduct(
       id: 'prod-grazer',

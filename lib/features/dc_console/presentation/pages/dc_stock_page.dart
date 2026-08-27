@@ -687,18 +687,30 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
               child: Column(
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _buildMetricMiniPill('🏢 In DC Possession', '${item.availableCount} Units', const Color(0xFF10B981)),
-                      _buildMetricMiniPill('🛵 In Rider Custody', '$inCustody Units', const Color(0xFF8B5CF6)),
+                      Expanded(
+                        child: _buildMetricMiniPill('🏢 In DC Possession', '${item.availableCount} Units', const Color(0xFF10B981)),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildMetricMiniPill('🛵 In Rider Custody', '$inCustody Units', const Color(0xFF8B5CF6)),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 8),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _buildMetricMiniPill('✅ Delivered', '${item.deliveredCount} Units', const Color(0xFF2563EB)),
-                      _buildMetricMiniPill('⚠️ Complaints', '${item.complaintCount} Units', item.complaintCount > 0 ? const Color(0xFFEF4444) : const Color(0xFF94A3B8)),
+                      Expanded(
+                        child: _buildMetricMiniPill('✅ Delivered', '${item.deliveredCount} Units', const Color(0xFF2563EB)),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildMetricMiniPill(
+                          '⚠️ Complaints',
+                          '${item.complaintCount} Units',
+                          item.complaintCount > 0 ? const Color(0xFFEF4444) : const Color(0xFF94A3B8),
+                        ),
+                      ),
                     ],
                   ),
                 ],
@@ -734,18 +746,21 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
   }
 
   Widget _buildMetricMiniPill(String title, String value, Color color) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          '$title: ',
-          style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B)),
-        ),
-        Text(
-          value,
-          style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.bold, color: color),
-        ),
-      ],
+    return Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(
+            text: '$title: ',
+            style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B)),
+          ),
+          TextSpan(
+            text: value,
+            style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.bold, color: color),
+          ),
+        ],
+      ),
+      overflow: TextOverflow.ellipsis,
+      maxLines: 1,
     );
   }
 
