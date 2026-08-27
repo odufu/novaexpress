@@ -69,7 +69,7 @@ class _StockPageState extends ConsumerState<StockPage> {
           },
         ),
         title: Text(
-          'Inventory',
+          'Stock',
           style: GoogleFonts.inter(
             color: theme.colorScheme.onSurface,
             fontSize: 20,
@@ -139,7 +139,7 @@ class _StockPageState extends ConsumerState<StockPage> {
                   children: [
                     Icon(Icons.fact_check_outlined, size: 18, color: Color(0xFF2563EB)),
                     SizedBox(width: 10),
-                    Text('Stock Audit / Reconciliation'),
+                    Text('Stock Reconciliation'),
                   ],
                 ),
               ),
@@ -149,7 +149,7 @@ class _StockPageState extends ConsumerState<StockPage> {
                   children: [
                     Icon(Icons.sync_rounded, size: 18, color: Color(0xFF64748B)),
                     SizedBox(width: 10),
-                    Text('Sync Inventory Data'),
+                    Text('Sync Stock Data'),
                   ],
                 ),
               ),
@@ -157,21 +157,6 @@ class _StockPageState extends ConsumerState<StockPage> {
           ),
           const SizedBox(width: 4),
         ],
-      ),
-      // Floating Primary Action: Request Stock
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push('/stock/request'),
-        backgroundColor: AppColors.primary,
-        elevation: 4,
-        icon: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
-        label: Text(
-          'Request Stock',
-          style: GoogleFonts.inter(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
       ),
       body: RefreshIndicator(
         onRefresh: () async {
@@ -188,9 +173,9 @@ class _StockPageState extends ConsumerState<StockPage> {
             children: [
               // Subtitle
               Text(
-                'My assigned stock',
+                'Vehicle stock allocated by Distribution Center',
                 style: GoogleFonts.inter(
-                  fontSize: 14,
+                  fontSize: 13,
                   color: theme.colorScheme.onSurfaceVariant,
                   fontWeight: FontWeight.w500,
                 ),
@@ -242,13 +227,13 @@ class _StockPageState extends ConsumerState<StockPage> {
               ),
               const SizedBox(height: 18),
 
-              // INVENTORY SUMMARY (My Stock / What's Available)
+              // STOCK ALLOCATION SUMMARY (My Stock / What's Available)
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Expanded(
                     child: Text(
-                      'INVENTORY SUMMARY',
+                      'STOCK ALLOCATION SUMMARY',
                       style: GoogleFonts.inter(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
@@ -305,15 +290,15 @@ class _StockPageState extends ConsumerState<StockPage> {
               else
                 Row(
                   children: [
-                    // Total Stock
+                    // In Vehicle Custody
                     Expanded(
                       child: _SummaryMetricCard(
-                        iconBgColor: const Color(0xFFE0EDFF),
-                        iconColor: const Color(0xFF2563EB),
-                        icon: Icons.inventory_2_rounded,
-                        count: stockState.totalInCustody,
-                        title: 'Total Stock',
-                        subtitle: 'Assigned to you',
+                        iconBgColor: const Color(0xFFFFEDD5),
+                        iconColor: const Color(0xFFEA580C),
+                        icon: Icons.two_wheeler_rounded,
+                        count: stockState.totalAvailable,
+                        title: 'In Vehicle',
+                        subtitle: 'On motorbike',
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -322,34 +307,34 @@ class _StockPageState extends ConsumerState<StockPage> {
                       child: _SummaryMetricCard(
                         iconBgColor: const Color(0xFFDCFCE7),
                         iconColor: const Color(0xFF16A34A),
-                        icon: Icons.check_rounded,
+                        icon: Icons.check_circle_rounded,
                         count: stockState.stockItems.fold(0, (acc, i) => acc + i.deliveredCount),
                         title: 'Delivered',
-                        subtitle: 'Total delivered',
+                        subtitle: 'Fulfilled',
                       ),
                     ),
                     const SizedBox(width: 8),
-                    // Available
+                    // Total Assigned by DC
                     Expanded(
                       child: _SummaryMetricCard(
-                        iconBgColor: const Color(0xFFFFEDD5),
-                        iconColor: const Color(0xFFEA580C),
-                        icon: Icons.all_inbox_rounded,
-                        count: stockState.totalAvailable,
-                        title: 'Available',
-                        subtitle: 'In your possession',
+                        iconBgColor: const Color(0xFFE0EDFF),
+                        iconColor: const Color(0xFF2563EB),
+                        icon: Icons.inventory_2_rounded,
+                        count: stockState.totalInCustody,
+                        title: 'Assigned',
+                        subtitle: 'Given by DC',
                       ),
                     ),
                     const SizedBox(width: 8),
-                    // Returned
+                    // Returned / Defective
                     Expanded(
                       child: _SummaryMetricCard(
                         iconBgColor: const Color(0xFFFFE4E6),
                         iconColor: const Color(0xFFE11D48),
-                        icon: Icons.reply_rounded,
+                        icon: Icons.assignment_return_rounded,
                         count: stockState.stockItems.fold(0, (acc, i) => acc + i.returnedCount),
                         title: 'Returned',
-                        subtitle: 'To hub/other',
+                        subtitle: 'To DC Hub',
                       ),
                     ),
                   ],
@@ -945,7 +930,7 @@ class _ProductInventoryCard extends StatelessWidget {
                       const SizedBox(height: 3),
                       _buildBulletRow(const Color(0xFF16A34A), 'Delivered', '${item.deliveredCount} ${item.deliveredCount == 1 ? "unit" : "units"}', isDark),
                       const SizedBox(height: 3),
-                      _buildBulletRow(const Color(0xFFEA580C), 'Available', '${item.availableCount} ${item.availableCount == 1 ? "unit" : "units"}', isDark),
+                      _buildBulletRow(const Color(0xFFEA580C), 'In Vehicle', '${item.availableCount} ${item.availableCount == 1 ? "unit" : "units"}', isDark),
                       const SizedBox(height: 3),
                       _buildBulletRow(const Color(0xFFE11D48), 'Returned', '${item.returnedCount} ${item.returnedCount == 1 ? "unit" : "units"}', isDark),
                     ],

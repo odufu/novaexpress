@@ -83,11 +83,11 @@ class _MainBottomNavShellState extends ConsumerState<MainBottomNavShell>
                                 .state = 0,
                           ),
                         ),
-                        // Tab 1: Inventory
+                        // Tab 1: Stock
                         Expanded(
                           child: _AnimatedNavItem(
                             icon: Icons.inventory_2_rounded,
-                            label: 'Inventory',
+                            label: 'Stock',
                             isSelected: currentIndex == 1,
                             onTap: () => ref
                                 .read(bottomNavIndexProvider.notifier)

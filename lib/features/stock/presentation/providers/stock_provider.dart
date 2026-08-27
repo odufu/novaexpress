@@ -860,6 +860,144 @@ class StockNotifier extends StateNotifier<StockState> {
       return {'status': 'error', 'error': e.toString()};
     }
   }
+
+  /// Automatically deducts physical units from rider vehicle stock and records delivered count upon order POD completion
+  Future<void> recordDeliveredOrderStock({
+    required String productNameOrSku,
+    required String riderId,
+    required int physicalQuantity,
+  }) async {
+    if (physicalQuantity <= 0) return;
+
+    final q = physicalQuantity;
+
+    // 1. Update Rider Stock Allocation
+    final updatedAllocations = state.riderAllocations.map((alloc) {
+      final matchesRider = alloc.riderId == riderId;
+      final matchesProd = alloc.productName.toLowerCase() == productNameOrSku.toLowerCase() ||
+          alloc.sku.toLowerCase() == productNameOrSku.toLowerCase() ||
+          alloc.productId == productNameOrSku;
+
+      if (matchesRider && matchesProd) {
+        final newInCustody = (alloc.inCustodyUnits - q).clamp(0, 999999);
+        final newDelivered = alloc.deliveredUnits + q;
+        return alloc.copyWith(
+          inCustodyUnits: newInCustody,
+          deliveredUnits: newDelivered,
+        );
+      }
+      return alloc;
+    }).toList();
+
+    // 2. Update Master Stock Items
+    final updatedItems = state.stockItems.map((item) {
+      final matchesProd = item.name.toLowerCase() == productNameOrSku.toLowerCase() ||
+          item.sku.toLowerCase() == productNameOrSku.toLowerCase() ||
+          item.id == productNameOrSku;
+
+      if (matchesProd) {
+        final newAvailable = (item.availableCount - q).clamp(0, 999999);
+        final newDelivered = item.deliveredCount + q;
+        return item.copyWith(
+          availableCount: newAvailable,
+          deliveredCount: newDelivered,
+        );
+      }
+      return item;
+    }).toList();
+
+    state = state.copyWith(
+      stockItems: updatedItems,
+      riderAllocations: updatedAllocations,
+    );
+
+    await _storageService.cacheStockItems(updatedItems);
+    await _storageService.cacheRiderStockAllocations(updatedAllocations);
+  }
+
+  /// Reconcile a single product in rider vehicle custody directly
+  Future<void> reconcileRiderProductStock({
+    required String productIdOrSku,
+    required String riderId,
+    required int physicalCounted,
+    String? reason,
+    String? notes,
+  }) async {
+    final updatedAllocations = state.riderAllocations.map((alloc) {
+      final matchesRider = alloc.riderId == riderId;
+      final matchesProd = alloc.productId == productIdOrSku ||
+          alloc.sku.toLowerCase() == productIdOrSku.toLowerCase() ||
+          alloc.productName.toLowerCase() == productIdOrSku.toLowerCase();
+
+      if (matchesRider && matchesProd) {
+        return alloc.copyWith(
+          inCustodyUnits: physicalCounted,
+        );
+      }
+      return alloc;
+    }).toList();
+
+    final updatedItems = state.stockItems.map((item) {
+      final matchesProd = item.id == productIdOrSku ||
+          item.sku.toLowerCase() == productIdOrSku.toLowerCase() ||
+          item.name.toLowerCase() == productIdOrSku.toLowerCase();
+
+      if (matchesProd) {
+        return item.copyWith(
+          availableCount: physicalCounted,
+          lastAuditDate: DateTime.now().toIso8601String().substring(0, 10),
+        );
+      }
+      return item;
+    }).toList();
+
+    state = state.copyWith(
+      stockItems: updatedItems,
+      riderAllocations: updatedAllocations,
+      lastAuditedTime: DateTime.now(),
+      isAuditRequired: false,
+    );
+
+    await _storageService.cacheStockItems(updatedItems);
+    await _storageService.cacheRiderStockAllocations(updatedAllocations);
+  }
+
+  /// Reconcile all products in rider vehicle custody from the audit page
+  Future<void> submitRiderStockAudit({
+    required String riderId,
+    required Map<String, int> physicalCounts,
+    Map<String, String>? varianceReasons,
+    Map<String, String>? notes,
+  }) async {
+    final updatedAllocations = state.riderAllocations.map((alloc) {
+      if (alloc.riderId == riderId && physicalCounts.containsKey(alloc.productId)) {
+        final count = physicalCounts[alloc.productId]!;
+        return alloc.copyWith(inCustodyUnits: count);
+      }
+      return alloc;
+    }).toList();
+
+    final updatedItems = state.stockItems.map((item) {
+      if (physicalCounts.containsKey(item.id)) {
+        final count = physicalCounts[item.id]!;
+        return item.copyWith(
+          availableCount: count,
+          lastAuditDate: DateTime.now().toIso8601String().substring(0, 10),
+        );
+      }
+      return item;
+    }).toList();
+
+    state = state.copyWith(
+      stockItems: updatedItems,
+      riderAllocations: updatedAllocations,
+      lastAuditedTime: DateTime.now(),
+      isAuditRequired: false,
+    );
+
+    await _storageService.cacheStockItems(updatedItems);
+    await _storageService.cacheRiderStockAllocations(updatedAllocations);
+  }
 }
 
 final stockRemoteDataSourceProvider = Provider<StockRemoteDataSource>((ref) {

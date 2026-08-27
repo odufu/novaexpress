@@ -258,10 +258,21 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
             notes: notes,
           );
 
+      final orderObj = ref.read(ordersProvider).orders.where((o) => o.id == widget.orderId || o.orderNumber == widget.orderId).firstOrNull;
+      
+      // Automatically deduct delivered physical stock units from vehicle custody
+      if (orderObj != null) {
+        final prodName = orderObj.productName.isNotEmpty ? orderObj.productName : 'Respira Detox Tea';
+        final physicalQty = orderObj.quantity > 0 ? orderObj.quantity : 1;
+        await ref.read(stockProvider.notifier).recordDeliveredOrderStock(
+              productNameOrSku: prodName,
+              riderId: agentId,
+              physicalQuantity: physicalQty,
+            );
+      }
+
       // Refresh finance, orders, stock & notifications state
       ref.read(financeProvider.notifier).loadRemittances(agentId);
-      ref.read(stockProvider.notifier).fetchStockItems();
-      final orderObj = ref.read(ordersProvider).orders.where((o) => o.id == widget.orderId || o.orderNumber == widget.orderId).firstOrNull;
       final displayOrderNo = orderObj?.orderNumber ?? (widget.orderId.length > 8 ? 'NX-${widget.orderId.substring(0, 4).toUpperCase()}' : widget.orderId);
 
       ref.read(notificationsProvider.notifier).emitNotification(

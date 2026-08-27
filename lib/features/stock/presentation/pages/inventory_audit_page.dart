@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/stock_provider.dart';
 
 class InventoryAuditPhysicalCountsNotifier extends StateNotifier<Map<String, int>> {
@@ -127,7 +128,7 @@ class _InventoryAuditPageState extends ConsumerState<InventoryAuditPage> {
           onPressed: () => context.pop(),
         ),
         title: Text(
-          'Inventory Physical Audit',
+          'Stock Reconciliation',
           style: GoogleFonts.inter(
             color: theme.colorScheme.onSurface,
             fontSize: 18,
@@ -156,14 +157,18 @@ class _InventoryAuditPageState extends ConsumerState<InventoryAuditPage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'PHYSICAL INVENTORY AUDIT',
-                        style: GoogleFonts.jetBrainsMono(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: const Color(0xFF64748B),
+                      Expanded(
+                        child: Text(
+                          'PHYSICAL STOCK AUDIT',
+                          style: GoogleFonts.jetBrainsMono(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF64748B),
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
@@ -171,7 +176,7 @@ class _InventoryAuditPageState extends ConsumerState<InventoryAuditPage> {
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          'MANDATORY BI-WEEKLY',
+                          'VEHICLE CUSTODY AUDIT',
                           style: GoogleFonts.jetBrainsMono(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
@@ -183,7 +188,7 @@ class _InventoryAuditPageState extends ConsumerState<InventoryAuditPage> {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    'Reconcile physical stock in custody with backend inventory system.',
+                    'Reconcile physical stock in vehicle custody with system records.',
                     style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B)),
                   ),
                   const SizedBox(height: 14),
@@ -347,12 +352,14 @@ class _InventoryAuditPageState extends ConsumerState<InventoryAuditPage> {
                                 children: [
                                   const Icon(Icons.warning_amber_rounded, size: 16, color: Color(0xFFE11D48)),
                                   const SizedBox(width: 6),
-                                  Text(
-                                    'Variance: ${variance > 0 ? "+$variance" : "$variance"} units (Physical: $physical vs System: ${item.availableCount})',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      color: const Color(0xFFE11D48),
+                                  Expanded(
+                                    child: Text(
+                                      'Variance: ${variance > 0 ? "+$variance" : "$variance"} units (Physical: $physical vs System: ${item.availableCount})',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: const Color(0xFFE11D48),
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -394,26 +401,37 @@ class _InventoryAuditPageState extends ConsumerState<InventoryAuditPage> {
               height: 50,
               child: ElevatedButton(
                 onPressed: () {
-                  ref.read(stockProvider.notifier).recordAuditSubmission();
+                  final user = ref.read(authProvider).user;
+                  final agentId = user?.deliveryAgentId ?? 'b1111111-1111-4111-8111-111111111111';
+                  final physical = ref.read(inventoryAuditPhysicalCountsProvider);
+                  final reasons = ref.read(inventoryAuditVarianceReasonsProvider);
+
+                  ref.read(stockProvider.notifier).submitRiderStockAudit(
+                        riderId: agentId,
+                        physicalCounts: physical,
+                        varianceReasons: reasons,
+                      );
 
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
-                        'Physical Audit Logged & Transmitted to DC Operations!',
-                        style: GoogleFonts.inter(color: Colors.white),
+                        'Stock Reconciliation Completed & Synced with DC Operations!',
+                        style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.bold),
                       ),
                       backgroundColor: const Color(0xFF16A34A),
                     ),
                   );
 
-                  context.pop();
+                  if (context.mounted) {
+                    Navigator.of(context).maybePop();
+                  }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 child: Text(
-                  'Submit Physical Audit Confirmation',
+                  'Submit Stock Reconciliation',
                   style: GoogleFonts.inter(
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
