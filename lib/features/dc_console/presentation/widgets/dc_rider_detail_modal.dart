@@ -226,7 +226,7 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
     final isPda = driver.isPda;
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -238,130 +238,115 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final isCompact = constraints.maxWidth < 700;
+          final isCompact = constraints.maxWidth < 650;
 
-          final profileInfo = Row(
+          final vehicleInfo = driver.vehiclePlate.isNotEmpty
+              ? (driver.vehicleModel.contains(driver.vehiclePlate)
+                  ? driver.vehicleModel
+                  : '${driver.vehicleType} (${driver.vehiclePlate})')
+              : driver.vehicleType;
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               CircleAvatar(
-                radius: 26,
+                radius: isCompact ? 22 : 26,
                 backgroundColor: const Color(0xFF2563EB).withValues(alpha: 0.15),
                 child: Text(
                   driver.name.isNotEmpty ? driver.name.substring(0, 1).toUpperCase() : 'R',
-                  style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w900, color: const Color(0xFF2563EB)),
+                  style: GoogleFonts.inter(
+                    fontSize: isCompact ? 18 : 22,
+                    fontWeight: FontWeight.w900,
+                    color: const Color(0xFF2563EB),
+                  ),
                 ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Flexible(
-                          child: Text(
-                            driver.name,
-                            style: GoogleFonts.inter(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: isDark ? Colors.white : const Color(0xFF0F172A),
-                            ),
-                            overflow: TextOverflow.ellipsis,
+                        Text(
+                          driver.name,
+                          style: GoogleFonts.inter(
+                            fontSize: isCompact ? 16 : 18,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
                           ),
                         ),
-                        const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                           decoration: BoxDecoration(
-                            color: isPda ? const Color(0xFF2563EB).withValues(alpha: 0.12) : const Color(0xFF10B981).withValues(alpha: 0.12),
+                            color: isPda
+                                ? const Color(0xFF2563EB).withValues(alpha: 0.12)
+                                : const Color(0xFF10B981).withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
                             isPda ? 'PDA (Personal)' : 'In-House Fleet',
                             style: GoogleFonts.inter(
-                              fontSize: 10,
+                              fontSize: 9.5,
                               fontWeight: FontWeight.bold,
                               color: isPda ? const Color(0xFF2563EB) : const Color(0xFF059669),
                             ),
                           ),
                         ),
-                        const SizedBox(width: 6),
                         _buildStatusBadge(driver.status),
                       ],
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 5),
                     Wrap(
-                      spacing: 12,
+                      spacing: 10,
                       runSpacing: 4,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        _buildHeaderMetaChip(Icons.badge_outlined, driver.driverCode, isDark),
-                        _buildHeaderMetaChip(Icons.phone_outlined, driver.phone, isDark),
-                        _buildHeaderMetaChip(Icons.two_wheeler_outlined, '${driver.vehicleModel} (${driver.vehiclePlate})', isDark),
-                        _buildHeaderMetaChip(Icons.location_on_outlined, driver.assignedZone, isDark),
+                        if (driver.driverCode.isNotEmpty)
+                          _buildHeaderMetaChip(Icons.badge_outlined, driver.driverCode, isDark),
+                        if (driver.phone.isNotEmpty)
+                          _buildHeaderMetaChip(Icons.phone_outlined, driver.phone, isDark),
+                        if (vehicleInfo.isNotEmpty)
+                          _buildHeaderMetaChip(Icons.two_wheeler_outlined, vehicleInfo, isDark),
+                        if (driver.assignedZone.isNotEmpty)
+                          _buildHeaderMetaChip(Icons.location_on_outlined, driver.assignedZone, isDark),
                       ],
                     ),
                   ],
                 ),
               ),
-            ],
-          );
-
-          final actionButtons = Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton.filledTonal(
-                onPressed: () {
-                  Clipboard.setData(ClipboardData(text: driver.phone));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('📋 Copied ${driver.name}\'s phone number (${driver.phone}) to clipboard.')),
-                  );
-                },
-                icon: const Icon(Icons.phone_rounded, size: 18),
-                tooltip: 'Copy Phone Number',
-              ),
               const SizedBox(width: 8),
-              IconButton.filledTonal(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('⚠️ Alert notification dispatched to ${driver.name}.')),
-                  );
-                },
-                icon: const Icon(Icons.notifications_active_rounded, size: 18),
-                tooltip: 'Send DC Alert',
-              ),
-              const SizedBox(width: 8),
+              if (!isCompact) ...[
+                IconButton.filledTonal(
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: driver.phone));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('📋 Copied ${driver.name}\'s phone number (${driver.phone}) to clipboard.')),
+                    );
+                  },
+                  icon: const Icon(Icons.phone_rounded, size: 18),
+                  tooltip: 'Copy Phone Number',
+                ),
+                const SizedBox(width: 6),
+                IconButton.filledTonal(
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('⚠️ Alert notification dispatched to ${driver.name}.')),
+                    );
+                  },
+                  icon: const Icon(Icons.notifications_active_rounded, size: 18),
+                  tooltip: 'Send DC Alert',
+                ),
+                const SizedBox(width: 6),
+              ],
               IconButton(
                 onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.close_rounded, size: 22),
+                icon: const Icon(Icons.close_rounded, size: 20),
                 tooltip: 'Close Modal',
               ),
-            ],
-          );
-
-          if (isCompact) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(child: profileInfo),
-                    IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.close_rounded, size: 20),
-                    ),
-                  ],
-                ),
-              ],
-            );
-          }
-
-          return Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(child: profileInfo),
-              const SizedBox(width: 14),
-              actionButtons,
             ],
           );
         },
@@ -394,10 +379,17 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
 
     switch (status.toLowerCase()) {
       case 'active':
+      case 'available':
         bg = const Color(0xFF10B981).withValues(alpha: 0.15);
         fg = const Color(0xFF059669);
         break;
       case 'delayed':
+      case 'on_delivery':
+        bg = const Color(0xFFF37021).withValues(alpha: 0.15);
+        fg = const Color(0xFFF37021);
+        break;
+      case 'inactive':
+      case 'deactivated':
         bg = const Color(0xFFEF4444).withValues(alpha: 0.15);
         fg = const Color(0xFFDC2626);
         break;
@@ -432,50 +424,53 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
       ),
       child: TabBar(
         controller: _tabController,
+        isScrollable: true,
+        tabAlignment: TabAlignment.start,
         labelColor: const Color(0xFF2563EB),
         unselectedLabelColor: const Color(0xFF64748B),
         indicatorColor: const Color(0xFF2563EB),
         indicatorWeight: 3,
         indicatorSize: TabBarIndicatorSize.tab,
-        labelStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
-        unselectedLabelStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500),
+        labelPadding: const EdgeInsets.symmetric(horizontal: 16),
+        labelStyle: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold),
+        unselectedLabelStyle: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w500),
         tabs: [
           Tab(
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.inventory_2_outlined, size: 16),
-                const SizedBox(width: 8),
+                const Icon(Icons.inventory_2_outlined, size: 15),
+                const SizedBox(width: 6),
                 Text('Orders ($orderCount)'),
               ],
             ),
           ),
           Tab(
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.account_balance_wallet_outlined, size: 16),
-                const SizedBox(width: 8),
-                Text('Remittance ($txnCount)'),
+                const Icon(Icons.account_balance_wallet_outlined, size: 15),
+                const SizedBox(width: 6),
+                Text('Remittances ($txnCount)'),
               ],
             ),
           ),
           Tab(
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.layers_outlined, size: 16),
-                const SizedBox(width: 8),
-                Text('Stocks in Custody ($stockCount)'),
+                const Icon(Icons.layers_outlined, size: 15),
+                const SizedBox(width: 6),
+                Text('Stock ($stockCount)'),
               ],
             ),
           ),
           const Tab(
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.manage_accounts_outlined, size: 16),
-                SizedBox(width: 8),
+                Icon(Icons.manage_accounts_outlined, size: 15),
+                SizedBox(width: 6),
                 Text('Details & Terms'),
               ],
             ),
@@ -1614,37 +1609,79 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Search & Sort Bar
-        Row(
-          children: [
-            Expanded(
-              child: SizedBox(
-                height: 38,
-                child: TextField(
-                  controller: searchController,
-                  onChanged: onSearchChanged,
-                  style: GoogleFonts.inter(fontSize: 12),
-                  decoration: InputDecoration(
-                    hintText: searchHint,
-                    hintStyle: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF94A3B8)),
-                    prefixIcon: const Icon(Icons.search_rounded, size: 16, color: Color(0xFF94A3B8)),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                    filled: true,
-                    fillColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final isVeryNarrow = constraints.maxWidth < 420;
+            if (isVeryNarrow) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(
+                    height: 38,
+                    child: TextField(
+                      controller: searchController,
+                      onChanged: onSearchChanged,
+                      style: GoogleFonts.inter(fontSize: 12),
+                      decoration: InputDecoration(
+                        hintText: searchHint,
+                        hintStyle: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF94A3B8)),
+                        prefixIcon: const Icon(Icons.search_rounded, size: 16, color: Color(0xFF94A3B8)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                        ),
+                      ),
                     ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                  ),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: sortWidget,
+                  ),
+                ],
+              );
+            }
+
+            return Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 38,
+                    child: TextField(
+                      controller: searchController,
+                      onChanged: onSearchChanged,
+                      style: GoogleFonts.inter(fontSize: 12),
+                      decoration: InputDecoration(
+                        hintText: searchHint,
+                        hintStyle: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF94A3B8)),
+                        prefixIcon: const Icon(Icons.search_rounded, size: 16, color: Color(0xFF94A3B8)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            sortWidget,
-          ],
+                const SizedBox(width: 10),
+                sortWidget,
+              ],
+            );
+          },
         ),
 
         const SizedBox(height: 10),

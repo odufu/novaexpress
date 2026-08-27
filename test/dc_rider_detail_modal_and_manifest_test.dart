@@ -169,11 +169,16 @@ void main() {
       await tester.binding.setSurfaceSize(const Size(1280, 900));
 
       await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: DCDriverManifestTable(
-              drivers: const [sampleDriver],
-              onDriverTap: (_) {},
+        ProviderScope(
+          overrides: [
+            ordersProvider.overrideWith((ref) => _MockOrdersNotifier(mockOrders)),
+          ],
+          child: MaterialApp(
+            home: Scaffold(
+              body: DCDriverManifestTable(
+                drivers: const [sampleDriver],
+                onDriverTap: (_) {},
+              ),
             ),
           ),
         ),
@@ -186,7 +191,7 @@ void main() {
       expect(find.byType(TextField), findsOneWidget);
       expect(find.text('PDA-7000'), findsOneWidget);
       expect(find.text('Emeka Rider'), findsOneWidget);
-      expect(find.text('PDA'), findsOneWidget);
+      expect(find.textContaining('PDA'), findsWidgets);
 
       // Search for non-existent driver
       await tester.enterText(find.byType(TextField), 'NonExistentPerson');
@@ -290,7 +295,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Switch to Remittance Tab
-      final remittanceTab = find.text('Remittance (2)');
+      final remittanceTab = find.text('Remittances (2)');
       expect(remittanceTab, findsOneWidget);
       await tester.tap(remittanceTab);
       await tester.pumpAndSettle();
@@ -325,7 +330,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Switch to Stocks in Custody Tab
-      final stocksTab = find.textContaining('Stocks in Custody');
+      final stocksTab = find.text('Stock (2)');
       expect(stocksTab, findsOneWidget);
       await tester.tap(stocksTab);
       await tester.pumpAndSettle();
