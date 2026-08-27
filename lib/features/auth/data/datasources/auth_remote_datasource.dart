@@ -36,6 +36,23 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   static final Map<String, UserModel> _registeredUsers = {};
   static final Map<String, String> _registeredPasswords = {};
 
+  static void registerUserInMemory(UserModel user, [String? password]) {
+    final cleanEmail = user.email.trim().toLowerCase();
+    if (cleanEmail.isNotEmpty) {
+      _registeredUsers[cleanEmail] = user;
+      if (password != null && password.isNotEmpty) {
+        _registeredPasswords[cleanEmail] = password;
+      }
+    }
+    if (user.deliveryAgentCode != null && user.deliveryAgentCode!.isNotEmpty) {
+      _registeredUsers[user.deliveryAgentCode!.toLowerCase()] = user;
+    }
+  }
+
+  static UserModel? getRegisteredUser(String key) {
+    return _registeredUsers[key.toLowerCase()];
+  }
+
   AuthRemoteDataSourceImpl(this.supabaseClient);
 
   @override
@@ -447,23 +464,20 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         await dbClient.from(SupabaseConstants.deliveryAgentsTable).upsert({
           'id': agentId,
           'user_id': userId,
-          'distribution_center_id': distributionCenterId.isNotEmpty ? distributionCenterId : '22222222-2222-4222-8222-222222222222',
           'agent_code': agentCode,
+          'agent_type': 'independent_rider',
+          'distribution_center_id': distributionCenterId.isNotEmpty ? distributionCenterId : '22222222-2222-4222-8222-222222222222',
           'vehicle_type': vehicleType,
           'vehicle_plate_number': vehiclePlateNumber,
           'operating_state': 'Abuja (FCT)',
           'operating_city': assignedZone.isNotEmpty ? assignedZone : 'Wuse 2',
           'current_status': 'available',
+          'is_active': true,
           'current_cod_balance': 0.00,
           'direct_transfer_balance': 0.00,
           'bank_name': bankName,
           'bank_account_number': bankAccountNumber,
           'bank_account_name': bankAccountName,
-          'personnel_type': personnelType,
-          'commission_rate': commissionRate,
-          'transport_allowance': transportAllowance,
-          'fuel_allowance': fuelAllowance,
-          'base_salary': baseSalary,
         });
         debugPrint('[AUTH_DATASOURCE] ✅ Delivery agents table record upserted: $agentId ($agentCode)');
       } catch (agentErr) {
@@ -602,23 +616,28 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         merged['email'] = email;
       }
 
-      // If first name / last name are missing, infer dynamically from email prefix
-      if (merged['first_name'] == null || (merged['first_name'] as String).isEmpty) {
-        final prefix = cleanEmail.contains('@') ? cleanEmail.split('@').first : cleanEmail;
-        final parts = prefix.split(RegExp(r'[._-]'));
-        merged['first_name'] = parts.isNotEmpty && parts[0].isNotEmpty
-            ? (parts[0][0].toUpperCase() + (parts[0].length > 1 ? parts[0].substring(1) : ''))
-            : 'Delivery';
-        merged['last_name'] = parts.length > 1 && parts[1].isNotEmpty
-            ? (parts[1][0].toUpperCase() + (parts[1].length > 1 ? parts[1].substring(1) : ''))
-            : 'Agent';
+      // Apply custom compensation terms if configured
+      for (final u in _registeredUsers.values) {
+        final matchesEmail = cleanEmail.isNotEmpty && u.email.toLowerCase() == cleanEmail;
+        final matchesId = u.id == userId || u.deliveryAgentId == deliveryAgentId;
+        final matchesCode = merged['agent_code'] != null && u.deliveryAgentCode?.toUpperCase() == merged['agent_code'].toString().toUpperCase();
+        if (matchesEmail || matchesId || matchesCode) {
+          merged['commission_rate'] = u.commissionRate;
+          merged['transport_allowance'] = u.transportAllowance;
+          merged['fuel_allowance'] = u.fuelAllowance;
+          merged['failed_delivery_allowance'] = u.failedDeliveryAllowance;
+          merged['base_salary'] = u.baseSalary;
+          merged['personnel_type'] = u.personnelType;
+          merged['compensation_type'] = u.compensationType;
+          break;
+        }
       }
 
       final profile = UserModel.fromJson(
         merged,
         deliveryAgentId: isDcStaff ? null : (deliveryAgentId ?? agentRes?['id']),
       );
-      debugPrint('[AUTH_DATASOURCE] ✅ User profile loaded from database: ${profile.firstName} ${profile.lastName} (Role: ${profile.role}, isDcManager: ${profile.isDcManager}, AgentCode: ${profile.deliveryAgentCode})');
+      debugPrint('[AUTH_DATASOURCE] ✅ User profile loaded from database: ${profile.firstName} ${profile.lastName} (Role: ${profile.role}, isDcManager: ${profile.isDcManager}, AgentCode: ${profile.deliveryAgentCode}, Commission: ₦${profile.commissionRate}, Transport: ₦${profile.transportAllowance})');
       return profile;
     } catch (e) {
       debugPrint('[AUTH_DATASOURCE] ❌ Database error fetching user profile ($e)');

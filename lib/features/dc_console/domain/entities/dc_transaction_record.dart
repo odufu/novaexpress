@@ -13,11 +13,13 @@ class DCTransactionRecord {
   final double amount;
   final double commission;
   final double transportAllowance;
+  final double transactionFee;
+  final String? feeType; // 'paystack', 'pos_agent', 'none'
   final String category; // 'paystack_direct', 'cash_pod', 'remittance', 'payout', 'allowance'
   final String paymentMethod; // 'paystack', 'cash', 'bank_transfer', 'pos'
   final String? gatewayReference;
   final String channel; // 'Titan Trust / Paystack', 'Cash in Hand', 'GTBank NIP', 'POS Terminal'
-  final String status; // 'verified', 'collected', 'pending', 'partial', 'disbursed', 'disputed'
+  final String status; // 'remitted', 'settled', 'verified', 'collected', 'pending', 'partial', 'disbursed', 'disputed'
   final bool isCredit;
   final bool isPartial;
   final double? expectedAmount;
@@ -42,6 +44,8 @@ class DCTransactionRecord {
     required this.amount,
     this.commission = 1000.0,
     this.transportAllowance = 1500.0,
+    this.transactionFee = 0.0,
+    this.feeType,
     required this.category,
     required this.paymentMethod,
     this.gatewayReference,
@@ -62,7 +66,14 @@ class DCTransactionRecord {
   bool get isRemittance => category == 'remittance';
   bool get isPayout => category == 'payout';
   bool get isVerified =>
-      status == 'verified' || status == 'settled' || status == 'approved' || status == 'complete' || status == 'completed';
+      status == 'remitted' ||
+      status == 'settled' ||
+      status == 'verified' ||
+      status == 'approved' ||
+      status == 'success' ||
+      status == 'successful' ||
+      status == 'complete' ||
+      status == 'completed';
   bool get isPending => status == 'pending' || status == 'pending_review' || status == 'submitted';
 
   bool get isPartialRemittance =>
@@ -77,6 +88,75 @@ class DCTransactionRecord {
       isRemittance && !isPartialRemittance && (isVerified || !isPending);
 
   double get totalRiderEntitlement => commission + transportAllowance;
+
+  /// Dynamic calculation of transaction fee based on channel / method
+  double get effectiveTransactionFee {
+    if (transactionFee > 0) return transactionFee;
+    if (isPaystack) {
+      // Paystack charge: 1.5% capped at 2,000, or flat 150 for bank transfer
+      return (amount * 0.015).clamp(100.0, 2000.0);
+    }
+    if (isRemittance || paymentMethod == 'pos') {
+      // POS transfer fee: 100 per 5000, or flat rate 350
+      if (amount <= 0) return 350.0;
+      final steppedFee = (amount / 5000.0).ceil() * 100.0;
+      return steppedFee > 0 ? steppedFee : 350.0;
+    }
+    return 0.0;
+  }
+
+  String get effectiveFeeType {
+    if (feeType != null && feeType!.isNotEmpty) {
+      if (feeType == 'pos_agent' || feeType == 'pos') return 'POS Transfer Agent';
+      if (feeType == 'paystack') return 'Paystack Transfer';
+      return feeType!;
+    }
+    if (isRemittance || paymentMethod == 'pos') return 'POS Transfer Agent';
+    if (isPaystack) return 'Paystack Transfer';
+    return 'None';
+  }
+
+  /// Paystack & Cash POD compliant status display
+  String get paystackStatusDisplay {
+    final s = status.toLowerCase();
+    if (isRemittance) {
+      if (s == 'remitted' || s == 'settled' || s == 'verified' || s == 'approved' || s == 'success' || s == 'completed') {
+        return 'REMITTED';
+      }
+      if (s == 'pending' || s == 'pending_review' || s == 'submitted') {
+        return 'PENDING';
+      }
+      if (s == 'partial' || isPartialRemittance) {
+        return 'PARTIAL';
+      }
+      return status.toUpperCase().replaceAll('_', ' ');
+    }
+
+    if (isCashPod) {
+      if (s == 'collected' || s == 'delivered' || s == 'remitted' || s == 'verified' || s == 'settled' || s == 'success') {
+        return 'COLLECTED';
+      }
+      if (s == 'pending' || s == 'pending_review') {
+        return 'PENDING';
+      }
+      return status.toUpperCase().replaceAll('_', ' ');
+    }
+
+    if (isPaystack) {
+      if (s == 'settled' || s == 'verified' || s == 'approved' || s == 'success' || s == 'completed' || s == 'paid' || s == 'delivered') {
+        return 'SETTLED';
+      }
+      if (s == 'pending' || s == 'pending_review') {
+        return 'PENDING';
+      }
+      return status.toUpperCase().replaceAll('_', ' ');
+    }
+
+    if (s == 'verified' || s == 'settled' || s == 'completed') {
+      return 'SETTLED';
+    }
+    return status.toUpperCase().replaceAll('_', ' ');
+  }
 
   double get remainingShortage {
     if (expectedAmount != null && expectedAmount! > amount) {
@@ -147,13 +227,16 @@ class DCTransactionRecord {
     final chan = json['channel']?.toString() ??
         (pMethod == 'paystack'
             ? 'Titan Trust / Paystack'
-            : (pMethod == 'cash' ? 'Cash in Hand' : (pMethod == 'pos' ? 'POS Terminal' : 'Bank Transfer')));
+            : (pMethod == 'cash' ? 'Cash in Hand (COD)' : (pMethod == 'pos' ? 'POS Terminal' : 'Bank Transfer')));
 
     final bool isPartialVal = json['is_partial'] == true ||
         json['isPartial'] == true ||
         (json['status']?.toString().toLowerCase().contains('partial') ?? false) ||
         (json['metadata'] is Map && (json['metadata']['is_partial'] == true || json['metadata']['isPartial'] == true)) ||
         (json['notes']?.toString().toLowerCase().contains('partial') ?? false);
+
+    final dynamic rawFee = json['transaction_fee'] ?? json['pos_fee'] ?? json['fee'];
+    final double fee = (rawFee is num) ? rawFee.toDouble() : (double.tryParse(rawFee?.toString() ?? '') ?? 0.0);
 
     return DCTransactionRecord(
       id: json['id']?.toString() ?? 'txn-${DateTime.now().millisecondsSinceEpoch}',
@@ -170,11 +253,13 @@ class DCTransactionRecord {
       amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
       commission: (json['commission'] as num?)?.toDouble() ?? 1000.0,
       transportAllowance: (json['transport_allowance'] as num?)?.toDouble() ?? 1500.0,
+      transactionFee: fee,
+      feeType: json['fee_type']?.toString(),
       category: cat,
       paymentMethod: pMethod,
       gatewayReference: json['gateway_reference']?.toString() ?? json['reference']?.toString(),
       channel: chan,
-      status: json['status']?.toString() ?? (isPartialVal ? 'partial' : 'verified'),
+      status: json['status']?.toString() ?? (isPartialVal ? 'partial' : 'settled'),
       isCredit: json['is_credit'] == true || json['isCredit'] == true,
       isPartial: isPartialVal,
       expectedAmount: (json['expected_amount'] as num?)?.toDouble(),
@@ -204,6 +289,8 @@ class DCTransactionRecord {
       'amount': amount,
       'commission': commission,
       'transport_allowance': transportAllowance,
+      'transaction_fee': transactionFee,
+      'fee_type': feeType,
       'category': category,
       'payment_method': paymentMethod,
       'gateway_reference': gatewayReference,

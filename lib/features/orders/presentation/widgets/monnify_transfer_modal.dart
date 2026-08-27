@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/helpers/formatters.dart';
 
-class MonnifyTransferModal extends StatefulWidget {
+final monnifyReceivedProvider = StateProvider.autoDispose<bool>((ref) => false);
+
+class MonnifyTransferModal extends ConsumerStatefulWidget {
   final String orderNumber;
   final double amount;
   final VoidCallback onPaymentConfirmed;
@@ -35,14 +38,13 @@ class MonnifyTransferModal extends StatefulWidget {
   }
 
   @override
-  State<MonnifyTransferModal> createState() => _MonnifyTransferModalState();
+  ConsumerState<MonnifyTransferModal> createState() => _MonnifyTransferModalState();
 }
 
-class _MonnifyTransferModalState extends State<MonnifyTransferModal>
+class _MonnifyTransferModalState extends ConsumerState<MonnifyTransferModal>
     with SingleTickerProviderStateMixin {
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
-  bool _isReceived = false;
   Timer? _pollingTimer;
 
   late String _virtualAccountNumber;
@@ -86,9 +88,7 @@ class _MonnifyTransferModalState extends State<MonnifyTransferModal>
   }
 
   void _triggerInstantSettlement() {
-    setState(() {
-      _isReceived = true;
-    });
+    ref.read(monnifyReceivedProvider.notifier).state = true;
 
     Future.delayed(const Duration(milliseconds: 900), () {
       if (mounted) {
@@ -102,6 +102,7 @@ class _MonnifyTransferModalState extends State<MonnifyTransferModal>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final isReceived = ref.watch(monnifyReceivedProvider);
 
     return Container(
       decoration: BoxDecoration(
@@ -129,7 +130,7 @@ class _MonnifyTransferModalState extends State<MonnifyTransferModal>
           ),
           const SizedBox(height: 16),
 
-          if (_isReceived) ...[
+          if (isReceived) ...[
             // Payment Received Celebration
             Container(
               padding: const EdgeInsets.all(20),

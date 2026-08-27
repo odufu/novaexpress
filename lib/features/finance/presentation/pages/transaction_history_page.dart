@@ -9,6 +9,8 @@ import '../../domain/entities/financial_summary.dart';
 import '../../domain/entities/transaction_item.dart';
 import '../providers/finance_provider.dart';
 
+final transactionHistoryCategoryProvider = StateProvider.autoDispose<String>((ref) => 'all');
+
 class TransactionHistoryPage extends ConsumerStatefulWidget {
   const TransactionHistoryPage({super.key});
 
@@ -17,7 +19,6 @@ class TransactionHistoryPage extends ConsumerStatefulWidget {
 }
 
 class _TransactionHistoryPageState extends ConsumerState<TransactionHistoryPage> {
-  String _selectedCategory = 'all'; // 'all', 'earnings', 'direct_transfer', 'remittance', 'payout'
 
   @override
   void initState() {
@@ -212,13 +213,15 @@ class _TransactionHistoryPageState extends ConsumerState<TransactionHistoryPage>
       remittances: financeState.remittances,
       user: authState.user,
       manualEarnedBalance: financeState.totalEarnedBalance,
+      transactions: financeState.transactions,
     );
 
     final transactionsList = _getLiveOrDerivedTransactions(financeState, ordersState, authState.user);
+    final selectedCategory = ref.watch(transactionHistoryCategoryProvider);
 
     final filteredList = transactionsList.where((t) {
-      if (_selectedCategory == 'all') return true;
-      return t.category.toLowerCase() == _selectedCategory.toLowerCase();
+      if (selectedCategory == 'all') return true;
+      return t.category.toLowerCase() == selectedCategory.toLowerCase();
     }).toList();
 
     return Scaffold(
@@ -412,15 +415,15 @@ class _TransactionHistoryPageState extends ConsumerState<TransactionHistoryPage>
                       scrollDirection: Axis.horizontal,
                       child: Row(
                         children: [
-                          _buildFilterPill('All (${transactionsList.length})', 'all', isDark),
+                          _buildFilterPill('All (${transactionsList.length})', 'all', isDark, selectedCategory),
                           const SizedBox(width: 8),
-                          _buildFilterPill('Direct Transfers', 'direct_transfer', isDark),
+                          _buildFilterPill('Direct Transfers', 'direct_transfer', isDark, selectedCategory),
                           const SizedBox(width: 8),
-                          _buildFilterPill('Remittances', 'remittance', isDark),
+                          _buildFilterPill('Remittances', 'remittance', isDark, selectedCategory),
                           const SizedBox(width: 8),
-                          _buildFilterPill('Earnings', 'earnings', isDark),
+                          _buildFilterPill('Earnings', 'earnings', isDark, selectedCategory),
                           const SizedBox(width: 8),
-                          _buildFilterPill('Payouts', 'payout', isDark),
+                          _buildFilterPill('Payouts', 'payout', isDark, selectedCategory),
                         ],
                       ),
                     ),
@@ -501,11 +504,11 @@ class _TransactionHistoryPageState extends ConsumerState<TransactionHistoryPage>
     );
   }
 
-  Widget _buildFilterPill(String label, String value, bool isDark) {
-    final isSelected = _selectedCategory == value;
+  Widget _buildFilterPill(String label, String value, bool isDark, String selectedCategory) {
+    final isSelected = selectedCategory == value;
 
     return InkWell(
-      onTap: () => setState(() => _selectedCategory = value),
+      onTap: () => ref.read(transactionHistoryCategoryProvider.notifier).state = value,
       borderRadius: BorderRadius.circular(20),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6.5),

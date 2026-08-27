@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../../core/helpers/formatters.dart';
-import '../../domain/entities/dc_fleet_driver.dart';
 import '../providers/dc_console_provider.dart';
 import '../widgets/dc_driver_manifest_table.dart';
 import '../widgets/dc_onboard_rider_modal.dart';
+import '../widgets/dc_rider_detail_modal.dart';
 
 class DCRidersPage extends ConsumerWidget {
   const DCRidersPage({super.key});
@@ -171,7 +170,7 @@ class DCRidersPage extends ConsumerWidget {
                 const SnackBar(content: Text('✅ DC Rider Roster exported as CSV.')),
               );
             },
-            onDriverTap: (driver) => _showRiderDetailDrawer(context, isDark, driver),
+            onDriverTap: (driver) => DCRiderDetailModal.show(context, driver),
           ),
         ],
       ),
@@ -242,175 +241,6 @@ class DCRidersPage extends ConsumerWidget {
             color: isSelected ? Colors.white : const Color(0xFF64748B),
           ),
         ),
-      ),
-    );
-  }
-
-  void _showRiderDetailDrawer(BuildContext context, bool isDark, DCFleetDriver driver) {
-    final isPda = driver.isPda;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.all(24),
-        constraints: const BoxConstraints(maxWidth: 650),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              Row(
-                children: [
-                  CircleAvatar(
-                    radius: 24,
-                    backgroundColor: const Color(0xFF2563EB).withValues(alpha: 0.15),
-                    child: Text(driver.name.substring(0, 1), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Text(driver.name, style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold)),
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: isPda ? const Color(0xFF2563EB).withValues(alpha: 0.12) : const Color(0xFF10B981).withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                isPda ? 'PDA (Own Transport)' : 'In-House Rider',
-                                style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: isPda ? const Color(0xFF2563EB) : const Color(0xFF10B981)),
-                              ),
-                            ),
-                          ],
-                        ),
-                        Text('${driver.driverCode} • ${driver.vehicleModel}', style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B))),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: driver.isActive ? const Color(0xFFECFDF5) : const Color(0xFFFFFBEB),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      driver.status.toUpperCase().replaceAll('_', ' '),
-                      style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: driver.isActive ? const Color(0xFF059669) : const Color(0xFFD97706)),
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 16),
-              const Divider(height: 1),
-              const SizedBox(height: 14),
-
-              // Unique Compensation Agreement Box
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Compensation Agreement Terms', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF065F46))),
-                        Text(
-                          '${CurrencyFormatter.formatNaira(driver.totalPerDeliveryEntitlement)} / drop',
-                          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w900, color: const Color(0xFF059669)),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    _buildDetailRow('Model Structure:', driver.compensationType.toUpperCase()),
-                    _buildDetailRow('Delivery Commission:', '${CurrencyFormatter.formatNaira(driver.commissionRate)} per drop'),
-                    _buildDetailRow('Transport / Fuel Allowance:', '${CurrencyFormatter.formatNaira(driver.transportAllowance)} per drop'),
-                    _buildDetailRow('Failed Attempt Stipend:', '${CurrencyFormatter.formatNaira(driver.failedDeliveryAllowance)} per attempt'),
-                    if (driver.baseSalary > 0)
-                      _buildDetailRow('Monthly Base Salary:', CurrencyFormatter.formatNaira(driver.baseSalary)),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 14),
-              Text('Operational Custody & SLA', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 6),
-              _buildDetailRow('Assigned Distribution Center:', 'Wuse DC (DC-WUSE-01)'),
-              _buildDetailRow('Assigned Zone:', driver.assignedZone),
-              _buildDetailRow('Contact Phone:', driver.phone),
-              _buildDetailRow('Live Vehicle Stock Units:', '${driver.itemsInCustody} units in custody'),
-              _buildDetailRow('Live Cash in Hand (COD):', CurrencyFormatter.formatNaira(driver.cashInCustody), isBold: true),
-              _buildDetailRow('Completed Deliveries Today:', '${driver.completedOrders} / ${driver.totalAssignedOrders} orders'),
-              _buildDetailRow('Route SLA Rating:', '${driver.efficiencyRating.toStringAsFixed(1)}%'),
-
-              const SizedBox(height: 14),
-              Text('Payout Bank Account & Guarantor', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 6),
-              _buildDetailRow('Payout Bank:', '${driver.bankName} • ${driver.bankAccountNumber}'),
-              _buildDetailRow('Account Name:', driver.bankAccountName.isNotEmpty ? driver.bankAccountName : driver.name),
-              _buildDetailRow('Guarantor:', '${driver.guarantorName} (${driver.guarantorPhone})'),
-
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('📞 Calling ${driver.name} at ${driver.phone}...')),
-                        );
-                      },
-                      icon: const Icon(Icons.phone_rounded, size: 16),
-                      label: const Text('Call Rider'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('⚠️ Alert sent to ${driver.name}')),
-                        );
-                      },
-                      icon: const Icon(Icons.notifications_active_rounded, size: 16, color: Colors.white),
-                      label: const Text('Dispatch Alert', style: TextStyle(color: Colors.white)),
-                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF031632)),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDetailRow(String label, String val, {bool isBold = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-          Text(val, style: GoogleFonts.inter(fontSize: 12, fontWeight: isBold ? FontWeight.bold : FontWeight.w600)),
-        ],
       ),
     );
   }

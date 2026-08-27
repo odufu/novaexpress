@@ -11,6 +11,13 @@ import '../../../notifications/presentation/providers/notifications_provider.dar
 import '../../domain/entities/order.dart';
 import '../providers/orders_provider.dart';
 
+final pdaOrdersSelectedTabProvider = StateProvider.autoDispose<String>((ref) => 'All');
+final pdaOrdersSearchQueryProvider = StateProvider.autoDispose<String>((ref) => '');
+final pdaOrdersIsSearchVisibleProvider = StateProvider.autoDispose<bool>((ref) => false);
+final pdaOrdersFilterPaymentTypeProvider = StateProvider.autoDispose<String>((ref) => 'All');
+final pdaOrdersFilterDeliveryTypeProvider = StateProvider.autoDispose<String>((ref) => 'All');
+final pdaOrdersFilterClientProvider = StateProvider.autoDispose<String>((ref) => 'All');
+
 class OrdersListPage extends ConsumerStatefulWidget {
   const OrdersListPage({super.key});
 
@@ -19,14 +26,6 @@ class OrdersListPage extends ConsumerStatefulWidget {
 }
 
 class _OrdersListPageState extends ConsumerState<OrdersListPage> {
-  String _selectedTab = 'All';
-  String _searchQuery = '';
-  bool _isSearchVisible = false;
-
-  // Filter BottomSheet States
-  String _filterPaymentType = 'All'; // All, POD, Prepaid
-  String _filterDeliveryType = 'All'; // All, Distributed Inventory, Client Package
-  String _filterClient = 'All'; // All, Novacare, Other
   final TextEditingController _searchController = TextEditingController();
 
   @override
@@ -54,6 +53,13 @@ class _OrdersListPageState extends ConsumerState<OrdersListPage> {
     final user = authState.user;
     final agentName = user?.firstName ?? '';
 
+    final selectedTab = ref.watch(pdaOrdersSelectedTabProvider);
+    final searchQuery = ref.watch(pdaOrdersSearchQueryProvider);
+    final isSearchVisible = ref.watch(pdaOrdersIsSearchVisibleProvider);
+    final filterPaymentType = ref.watch(pdaOrdersFilterPaymentTypeProvider);
+    final filterDeliveryType = ref.watch(pdaOrdersFilterDeliveryTypeProvider);
+    final filterClient = ref.watch(pdaOrdersFilterClientProvider);
+
     final allOrders = ordersState.orders;
 
     // Real-time metrics matching DOCUMENTATION/PDA/delivery and orders.md
@@ -66,22 +72,22 @@ class _OrdersListPageState extends ConsumerState<OrdersListPage> {
     // Filter Logic matching PRD
     final filteredOrders = allOrders.where((o) {
       // 1. Tab Filter
-      if (_selectedTab == 'Pending' && (o.status != 'assigned' && o.status != 'accepted' && o.status != 'pending')) return false;
-      if (_selectedTab == 'In Progress' && (o.status != 'in_transit' && o.status != 'picked_up')) return false;
-      if (_selectedTab == 'Delivered' && o.status != 'delivered') return false;
-      if (_selectedTab == 'Failed' && (o.status != 'failed' && o.status != 'call_back' && o.status != 'cancelled')) return false;
-      if (_selectedTab == 'Returns' && (o.status != 'returned' && o.status != 'failed' && o.status != 'call_back')) return false;
+      if (selectedTab == 'Pending' && (o.status != 'assigned' && o.status != 'accepted' && o.status != 'pending')) return false;
+      if (selectedTab == 'In Progress' && (o.status != 'in_transit' && o.status != 'picked_up')) return false;
+      if (selectedTab == 'Delivered' && o.status != 'delivered') return false;
+      if (selectedTab == 'Failed' && (o.status != 'failed' && o.status != 'call_back' && o.status != 'cancelled')) return false;
+      if (selectedTab == 'Returns' && (o.status != 'returned' && o.status != 'failed' && o.status != 'call_back')) return false;
 
       // 2. Modal Sheet Filters
-      if (_filterPaymentType == 'POD' && !o.isPod) return false;
-      if (_filterPaymentType == 'Prepaid' && o.isPod) return false;
-      if (_filterDeliveryType == 'Distributed Inventory' && !o.isDistributedInventory) return false;
-      if (_filterDeliveryType == 'Client Package' && !o.isClientPackage) return false;
-      if (_filterClient != 'All' && !o.clientName.toLowerCase().contains(_filterClient.toLowerCase())) return false;
+      if (filterPaymentType == 'POD' && !o.isPod) return false;
+      if (filterPaymentType == 'Prepaid' && o.isPod) return false;
+      if (filterDeliveryType == 'Distributed Inventory' && !o.isDistributedInventory) return false;
+      if (filterDeliveryType == 'Client Package' && !o.isClientPackage) return false;
+      if (filterClient != 'All' && !o.clientName.toLowerCase().contains(filterClient.toLowerCase())) return false;
 
       // 3. Search Query Filter (Order ID, Customer, Phone, Product, Address)
-      if (_searchQuery.isNotEmpty) {
-        final query = _searchQuery.toLowerCase();
+      if (searchQuery.isNotEmpty) {
+        final query = searchQuery.toLowerCase();
         final matchId = o.orderNumber.toLowerCase().contains(query);
         final matchCustomer = o.customerName.toLowerCase().contains(query);
         final matchPhone = o.customerPhone.toLowerCase().contains(query);
@@ -159,23 +165,22 @@ class _OrdersListPageState extends ConsumerState<OrdersListPage> {
         actions: [
           IconButton(
             icon: Icon(
-              _isSearchVisible ? Icons.close_rounded : Icons.search_rounded,
+              isSearchVisible ? Icons.close_rounded : Icons.search_rounded,
               color: Colors.white,
             ),
             onPressed: () {
-              setState(() {
-                _isSearchVisible = !_isSearchVisible;
-                if (!_isSearchVisible) {
-                  _searchController.clear();
-                  _searchQuery = '';
-                }
-              });
+              final newVisible = !isSearchVisible;
+              ref.read(pdaOrdersIsSearchVisibleProvider.notifier).state = newVisible;
+              if (!newVisible) {
+                _searchController.clear();
+                ref.read(pdaOrdersSearchQueryProvider.notifier).state = '';
+              }
             },
           ),
           IconButton(
             icon: Icon(
               Icons.tune_rounded,
-              color: (_filterPaymentType != 'All' || _filterDeliveryType != 'All' || _filterClient != 'All')
+              color: (filterPaymentType != 'All' || filterDeliveryType != 'All' || filterClient != 'All')
                   ? AppColors.orange
                   : Colors.white,
             ),
@@ -261,21 +266,21 @@ class _OrdersListPageState extends ConsumerState<OrdersListPage> {
                 child: Column(
                   children: [
                     // Search Input Bar (when toggled open)
-                    if (_isSearchVisible) ...[
+                    if (isSearchVisible) ...[
                       TextField(
                         controller: _searchController,
                         style: const TextStyle(color: Colors.white, fontSize: 13),
-                        onChanged: (value) => setState(() => _searchQuery = value),
+                        onChanged: (value) => ref.read(pdaOrdersSearchQueryProvider.notifier).state = value,
                         decoration: InputDecoration(
                           hintText: 'Search by ID, Customer, Phone, Product, Address...',
                           hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
                           prefixIcon: const Icon(Icons.search_rounded, size: 20, color: Color(0xFF94A3B8)),
-                          suffixIcon: _searchQuery.isNotEmpty
+                          suffixIcon: searchQuery.isNotEmpty
                               ? IconButton(
                                   icon: const Icon(Icons.clear_rounded, size: 18, color: Colors.white70),
                                   onPressed: () {
                                     _searchController.clear();
-                                    setState(() => _searchQuery = '');
+                                    ref.read(pdaOrdersSearchQueryProvider.notifier).state = '';
                                   },
                                 )
                               : null,
@@ -401,38 +406,38 @@ class _OrdersListPageState extends ConsumerState<OrdersListPage> {
                         children: [
                           _FilterTabPill(
                             label: 'All (${allOrders.length})',
-                            isSelected: _selectedTab == 'All',
-                            onTap: () => setState(() => _selectedTab = 'All'),
+                            isSelected: selectedTab == 'All',
+                            onTap: () => ref.read(pdaOrdersSelectedTabProvider.notifier).state = 'All',
                           ),
                           const SizedBox(width: 8),
                           _FilterTabPill(
                             label: 'Pending ($assignedCount)',
-                            isSelected: _selectedTab == 'Pending',
-                            onTap: () => setState(() => _selectedTab = 'Pending'),
+                            isSelected: selectedTab == 'Pending',
+                            onTap: () => ref.read(pdaOrdersSelectedTabProvider.notifier).state = 'Pending',
                           ),
                           const SizedBox(width: 8),
                           _FilterTabPill(
                             label: 'In Progress ($inProgressCount)',
-                            isSelected: _selectedTab == 'In Progress',
-                            onTap: () => setState(() => _selectedTab = 'In Progress'),
+                            isSelected: selectedTab == 'In Progress',
+                            onTap: () => ref.read(pdaOrdersSelectedTabProvider.notifier).state = 'In Progress',
                           ),
                           const SizedBox(width: 8),
                           _FilterTabPill(
                             label: 'Delivered ($deliveredCount)',
-                            isSelected: _selectedTab == 'Delivered',
-                            onTap: () => setState(() => _selectedTab = 'Delivered'),
+                            isSelected: selectedTab == 'Delivered',
+                            onTap: () => ref.read(pdaOrdersSelectedTabProvider.notifier).state = 'Delivered',
                           ),
                           const SizedBox(width: 8),
                           _FilterTabPill(
                             label: 'Failed ($failedCount)',
-                            isSelected: _selectedTab == 'Failed',
-                            onTap: () => setState(() => _selectedTab = 'Failed'),
+                            isSelected: selectedTab == 'Failed',
+                            onTap: () => ref.read(pdaOrdersSelectedTabProvider.notifier).state = 'Failed',
                           ),
                           const SizedBox(width: 8),
                           _FilterTabPill(
                             label: 'Returns ($returnsCount)',
-                            isSelected: _selectedTab == 'Returns',
-                            onTap: () => setState(() => _selectedTab = 'Returns'),
+                            isSelected: selectedTab == 'Returns',
+                            onTap: () => ref.read(pdaOrdersSelectedTabProvider.notifier).state = 'Returns',
                           ),
                         ],
                       ),
@@ -512,8 +517,10 @@ class _OrdersListPageState extends ConsumerState<OrdersListPage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
+        return Consumer(
+          builder: (context, ref, _) {
+            final filterPaymentType = ref.watch(pdaOrdersFilterPaymentTypeProvider);
+            final filterDeliveryType = ref.watch(pdaOrdersFilterDeliveryTypeProvider);
             return Padding(
               padding: const EdgeInsets.all(20),
               child: Column(
@@ -541,15 +548,14 @@ class _OrdersListPageState extends ConsumerState<OrdersListPage> {
                   const SizedBox(height: 8),
                   Row(
                     children: ['All', 'POD', 'Prepaid'].map((type) {
-                      final selected = _filterPaymentType == type;
+                      final selected = filterPaymentType == type;
                       return Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: ChoiceChip(
                           label: Text(type),
                           selected: selected,
                           onSelected: (_) {
-                            setModalState(() => _filterPaymentType = type);
-                            setState(() {});
+                            ref.read(pdaOrdersFilterPaymentTypeProvider.notifier).state = type;
                           },
                         ),
                       );
@@ -563,13 +569,12 @@ class _OrdersListPageState extends ConsumerState<OrdersListPage> {
                   Wrap(
                     spacing: 8,
                     children: ['All', 'Distributed Inventory', 'Client Package'].map((type) {
-                      final selected = _filterDeliveryType == type;
+                      final selected = filterDeliveryType == type;
                       return ChoiceChip(
                         label: Text(type),
                         selected: selected,
                         onSelected: (_) {
-                          setModalState(() => _filterDeliveryType = type);
-                          setState(() {});
+                          ref.read(pdaOrdersFilterDeliveryTypeProvider.notifier).state = type;
                         },
                       );
                     }).toList(),
@@ -582,12 +587,9 @@ class _OrdersListPageState extends ConsumerState<OrdersListPage> {
                       Expanded(
                         child: OutlinedButton(
                           onPressed: () {
-                            setModalState(() {
-                              _filterPaymentType = 'All';
-                              _filterDeliveryType = 'All';
-                              _filterClient = 'All';
-                            });
-                            setState(() {});
+                            ref.read(pdaOrdersFilterPaymentTypeProvider.notifier).state = 'All';
+                            ref.read(pdaOrdersFilterDeliveryTypeProvider.notifier).state = 'All';
+                            ref.read(pdaOrdersFilterClientProvider.notifier).state = 'All';
                             Navigator.pop(context);
                           },
                           child: const Text('Reset'),

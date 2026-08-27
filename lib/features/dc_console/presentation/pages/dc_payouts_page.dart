@@ -6,6 +6,9 @@ import '../../../../core/widgets/app_skeleton_loader.dart';
 import '../../domain/entities/dc_payout_claim.dart';
 import '../providers/dc_console_provider.dart';
 
+final dcPayoutFilterProvider = StateProvider.autoDispose<String>((ref) => 'all');
+final dcPayoutSearchProvider = StateProvider.autoDispose<String>((ref) => '');
+
 class DCPayoutsPage extends ConsumerStatefulWidget {
   const DCPayoutsPage({super.key});
 
@@ -14,8 +17,6 @@ class DCPayoutsPage extends ConsumerStatefulWidget {
 }
 
 class _DCPayoutsPageState extends ConsumerState<DCPayoutsPage> {
-  String _selectedFilter = 'all'; // 'all', 'pending', 'approved', 'rejected'
-  String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
 
   @override
@@ -31,17 +32,19 @@ class _DCPayoutsPageState extends ConsumerState<DCPayoutsPage> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isCompact = screenWidth < 700;
 
+    final selectedFilter = ref.watch(dcPayoutFilterProvider);
+    final searchQuery = ref.watch(dcPayoutSearchProvider);
     final dcState = ref.watch(dcConsoleProvider);
     final allClaims = dcState.payoutClaims;
 
     // Filter claims
     final filteredClaims = allClaims.where((claim) {
-      if (_selectedFilter == 'pending' && !claim.isPending) return false;
-      if (_selectedFilter == 'approved' && !claim.isApproved) return false;
-      if (_selectedFilter == 'rejected' && !claim.isRejected) return false;
+      if (selectedFilter == 'pending' && !claim.isPending) return false;
+      if (selectedFilter == 'approved' && !claim.isApproved) return false;
+      if (selectedFilter == 'rejected' && !claim.isRejected) return false;
 
-      if (_searchQuery.trim().isNotEmpty) {
-        final q = _searchQuery.trim().toLowerCase();
+      if (searchQuery.trim().isNotEmpty) {
+        final q = searchQuery.trim().toLowerCase();
         final matchNum = claim.claimNumber.toLowerCase().contains(q);
         final matchRider = claim.riderName.toLowerCase().contains(q);
         final matchCode = claim.riderCode.toLowerCase().contains(q);
@@ -184,18 +187,18 @@ class _DCPayoutsPageState extends ConsumerState<DCPayoutsPage> {
                     Expanded(
                       child: TextField(
                         controller: _searchController,
-                        onChanged: (val) => setState(() => _searchQuery = val),
+                        onChanged: (val) => ref.read(dcPayoutSearchProvider.notifier).state = val,
                         style: GoogleFonts.inter(fontSize: 13),
                         decoration: InputDecoration(
                           hintText: 'Search rider name, PDA code, account or claim #...',
                           hintStyle: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)),
                           prefixIcon: const Icon(Icons.search_rounded, size: 18),
-                          suffixIcon: _searchQuery.isNotEmpty
+                          suffixIcon: searchQuery.isNotEmpty
                               ? IconButton(
                                   icon: const Icon(Icons.clear_rounded, size: 16),
                                   onPressed: () {
                                     _searchController.clear();
-                                    setState(() => _searchQuery = '');
+                                    ref.read(dcPayoutSearchProvider.notifier).state = '';
                                   },
                                 )
                               : null,
@@ -252,7 +255,7 @@ class _DCPayoutsPageState extends ConsumerState<DCPayoutsPage> {
                         Icon(Icons.inbox_outlined, size: 48, color: const Color(0xFF94A3B8).withValues(alpha: 0.7)),
                         const SizedBox(height: 12),
                         Text(
-                          _searchQuery.isNotEmpty || _selectedFilter != 'all'
+                          searchQuery.isNotEmpty || selectedFilter != 'all'
                               ? 'No claims match your search criteria'
                               : 'No payout claims logged yet',
                           style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: const Color(0xFF64748B)),
@@ -516,9 +519,10 @@ class _DCPayoutsPageState extends ConsumerState<DCPayoutsPage> {
   }
 
   Widget _buildFilterChip(String label, String key, bool isDark) {
-    final isSelected = _selectedFilter == key;
+    final selectedFilter = ref.watch(dcPayoutFilterProvider);
+    final isSelected = selectedFilter == key;
     return InkWell(
-      onTap: () => setState(() => _selectedFilter = key),
+      onTap: () => ref.read(dcPayoutFilterProvider.notifier).state = key,
       borderRadius: BorderRadius.circular(20),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),

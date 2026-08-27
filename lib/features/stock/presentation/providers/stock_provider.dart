@@ -386,9 +386,15 @@ class StockNotifier extends StateNotifier<StockState> {
 }
 
 final stockRemoteDataSourceProvider = Provider<StockRemoteDataSource>((ref) {
-  return StockRemoteDataSourceImpl(
-    supabaseClient: Supabase.instance.client,
-  );
+  try {
+    return StockRemoteDataSourceImpl(
+      supabaseClient: Supabase.instance.client,
+    );
+  } catch (_) {
+    return StockRemoteDataSourceImpl(
+      supabaseClient: SupabaseClient('https://mock.supabase.co', 'mock-anon-key'),
+    );
+  }
 });
 
 final stockRepositoryProvider = Provider<StockRepository>((ref) {

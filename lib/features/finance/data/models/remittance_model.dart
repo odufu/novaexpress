@@ -10,6 +10,7 @@ class RemittanceModel extends RemittanceEntity {
     super.grossCollections = 0.0,
     super.commissionDeducted = 0.0,
     super.transportAllowanceDeducted = 0.0,
+    super.failedStipendsDeducted = 0.0,
     super.posFee = 0.0,
     super.paymentMethod = 'bank_transfer',
     super.depositReceiptUrl,
@@ -31,6 +32,7 @@ class RemittanceModel extends RemittanceEntity {
     super.destinationAccountNumber = '1012398412',
     super.destinationAccountName = 'NovaExpress Logistics Limited',
     super.notes,
+    super.associatedOrders = const [],
     required super.createdAt,
     super.verifiedAt,
   });
@@ -55,6 +57,11 @@ class RemittanceModel extends RemittanceEntity {
     final double transportAllowanceDeducted = (rawTransport is num)
         ? rawTransport.toDouble()
         : (double.tryParse(rawTransport?.toString() ?? '') ?? 0.0);
+
+    final dynamic rawFailedStipends = json['failed_stipends_deducted'] ?? json['failed_stipends'];
+    final double failedStipendsDeducted = (rawFailedStipends is num)
+        ? rawFailedStipends.toDouble()
+        : (double.tryParse(rawFailedStipends?.toString() ?? '') ?? 0.0);
 
     final dynamic rawPos = json['pos_fee'];
     final double posFee = (rawPos is num)
@@ -107,6 +114,11 @@ class RemittanceModel extends RemittanceEntity {
       parsedPaystackPaidAt = null;
     }
 
+    final List<dynamic>? rawOrders = json['associated_orders'] ?? json['orders'] ?? json['order_breakdown'];
+    final List<RemittanceOrderItem> orders = rawOrders != null
+        ? rawOrders.map((o) => RemittanceOrderItem.fromJson(Map<String, dynamic>.from(o))).toList()
+        : const [];
+
     return RemittanceModel(
       id: id,
       referenceNumber: ref,
@@ -116,6 +128,7 @@ class RemittanceModel extends RemittanceEntity {
       grossCollections: grossCollections,
       commissionDeducted: commissionDeducted,
       transportAllowanceDeducted: transportAllowanceDeducted,
+      failedStipendsDeducted: failedStipendsDeducted,
       posFee: posFee,
       paymentMethod: json['payment_method']?.toString() ?? 'bank_transfer',
       depositReceiptUrl: json['deposit_receipt_url']?.toString(),
@@ -137,6 +150,7 @@ class RemittanceModel extends RemittanceEntity {
       destinationAccountNumber: json['destination_account_number']?.toString() ?? '1012398412',
       destinationAccountName: json['destination_account_name']?.toString() ?? 'NovaExpress Logistics Limited',
       notes: json['notes']?.toString(),
+      associatedOrders: orders,
       createdAt: parsedCreated,
       verifiedAt: parsedVerified,
     );
@@ -152,6 +166,7 @@ class RemittanceModel extends RemittanceEntity {
       grossCollections: entity.grossCollections,
       commissionDeducted: entity.commissionDeducted,
       transportAllowanceDeducted: entity.transportAllowanceDeducted,
+      failedStipendsDeducted: entity.failedStipendsDeducted,
       posFee: entity.posFee,
       paymentMethod: entity.paymentMethod,
       depositReceiptUrl: entity.depositReceiptUrl,
@@ -173,6 +188,7 @@ class RemittanceModel extends RemittanceEntity {
       destinationAccountNumber: entity.destinationAccountNumber,
       destinationAccountName: entity.destinationAccountName,
       notes: entity.notes,
+      associatedOrders: entity.associatedOrders,
       createdAt: entity.createdAt,
       verifiedAt: entity.verifiedAt,
     );
@@ -188,6 +204,7 @@ class RemittanceModel extends RemittanceEntity {
       'gross_collections': grossCollections,
       'commission_deducted': commissionDeducted,
       'transport_allowance_deducted': transportAllowanceDeducted,
+      'failed_stipends_deducted': failedStipendsDeducted,
       'pos_fee': posFee,
       'payment_method': paymentMethod,
       'deposit_receipt_url': depositReceiptUrl,
@@ -208,6 +225,7 @@ class RemittanceModel extends RemittanceEntity {
       'destination_account_number': destinationAccountNumber,
       'destination_account_name': destinationAccountName,
       'notes': notes,
+      'associated_orders': associatedOrders.map((o) => o.toJson()).toList(),
       'created_at': createdAt.toIso8601String(),
       'verified_at': verifiedAt?.toIso8601String(),
     };

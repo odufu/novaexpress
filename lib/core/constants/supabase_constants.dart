@@ -23,4 +23,9 @@ class SupabaseConstants {
   static const String paystackSecretKey = 'sk_test_94f116e6e978f0e75dc42f8a789837931b487006';
   static const String paystackPublicKey = 'pk_test_0ac140673685b32b2e9613b548991cd9563e917a';
   static const String paystackWebhookUrl = 'https://vacyxnehxpqvwtaimkgc.supabase.co/functions/v1/paystack-webhook';
+
+  // Storage Buckets
+  static const String podSignaturesBucket = 'pod_signatures';
+  static const String proofOfDeliveryBucket = 'pod_proofs';
+  static const String remittanceReceiptsBucket = 'remittance_receipts';
 }

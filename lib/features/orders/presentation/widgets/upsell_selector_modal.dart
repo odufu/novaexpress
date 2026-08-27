@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/helpers/formatters.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../stock/domain/entities/stock_item.dart';
 
-class UpsellSelectorModal extends StatefulWidget {
+final selectedUpsellItemProvider = StateProvider.autoDispose<StockItemEntity?>((ref) => null);
+
+class UpsellSelectorModal extends ConsumerWidget {
   final List<StockItemEntity> availableStock;
   final Function(StockItemEntity item, double extraAmount) onUpsellSelected;
 
@@ -31,19 +34,13 @@ class UpsellSelectorModal extends StatefulWidget {
   }
 
   @override
-  State<UpsellSelectorModal> createState() => _UpsellSelectorModalState();
-}
-
-class _UpsellSelectorModalState extends State<UpsellSelectorModal> {
-  StockItemEntity? _selectedItem;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final selectedItem = ref.watch(selectedUpsellItemProvider);
 
-    final defaultItems = widget.availableStock.isNotEmpty
-        ? widget.availableStock
+    final defaultItems = availableStock.isNotEmpty
+        ? availableStock
         : [
             const StockItemEntity(
               id: 'stk-001',
@@ -208,13 +205,11 @@ class _UpsellSelectorModalState extends State<UpsellSelectorModal> {
               separatorBuilder: (_, __) => const SizedBox(height: 8),
               itemBuilder: (ctx, i) {
                 final item = defaultItems[i];
-                final isSelected = _selectedItem?.id == item.id;
+                final isSelected = selectedItem?.id == item.id;
 
                 return InkWell(
                   onTap: () {
-                    setState(() {
-                      _selectedItem = item;
-                    });
+                    ref.read(selectedUpsellItemProvider.notifier).state = item;
                   },
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
@@ -235,12 +230,10 @@ class _UpsellSelectorModalState extends State<UpsellSelectorModal> {
                       children: [
                         Radio<String>(
                           value: item.id,
-                          groupValue: _selectedItem?.id,
+                          groupValue: selectedItem?.id,
                           activeColor: const Color(0xFF2563EB),
                           onChanged: (_) {
-                            setState(() {
-                              _selectedItem = item;
-                            });
+                            ref.read(selectedUpsellItemProvider.notifier).state = item;
                           },
                         ),
                         const SizedBox(width: 4),
@@ -313,15 +306,15 @@ class _UpsellSelectorModalState extends State<UpsellSelectorModal> {
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
-              onPressed: _selectedItem == null
+              onPressed: selectedItem == null
                   ? null
                   : () {
                       Navigator.pop(context);
-                      widget.onUpsellSelected(_selectedItem!, _selectedItem!.price);
+                      onUpsellSelected(selectedItem, selectedItem.price);
                     },
               child: Text(
-                _selectedItem != null
-                    ? 'Add +1 ${_selectedItem!.name} (${CurrencyFormatter.formatNaira(_selectedItem!.price)})'
+                selectedItem != null
+                    ? 'Add +1 ${selectedItem.name} (${CurrencyFormatter.formatNaira(selectedItem.price)})'
                     : 'Select a product to add',
                 style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13),
               ),

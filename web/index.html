@@ -115,13 +115,17 @@
             if (onClose) onClose();
             return;
           }
+          var meta = options.metadata || {};
+          if (typeof meta === 'string') {
+            try { meta = JSON.parse(meta); } catch(e) { meta = {}; }
+          }
           var handler = PaystackPop.setup({
             key: options.key,
             email: options.email,
             amount: options.amount,
             currency: options.currency || 'NGN',
             ref: options.ref,
-            metadata: options.metadata || {},
+            metadata: meta,
             callback: function(response) {
               console.log('[PAYSTACK] Payment successful callback:', response);
               if (onSuccess) onSuccess(response && response.reference ? response.reference : options.ref);

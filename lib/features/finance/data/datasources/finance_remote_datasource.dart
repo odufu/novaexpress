@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/supabase_constants.dart';
+import '../../domain/entities/remittance.dart';
 import '../models/remittance_model.dart';
 
 abstract class FinanceRemoteDataSource {
@@ -12,6 +13,7 @@ abstract class FinanceRemoteDataSource {
     double grossCollections = 0.0,
     double commissionDeducted = 0.0,
     double transportAllowanceDeducted = 0.0,
+    double failedStipendsDeducted = 0.0,
     double posFee = 0.0,
     String? depositReceiptUrl,
     String? referenceNumber,
@@ -20,6 +22,7 @@ abstract class FinanceRemoteDataSource {
     double? expectedAmount,
     bool isPartial = false,
     String? notes,
+    List<RemittanceOrderItem> associatedOrders = const [],
   });
   Future<Map<String, dynamic>> requestPayout({
     required String agentId,
@@ -57,24 +60,19 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
   @override
   Future<List<RemittanceModel>> getAgentRemittances(String agentId) async {
     try {
-      final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
-      final validAgentUuid = (agentId.isNotEmpty && uuidRegex.hasMatch(agentId))
-          ? agentId
-          : 'b1111111-1111-4111-8111-111111111111';
+      final cleanId = agentId.trim();
+      if (cleanId.isEmpty) return [];
 
-      dynamic response;
-      try {
-        response = await supabaseClient
-            .from(SupabaseConstants.cashRemittancesTable)
-            .select()
-            .or('delivery_agent_id.eq.$validAgentUuid,delivery_agent_id.eq.b1111111-1111-4111-8111-111111111111')
-            .order('created_at', ascending: false);
-      } catch (_) {
-        response = await supabaseClient
-            .from(SupabaseConstants.cashRemittancesTable)
-            .select()
-            .order('created_at', ascending: false);
-      }
+      final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
+      final validAgentUuid = (cleanId.isNotEmpty && uuidRegex.hasMatch(cleanId))
+          ? cleanId
+          : cleanId;
+
+      final response = await supabaseClient
+          .from(SupabaseConstants.cashRemittancesTable)
+          .select()
+          .eq('delivery_agent_id', validAgentUuid)
+          .order('created_at', ascending: false);
 
       final list = (response as List)
           .map((item) => RemittanceModel.fromJson(item))
@@ -95,6 +93,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     double grossCollections = 0.0,
     double commissionDeducted = 0.0,
     double transportAllowanceDeducted = 0.0,
+    double failedStipendsDeducted = 0.0,
     double posFee = 0.0,
     String? depositReceiptUrl,
     String? referenceNumber,
@@ -103,6 +102,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     double? expectedAmount,
     bool isPartial = false,
     String? notes,
+    List<RemittanceOrderItem> associatedOrders = const [],
   }) async {
     final ref = referenceNumber ?? 'REM-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
     final isPaystack = paymentMethod == 'paystack' || paymentMethod == 'paystack_transfer';
@@ -144,12 +144,14 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
             'grossCollections': grossCollections,
             'commissionDeducted': commissionDeducted,
             'transportAllowanceDeducted': transportAllowanceDeducted,
+            'failedStipendsDeducted': failedStipendsDeducted,
             'posFee': posFee,
             'expectedAmount': expectedAmount,
             'isPartial': actualIsPartial,
             'discrepancyAmount': actualDiscrepancy,
             'discrepancyReason': discrepancyReason,
             'notes': remittanceNotes,
+            'associatedOrders': associatedOrders.map((o) => o.toJson()).toList(),
           },
         );
 
@@ -165,6 +167,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
             grossCollections: grossCollections,
             commissionDeducted: commissionDeducted,
             transportAllowanceDeducted: transportAllowanceDeducted,
+            failedStipendsDeducted: failedStipendsDeducted,
             posFee: posFee,
             paymentMethod: paymentMethod,
             depositReceiptUrl: depositReceiptUrl,
@@ -174,6 +177,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
             discrepancyAmount: actualDiscrepancy,
             discrepancyReason: discrepancyReason,
             notes: remittanceNotes,
+            associatedOrders: associatedOrders,
             createdAt: DateTime.now(),
           );
         }
@@ -245,7 +249,10 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
         });
       } catch (_) {}
 
-      return RemittanceModel.fromJson(response);
+      return RemittanceModel.fromJson({
+        ...response,
+        'associated_orders': associatedOrders.map((o) => o.toJson()).toList(),
+      });
     } catch (e) {
       rethrow;
     }
@@ -313,15 +320,18 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
   @override
   Future<List<Map<String, dynamic>>> getRiderTransactions(String agentId) async {
     try {
+      final cleanId = agentId.trim();
+      if (cleanId.isEmpty) return [];
+
       final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
-      final validAgentUuid = (agentId.isNotEmpty && uuidRegex.hasMatch(agentId))
-          ? agentId
-          : 'b1111111-1111-4111-8111-111111111111';
+      final validAgentUuid = (cleanId.isNotEmpty && uuidRegex.hasMatch(cleanId))
+          ? cleanId
+          : cleanId;
 
       final response = await supabaseClient
           .from('rider_transactions')
           .select()
-          .or('delivery_agent_id.eq.$validAgentUuid,delivery_agent_id.eq.b1111111-1111-4111-8111-111111111111,delivery_agent_id.is.null')
+          .eq('delivery_agent_id', validAgentUuid)
           .order('created_at', ascending: false);
 
       return List<Map<String, dynamic>>.from(response as List);

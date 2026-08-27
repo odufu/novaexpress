@@ -37,6 +37,26 @@ class PayoutRequestItem {
   bool get isRejected => status == 'rejected';
 }
 
+final payoutsFilterProvider = StateProvider.autoDispose<String>((ref) => 'all');
+final payoutModalSelectedBankProvider = StateProvider.autoDispose<String>((ref) => 'Zenith Bank');
+
+class PayoutsListNotifier extends StateNotifier<List<PayoutRequestItem>> {
+  PayoutsListNotifier() : super([]);
+
+  void setPayouts(List<PayoutRequestItem> list) {
+    state = list;
+  }
+
+  void addPayout(PayoutRequestItem item) {
+    state = [item, ...state];
+  }
+}
+
+final payoutsListProvider =
+    StateNotifierProvider.autoDispose<PayoutsListNotifier, List<PayoutRequestItem>>((ref) {
+  return PayoutsListNotifier();
+});
+
 class PayoutsPage extends ConsumerStatefulWidget {
   const PayoutsPage({super.key});
 
@@ -45,9 +65,6 @@ class PayoutsPage extends ConsumerStatefulWidget {
 }
 
 class _PayoutsPageState extends ConsumerState<PayoutsPage> {
-  String _selectedFilter = 'all'; // 'all', 'pending', 'approved', 'rejected'
-  List<PayoutRequestItem> _payouts = [];
-
   @override
   void initState() {
     super.initState();
@@ -61,21 +78,20 @@ class _PayoutsPageState extends ConsumerState<PayoutsPage> {
 
     final raw = await ref.read(financeProvider.notifier).loadPayoutRequests(agentId);
     if (mounted && raw.isNotEmpty) {
-      setState(() {
-        _payouts = raw.map((map) {
-          return PayoutRequestItem(
-            id: map['id']?.toString() ?? 'PAY-0001',
-            amount: (map['amount'] as num?)?.toDouble() ?? 0.0,
-            status: map['status']?.toString() ?? 'pending',
-            date: map['created_at'] != null ? DateTime.tryParse(map['created_at'].toString()) ?? DateTime.now() : DateTime.now(),
-            bankName: map['bank_name']?.toString() ?? 'Bank',
-            accountNumber: map['account_number']?.toString() ?? '0000000000',
-            accountName: map['account_name']?.toString() ?? 'Rider',
-            disbursementRef: map['disbursement_reference']?.toString(),
-            dcNotes: map['notes']?.toString(),
-          );
-        }).toList();
-      });
+      final items = raw.map((map) {
+        return PayoutRequestItem(
+          id: map['id']?.toString() ?? 'PAY-0001',
+          amount: (map['amount'] as num?)?.toDouble() ?? 0.0,
+          status: map['status']?.toString() ?? 'pending',
+          date: map['created_at'] != null ? DateTime.tryParse(map['created_at'].toString()) ?? DateTime.now() : DateTime.now(),
+          bankName: map['bank_name']?.toString() ?? 'Bank',
+          accountNumber: map['account_number']?.toString() ?? '0000000000',
+          accountName: map['account_name']?.toString() ?? 'Rider',
+          disbursementRef: map['disbursement_reference']?.toString(),
+          dcNotes: map['notes']?.toString(),
+        );
+      }).toList();
+      ref.read(payoutsListProvider.notifier).setPayouts(items);
     }
   }
 
@@ -85,15 +101,16 @@ class _PayoutsPageState extends ConsumerState<PayoutsPage> {
     final defaultBank = user?.bankName.isNotEmpty == true ? user!.bankName : 'Zenith Bank';
     final amountController = TextEditingController(text: availableBalance > 0 ? (availableBalance > 10000 ? '10000' : availableBalance.toInt().toString()) : '5000');
     final accountController = TextEditingController(text: defaultAccount);
-    String selectedBank = defaultBank;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModalState) {
+      builder: (ctx) => Consumer(
+        builder: (ctx, modalRef, _) {
           final isDark = Theme.of(context).brightness == Brightness.dark;
+          final selectedBank = modalRef.watch(payoutModalSelectedBankProvider);
+
           return Padding(
             padding: EdgeInsets.only(
               bottom: MediaQuery.of(ctx).viewInsets.bottom,
@@ -162,7 +179,7 @@ class _PayoutsPageState extends ConsumerState<PayoutsPage> {
 
                   // Bank Dropdown
                   DropdownButtonFormField<String>(
-                    initialValue: selectedBank,
+                    value: ['Zenith Bank', 'Access Bank', 'GTBank', 'Kuda Bank', 'Opay', 'Moniepoint', 'First Bank'].contains(selectedBank) ? selectedBank : defaultBank,
                     decoration: InputDecoration(
                       labelText: 'Select Bank',
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
@@ -171,7 +188,9 @@ class _PayoutsPageState extends ConsumerState<PayoutsPage> {
                         .map((b) => DropdownMenuItem(value: b, child: Text(b)))
                         .toList(),
                     onChanged: (v) {
-                      if (v != null) setModalState(() => selectedBank = v);
+                      if (v != null) {
+                        modalRef.read(payoutModalSelectedBankProvider.notifier).state = v;
+                      }
                     },
                   ),
                   const SizedBox(height: 12),
@@ -215,21 +234,18 @@ class _PayoutsPageState extends ConsumerState<PayoutsPage> {
                         final riderName = auth.user != null ? '${auth.user!.firstName} ${auth.user!.lastName}'.trim() : 'Field Agent';
 
                         Navigator.pop(ctx);
-                        setState(() {
-                          _payouts.insert(
-                            0,
-                            PayoutRequestItem(
-                              id: 'PAY-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}',
-                              amount: reqAmount,
-                              status: 'pending',
-                              date: DateTime.now(),
-                              bankName: selectedBank,
-                              accountNumber: accountController.text.trim(),
-                              accountName: riderName.isNotEmpty ? riderName : 'Field Agent',
-                              dcNotes: 'New request submitted for DC review',
-                            ),
-                          );
-                        });
+                        ref.read(payoutsListProvider.notifier).addPayout(
+                          PayoutRequestItem(
+                            id: 'PAY-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}',
+                            amount: reqAmount,
+                            status: 'pending',
+                            date: DateTime.now(),
+                            bankName: selectedBank,
+                            accountNumber: accountController.text.trim(),
+                            accountName: riderName.isNotEmpty ? riderName : 'Field Agent',
+                            dcNotes: 'New request submitted for DC review',
+                          ),
+                        );
 
                         // Call Edge Function
                         await ref.read(financeProvider.notifier).requestPayout(
@@ -298,8 +314,8 @@ class _PayoutsPageState extends ConsumerState<PayoutsPage> {
                   ),
                   child: Text(
                     item.status.toUpperCase(),
-                    style: GoogleFonts.inter(
-                      fontSize: 10,
+                    style: GoogleFonts.jetBrainsMono(
+                      fontSize: 11,
                       fontWeight: FontWeight.bold,
                       color: item.isApproved
                           ? const Color(0xFF16A34A)
@@ -310,18 +326,13 @@ class _PayoutsPageState extends ConsumerState<PayoutsPage> {
               ],
             ),
             const SizedBox(height: 16),
-            Text('Amount: ${CurrencyFormatter.formatNaira(item.amount)}', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 12),
-            Text('Bank: ${item.bankName} • ${item.accountNumber}', style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B))),
-            Text('Account Name: ${item.accountName}', style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B))),
-            if (item.disbursementRef != null) ...[
-              const SizedBox(height: 6),
-              Text('Disbursement Ref: ${item.disbursementRef}', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF2563EB), fontWeight: FontWeight.w600)),
-            ],
-            if (item.dcNotes != null) ...[
-              const SizedBox(height: 6),
-              Text('DC Notes: ${item.dcNotes}', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-            ],
+            _buildModalRow('Requested Amount', CurrencyFormatter.formatNaira(item.amount), isBold: true),
+            _buildModalRow('Bank Name', item.bankName),
+            _buildModalRow('Account Number', item.accountNumber),
+            _buildModalRow('Account Name', item.accountName),
+            _buildModalRow('Date', '${item.date.day}/${item.date.month}/${item.date.year} ${item.date.hour}:${item.date.minute.toString().padLeft(2, '0')}'),
+            if (item.disbursementRef != null) _buildModalRow('Disbursement Ref', item.disbursementRef!),
+            if (item.dcNotes != null) _buildModalRow('DC Notes', item.dcNotes!),
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
@@ -344,19 +355,22 @@ class _PayoutsPageState extends ConsumerState<PayoutsPage> {
     final financeState = ref.watch(financeProvider);
     final ordersState = ref.watch(ordersProvider);
     final user = ref.watch(authProvider).user;
+    final selectedFilter = ref.watch(payoutsFilterProvider);
+    final payouts = ref.watch(payoutsListProvider);
 
     final summary = FinancialSummary.calculate(
       orders: ordersState.orders,
       remittances: financeState.remittances,
       user: user,
       manualEarnedBalance: financeState.totalEarnedBalance,
+      transactions: financeState.transactions,
     );
 
     final availableBalance = summary.myDirectTransfersBalance;
 
-    final filteredList = _payouts.where((p) {
-      if (_selectedFilter == 'all') return true;
-      return p.status == _selectedFilter;
+    final filteredList = payouts.where((p) {
+      if (selectedFilter == 'all') return true;
+      return p.status == selectedFilter;
     }).toList();
 
     return Scaffold(
@@ -378,138 +392,121 @@ class _PayoutsPageState extends ConsumerState<PayoutsPage> {
         ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 1. HERO BALANCE CARD
+            // 1. TOP BALANCE CARD
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF1E3A8A), Color(0xFF0F172A)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFF3B82F6).withValues(alpha: 0.5)),
+                color: isDark ? const Color(0xFF1E293B) : const Color(0xFF0F172A),
+                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(22)),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF1E3A8A).withValues(alpha: 0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
+                    color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.12),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
                   ),
                 ],
               ),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'MY EARNINGS BALANCE',
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.inter(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.8,
-                            color: const Color(0xFF93C5FD),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2563EB).withValues(alpha: 0.4),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          'Direct Transfers',
-                          style: GoogleFonts.inter(fontSize: 9.5, color: Colors.white, fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                    ],
+                  Text(
+                    'WITHDRAWABLE DIRECT TRANSFER BALANCE',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.8,
+                      color: const Color(0xFF94A3B8),
+                    ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   Text(
                     CurrencyFormatter.formatNaira(availableBalance),
                     style: GoogleFonts.inter(
-                      fontSize: 30,
+                      fontSize: 32,
                       fontWeight: FontWeight.w900,
-                      color: Colors.white,
+                      color: const Color(0xFF60A5FA),
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Accumulated from Monnify customer direct transfers & allowances.',
-                    style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
+                    'Net earnings from Paystack customer transfers held by company.',
+                    style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)),
                   ),
                   const SizedBox(height: 16),
                   SizedBox(
                     width: double.infinity,
-                    height: 44,
+                    height: 46,
                     child: ElevatedButton.icon(
                       onPressed: () => _showRequestPayoutModal(context, availableBalance),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF2563EB),
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
-                      label: Text(
-                        'Request New Payout',
-                        style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold),
-                      ),
+                      icon: const Icon(Icons.account_balance_wallet_outlined, size: 18),
+                      label: Text('Request Payout', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
 
-            // 2. PAYOUT HISTORY SECTION
-            Text(
-              'PAYOUT REQUESTS HISTORY',
-              style: GoogleFonts.inter(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.6,
-                color: const Color(0xFF475569),
-              ),
-            ),
-            const SizedBox(height: 10),
-
-            // Filter Tabs
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
+            // 2. FILTER PILLS
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildFilterPill('All (${_payouts.length})', 'all', isDark),
-                  const SizedBox(width: 8),
-                  _buildFilterPill('Pending (${_payouts.where((p) => p.isPending).length})', 'pending', isDark),
-                  const SizedBox(width: 8),
-                  _buildFilterPill('Approved (${_payouts.where((p) => p.isApproved).length})', 'approved', isDark),
-                  const SizedBox(width: 8),
-                  _buildFilterPill('Rejected (0)', 'rejected', isDark),
+                  Text(
+                    'PAYOUT HISTORY & STATUS',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.6,
+                      color: const Color(0xFF475569),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _buildFilterPill('All (${payouts.length})', 'all', isDark, selectedFilter),
+                        const SizedBox(width: 8),
+                        _buildFilterPill('Pending (${payouts.where((p) => p.isPending).length})', 'pending', isDark, selectedFilter),
+                        const SizedBox(width: 8),
+                        _buildFilterPill('Approved (${payouts.where((p) => p.isApproved).length})', 'approved', isDark, selectedFilter),
+                        const SizedBox(width: 8),
+                        _buildFilterPill('Rejected (${payouts.where((p) => p.isRejected).length})', 'rejected', isDark, selectedFilter),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
             const SizedBox(height: 14),
 
-            // Payout Items List
+            // 3. PAYOUTS LIST
             if (filteredList.isNotEmpty) ...[
-              ...filteredList.map((p) => Padding(
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  children: filteredList.map((p) => Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: _buildPayoutCard(context, p, isDark, theme),
-                  )),
+                  )).toList(),
+                ),
+              ),
             ] else ...[
               Container(
-                width: double.infinity,
+                margin: const EdgeInsets.symmetric(horizontal: 16),
                 padding: const EdgeInsets.all(28),
+                width: double.infinity,
                 decoration: BoxDecoration(
                   color: isDark ? const Color(0xFF1E293B) : Colors.white,
                   borderRadius: BorderRadius.circular(14),
@@ -517,7 +514,7 @@ class _PayoutsPageState extends ConsumerState<PayoutsPage> {
                 ),
                 child: Center(
                   child: Text(
-                    'No payout requests in this category.',
+                    'No payout requests in this filter.',
                     style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B)),
                   ),
                 ),
@@ -530,11 +527,11 @@ class _PayoutsPageState extends ConsumerState<PayoutsPage> {
     );
   }
 
-  Widget _buildFilterPill(String label, String value, bool isDark) {
-    final isSelected = _selectedFilter == value;
+  Widget _buildFilterPill(String label, String value, bool isDark, String selectedFilter) {
+    final isSelected = selectedFilter == value;
 
     return InkWell(
-      onTap: () => setState(() => _selectedFilter = value),
+      onTap: () => ref.read(payoutsFilterProvider.notifier).state = value,
       borderRadius: BorderRadius.circular(20),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
@@ -561,106 +558,80 @@ class _PayoutsPageState extends ConsumerState<PayoutsPage> {
     );
   }
 
-  Widget _buildPayoutCard(BuildContext context, PayoutRequestItem item, bool isDark, ThemeData theme) {
+  Widget _buildPayoutCard(BuildContext context, PayoutRequestItem p, bool isDark, ThemeData theme) {
     return InkWell(
-      onTap: () => _showPayoutDetailsModal(context, item),
+      onTap: () => _showPayoutDetailsModal(context, p),
       borderRadius: BorderRadius.circular(14),
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF1E293B) : Colors.white,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-          ),
+          border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Expanded(
-                  child: Text(
-                    item.id,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.jetBrainsMono(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
+                Text(p.id, style: GoogleFonts.jetBrainsMono(fontSize: 13, fontWeight: FontWeight.bold)),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: item.isApproved
+                    color: p.isApproved
                         ? const Color(0xFFDCFCE7)
-                        : (item.isPending ? const Color(0xFFFFF7ED) : const Color(0xFFFFE4E6)),
+                        : (p.isPending ? const Color(0xFFFFF7ED) : const Color(0xFFFFE4E6)),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    item.isApproved ? 'APPROVED & PAID' : (item.isPending ? 'PENDING DC' : 'REJECTED'),
-                    style: GoogleFonts.inter(
-                      fontSize: 9.5,
+                    p.status.toUpperCase(),
+                    style: GoogleFonts.jetBrainsMono(
+                      fontSize: 10,
                       fontWeight: FontWeight.bold,
-                      color: item.isApproved
+                      color: p.isApproved
                           ? const Color(0xFF16A34A)
-                          : (item.isPending ? const Color(0xFFEA580C) : const Color(0xFFE11D48)),
+                          : (p.isPending ? const Color(0xFFEA580C) : const Color(0xFFE11D48)),
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  CurrencyFormatter.formatNaira(item.amount),
-                  style: GoogleFonts.inter(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                    color: item.isApproved ? const Color(0xFF16A34A) : const Color(0xFF2563EB),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    '${item.bankName} • ${item.accountNumber.length >= 4 ? item.accountNumber.substring(0, 4) : item.accountNumber}***',
-                    textAlign: TextAlign.end,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                const Icon(Icons.access_time_rounded, size: 12, color: Color(0xFF64748B)),
-                const SizedBox(width: 4),
-                Text(
-                  '${item.date.day} Aug 2026 • ${item.date.hour}:${item.date.minute.toString().padLeft(2, '0')}',
-                  style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
-                ),
-                const Spacer(),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Details',
-                      style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF2563EB), fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(width: 2),
-                    const Icon(Icons.chevron_right_rounded, size: 14, color: Color(0xFF2563EB)),
+                    Text('${p.bankName} • ${p.accountNumber}', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                    const SizedBox(height: 2),
+                    Text('${p.date.day}/${p.date.month}/${p.date.year}', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8))),
                   ],
+                ),
+                Text(
+                  CurrencyFormatter.formatNaira(p.amount),
+                  style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w900, color: const Color(0xFF2563EB)),
                 ),
               ],
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildModalRow(String label, String value, {bool isBold = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF64748B))),
+          Text(
+            value,
+            style: GoogleFonts.inter(fontSize: 13, fontWeight: isBold ? FontWeight.bold : FontWeight.w600),
+          ),
+        ],
       ),
     );
   }

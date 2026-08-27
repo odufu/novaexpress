@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:novexps/core/widgets/offline_sync_banner.dart';
 import 'package:novexps/core/widgets/signature_pad_widget.dart';
@@ -40,12 +41,14 @@ void main() {
 
     testWidgets('MonnifyTransferModal renders virtual account details and amount', (WidgetTester tester) async {
       await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: MonnifyTransferModal(
-              orderNumber: 'ORD-7890',
-              amount: 25000.0,
-              onPaymentConfirmed: () {},
+        ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: MonnifyTransferModal(
+                orderNumber: 'ORD-7890',
+                amount: 25000.0,
+                onPaymentConfirmed: () {},
+              ),
             ),
           ),
         ),
@@ -57,12 +60,14 @@ void main() {
 
     testWidgets('RescheduleCallbackModal renders preset dates and confirm button', (WidgetTester tester) async {
       await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: RescheduleCallbackModal(
-              orderId: 'ord-123',
-              customerName: 'Amina Yusuf',
-              onRescheduleConfirmed: (dt, note) {},
+        ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: RescheduleCallbackModal(
+                orderId: 'ord-123',
+                customerName: 'Amina Yusuf',
+                onRescheduleConfirmed: (dt, note) {},
+              ),
             ),
           ),
         ),
@@ -75,11 +80,13 @@ void main() {
 
     testWidgets('UpsellSelectorModal renders vehicle stock products and commission banner', (WidgetTester tester) async {
       await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: UpsellSelectorModal(
-              availableStock: const [],
-              onUpsellSelected: (item, price) {},
+        ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: UpsellSelectorModal(
+                availableStock: const [],
+                onUpsellSelected: (item, price) {},
+              ),
             ),
           ),
         ),

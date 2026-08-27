@@ -9,6 +9,10 @@ import '../../../../core/widgets/user_avatar_widget.dart';
 import '../../../auth/domain/entities/user.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 
+final editProfileAvatarUrlProvider = StateProvider.autoDispose<String?>((ref) => null);
+final editProfileSavingProvider = StateProvider.autoDispose<bool>((ref) => false);
+final editProfileUploadingPhotoProvider = StateProvider.autoDispose<bool>((ref) => false);
+
 class EditProfileModal extends ConsumerStatefulWidget {
   final UserEntity user;
   final int initialTabIndex;
@@ -51,10 +55,6 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> with Single
   late TextEditingController _bankNameController;
   late TextEditingController _bankAccountNoController;
   late TextEditingController _bankAccountNameController;
-
-  String? _selectedAvatarUrl;
-  bool _isSaving = false;
-  bool _isUploadingPhoto = false;
 
   static const List<String> nigerianBanks = [
     'Guaranty Trust Bank (GTBank)',
@@ -116,7 +116,10 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> with Single
     _bankNameController = TextEditingController(text: widget.user.bankName.isNotEmpty ? widget.user.bankName : 'Guaranty Trust Bank (GTBank)');
     _bankAccountNoController = TextEditingController(text: widget.user.bankAccountNumber);
     _bankAccountNameController = TextEditingController(text: widget.user.bankAccountName.isNotEmpty ? widget.user.bankAccountName : '${widget.user.firstName} ${widget.user.lastName}'.trim());
-    _selectedAvatarUrl = widget.user.avatarUrl;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(editProfileAvatarUrlProvider.notifier).state = widget.user.avatarUrl;
+    });
   }
 
   @override
@@ -147,14 +150,14 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> with Single
 
       if (pickedFile == null) return;
 
-      setState(() => _isUploadingPhoto = true);
+      ref.read(editProfileUploadingPhotoProvider.notifier).state = true;
 
       final bytes = await pickedFile.readAsBytes();
 
       // 1. Client-Side Size Restriction: 5 MB Max
       if (bytes.lengthInBytes > 5 * 1024 * 1024) {
         if (mounted) {
-          setState(() => _isUploadingPhoto = false);
+          ref.read(editProfileUploadingPhotoProvider.notifier).state = false;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               backgroundColor: Color(0xFFDC2626),
@@ -170,7 +173,7 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> with Single
       final allowedExts = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
       if (!allowedExts.contains(ext)) {
         if (mounted) {
-          setState(() => _isUploadingPhoto = false);
+          ref.read(editProfileUploadingPhotoProvider.notifier).state = false;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               backgroundColor: Color(0xFFDC2626),
@@ -203,10 +206,8 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> with Single
       }
 
       if (mounted) {
-        setState(() {
-          _selectedAvatarUrl = uploadedUrl;
-          _isUploadingPhoto = false;
-        });
+        ref.read(editProfileAvatarUrlProvider.notifier).state = uploadedUrl;
+        ref.read(editProfileUploadingPhotoProvider.notifier).state = false;
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -217,7 +218,7 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> with Single
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isUploadingPhoto = false);
+        ref.read(editProfileUploadingPhotoProvider.notifier).state = false;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: const Color(0xFFDC2626),
@@ -228,10 +229,10 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> with Single
     }
   }
 
-  void _saveProfile() async {
+  void _saveProfile(String? selectedAvatarUrl) async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isSaving = true);
+    ref.read(editProfileSavingProvider.notifier).state = true;
 
     final success = await ref.read(authProvider.notifier).updateProfile(
           firstName: _firstNameController.text.trim(),
@@ -244,11 +245,11 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> with Single
           bankName: _bankNameController.text.trim(),
           bankAccountNumber: _bankAccountNoController.text.trim(),
           bankAccountName: _bankAccountNameController.text.trim(),
-          avatarUrl: _selectedAvatarUrl,
+          avatarUrl: selectedAvatarUrl,
         );
 
     if (mounted) {
-      setState(() => _isSaving = false);
+      ref.read(editProfileSavingProvider.notifier).state = false;
       if (success) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -261,21 +262,26 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> with Single
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             backgroundColor: Color(0xFFDC2626),
-            content: Text('⚠️ Failed to save profile changes. Please try again.'),
+            content: Text('Failed to save profile changes. Please try again.'),
           ),
         );
       }
     }
   }
 
-  void _showAvatarPicker() {
+  void _showAvatarOptionsSheet(BuildContext parentContext, String? selectedAvatarUrl) {
+    final theme = Theme.of(parentContext);
+    final isDark = theme.brightness == Brightness.dark;
+
     showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      context: parentContext,
+      backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -283,59 +289,52 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> with Single
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    const Icon(Icons.add_a_photo_rounded, color: AppColors.orange, size: 22),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Select Display Picture (DP)',
-                      style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                  ],
+                Text(
+                  'Change Profile Photo',
+                  style: GoogleFonts.inter(fontSize: 16.5, fontWeight: FontWeight.bold),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close_rounded),
+                  icon: const Icon(Icons.close_rounded, size: 20),
                   onPressed: () => Navigator.pop(ctx),
                 ),
               ],
             ),
-            const Divider(),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
 
-            // Action Options: Camera & Gallery
+            // Camera / Gallery Buttons
             Row(
               children: [
                 Expanded(
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.orange,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      side: const BorderSide(color: AppColors.orange),
+                      foregroundColor: AppColors.orange,
                     ),
                     onPressed: () {
                       Navigator.pop(ctx);
                       _pickAndUploadImage(ImageSource.camera);
                     },
                     icon: const Icon(Icons.camera_alt_rounded, size: 18),
-                    label: const Text('Take Photo', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    label: const Text('Camera', style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2563EB),
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      backgroundColor: AppColors.orange,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
                     onPressed: () {
                       Navigator.pop(ctx);
                       _pickAndUploadImage(ImageSource.gallery);
                     },
                     icon: const Icon(Icons.photo_library_rounded, size: 18),
-                    label: const Text('Upload Photo', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    label: const Text('Gallery', style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ),
               ],
@@ -351,10 +350,10 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> with Single
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: _avatarPresets.map((preset) {
-                final isSelected = _selectedAvatarUrl == preset['url'];
+                final isSelected = selectedAvatarUrl == preset['url'];
                 return GestureDetector(
                   onTap: () {
-                    setState(() => _selectedAvatarUrl = preset['url']);
+                    ref.read(editProfileAvatarUrlProvider.notifier).state = preset['url'];
                     Navigator.pop(ctx);
                   },
                   child: Column(
@@ -390,12 +389,12 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> with Single
             const SizedBox(height: 16),
 
             // Clear Photo Option
-            if (_selectedAvatarUrl != null)
+            if (selectedAvatarUrl != null)
               Center(
                 child: TextButton.icon(
                   style: TextButton.styleFrom(foregroundColor: const Color(0xFFBA1A1A)),
                   onPressed: () {
-                    setState(() => _selectedAvatarUrl = '');
+                    ref.read(editProfileAvatarUrlProvider.notifier).state = '';
                     Navigator.pop(ctx);
                   },
                   icon: const Icon(Icons.delete_outline_rounded, size: 16),
@@ -413,6 +412,9 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> with Single
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final selectedAvatarUrl = ref.watch(editProfileAvatarUrlProvider);
+    final isSaving = ref.watch(editProfileSavingProvider);
+    final isUploadingPhoto = ref.watch(editProfileUploadingPhotoProvider);
     final displayName = '${_firstNameController.text} ${_lastNameController.text}'.trim();
 
     return Container(
@@ -487,7 +489,7 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> with Single
                           child: Stack(
                             children: [
                               UserAvatarWidget(
-                                avatarUrl: _selectedAvatarUrl,
+                                avatarUrl: selectedAvatarUrl,
                                 fullName: displayName.isNotEmpty ? displayName : widget.user.fullName,
                                 radius: 44,
                                 showBorder: true,
@@ -498,16 +500,21 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> with Single
                                 bottom: 0,
                                 right: 0,
                                 child: GestureDetector(
-                                  onTap: _showAvatarPicker,
+                                  onTap: isUploadingPhoto ? null : () => _showAvatarOptionsSheet(context, selectedAvatarUrl),
                                   child: Container(
                                     padding: const EdgeInsets.all(7),
-                                    decoration: const BoxDecoration(
+                                    decoration: BoxDecoration(
                                       color: AppColors.orange,
                                       shape: BoxShape.circle,
+                                      border: Border.all(color: theme.cardColor, width: 2),
                                     ),
-                                    child: _isUploadingPhoto
-                                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                                        : const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 16),
+                                    child: isUploadingPhoto
+                                        ? const SizedBox(
+                                            width: 14,
+                                            height: 14,
+                                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                          )
+                                        : const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 14),
                                   ),
                                 ),
                               ),
@@ -516,82 +523,72 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> with Single
                         ),
                         const SizedBox(height: 8),
                         Center(
-                          child: TextButton.icon(
-                            onPressed: _showAvatarPicker,
-                            icon: const Icon(Icons.photo_camera_outlined, size: 16, color: AppColors.orange),
-                            label: Text(
-                              _isUploadingPhoto ? 'Uploading Photo...' : 'Upload Display Picture (DP)',
-                              style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.orange),
+                          child: Text(
+                            'Tap camera icon to change DP or choose 3D avatar',
+                            style: GoogleFonts.inter(
+                              fontSize: 11.5,
+                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                             ),
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 20),
 
-                        Text(
-                          'PERSONAL DETAILS',
-                          style: GoogleFonts.jetBrainsMono(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF64748B), letterSpacing: 0.8),
+                        // First Name
+                        TextFormField(
+                          controller: _firstNameController,
+                          decoration: const InputDecoration(
+                            labelText: 'First Name',
+                            prefixIcon: Icon(Icons.person_rounded, size: 18),
+                          ),
+                          validator: (v) => v == null || v.trim().isEmpty ? 'First name is required' : null,
                         ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextFormField(
-                                controller: _firstNameController,
-                                decoration: const InputDecoration(labelText: 'First Name'),
-                                validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: TextFormField(
-                                controller: _lastNameController,
-                                decoration: const InputDecoration(labelText: 'Last Name'),
-                                validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
-                              ),
-                            ),
-                          ],
+                        const SizedBox(height: 14),
+
+                        // Last Name
+                        TextFormField(
+                          controller: _lastNameController,
+                          decoration: const InputDecoration(
+                            labelText: 'Last Name',
+                            prefixIcon: Icon(Icons.person_outline_rounded, size: 18),
+                          ),
+                          validator: (v) => v == null || v.trim().isEmpty ? 'Last name is required' : null,
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 14),
+
+                        // Phone Number
                         TextFormField(
                           controller: _phoneController,
+                          keyboardType: TextInputType.phone,
                           decoration: const InputDecoration(
                             labelText: 'Phone Number',
                             prefixIcon: Icon(Icons.phone_rounded, size: 18),
                           ),
-                          validator: (v) => v == null || v.trim().isEmpty ? 'Enter valid phone number' : null,
+                          validator: (v) => v == null || v.trim().isEmpty ? 'Phone number is required' : null,
                         ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          initialValue: widget.user.email,
-                          readOnly: true,
-                          decoration: const InputDecoration(
-                            labelText: 'Email Address (Account ID)',
-                            prefixIcon: Icon(Icons.email_outlined, size: 18),
-                            helperText: 'Email is tied to system security and cannot be changed here.',
-                          ),
-                        ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 14),
 
-                        Text(
-                          'OPERATING REGION',
-                          style: GoogleFonts.jetBrainsMono(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF64748B), letterSpacing: 0.8),
-                        ),
-                        const SizedBox(height: 8),
+                        // Operating Region / State
                         Row(
                           children: [
                             Expanded(
                               child: TextFormField(
                                 controller: _stateController,
-                                decoration: const InputDecoration(labelText: 'State (e.g. Abuja (FCT))'),
-                                validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                                decoration: const InputDecoration(
+                                  labelText: 'State / Region',
+                                  prefixIcon: Icon(Icons.map_rounded, size: 18),
+                                ),
+                                validator: (v) => v == null || v.trim().isEmpty ? 'State is required' : null,
                               ),
                             ),
                             const SizedBox(width: 10),
                             Expanded(
                               child: TextFormField(
                                 controller: _cityController,
-                                decoration: const InputDecoration(labelText: 'City / Zone (e.g. Wuse II)'),
-                                validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                                decoration: const InputDecoration(
+                                  labelText: 'City / Hub Hub',
+                                  prefixIcon: Icon(Icons.location_city_rounded, size: 18),
+                                ),
+                                validator: (v) => v == null || v.trim().isEmpty ? 'City is required' : null,
                               ),
                             ),
                           ],
@@ -607,7 +604,7 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> with Single
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Container(
-                          padding: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
                             color: const Color(0xFF16A34A).withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
@@ -615,12 +612,12 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> with Single
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.security_rounded, color: Color(0xFF16A34A), size: 20),
+                              const Icon(Icons.shield_rounded, color: Color(0xFF16A34A), size: 22),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
-                                  'Direct Settlement Account for Weekly Base Commission & Transport Allowances.',
-                                  style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF16A34A), fontWeight: FontWeight.w600),
+                                  'Payout earnings, milestone bonuses, and transport allowances will be settled directly to this account.',
+                                  style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF16A34A), fontWeight: FontWeight.w500),
                                 ),
                               ),
                             ],
@@ -628,21 +625,16 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> with Single
                         ),
                         const SizedBox(height: 16),
 
-                        Text(
-                          'BANK DETAILS',
-                          style: GoogleFonts.jetBrainsMono(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF64748B), letterSpacing: 0.8),
-                        ),
-                        const SizedBox(height: 8),
                         DropdownButtonFormField<String>(
                           initialValue: nigerianBanks.contains(_bankNameController.text) ? _bankNameController.text : nigerianBanks.first,
                           decoration: const InputDecoration(
-                            labelText: 'Settlement Bank',
+                            labelText: 'Receiving Bank',
                             prefixIcon: Icon(Icons.account_balance_rounded, size: 18),
                           ),
                           items: nigerianBanks.map((b) => DropdownMenuItem(value: b, child: Text(b, style: const TextStyle(fontSize: 13.5)))).toList(),
                           onChanged: (val) {
                             if (val != null) {
-                              setState(() => _bankNameController.text = val);
+                              _bankNameController.text = val;
                             }
                           },
                         ),
@@ -697,7 +689,7 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> with Single
                           items: vehicleTypes.map((v) => DropdownMenuItem(value: v, child: Text(v, style: const TextStyle(fontSize: 13.5)))).toList(),
                           onChanged: (val) {
                             if (val != null) {
-                              setState(() => _vehicleTypeController.text = val);
+                              _vehicleTypeController.text = val;
                             }
                           },
                         ),
@@ -754,12 +746,12 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> with Single
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                onPressed: _isSaving ? null : _saveProfile,
-                icon: _isSaving
+                onPressed: isSaving ? null : () => _saveProfile(selectedAvatarUrl),
+                icon: isSaving
                     ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                     : const Icon(Icons.save_rounded, size: 20),
                 label: Text(
-                  _isSaving ? 'SAVING PROFILE...' : 'SAVE PROFILE CHANGES',
+                  isSaving ? 'SAVING PROFILE...' : 'SAVE PROFILE CHANGES',
                   style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 15),
                 ),
               ),

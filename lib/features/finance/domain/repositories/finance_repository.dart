@@ -11,6 +11,7 @@ abstract class FinanceRepository {
     double grossCollections = 0.0,
     double commissionDeducted = 0.0,
     double transportAllowanceDeducted = 0.0,
+    double failedStipendsDeducted = 0.0,
     double posFee = 0.0,
     String? depositReceiptUrl,
     String? referenceNumber,
@@ -19,6 +20,7 @@ abstract class FinanceRepository {
     double? expectedAmount,
     bool isPartial = false,
     String? notes,
+    List<RemittanceOrderItem> associatedOrders = const [],
   });
   Future<Map<String, dynamic>> requestPayout({
     required String agentId,

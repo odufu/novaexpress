@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -74,7 +75,15 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
         super(OrdersState()) {
     _initOrders();
     _setupRealtimeSubscription();
-    _startHeartbeatTimer();
+    bool isTest = false;
+    if (!kIsWeb) {
+      try {
+        isTest = Platform.environment.containsKey('FLUTTER_TEST');
+      } catch (_) {}
+    }
+    if (!isTest) {
+      _startHeartbeatTimer();
+    }
   }
 
   bool _isRiderUser() {
@@ -170,6 +179,11 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
   }
 
   void _startHeartbeatTimer() {
+    if (!kIsWeb) {
+      try {
+        if (Platform.environment.containsKey('FLUTTER_TEST')) return;
+      } catch (_) {}
+    }
     _heartbeatTimer?.cancel();
     _heartbeatTimer = Timer.periodic(const Duration(seconds: 3), (_) {
       if (!mounted) return;
@@ -221,12 +235,14 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
 
   Future<void> _initOrders() async {
     final cached = await _storageService.getCachedOrders(_getScopeKey());
+    if (!mounted) return;
     if (cached != null && cached.isNotEmpty) {
       final sortedCached = _sortOrdersByOperationalPriority(cached);
       state = state.copyWith(orders: sortedCached);
       debugPrint('[ORDERS_PROVIDER] ⚡ Hydrated ${sortedCached.length} orders from local cache for scope (${_getScopeKey()}).');
     }
     final agentId = _getActiveAgentId();
+    if (!mounted) return;
     if (agentId.isNotEmpty && _isRiderUser()) {
       await loadOrders(agentId);
     } else {
@@ -239,22 +255,26 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
   }
 
   Future<void> loadOrders([String? agentId]) async {
+    if (!mounted) return;
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
       final isRider = _isRiderUser();
       if (isRider && ((agentId != null && agentId.isNotEmpty) || _getActiveAgentId().isNotEmpty)) {
         final idToLoad = (agentId != null && agentId.isNotEmpty) ? agentId : _getActiveAgentId();
         final rawOrders = await _repository.getAssignedOrders(idToLoad);
+        if (!mounted) return;
         final orderEntities = _sortOrdersByOperationalPriority(rawOrders);
         state = state.copyWith(isLoading: false, orders: orderEntities);
         await _storageService.cacheOrders(orderEntities, _getScopeKey());
       } else {
         final rawOrders = await _repository.getDistributionCenterOrders('22222222-2222-4222-8222-222222222222');
+        if (!mounted) return;
         final orderEntities = _sortOrdersByOperationalPriority(rawOrders);
         state = state.copyWith(isLoading: false, orders: orderEntities);
         await _storageService.cacheOrders(orderEntities, _getScopeKey());
       }
     } catch (e) {
+      if (!mounted) return;
       state = state.copyWith(
         isLoading: false,
         errorMessage: 'Failed to load manifest orders: $e',
@@ -263,13 +283,16 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
   }
 
   Future<void> loadDcOrders([String? dcId]) async {
+    if (!mounted) return;
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
       final rawOrders = await _repository.getDistributionCenterOrders(dcId ?? '22222222-2222-4222-8222-222222222222');
+      if (!mounted) return;
       final orderEntities = _sortOrdersByOperationalPriority(rawOrders);
       state = state.copyWith(isLoading: false, orders: orderEntities);
       await _storageService.cacheOrders(orderEntities, 'dc');
     } catch (e) {
+      if (!mounted) return;
       state = state.copyWith(isLoading: false, errorMessage: 'Failed to load DC orders: $e');
     }
   }

@@ -11,6 +11,9 @@ import '../../domain/entities/financial_summary.dart';
 import '../../domain/entities/remittance.dart';
 import '../providers/finance_provider.dart';
 
+final cashFilterProvider = StateProvider.autoDispose<String>((ref) => 'all');
+final cashMetricTabProvider = StateProvider.autoDispose<int>((ref) => 0);
+
 class CashPage extends ConsumerStatefulWidget {
   const CashPage({super.key});
 
@@ -19,9 +22,6 @@ class CashPage extends ConsumerStatefulWidget {
 }
 
 class _CashPageState extends ConsumerState<CashPage> {
-  String _selectedFilter = 'all'; // 'all', 'approved', 'submitted', 'rejected'
-  int _selectedMetricTabIndex = 0; // 0: Cumulative, 1: Most Recent, 2: My Balance
-
   @override
   void initState() {
     super.initState();
@@ -42,6 +42,8 @@ class _CashPageState extends ConsumerState<CashPage> {
     final financeState = ref.watch(financeProvider);
     final ordersState = ref.watch(ordersProvider);
     final notifState = ref.watch(notificationsProvider);
+    final selectedFilter = ref.watch(cashFilterProvider);
+    final selectedMetricTabIndex = ref.watch(cashMetricTabProvider);
 
     final user = authState.user;
     final agentName = user != null && (user.firstName.isNotEmpty || user.lastName.isNotEmpty)
@@ -55,6 +57,7 @@ class _CashPageState extends ConsumerState<CashPage> {
       remittances: financeState.remittances,
       user: user,
       manualEarnedBalance: financeState.totalEarnedBalance,
+      transactions: financeState.transactions,
     );
 
     final approvedRemittances = financeState.remittances
@@ -70,6 +73,7 @@ class _CashPageState extends ConsumerState<CashPage> {
     final double cashCollected = summary.cashCollectedAllTime > 0
         ? summary.cashCollectedAllTime
         : summary.cashCollectedToday;
+    final double totalRemitted = summary.totalRemittedAllTime;
     final double totalCommission = summary.totalCommissionRetained;
     final double totalTransport = summary.totalTransportRetained;
     final double toRemit = summary.pendingRemittanceToDC;
@@ -223,7 +227,7 @@ class _CashPageState extends ConsumerState<CashPage> {
                                   index: 0,
                                   title: 'Cumulative',
                                   icon: Icons.pie_chart_outline_rounded,
-                                  isSelected: _selectedMetricTabIndex == 0,
+                                  isSelected: selectedMetricTabIndex == 0,
                                   activeColor: const Color(0xFF00A2D3),
                                 ),
                               ),
@@ -233,7 +237,7 @@ class _CashPageState extends ConsumerState<CashPage> {
                                   index: 1,
                                   title: 'Most Recent',
                                   icon: Icons.flash_on_rounded,
-                                  isSelected: _selectedMetricTabIndex == 1,
+                                  isSelected: selectedMetricTabIndex == 1,
                                   activeColor: const Color(0xFF00A2D3),
                                 ),
                               ),
@@ -243,7 +247,7 @@ class _CashPageState extends ConsumerState<CashPage> {
                                   index: 2,
                                   title: 'My Balance',
                                   icon: Icons.account_balance_wallet_outlined,
-                                  isSelected: _selectedMetricTabIndex == 2,
+                                  isSelected: selectedMetricTabIndex == 2,
                                   activeColor: const Color(0xFF2563EB),
                                 ),
                               ),
@@ -253,7 +257,7 @@ class _CashPageState extends ConsumerState<CashPage> {
                         const SizedBox(height: 8),
 
                         // CONDITIONALLY RENDER ONLY THE SELECTED CARD BELOW
-                        if (_selectedMetricTabIndex == 0) ...[
+                        if (selectedMetricTabIndex == 0) ...[
                           // 1. CUMULATIVE SUMMARY CARD (ALL DELIVERIES)
                           Container(
                             width: double.infinity,
@@ -340,6 +344,16 @@ class _CashPageState extends ConsumerState<CashPage> {
                                       _buildVerticalSeparator(),
                                       Expanded(
                                         child: _buildCompactMetricColumn(
+                                          icon: Icons.check_circle_outline_rounded,
+                                          iconColor: const Color(0xFF34D399),
+                                          amountColor: const Color(0xFF34D399),
+                                          label: 'Remitted',
+                                          amount: totalRemitted,
+                                        ),
+                                      ),
+                                      _buildVerticalSeparator(),
+                                      Expanded(
+                                        child: _buildCompactMetricColumn(
                                           icon: Icons.near_me_outlined,
                                           iconColor: const Color(0xFFFB923C),
                                           amountColor: const Color(0xFFFB923C),
@@ -372,7 +386,7 @@ class _CashPageState extends ConsumerState<CashPage> {
                                 ],
                               ),
                             ),
-                          ] else if (_selectedMetricTabIndex == 1) ...[
+                          ] else if (selectedMetricTabIndex == 1) ...[
                             // 2. MOST RECENT TRANSACTION CARD (INDIVIDUAL TRANSACTION BREAKDOWN)
                             Container(
                               width: double.infinity,
@@ -512,7 +526,7 @@ class _CashPageState extends ConsumerState<CashPage> {
                               ],
                             ),
                           ),
-                        ] else if (_selectedMetricTabIndex == 2) ...[
+                        ] else if (selectedMetricTabIndex == 2) ...[
                           // 3. MY BALANCE CARD (DIRECT TRANSFER EARNINGS & PAYOUT REQUEST)
                           Container(
                             width: double.infinity,
@@ -938,13 +952,13 @@ class _CashPageState extends ConsumerState<CashPage> {
                       scrollDirection: Axis.horizontal,
                       child: Row(
                         children: [
-                          _buildFilterPill('All (${financeState.remittances.length})', 'all', isDark),
+                          _buildFilterPill('All (${financeState.remittances.length})', 'all', isDark, selectedFilter),
                           const SizedBox(width: 8),
-                          _buildFilterPill('Approved (${approvedRemittances.length})', 'approved', isDark),
+                          _buildFilterPill('Approved (${approvedRemittances.length})', 'approved', isDark, selectedFilter),
                           const SizedBox(width: 8),
-                          _buildFilterPill('Submitted (${pendingRemittances.length})', 'submitted', isDark),
+                          _buildFilterPill('Submitted (${pendingRemittances.length})', 'submitted', isDark, selectedFilter),
                           const SizedBox(width: 8),
-                          _buildFilterPill('Rejected (${financeState.remittances.where((r) => r.isRejected || r.status.toLowerCase() == 'rejected').length})', 'rejected', isDark),
+                          _buildFilterPill('Rejected (${financeState.remittances.where((r) => r.isRejected || r.status.toLowerCase() == 'rejected').length})', 'rejected', isDark, selectedFilter),
                         ],
                       ),
                     ),
@@ -955,11 +969,11 @@ class _CashPageState extends ConsumerState<CashPage> {
                       builder: (context) {
                         final allRems = financeState.remittances;
                         List<RemittanceEntity> displayList;
-                        if (_selectedFilter == 'approved') {
+                        if (selectedFilter == 'approved') {
                           displayList = approvedRemittances;
-                        } else if (_selectedFilter == 'submitted') {
+                        } else if (selectedFilter == 'submitted') {
                           displayList = pendingRemittances;
-                        } else if (_selectedFilter == 'rejected') {
+                        } else if (selectedFilter == 'rejected') {
                           displayList = allRems.where((r) => r.isRejected || r.status.toLowerCase() == 'rejected').toList();
                         } else {
                           displayList = allRems;
@@ -976,7 +990,7 @@ class _CashPageState extends ConsumerState<CashPage> {
                             ),
                             child: Center(
                               child: Text(
-                                'No ${_selectedFilter.toUpperCase()} remittances found.',
+                                'No ${selectedFilter.toUpperCase()} remittances found.',
                                 style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B)),
                               ),
                             ),
@@ -1017,7 +1031,7 @@ class _CashPageState extends ConsumerState<CashPage> {
     required Color activeColor,
   }) {
     return InkWell(
-      onTap: () => setState(() => _selectedMetricTabIndex = index),
+      onTap: () => ref.read(cashMetricTabProvider.notifier).state = index,
       borderRadius: BorderRadius.circular(9),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
@@ -1160,11 +1174,11 @@ class _CashPageState extends ConsumerState<CashPage> {
     );
   }
 
-  Widget _buildFilterPill(String label, String value, bool isDark) {
-    final isSelected = _selectedFilter == value;
+  Widget _buildFilterPill(String label, String value, bool isDark, String selectedFilter) {
+    final isSelected = selectedFilter == value;
 
     return InkWell(
-      onTap: () => setState(() => _selectedFilter = value),
+      onTap: () => ref.read(cashFilterProvider.notifier).state = value,
       borderRadius: BorderRadius.circular(20),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),

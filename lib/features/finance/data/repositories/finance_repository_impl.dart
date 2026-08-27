@@ -22,6 +22,7 @@ class FinanceRepositoryImpl implements FinanceRepository {
     double grossCollections = 0.0,
     double commissionDeducted = 0.0,
     double transportAllowanceDeducted = 0.0,
+    double failedStipendsDeducted = 0.0,
     double posFee = 0.0,
     String? depositReceiptUrl,
     String? referenceNumber,
@@ -30,6 +31,7 @@ class FinanceRepositoryImpl implements FinanceRepository {
     double? expectedAmount,
     bool isPartial = false,
     String? notes,
+    List<RemittanceOrderItem> associatedOrders = const [],
   }) async {
     return await remoteDataSource.submitRemittance(
       agentId: agentId,
@@ -39,6 +41,7 @@ class FinanceRepositoryImpl implements FinanceRepository {
       grossCollections: grossCollections,
       commissionDeducted: commissionDeducted,
       transportAllowanceDeducted: transportAllowanceDeducted,
+      failedStipendsDeducted: failedStipendsDeducted,
       posFee: posFee,
       depositReceiptUrl: depositReceiptUrl,
       referenceNumber: referenceNumber,
@@ -47,6 +50,7 @@ class FinanceRepositoryImpl implements FinanceRepository {
       expectedAmount: expectedAmount,
       isPartial: isPartial,
       notes: notes,
+      associatedOrders: associatedOrders,
     );
   }
 

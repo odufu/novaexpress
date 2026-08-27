@@ -1,7 +1,57 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-class RescheduleCallbackModal extends StatefulWidget {
+class RescheduleCallbackState {
+  final DateTime selectedDate;
+  final TimeOfDay selectedTime;
+  final String datePreset;
+  final String timePreset;
+
+  RescheduleCallbackState({
+    required this.selectedDate,
+    required this.selectedTime,
+    this.datePreset = 'tomorrow',
+    this.timePreset = 'afternoon',
+  });
+
+  RescheduleCallbackState copyWith({
+    DateTime? selectedDate,
+    TimeOfDay? selectedTime,
+    String? datePreset,
+    String? timePreset,
+  }) {
+    return RescheduleCallbackState(
+      selectedDate: selectedDate ?? this.selectedDate,
+      selectedTime: selectedTime ?? this.selectedTime,
+      datePreset: datePreset ?? this.datePreset,
+      timePreset: timePreset ?? this.timePreset,
+    );
+  }
+}
+
+class RescheduleCallbackNotifier extends StateNotifier<RescheduleCallbackState> {
+  RescheduleCallbackNotifier()
+      : super(RescheduleCallbackState(
+          selectedDate: DateTime.now().add(const Duration(days: 1)),
+          selectedTime: const TimeOfDay(hour: 14, minute: 0),
+        ));
+
+  void setDatePreset(String preset, DateTime date) {
+    state = state.copyWith(datePreset: preset, selectedDate: date);
+  }
+
+  void setTimePreset(String preset, TimeOfDay time) {
+    state = state.copyWith(timePreset: preset, selectedTime: time);
+  }
+}
+
+final rescheduleCallbackProvider =
+    StateNotifierProvider.autoDispose<RescheduleCallbackNotifier, RescheduleCallbackState>((ref) {
+  return RescheduleCallbackNotifier();
+});
+
+class RescheduleCallbackModal extends ConsumerStatefulWidget {
   final String orderId;
   final String customerName;
   final Function(DateTime scheduledTime, String note) onRescheduleConfirmed;
@@ -32,16 +82,11 @@ class RescheduleCallbackModal extends StatefulWidget {
   }
 
   @override
-  State<RescheduleCallbackModal> createState() => _RescheduleCallbackModalState();
+  ConsumerState<RescheduleCallbackModal> createState() => _RescheduleCallbackModalState();
 }
 
-class _RescheduleCallbackModalState extends State<RescheduleCallbackModal> {
-  DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
-  TimeOfDay _selectedTime = const TimeOfDay(hour: 14, minute: 0);
+class _RescheduleCallbackModalState extends ConsumerState<RescheduleCallbackModal> {
   final TextEditingController _notesController = TextEditingController();
-
-  String _datePreset = 'tomorrow'; // 'tomorrow', 'next_2_days', 'custom'
-  String _timePreset = 'afternoon'; // 'morning', 'afternoon', 'evening', 'custom'
 
   @override
   void dispose() {
@@ -49,31 +94,25 @@ class _RescheduleCallbackModalState extends State<RescheduleCallbackModal> {
     super.dispose();
   }
 
-  void _pickCustomDate() async {
+  void _pickCustomDate(DateTime currentDate) async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: _selectedDate,
+      initialDate: currentDate,
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 14)),
     );
     if (picked != null) {
-      setState(() {
-        _selectedDate = picked;
-        _datePreset = 'custom';
-      });
+      ref.read(rescheduleCallbackProvider.notifier).setDatePreset('custom', picked);
     }
   }
 
-  void _pickCustomTime() async {
+  void _pickCustomTime(TimeOfDay currentTime) async {
     final picked = await showTimePicker(
       context: context,
-      initialTime: _selectedTime,
+      initialTime: currentTime,
     );
     if (picked != null) {
-      setState(() {
-        _selectedTime = picked;
-        _timePreset = 'custom';
-      });
+      ref.read(rescheduleCallbackProvider.notifier).setTimePreset('custom', picked);
     }
   }
 
@@ -81,6 +120,7 @@ class _RescheduleCallbackModalState extends State<RescheduleCallbackModal> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final callbackState = ref.watch(rescheduleCallbackProvider);
 
     return Container(
       decoration: BoxDecoration(
@@ -164,12 +204,12 @@ class _RescheduleCallbackModalState extends State<RescheduleCallbackModal> {
               Expanded(
                 child: _buildDatePresetChip(
                   label: 'Tomorrow',
-                  isSelected: _datePreset == 'tomorrow',
+                  isSelected: callbackState.datePreset == 'tomorrow',
                   onTap: () {
-                    setState(() {
-                      _datePreset = 'tomorrow';
-                      _selectedDate = DateTime.now().add(const Duration(days: 1));
-                    });
+                    ref.read(rescheduleCallbackProvider.notifier).setDatePreset(
+                          'tomorrow',
+                          DateTime.now().add(const Duration(days: 1)),
+                        );
                   },
                 ),
               ),
@@ -177,12 +217,12 @@ class _RescheduleCallbackModalState extends State<RescheduleCallbackModal> {
               Expanded(
                 child: _buildDatePresetChip(
                   label: 'In 2 Days',
-                  isSelected: _datePreset == 'next_2_days',
+                  isSelected: callbackState.datePreset == 'next_2_days',
                   onTap: () {
-                    setState(() {
-                      _datePreset = 'next_2_days';
-                      _selectedDate = DateTime.now().add(const Duration(days: 2));
-                    });
+                    ref.read(rescheduleCallbackProvider.notifier).setDatePreset(
+                          'next_2_days',
+                          DateTime.now().add(const Duration(days: 2)),
+                        );
                   },
                 ),
               ),
@@ -190,8 +230,8 @@ class _RescheduleCallbackModalState extends State<RescheduleCallbackModal> {
               Expanded(
                 child: _buildDatePresetChip(
                   label: 'Custom Date',
-                  isSelected: _datePreset == 'custom',
-                  onTap: _pickCustomDate,
+                  isSelected: callbackState.datePreset == 'custom',
+                  onTap: () => _pickCustomDate(callbackState.selectedDate),
                 ),
               ),
             ],
@@ -214,12 +254,12 @@ class _RescheduleCallbackModalState extends State<RescheduleCallbackModal> {
               Expanded(
                 child: _buildTimePresetChip(
                   label: 'Morning (10 AM)',
-                  isSelected: _timePreset == 'morning',
+                  isSelected: callbackState.timePreset == 'morning',
                   onTap: () {
-                    setState(() {
-                      _timePreset = 'morning';
-                      _selectedTime = const TimeOfDay(hour: 10, minute: 0);
-                    });
+                    ref.read(rescheduleCallbackProvider.notifier).setTimePreset(
+                          'morning',
+                          const TimeOfDay(hour: 10, minute: 0),
+                        );
                   },
                 ),
               ),
@@ -227,12 +267,12 @@ class _RescheduleCallbackModalState extends State<RescheduleCallbackModal> {
               Expanded(
                 child: _buildTimePresetChip(
                   label: 'Afternoon (2 PM)',
-                  isSelected: _timePreset == 'afternoon',
+                  isSelected: callbackState.timePreset == 'afternoon',
                   onTap: () {
-                    setState(() {
-                      _timePreset = 'afternoon';
-                      _selectedTime = const TimeOfDay(hour: 14, minute: 0);
-                    });
+                    ref.read(rescheduleCallbackProvider.notifier).setTimePreset(
+                          'afternoon',
+                          const TimeOfDay(hour: 14, minute: 0),
+                        );
                   },
                 ),
               ),
@@ -240,23 +280,23 @@ class _RescheduleCallbackModalState extends State<RescheduleCallbackModal> {
               Expanded(
                 child: _buildTimePresetChip(
                   label: 'Evening (5 PM)',
-                  isSelected: _timePreset == 'evening',
+                  isSelected: callbackState.timePreset == 'evening',
                   onTap: () {
-                    setState(() {
-                      _timePreset = 'evening';
-                      _selectedTime = const TimeOfDay(hour: 17, minute: 0);
-                    });
+                    ref.read(rescheduleCallbackProvider.notifier).setTimePreset(
+                          'evening',
+                          const TimeOfDay(hour: 17, minute: 0),
+                        );
                   },
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: _buildTimePresetChip(
-                  label: _timePreset == 'custom'
-                      ? _selectedTime.format(context)
+                  label: callbackState.timePreset == 'custom'
+                      ? callbackState.selectedTime.format(context)
                       : 'Pick Time',
-                  isSelected: _timePreset == 'custom',
-                  onTap: _pickCustomTime,
+                  isSelected: callbackState.timePreset == 'custom',
+                  onTap: () => _pickCustomTime(callbackState.selectedTime),
                 ),
               ),
             ],
@@ -298,22 +338,22 @@ class _RescheduleCallbackModalState extends State<RescheduleCallbackModal> {
               ),
               onPressed: () {
                 final scheduledDateTime = DateTime(
-                  _selectedDate.year,
-                  _selectedDate.month,
-                  _selectedDate.day,
-                  _selectedTime.hour,
-                  _selectedTime.minute,
+                  callbackState.selectedDate.year,
+                  callbackState.selectedDate.month,
+                  callbackState.selectedDate.day,
+                  callbackState.selectedTime.hour,
+                  callbackState.selectedTime.minute,
                 );
                 final note = _notesController.text.trim().isNotEmpty
                     ? _notesController.text.trim()
-                    : 'Customer requested reschedule for ${_selectedDate.day}/${_selectedDate.month} at ${_selectedTime.format(context)}';
+                    : 'Customer requested reschedule for ${callbackState.selectedDate.day}/${callbackState.selectedDate.month} at ${callbackState.selectedTime.format(context)}';
 
                 Navigator.pop(context);
                 widget.onRescheduleConfirmed(scheduledDateTime, note);
               },
               icon: const Icon(Icons.alarm_add_rounded, size: 18),
               label: Text(
-                'Confirm Reschedule (${_selectedDate.day}/${_selectedDate.month} • ${_selectedTime.format(context)})',
+                'Confirm Reschedule (${callbackState.selectedDate.day}/${callbackState.selectedDate.month} • ${callbackState.selectedTime.format(context)})',
                 style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13),
               ),
             ),

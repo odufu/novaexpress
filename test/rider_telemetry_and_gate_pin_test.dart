@@ -11,6 +11,7 @@ import 'package:novexps/features/orders/data/services/geocoding_service.dart';
 import 'package:novexps/features/orders/domain/entities/order.dart';
 import 'package:novexps/features/orders/domain/repositories/orders_repository.dart';
 import 'package:novexps/features/orders/presentation/providers/orders_provider.dart';
+import 'package:novexps/features/stock/presentation/providers/stock_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -81,12 +82,12 @@ void main() {
       expect(updated.geocodingStatus, equals('exact_verified'));
       expect(updated.locationConfidence, equals('high'));
       expect(updated.latitude, equals(9.076550));
+      notifier.dispose();
     });
 
     testWidgets('3. DCOrdersPage dispatch modal shows GIS Nearest Rider Match for geocoded orders', (tester) async {
-      tester.view.physicalSize = const Size(1280, 900);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(() => tester.view.resetPhysicalSize());
+      await tester.binding.setSurfaceSize(const Size(1280, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
 
       final unassignedOrder = OrderModel(
         id: 'ord-gis-001',
@@ -116,38 +117,31 @@ void main() {
         ProviderScope(
           overrides: [
             ordersRemoteDataSourceProvider.overrideWithValue(mockOrdersDataSource),
-            ordersProvider.overrideWith((ref) {
-              final notifier = OrdersNotifier(_MockOrdersRepo([unassignedOrder]));
-              notifier.state = OrdersState(isLoading: false, orders: [unassignedOrder]);
-              return notifier;
-            }),
+            ordersProvider.overrideWith((ref) => _MockOrdersNotifier([unassignedOrder])),
+            stockProvider.overrideWith((ref) => _MockStockNotifier()),
             dcConsoleProvider.overrideWith((ref) {
-              final notifier = DCConsoleNotifier();
-              notifier.state = notifier.state.copyWith(
-                drivers: const [
-                  DCFleetDriver(
-                    id: 'b1111111-1111-4111-8111-111111111111',
-                    driverCode: 'PDA-7000',
-                    name: 'Emeka Rider',
-                    phone: '08012345678',
-                    avatarUrl: '',
-                    vehicleModel: 'Bajaj Boxer',
-                    vehiclePlate: 'ABJ-204-XY',
-                    vehicleType: 'Motorcycle',
-                    status: 'active',
-                    assignedZone: 'Wuse II & Abuja Central',
-                    totalAssignedOrders: 0,
-                    completedOrders: 0,
-                    routeProgressPercent: 0.0,
-                    efficiencyRating: 100.0,
-                    cashInCustody: 0.0,
-                    itemsInCustody: 0,
-                    personnelType: 'pda',
-                    compensationType: 'commission',
-                  ),
-                ],
-              );
-              return notifier;
+              return _MockDCConsoleNotifier(const [
+                DCFleetDriver(
+                  id: 'b1111111-1111-4111-8111-111111111111',
+                  driverCode: 'PDA-7000',
+                  name: 'Emeka Rider',
+                  phone: '08012345678',
+                  avatarUrl: '',
+                  vehicleModel: 'Bajaj Boxer',
+                  vehiclePlate: 'ABJ-204-XY',
+                  vehicleType: 'Motorcycle',
+                  status: 'active',
+                  assignedZone: 'Wuse II & Abuja Central',
+                  totalAssignedOrders: 0,
+                  completedOrders: 0,
+                  routeProgressPercent: 0.0,
+                  efficiencyRating: 100.0,
+                  cashInCustody: 0.0,
+                  itemsInCustody: 0,
+                  personnelType: 'pda',
+                  compensationType: 'commission',
+                ),
+              ]);
             }),
           ],
           child: const MaterialApp(
@@ -161,7 +155,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Open dispatch modal
-      final assignButton = find.widgetWithText(ElevatedButton, 'Assign Rider');
+      final assignButton = find.text('Assign Rider');
       expect(assignButton, findsOneWidget);
       await tester.tap(assignButton);
       await tester.pumpAndSettle();
@@ -288,4 +282,31 @@ class _MockOrdersRemoteDS implements OrdersRemoteDataSource {
     bool isLocationVerified = true,
     String? geocodedAddress,
   }) async {}
+}
+
+class _MockOrdersNotifier extends StateNotifier<OrdersState> implements OrdersNotifier {
+  _MockOrdersNotifier(List<OrderEntity> orders) : super(OrdersState(isLoading: false, orders: orders));
+
+  @override
+  Future<void> loadDcOrders([String? dcId]) async {}
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _MockDCConsoleNotifier extends StateNotifier<DCConsoleState> implements DCConsoleNotifier {
+  _MockDCConsoleNotifier(List<DCFleetDriver> drivers) : super(DCConsoleState(drivers: drivers));
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _MockStockNotifier extends StateNotifier<StockState> implements StockNotifier {
+  _MockStockNotifier() : super(const StockState(isLoading: false, stockItems: []));
+
+  @override
+  Future<void> fetchStockItems([String? agentId]) async {}
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

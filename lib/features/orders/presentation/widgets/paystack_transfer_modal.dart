@@ -2,13 +2,19 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/constants/paystack_constants.dart';
 import '../../../../core/helpers/formatters.dart';
 import '../../../../core/services/paystack_service.dart';
 import '../../../../core/services/paystack_web_interop.dart';
 
-class PaystackTransferModal extends StatefulWidget {
+import '../../../../core/services/paystack_gateway_launcher.dart';
+
+final paystackModalVerifyingProvider = StateProvider.autoDispose<bool>((ref) => false);
+final paystackModalReceivedProvider = StateProvider.autoDispose<bool>((ref) => false);
+
+class PaystackTransferModal extends ConsumerStatefulWidget {
   final String orderNumber;
   final double amount;
   final String customerEmail;
@@ -41,33 +47,28 @@ class PaystackTransferModal extends StatefulWidget {
     String? agentId,
     required VoidCallback onPaymentConfirmed,
   }) {
-    return showModalBottomSheet(
+    final ref = 'PSTK-${orderNumber.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')}-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}';
+    return PaystackGatewayLauncher.openPayment(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => PaystackTransferModal(
-        orderNumber: orderNumber,
-        amount: amount,
-        customerEmail: customerEmail,
-        customerName: customerName,
-        customerPhone: customerPhone,
-        orderId: orderId,
-        agentId: agentId,
-        onPaymentConfirmed: onPaymentConfirmed,
-      ),
+      amount: amount,
+      email: customerEmail,
+      reference: ref,
+      title: 'Paystack Customer Checkout',
+      payerName: customerName,
+      agentId: agentId,
+      transactionType: 'order_payment',
+      onSuccess: (_) => onPaymentConfirmed(),
     );
   }
 
   @override
-  State<PaystackTransferModal> createState() => _PaystackTransferModalState();
+  ConsumerState<PaystackTransferModal> createState() => _PaystackTransferModalState();
 }
 
-class _PaystackTransferModalState extends State<PaystackTransferModal>
+class _PaystackTransferModalState extends ConsumerState<PaystackTransferModal>
     with SingleTickerProviderStateMixin {
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
-  bool _isVerifying = false;
-  bool _isReceived = false;
 
   late String _virtualAccountNumber;
   final String _bankName = PaystackConstants.defaultBankName;
@@ -122,11 +123,9 @@ class _PaystackTransferModalState extends State<PaystackTransferModal>
           'order_id': widget.orderId,
           'agent_id': widget.agentId,
         },
-        onSuccess: (String ref) async {
+        onSuccess: (String refId) async {
           if (mounted) {
-            setState(() {
-              _isReceived = true;
-            });
+            ref.read(paystackModalReceivedProvider.notifier).state = true;
             await Future.delayed(const Duration(milliseconds: 500));
             if (mounted) {
               Navigator.pop(context);
@@ -158,7 +157,7 @@ class _PaystackTransferModalState extends State<PaystackTransferModal>
   }
 
   void _verifyPayment() async {
-    setState(() => _isVerifying = true);
+    ref.read(paystackModalVerifyingProvider.notifier).state = true;
 
     final res = await _paystackService.verifyTransaction(_paymentReference);
 
@@ -178,10 +177,8 @@ class _PaystackTransferModalState extends State<PaystackTransferModal>
         responseData: res.rawData,
       );
 
-      setState(() {
-        _isVerifying = false;
-        _isReceived = true;
-      });
+      ref.read(paystackModalVerifyingProvider.notifier).state = false;
+      ref.read(paystackModalReceivedProvider.notifier).state = true;
 
       Future.delayed(const Duration(milliseconds: 700), () {
         if (mounted) {
@@ -190,7 +187,7 @@ class _PaystackTransferModalState extends State<PaystackTransferModal>
         }
       });
     } else {
-      setState(() => _isVerifying = false);
+      ref.read(paystackModalVerifyingProvider.notifier).state = false;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
@@ -208,6 +205,8 @@ class _PaystackTransferModalState extends State<PaystackTransferModal>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final isVerifying = ref.watch(paystackModalVerifyingProvider);
+    final isReceived = ref.watch(paystackModalReceivedProvider);
 
     return Container(
       decoration: BoxDecoration(
@@ -441,22 +440,22 @@ class _PaystackTransferModalState extends State<PaystackTransferModal>
               Expanded(
                 flex: 2,
                 child: ScaleTransition(
-                  scale: _isVerifying ? _pulseAnimation : const AlwaysStoppedAnimation(1.0),
+                  scale: isVerifying ? _pulseAnimation : const AlwaysStoppedAnimation(1.0),
                   child: ElevatedButton.icon(
-                    onPressed: _isVerifying ? null : _verifyPayment,
+                    onPressed: isVerifying ? null : _verifyPayment,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _isReceived ? const Color(0xFF16A34A) : const Color(0xFF00A2D3),
+                      backgroundColor: isReceived ? const Color(0xFF16A34A) : const Color(0xFF00A2D3),
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
-                    icon: _isVerifying
+                    icon: isVerifying
                         ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                        : Icon(_isReceived ? Icons.check_circle_rounded : Icons.sync_rounded, size: 18),
+                        : Icon(isReceived ? Icons.check_circle_rounded : Icons.sync_rounded, size: 18),
                     label: Text(
-                      _isReceived
+                      isReceived
                           ? 'Payment Verified! 🎉'
-                          : (_isVerifying ? 'Verifying with Paystack...' : 'Check Payment Status'),
+                          : (isVerifying ? 'Verifying with Paystack...' : 'Check Payment Status'),
                       style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
                     ),
                   ),

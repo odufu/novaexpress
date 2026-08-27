@@ -13,6 +13,7 @@ import 'dc_orders_page.dart';
 import 'dc_payouts_page.dart';
 import 'dc_returns_page.dart';
 import 'dc_riders_page.dart';
+import 'dc_settings_page.dart';
 import 'dc_stock_page.dart';
 import 'dc_transactions_page.dart';
 
@@ -56,6 +57,7 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
       const DCReturnsPage(),
       const DCPayoutsPage(),
       const DCRidersPage(),
+      const DCSettingsPage(),
     ];
 
     return Scaffold(
@@ -189,6 +191,7 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
                 _buildNavItem(6, 'Returns & QC Desk', Icons.assignment_return_rounded, state.activeTabIndex == 6, isCollapsed, isDrawer),
                 _buildNavItem(7, 'Rider Payouts', Icons.payments_rounded, state.activeTabIndex == 7, isCollapsed, isDrawer),
                 _buildNavItem(8, 'Riders & Fleet', Icons.badge_rounded, state.activeTabIndex == 8, isCollapsed, isDrawer),
+                _buildNavItem(9, 'Policy & Settings', Icons.tune_rounded, state.activeTabIndex == 9, isCollapsed, isDrawer),
               ],
             ),
           ),

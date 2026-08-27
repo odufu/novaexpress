@@ -8,7 +8,9 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/entities/order.dart';
 import '../providers/orders_provider.dart';
 
-class PdaNavigationCard extends ConsumerStatefulWidget {
+final pdaNavigatingOrderProvider = StateProvider.autoDispose.family<bool, String>((ref, id) => false);
+
+class PdaNavigationCard extends ConsumerWidget {
   final OrderEntity order;
 
   const PdaNavigationCard({
@@ -16,57 +18,48 @@ class PdaNavigationCard extends ConsumerStatefulWidget {
     required this.order,
   });
 
-  @override
-  ConsumerState<PdaNavigationCard> createState() => _PdaNavigationCardState();
-}
-
-class _PdaNavigationCardState extends ConsumerState<PdaNavigationCard> {
-  bool _isNavigating = false;
-
-  void _launchGoogleMapsNavigation(BuildContext context) async {
-    setState(() => _isNavigating = true);
+  void _launchGoogleMapsNavigation(BuildContext context, WidgetRef ref) async {
+    ref.read(pdaNavigatingOrderProvider(order.id).notifier).state = true;
     try {
-      final fullDestination = '${widget.order.deliveryAddress}, ${widget.order.deliveryCity}, ${widget.order.deliveryState}';
+      final fullDestination = '${order.deliveryAddress}, ${order.deliveryCity}, ${order.deliveryState}';
       await MapLauncherHelper.launchTurnByTurnNavigation(
         context: context,
-        latitude: widget.order.latitude,
-        longitude: widget.order.longitude,
+        latitude: order.latitude,
+        longitude: order.longitude,
         destinationAddress: fullDestination,
-        customerName: widget.order.customerName,
+        customerName: order.customerName,
       );
     } finally {
-      if (mounted) {
-        setState(() => _isNavigating = false);
-      }
+      ref.read(pdaNavigatingOrderProvider(order.id).notifier).state = false;
     }
   }
 
-  void _launchWhatsAppLocationPrompt(BuildContext context) async {
+  void _launchWhatsAppLocationPrompt(BuildContext context, WidgetRef ref) async {
     final authState = ref.read(authProvider);
     final user = authState.user;
     final riderName = user != null && (user.firstName.isNotEmpty || user.lastName.isNotEmpty)
         ? '${user.firstName} ${user.lastName}'.trim()
         : (user?.fullName.isNotEmpty == true ? user!.fullName : 'Dispatch Rider');
 
-    final message = widget.order.getWhatsAppLocationRequestText(riderName: riderName);
-    final fallbackUri = widget.order.getWhatsAppLocationRequestUri(riderName: riderName);
+    final message = order.getWhatsAppLocationRequestText(riderName: riderName);
+    final fallbackUri = order.getWhatsAppLocationRequestUri(riderName: riderName);
     await MapLauncherHelper.launchWhatsApp(
       context: context,
-      customerPhone: widget.order.customerPhone,
+      customerPhone: order.customerPhone,
       message: message,
       fallbackUri: fallbackUri,
     );
   }
 
-  void _showRefineGatePinModal(BuildContext context) {
+  void _showRefineGatePinModal(BuildContext context, WidgetRef ref) {
     final latController = TextEditingController(
-      text: widget.order.latitude != null ? widget.order.latitude!.toStringAsFixed(6) : '6.447400',
+      text: order.latitude != null ? order.latitude!.toStringAsFixed(6) : '6.447400',
     );
     final lngController = TextEditingController(
-      text: widget.order.longitude != null ? widget.order.longitude!.toStringAsFixed(6) : '3.483900',
+      text: order.longitude != null ? order.longitude!.toStringAsFixed(6) : '3.483900',
     );
     final addressNotesController = TextEditingController(
-      text: widget.order.landmark ?? 'Direct gate entrance',
+      text: order.landmark ?? 'Direct gate entrance',
     );
 
     showModalBottomSheet(
@@ -131,7 +124,7 @@ class _PdaNavigationCardState extends ConsumerState<PdaNavigationCard> {
                             ),
                           ),
                           Text(
-                            'Permanently records exact gate coordinates for order #${widget.order.orderNumber}',
+                            'Permanently records exact gate coordinates for order #${order.orderNumber}',
                             style: TextStyle(
                               fontSize: 12,
                               color: theme.colorScheme.onSurfaceVariant,
@@ -255,11 +248,11 @@ class _PdaNavigationCardState extends ConsumerState<PdaNavigationCard> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     onPressed: () async {
-                      final lat = double.tryParse(latController.text.trim()) ?? widget.order.latitude ?? 6.4474;
-                      final lng = double.tryParse(lngController.text.trim()) ?? widget.order.longitude ?? 3.4839;
+                      final lat = double.tryParse(latController.text.trim()) ?? order.latitude ?? 6.4474;
+                      final lng = double.tryParse(lngController.text.trim()) ?? order.longitude ?? 3.4839;
 
                       await ref.read(ordersProvider.notifier).recordVerifiedGatePin(
-                            orderId: widget.order.id,
+                            orderId: order.id,
                             latitude: lat,
                             longitude: lng,
                             pinLabel: addressNotesController.text.trim().isNotEmpty
@@ -293,10 +286,10 @@ class _PdaNavigationCardState extends ConsumerState<PdaNavigationCard> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final order = widget.order;
+    final isNavigating = ref.watch(pdaNavigatingOrderProvider(order.id));
 
     // Location Confidence Colors & Badges
     Color confidenceBg;
@@ -520,8 +513,8 @@ class _PdaNavigationCardState extends ConsumerState<PdaNavigationCard> {
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
-                    onPressed: _isNavigating ? null : () => _launchGoogleMapsNavigation(context),
-                    icon: _isNavigating
+                    onPressed: isNavigating ? null : () => _launchGoogleMapsNavigation(context, ref),
+                    icon: isNavigating
                         ? const SizedBox(
                             width: 16,
                             height: 16,
@@ -556,7 +549,7 @@ class _PdaNavigationCardState extends ConsumerState<PdaNavigationCard> {
                             borderRadius: BorderRadius.circular(10),
                           ),
                         ),
-                        onPressed: () => _launchWhatsAppLocationPrompt(context),
+                        onPressed: () => _launchWhatsAppLocationPrompt(context, ref),
                         icon: const Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFF16A34A), size: 16),
                         label: Text(
                           'WhatsApp Live Pin',
@@ -584,7 +577,7 @@ class _PdaNavigationCardState extends ConsumerState<PdaNavigationCard> {
                             borderRadius: BorderRadius.circular(10),
                           ),
                         ),
-                        onPressed: () => _showRefineGatePinModal(context),
+                        onPressed: () => _showRefineGatePinModal(context, ref),
                         icon: const Icon(Icons.edit_location_alt_outlined, size: 15),
                         label: Text(
                           'Gate Pin',

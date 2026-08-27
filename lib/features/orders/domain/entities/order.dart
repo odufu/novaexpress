@@ -34,6 +34,8 @@ class OrderEntity {
   final String? geocodingStatus; // 'exact_verified', 'rooftop', 'landmark_match', 'locality_fallback', 'pending'
   final String? geocodedAddress;
   final String? locationConfidence; // 'high', 'medium', 'low', 'unresolved'
+  final String? customerSignatureUrl;
+  final String? photoProofUrl;
   final bool isLocationVerified;
   final DateTime createdAt;
 
@@ -73,16 +75,27 @@ class OrderEntity {
     this.geocodingStatus,
     this.geocodedAddress,
     this.locationConfidence,
+    this.customerSignatureUrl,
+    this.photoProofUrl,
     this.isLocationVerified = false,
     required this.createdAt,
   });
 
   bool get isDirectTransfer {
     final pt = paymentType.toLowerCase();
-    if (pt == 'prepaid' ||
+    if (pt == 'pay_on_delivery' ||
+        pt == 'pod' ||
+        pt == 'cash' ||
+        pt == 'cod' ||
+        pt == 'cash_pod' ||
+        pt == 'cash_on_delivery' ||
+        pt == 'pay_on_pickup') {
+      return false;
+    }
+    if (pt == 'paystack' ||
         pt == 'direct_transfer' ||
         pt == 'bank_transfer' ||
-        pt == 'paystack' ||
+        pt == 'prepaid' ||
         pt == 'monnify') {
       return true;
     }
@@ -99,8 +112,7 @@ class OrderEntity {
     final ps = paymentStatus.toLowerCase();
     if (ps == 'transfer_verified' ||
         ps == 'direct_transfer' ||
-        ps == 'paid_direct' ||
-        ps == 'paid') {
+        ps == 'paid_direct') {
       return true;
     }
     return false;
@@ -123,7 +135,8 @@ class OrderEntity {
   bool get isCashPod => isPod;
   bool get isClientPackage => fulfillmentType == 'client_package';
   bool get isDistributedInventory => fulfillmentType == 'distributed_inventory';
-  bool get isDelivered => status == 'delivered';
+  bool get isDelivered => status.toLowerCase() == 'delivered' || status.toLowerCase() == 'completed';
+  bool get isFailed => status.toLowerCase() == 'failed' || status.toLowerCase() == 'failed_attempt' || status.toLowerCase() == 'call_back';
   int get totalPhysicalQuantity => paidQuantity + freeQuantity > 0 ? paidQuantity + freeQuantity : quantity;
   bool get hasCoordinates => latitude != null && longitude != null && latitude != 0.0 && longitude != 0.0;
 

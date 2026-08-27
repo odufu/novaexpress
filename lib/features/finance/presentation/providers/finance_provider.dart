@@ -107,18 +107,7 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
       final remoteItems = await _repository.getAgentRemittances(targetAgentId);
       final txns = await _repository.getRiderTransactions(targetAgentId);
 
-      // Merge remote items with current state/cache to avoid wiping out fresh settlements
-      final Map<String, RemittanceEntity> mergedMap = {};
-      for (final r in state.remittances) {
-        final key = r.referenceNumber.isNotEmpty ? r.referenceNumber : r.id;
-        if (key.isNotEmpty) mergedMap[key] = r;
-      }
-      for (final r in remoteItems) {
-        final key = r.referenceNumber.isNotEmpty ? r.referenceNumber : r.id;
-        if (key.isNotEmpty) mergedMap[key] = r;
-      }
-
-      final finalItems = mergedMap.values.toList();
+      final finalItems = List<RemittanceEntity>.from(remoteItems);
       finalItems.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
       state = state.copyWith(
@@ -157,6 +146,7 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
     double grossCollections = 0.0,
     double commissionDeducted = 0.0,
     double transportAllowanceDeducted = 0.0,
+    double failedStipendsDeducted = 0.0,
     double posFee = 0.0,
     String? depositReceiptUrl,
     String? referenceNumber,
@@ -165,6 +155,7 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
     double? expectedAmount,
     bool isPartial = false,
     String? notes,
+    List<RemittanceOrderItem> associatedOrders = const [],
   }) async {
     state = state.copyWith(isLoading: true);
     try {
@@ -183,6 +174,7 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
         grossCollections: grossCollections,
         commissionDeducted: commissionDeducted,
         transportAllowanceDeducted: transportAllowanceDeducted,
+        failedStipendsDeducted: failedStipendsDeducted,
         posFee: posFee,
         depositReceiptUrl: depositReceiptUrl,
         referenceNumber: referenceNumber,
@@ -191,6 +183,7 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
         expectedAmount: expectedAmount,
         isPartial: isPartial,
         notes: notes,
+        associatedOrders: associatedOrders,
       );
 
       final otherRemittances = state.remittances.where((r) =>
@@ -229,7 +222,21 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
         accountName: accountName,
         notes: notes,
       );
-      state = state.copyWith(isLoading: false);
+
+      final newTxn = TransactionItem(
+        id: result['id']?.toString() ?? 'TXN-${DateTime.now().millisecondsSinceEpoch}',
+        title: 'Balance Payout Requested',
+        category: 'payout',
+        amount: amount,
+        isCredit: false,
+        timestamp: DateTime.now(),
+        reference: result['reference']?.toString() ?? 'PAYOUT-${DateTime.now().millisecondsSinceEpoch}',
+        status: 'pending',
+        description: 'Payout of ₦${amount.toStringAsFixed(2)} to $bankName ($accountNumber).',
+      );
+      final updatedTxns = [newTxn, ...state.transactions];
+      state = state.copyWith(isLoading: false, transactions: updatedTxns);
+      _storageService.cacheTransactions(updatedTxns);
       return result;
     } catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: e.toString());

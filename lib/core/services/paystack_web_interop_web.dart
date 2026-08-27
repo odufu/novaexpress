@@ -25,24 +25,52 @@ void launchPaystackInlineJs({
       onClose();
     });
 
-    // Execute direct robust JS injection script that manages PaystackPop
+    js.context['__paystack_on_fallback'] = js.JsFunction.withThis((dynamic _, [dynamic __]) {
+      if (onFallback != null) {
+        onFallback();
+      } else {
+        onClose();
+      }
+    });
+
     final jsSnippet = '''
       (function() {
         function triggerCheckout() {
           try {
-            if (typeof PaystackPop === 'undefined') {
-              console.warn('[PAYSTACK_INTEROP] PaystackPop unavailable');
-              if (window.__paystack_on_close) window.__paystack_on_close();
+            if (typeof window.payWithPaystack === 'function') {
+              window.payWithPaystack({
+                key: '$publicKey',
+                email: '$email',
+                amount: $amountKobo,
+                currency: 'NGN',
+                ref: '$reference',
+                metadata: $metaJson
+              }, function(ref) {
+                if (window.__paystack_on_success) window.__paystack_on_success(ref);
+              }, function() {
+                if (window.__paystack_on_close) window.__paystack_on_close();
+              });
               return;
             }
 
+            if (typeof PaystackPop === 'undefined') {
+              console.warn('[PAYSTACK_INTEROP] PaystackPop unavailable');
+              if (window.__paystack_on_fallback) {
+                window.__paystack_on_fallback();
+              } else if (window.__paystack_on_close) {
+                window.__paystack_on_close();
+              }
+              return;
+            }
+
+            var meta = $metaJson;
             var handler = PaystackPop.setup({
               key: '$publicKey',
               email: '$email',
               amount: $amountKobo,
               currency: 'NGN',
               ref: '$reference',
-              metadata: $metaJson,
+              metadata: meta,
               callback: function(response) {
                 console.log('[PAYSTACK_INTEROP] Success:', response);
                 var resolvedRef = (response && response.reference) ? response.reference : '$reference';
@@ -61,18 +89,26 @@ void launchPaystackInlineJs({
             handler.openIframe();
           } catch(err) {
             console.error('[PAYSTACK_INTEROP] Error opening iframe:', err);
-            if (window.__paystack_on_close) window.__paystack_on_close();
+            if (window.__paystack_on_fallback) {
+              window.__paystack_on_fallback();
+            } else if (window.__paystack_on_close) {
+              window.__paystack_on_close();
+            }
           }
         }
 
-        if (typeof PaystackPop === 'undefined') {
+        if (typeof PaystackPop === 'undefined' && typeof window.payWithPaystack === 'undefined') {
           var script = document.createElement('script');
           script.src = 'https://js.paystack.co/v1/inline.js';
           script.async = true;
           script.onload = triggerCheckout;
           script.onerror = function() {
             console.error('[PAYSTACK_INTEROP] CDN load failed');
-            if (window.__paystack_on_close) window.__paystack_on_close();
+            if (window.__paystack_on_fallback) {
+              window.__paystack_on_fallback();
+            } else if (window.__paystack_on_close) {
+              window.__paystack_on_close();
+            }
           };
           document.head.appendChild(script);
         } else {

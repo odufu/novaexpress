@@ -5,6 +5,52 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../providers/stock_provider.dart';
 
+class InventoryAuditPhysicalCountsNotifier extends StateNotifier<Map<String, int>> {
+  InventoryAuditPhysicalCountsNotifier() : super({});
+
+  void initialize(Map<String, int> counts) {
+    if (state.isEmpty) {
+      state = counts;
+    }
+  }
+
+  void increment(String itemId) {
+    final current = state[itemId] ?? 0;
+    state = {...state, itemId: current + 1};
+  }
+
+  void decrement(String itemId) {
+    final current = state[itemId] ?? 0;
+    if (current > 0) {
+      state = {...state, itemId: current - 1};
+    }
+  }
+}
+
+final inventoryAuditPhysicalCountsProvider = StateNotifierProvider.autoDispose<
+    InventoryAuditPhysicalCountsNotifier, Map<String, int>>((ref) {
+  return InventoryAuditPhysicalCountsNotifier();
+});
+
+class InventoryAuditVarianceReasonsNotifier extends StateNotifier<Map<String, String>> {
+  InventoryAuditVarianceReasonsNotifier() : super({});
+
+  void initialize(Map<String, String> reasons) {
+    if (state.isEmpty) {
+      state = reasons;
+    }
+  }
+
+  void setReason(String itemId, String reason) {
+    state = {...state, itemId: reason};
+  }
+}
+
+final inventoryAuditVarianceReasonsProvider = StateNotifierProvider.autoDispose<
+    InventoryAuditVarianceReasonsNotifier, Map<String, String>>((ref) {
+  return InventoryAuditVarianceReasonsNotifier();
+});
+
 class InventoryAuditPage extends ConsumerStatefulWidget {
   const InventoryAuditPage({super.key});
 
@@ -13,11 +59,9 @@ class InventoryAuditPage extends ConsumerStatefulWidget {
 }
 
 class _InventoryAuditPageState extends ConsumerState<InventoryAuditPage> {
-  late Map<String, int> _physicalCounts;
-  late Map<String, String> _varianceReasons;
   late Map<String, TextEditingController> _notesControllers;
 
-  final List<String> _reasonOptions = [
+  static const List<String> _reasonOptions = [
     'Damaged in Transit',
     'Missing Item',
     'Delivery not recorded',
@@ -31,9 +75,17 @@ class _InventoryAuditPageState extends ConsumerState<InventoryAuditPage> {
   void initState() {
     super.initState();
     final stockItems = ref.read(stockProvider).stockItems;
-    _physicalCounts = {for (var item in stockItems) item.id: item.availableCount};
-    _varianceReasons = {for (var item in stockItems) item.id: 'Damaged in Transit'};
     _notesControllers = {for (var item in stockItems) item.id: TextEditingController()};
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final items = ref.read(stockProvider).stockItems;
+      ref.read(inventoryAuditPhysicalCountsProvider.notifier).initialize({
+        for (var item in items) item.id: item.availableCount,
+      });
+      ref.read(inventoryAuditVarianceReasonsProvider.notifier).initialize({
+        for (var item in items) item.id: 'Damaged in Transit',
+      });
+    });
   }
 
   @override
@@ -49,13 +101,15 @@ class _InventoryAuditPageState extends ConsumerState<InventoryAuditPage> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final stockState = ref.watch(stockProvider);
+    final physicalCounts = ref.watch(inventoryAuditPhysicalCountsProvider);
+    final varianceReasons = ref.watch(inventoryAuditVarianceReasonsProvider);
 
     int totalSKUs = stockState.stockItems.length;
     int reconciledCount = 0;
     int varianceCount = 0;
 
     for (var item in stockState.stockItems) {
-      final physical = _physicalCounts[item.id] ?? item.availableCount;
+      final physical = physicalCounts[item.id] ?? item.availableCount;
       if (physical == item.availableCount) {
         reconciledCount++;
       } else {
@@ -103,81 +157,110 @@ class _InventoryAuditPageState extends ConsumerState<InventoryAuditPage> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'AUDIT SUMMARY',
-                        style: GoogleFonts.inter(
+                        'PHYSICAL INVENTORY AUDIT',
+                        style: GoogleFonts.jetBrainsMono(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
-                          letterSpacing: 1,
                           color: const Color(0xFF64748B),
                         ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: varianceCount == 0 ? const Color(0xFFDCFCE7) : const Color(0xFFFFEDD5),
+                          color: const Color(0xFF00A2D3).withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          varianceCount == 0 ? 'RECONCILED ✓' : '$varianceCount VARIANCES DETECTED',
+                          'MANDATORY BI-WEEKLY',
                           style: GoogleFonts.jetBrainsMono(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
-                            color: varianceCount == 0 ? const Color(0xFF16A34A) : const Color(0xFFEA580C),
+                            color: const Color(0xFF00A2D3),
                           ),
                         ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Reconcile physical stock in custody with backend inventory system.',
+                    style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B)),
+                  ),
                   const SizedBox(height: 14),
                   Row(
                     children: [
-                      _buildSummaryItem('Total SKUs', '$totalSKUs', const Color(0xFF2563EB), isDark),
-                      _buildSummaryItem('Reconciled', '$reconciledCount', const Color(0xFF16A34A), isDark),
-                      _buildSummaryItem('Variances', '$varianceCount', const Color(0xFFE11D48), isDark),
+                      Expanded(
+                        child: _buildHeaderMetric(
+                          label: 'Total SKUs',
+                          value: '$totalSKUs',
+                          color: const Color(0xFF2563EB),
+                          isDark: isDark,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildHeaderMetric(
+                          label: 'Reconciled',
+                          value: '$reconciledCount',
+                          color: const Color(0xFF16A34A),
+                          isDark: isDark,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildHeaderMetric(
+                          label: 'Variances',
+                          value: '$varianceCount',
+                          color: varianceCount > 0 ? const Color(0xFFE11D48) : const Color(0xFF64748B),
+                          isDark: isDark,
+                        ),
+                      ),
                     ],
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
 
+            // SKUs Audit List
             Text(
-              'Count Physical Custody Units',
-              style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold),
+              'Count Active Custody SKUs',
+              style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 4),
-            Text(
-              'Count the actual physical units in your vehicle and record differences.',
-              style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
-            ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
 
-            // Products Audit List
             ...stockState.stockItems.map((item) {
-              final physical = _physicalCounts[item.id] ?? item.availableCount;
+              final physical = physicalCounts[item.id] ?? item.availableCount;
+              final isMatch = physical == item.availableCount;
               final variance = physical - item.availableCount;
-              final isMatch = variance == 0;
 
               return Padding(
-                padding: const EdgeInsets.only(bottom: 14),
+                padding: const EdgeInsets.only(bottom: 12),
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(14),
                     border: Border.all(
                       color: isMatch
                           ? (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))
-                          : const Color(0xFFFECDD3),
-                      width: isMatch ? 1 : 1.5,
+                          : const Color(0xFFF43F5E),
                     ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF00A2D3).withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.inventory_2_rounded, color: Color(0xFF00A2D3), size: 20),
+                          ),
+                          const SizedBox(width: 12),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -187,8 +270,8 @@ class _InventoryAuditPageState extends ConsumerState<InventoryAuditPage> {
                                   style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold),
                                 ),
                                 Text(
-                                  'Owner: ${item.ownerName} • SKU: ${item.sku}',
-                                  style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                                  'System Expected: ${item.availableCount} units • SKU: ${item.sku}',
+                                  style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
                                 ),
                               ],
                             ),
@@ -196,23 +279,23 @@ class _InventoryAuditPageState extends ConsumerState<InventoryAuditPage> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                              color: isMatch ? const Color(0xFFDCFCE7) : const Color(0xFFFFE4E6),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
-                              'System: ${item.availableCount}',
+                              isMatch ? 'MATCH ✓' : 'VARIANCE',
                               style: GoogleFonts.jetBrainsMono(
-                                fontSize: 11,
+                                fontSize: 10,
                                 fontWeight: FontWeight.bold,
-                                color: isDark ? Colors.white : const Color(0xFF334155),
+                                color: isMatch ? const Color(0xFF16A34A) : const Color(0xFFE11D48),
                               ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 14),
 
-                      // Counter Row
+                      // Physical Count Stepper
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -225,9 +308,7 @@ class _InventoryAuditPageState extends ConsumerState<InventoryAuditPage> {
                               IconButton(
                                 icon: const Icon(Icons.remove_circle_outline_rounded, color: Color(0xFFE11D48)),
                                 onPressed: () {
-                                  if (physical > 0) {
-                                    setState(() => _physicalCounts[item.id] = physical - 1);
-                                  }
+                                  ref.read(inventoryAuditPhysicalCountsProvider.notifier).decrement(item.id);
                                 },
                               ),
                               Container(
@@ -241,7 +322,7 @@ class _InventoryAuditPageState extends ConsumerState<InventoryAuditPage> {
                               IconButton(
                                 icon: const Icon(Icons.add_circle_outline_rounded, color: Color(0xFF16A34A)),
                                 onPressed: () {
-                                  setState(() => _physicalCounts[item.id] = physical + 1);
+                                  ref.read(inventoryAuditPhysicalCountsProvider.notifier).increment(item.id);
                                 },
                               ),
                             ],
@@ -278,7 +359,7 @@ class _InventoryAuditPageState extends ConsumerState<InventoryAuditPage> {
                               ),
                               const SizedBox(height: 8),
                               DropdownButtonFormField<String>(
-                                initialValue: _varianceReasons[item.id] ?? _reasonOptions.first,
+                                value: varianceReasons[item.id] ?? _reasonOptions.first,
                                 decoration: InputDecoration(
                                   isDense: true,
                                   contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -292,7 +373,7 @@ class _InventoryAuditPageState extends ConsumerState<InventoryAuditPage> {
                                 items: _reasonOptions.map((r) => DropdownMenuItem(value: r, child: Text(r, style: const TextStyle(fontSize: 12)))).toList(),
                                 onChanged: (val) {
                                   if (val != null) {
-                                    setState(() => _varianceReasons[item.id] = val);
+                                    ref.read(inventoryAuditVarianceReasonsProvider.notifier).setReason(item.id, val);
                                   }
                                 },
                               ),
@@ -318,7 +399,7 @@ class _InventoryAuditPageState extends ConsumerState<InventoryAuditPage> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
-                        'Inventory Audit submitted successfully ($reconciledCount reconciled, $varianceCount variances recorded).',
+                        'Physical Audit Logged & Transmitted to DC Operations!',
                         style: GoogleFonts.inter(color: Colors.white),
                       ),
                       backgroundColor: const Color(0xFF16A34A),
@@ -332,7 +413,7 @@ class _InventoryAuditPageState extends ConsumerState<InventoryAuditPage> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 child: Text(
-                  'Submit Inventory Audit',
+                  'Submit Physical Audit Confirmation',
                   style: GoogleFonts.inter(
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
@@ -341,26 +422,41 @@ class _InventoryAuditPageState extends ConsumerState<InventoryAuditPage> {
                 ),
               ),
             ),
-            const SizedBox(height: 24),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSummaryItem(String label, String value, Color color, bool isDark) {
-    return Expanded(
+  Widget _buildHeaderMetric({
+    required String label,
+    required String value,
+    required Color color,
+    required bool isDark,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(10),
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
-          const SizedBox(height: 2),
           Text(
             value,
             style: GoogleFonts.inter(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
               color: color,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 11,
+              color: const Color(0xFF64748B),
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],

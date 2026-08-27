@@ -7,11 +7,10 @@ import '../../../../core/constants/paystack_constants.dart';
 import '../../../../core/constants/supabase_constants.dart';
 import '../../../../core/helpers/formatters.dart';
 import '../../../../core/providers/navigation_provider.dart';
-import '../../../../core/services/paystack_service.dart';
 import '../../../../core/services/paystack_web_interop.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_logo_widget.dart';
-import '../../../../core/widgets/signature_pad_widget.dart';
+import '../../../../core/widgets/signature_pad_modal.dart';
 import '../../../auth/domain/entities/user.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../finance/presentation/providers/finance_provider.dart';
@@ -20,6 +19,95 @@ import '../../../stock/presentation/providers/stock_provider.dart';
 import '../../domain/entities/order.dart';
 import '../providers/orders_provider.dart';
 import '../widgets/paystack_transfer_modal.dart';
+
+class ConfirmDeliveryPodState {
+  final String selectedPaymentMethod;
+  final bool hasConfirmedReceipt;
+  final bool paystackTransferVerified;
+  final bool isLoading;
+  final bool isSuccess;
+  final Uint8List? signatureBytes;
+  final String? signatureUrl;
+  final String? errorMessage;
+  final double enteredAmount;
+
+  const ConfirmDeliveryPodState({
+    this.selectedPaymentMethod = 'Cash',
+    this.hasConfirmedReceipt = true,
+    this.paystackTransferVerified = false,
+    this.isLoading = false,
+    this.isSuccess = false,
+    this.signatureBytes,
+    this.signatureUrl,
+    this.errorMessage,
+    this.enteredAmount = 0.0,
+  });
+
+  ConfirmDeliveryPodState copyWith({
+    String? selectedPaymentMethod,
+    bool? hasConfirmedReceipt,
+    bool? paystackTransferVerified,
+    bool? isLoading,
+    bool? isSuccess,
+    Uint8List? signatureBytes,
+    String? signatureUrl,
+    String? errorMessage,
+    double? enteredAmount,
+  }) {
+    return ConfirmDeliveryPodState(
+      selectedPaymentMethod: selectedPaymentMethod ?? this.selectedPaymentMethod,
+      hasConfirmedReceipt: hasConfirmedReceipt ?? this.hasConfirmedReceipt,
+      paystackTransferVerified: paystackTransferVerified ?? this.paystackTransferVerified,
+      isLoading: isLoading ?? this.isLoading,
+      isSuccess: isSuccess ?? this.isSuccess,
+      signatureBytes: signatureBytes ?? this.signatureBytes,
+      signatureUrl: signatureUrl ?? this.signatureUrl,
+      errorMessage: errorMessage,
+      enteredAmount: enteredAmount ?? this.enteredAmount,
+    );
+  }
+}
+
+class ConfirmDeliveryPodNotifier extends StateNotifier<ConfirmDeliveryPodState> {
+  ConfirmDeliveryPodNotifier() : super(const ConfirmDeliveryPodState());
+
+  void setPaymentMethod(String method) {
+    state = state.copyWith(selectedPaymentMethod: method);
+  }
+
+  void setConfirmedReceipt(bool confirmed) {
+    state = state.copyWith(hasConfirmedReceipt: confirmed);
+  }
+
+  void setPaystackVerified(bool verified) {
+    state = state.copyWith(paystackTransferVerified: verified);
+  }
+
+  void setLoading(bool loading) {
+    state = state.copyWith(isLoading: loading);
+  }
+
+  void setSuccess() {
+    state = state.copyWith(isLoading: false, isSuccess: true, errorMessage: null);
+  }
+
+  void setError(String error) {
+    state = state.copyWith(isLoading: false, errorMessage: error);
+  }
+
+  void setSignature(Uint8List? bytes, String? url) {
+    state = state.copyWith(signatureBytes: bytes, signatureUrl: url);
+  }
+
+  void setEnteredAmount(double amt) {
+    state = state.copyWith(enteredAmount: amt);
+  }
+}
+
+final confirmDeliveryPodProvider =
+    StateNotifierProvider.autoDispose<ConfirmDeliveryPodNotifier, ConfirmDeliveryPodState>((ref) {
+  return ConfirmDeliveryPodNotifier();
+});
 
 class ConfirmDeliveryPodPage extends ConsumerStatefulWidget {
   final String orderId;
@@ -36,12 +124,6 @@ class ConfirmDeliveryPodPage extends ConsumerStatefulWidget {
 class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage> {
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _referenceController = TextEditingController();
-  String _selectedPaymentMethod = 'Cash'; // Strictly 2 options: 'Cash', 'Direct Transfer (Paystack)'
-  bool _hasConfirmedReceipt = true;
-  bool _isVerifyingPaystack = false;
-  bool _paystackTransferVerified = false;
-  bool _isLoading = false;
-  bool _isSuccess = false;
 
   @override
   void initState() {
@@ -58,6 +140,7 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
       final order = matchedOrder ?? (ordersState.orders.isNotEmpty ? ordersState.orders.first : null);
       if (order != null) {
         _amountController.text = order.totalAmount.toStringAsFixed(0);
+        ref.read(confirmDeliveryPodProvider.notifier).setEnteredAmount(order.totalAmount);
       }
     });
   }
@@ -67,29 +150,6 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
     _amountController.dispose();
     _referenceController.dispose();
     super.dispose();
-  }
-
-  void _verifyPaystackPayment(String orderNumber) async {
-    setState(() => _isVerifyingPaystack = true);
-    final refCode = _referenceController.text.trim().isNotEmpty
-        ? _referenceController.text.trim()
-        : 'PSTK-${orderNumber.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')}';
-    final result = await PaystackService().verifyTransaction(refCode);
-    if (mounted) {
-      setState(() {
-        _isVerifyingPaystack = false;
-        _paystackTransferVerified = result.isSuccessful;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: result.isSuccessful ? const Color(0xFF16A34A) : const Color(0xFFEF4444),
-          content: Text(result.isSuccessful
-              ? '✓ Paystack direct transfer confirmed! Funds received in company account.'
-              : (result.gatewayResponse ?? 'Transfer verification pending. Please check again.')),
-        ),
-      );
-    }
   }
 
   void _launchPaystackCheckout(OrderEntity order, UserEntity? user) {
@@ -103,17 +163,9 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
 
     void onPaymentSuccess(String confirmedRef) {
       if (mounted) {
-        setState(() {
-          _paystackTransferVerified = true;
-          _referenceController.text = confirmedRef;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: const Color(0xFF16A34A),
-            content: Text('✓ Paystack Payment Confirmed! Ref: $confirmedRef. Completing delivery...'),
-          ),
-        );
+        ref.read(confirmDeliveryPodProvider.notifier).setPaystackVerified(true);
+        _referenceController.text = confirmedRef;
+        ref.read(confirmDeliveryPodProvider.notifier).setLoading(true);
         // Automatically submit & clear order upon successful Paystack payment
         _submitDelivery();
       }
@@ -131,10 +183,9 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
         agentId: user?.deliveryAgentId ?? user?.id,
         onPaymentConfirmed: () {
           if (mounted) {
-            setState(() {
-              _paystackTransferVerified = true;
-              _referenceController.text = refCode;
-            });
+            ref.read(confirmDeliveryPodProvider.notifier).setPaystackVerified(true);
+            _referenceController.text = refCode;
+            ref.read(confirmDeliveryPodProvider.notifier).setLoading(true);
             // Automatically submit & clear order upon successful payment
             _submitDelivery();
           }
@@ -167,10 +218,11 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
   }
 
   void _submitDelivery() async {
-    final isDirectTransfer = _selectedPaymentMethod == 'Direct Transfer (Paystack)';
+    final podState = ref.read(confirmDeliveryPodProvider);
+    final isDirectTransfer = podState.selectedPaymentMethod == 'Direct Transfer (Paystack)';
 
-    // If Direct Transfer selected but not yet verified, prompt checkout
-    if (isDirectTransfer && !_paystackTransferVerified) {
+    // If Direct Transfer selected but not yet verified, prompt Paystack checkout directly
+    if (isDirectTransfer && !podState.paystackTransferVerified) {
       final ordersState = ref.read(ordersProvider);
       final authState = ref.read(authProvider);
       final orderObj = ordersState.orders.where((o) => o.id == widget.orderId || o.orderNumber == widget.orderId).firstOrNull;
@@ -180,54 +232,56 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
       }
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    ref.read(confirmDeliveryPodProvider.notifier).setLoading(true);
 
-    final authState = ref.read(authProvider);
-    final agentId = authState.user?.deliveryAgentId ?? authState.user?.id ?? SupabaseConstants.defaultDeliveryAgentId;
-    final paymentMethod = isDirectTransfer ? 'bank_transfer' : 'cash';
-    final amount = double.tryParse(_amountController.text.trim()) ?? 0.0;
-    final refNo = _referenceController.text.trim();
-    final orderIdPrefix = (widget.orderId.length >= 4 ? widget.orderId.substring(0, 4) : widget.orderId).toUpperCase();
-    final paymentRef = refNo.isNotEmpty ? refNo : 'PSTK-$orderIdPrefix';
-    final notes = isDirectTransfer
-        ? '[POD Paid via Paystack Direct Transfer • Ref: $paymentRef] ₦0 cash held by PDA. Commission credited to My Balance.'
-        : (refNo.isNotEmpty
-            ? '[POD Collected via Cash (Ref: $refNo)] Cash in custody.'
-            : '[POD Collected via Cash] Cash in custody.');
+    try {
+      final authState = ref.read(authProvider);
+      final agentId = authState.user?.deliveryAgentId ?? authState.user?.id ?? SupabaseConstants.defaultDeliveryAgentId;
+      final paymentMethod = isDirectTransfer ? 'bank_transfer' : 'cash';
+      final amount = double.tryParse(_amountController.text.trim()) ?? 0.0;
+      final refNo = _referenceController.text.trim();
+      final orderIdPrefix = (widget.orderId.length >= 4 ? widget.orderId.substring(0, 4) : widget.orderId).toUpperCase();
+      final paymentRef = refNo.isNotEmpty ? refNo : 'PSTK-$orderIdPrefix';
+      final notes = isDirectTransfer
+          ? '[POD Paid via Paystack Direct Transfer • Ref: $paymentRef] ₦0 cash held by PDA. Commission credited to My Balance.'
+          : (refNo.isNotEmpty
+              ? '[POD Collected via Cash (Ref: $refNo)] Cash in custody.'
+              : '[POD Collected via Cash] Cash in custody.');
 
-    await ref.read(ordersProvider.notifier).confirmDeliveryPod(
-          orderId: widget.orderId,
-          agentId: agentId,
-          paymentType: isDirectTransfer ? 'prepaid' : 'pay_on_delivery',
-          paymentMethod: paymentMethod,
-          amountCollected: isDirectTransfer ? 0.0 : amount,
-          notes: notes,
-        );
+      await ref.read(ordersProvider.notifier).confirmDeliveryPod(
+            orderId: widget.orderId,
+            agentId: agentId,
+            paymentType: isDirectTransfer ? 'prepaid' : 'pay_on_delivery',
+            paymentMethod: paymentMethod,
+            amountCollected: isDirectTransfer ? 0.0 : amount,
+            customerSignatureUrl: podState.signatureUrl,
+            notes: notes,
+          );
 
-    // Refresh finance, orders, stock & notifications state
-    ref.read(financeProvider.notifier).loadRemittances(agentId);
-    ref.read(stockProvider.notifier).fetchStockItems();
-    final orderObj = ref.read(ordersProvider).orders.where((o) => o.id == widget.orderId || o.orderNumber == widget.orderId).firstOrNull;
-    final displayOrderNo = orderObj?.orderNumber ?? (widget.orderId.length > 8 ? 'NX-${widget.orderId.substring(0, 4).toUpperCase()}' : widget.orderId);
+      // Refresh finance, orders, stock & notifications state
+      ref.read(financeProvider.notifier).loadRemittances(agentId);
+      ref.read(stockProvider.notifier).fetchStockItems();
+      final orderObj = ref.read(ordersProvider).orders.where((o) => o.id == widget.orderId || o.orderNumber == widget.orderId).firstOrNull;
+      final displayOrderNo = orderObj?.orderNumber ?? (widget.orderId.length > 8 ? 'NX-${widget.orderId.substring(0, 4).toUpperCase()}' : widget.orderId);
 
-    ref.read(notificationsProvider.notifier).emitNotification(
-          title: 'Delivery POD Confirmed 🎉',
-          message: isDirectTransfer
-              ? 'Order $displayOrderNo delivered via Paystack direct transfer. Earning credited to My Balance.'
-              : 'Order $displayOrderNo was successfully delivered. Net collection of ${CurrencyFormatter.formatNaira(amount)} recorded.',
-          category: 'delivery',
-          actionRoute: '/orders',
-        );
+      ref.read(notificationsProvider.notifier).emitNotification(
+            title: 'Delivery POD Confirmed 🎉',
+            message: isDirectTransfer
+                ? 'Order $displayOrderNo delivered via Paystack direct transfer. Earning credited to My Balance.'
+                : 'Order $displayOrderNo was successfully delivered. Net collection of ${CurrencyFormatter.formatNaira(amount)} recorded.',
+            category: 'delivery',
+            actionRoute: '/orders',
+          );
 
-    await Future.delayed(const Duration(milliseconds: 400));
+      await Future.delayed(const Duration(milliseconds: 600));
 
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-        _isSuccess = true;
-      });
+      if (mounted) {
+        ref.read(confirmDeliveryPodProvider.notifier).setSuccess();
+      }
+    } catch (e) {
+      if (mounted) {
+        ref.read(confirmDeliveryPodProvider.notifier).setError(e.toString());
+      }
     }
   }
 
@@ -270,7 +324,8 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
             createdAt: DateTime.now(),
           ));
 
-    final isDirectTransfer = _selectedPaymentMethod == 'Direct Transfer (Paystack)';
+    final podState = ref.watch(confirmDeliveryPodProvider);
+    final isDirectTransfer = podState.selectedPaymentMethod == 'Direct Transfer (Paystack)';
 
     final commissionRate = user?.commissionRate ?? 1000.0;
     final transportAllowance = user?.isPda == true
@@ -283,7 +338,207 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
     final totalRetainedByRider = commissionRate + transportAllowance + cashTransferFee;
     final netCashRemittance = (enteredCash - commissionRate - transportAllowance - cashTransferFee).clamp(0.0, double.infinity);
 
-    if (_isSuccess) {
+    // ==========================================
+    // 1. FULL-PAGE PROCESSING / LOADER SCREEN
+    // ==========================================
+    if (podState.isLoading) {
+      return Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        appBar: AppBar(
+          backgroundColor: theme.appBarTheme.backgroundColor,
+          elevation: 0.5,
+          automaticallyImplyLeading: false,
+          title: Text(
+            'PROCESSING DELIVERY',
+            style: TextStyle(
+              color: theme.colorScheme.onSurface,
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.2,
+            ),
+          ),
+          centerTitle: true,
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    SizedBox(
+                      width: 84,
+                      height: 84,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 4,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          isDirectTransfer ? const Color(0xFF00A2D3) : AppColors.orange,
+                        ),
+                        backgroundColor: (isDirectTransfer ? const Color(0xFF00A2D3) : AppColors.orange).withValues(alpha: 0.15),
+                      ),
+                    ),
+                    Icon(
+                      isDirectTransfer ? Icons.bolt_rounded : Icons.local_shipping_rounded,
+                      size: 38,
+                      color: isDirectTransfer ? const Color(0xFF00A2D3) : AppColors.orange,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 28),
+                Text(
+                  isDirectTransfer ? 'Verifying & Reconciling Payment...' : 'Confirming POD Delivery...',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  isDirectTransfer
+                      ? 'Reconciling Paystack virtual account transfer, updating distribution center ledger, and crediting your earnings to "My Balance"...'
+                      : 'Logging customer digital signature, updating inventory quantities, and preparing cash remittance ledger...',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    height: 1.5,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Shipment #${order.orderNumber}',
+                        style: GoogleFonts.jetBrainsMono(fontSize: 11.5, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // ==========================================
+    // 2. FULL-PAGE FAILURE SCREEN
+    // ==========================================
+    if (podState.errorMessage != null) {
+      return Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        appBar: AppBar(
+          backgroundColor: theme.appBarTheme.backgroundColor,
+          elevation: 0.5,
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back_rounded, color: theme.colorScheme.onSurface),
+            onPressed: () {
+              ref.read(bottomNavIndexProvider.notifier).state = 2;
+              context.go('/');
+            },
+          ),
+          title: Text(
+            'DELIVERY STATUS',
+            style: TextStyle(
+              color: theme.colorScheme.onSurface,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.2,
+            ),
+          ),
+          centerTitle: true,
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDC2626).withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.error_outline_rounded, color: Color(0xFFDC2626), size: 48),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Delivery Confirmation Failed',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  podState.errorMessage!,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    color: const Color(0xFFDC2626),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.orange,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: _submitDelivery,
+                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                    label: const Text('RETRY CONFIRMATION', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () {
+                      ref.read(bottomNavIndexProvider.notifier).state = 2;
+                      context.go('/');
+                    },
+                    child: const Text('RETURN TO ORDERS LIST', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // ==========================================
+    // 3. FULL-PAGE SUCCESS RECEIPT SCREEN
+    // ==========================================
+    if (podState.isSuccess) {
       return Scaffold(
         backgroundColor: theme.scaffoldBackgroundColor,
         appBar: AppBar(
@@ -544,28 +799,26 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
               children: [
                 Expanded(
                   child: GestureDetector(
-                    onTap: () => setState(() {
-                      _selectedPaymentMethod = 'Cash';
-                    }),
+                    onTap: () => ref.read(confirmDeliveryPodProvider.notifier).setPaymentMethod('Cash'),
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       decoration: BoxDecoration(
-                        color: _selectedPaymentMethod == 'Cash'
+                        color: !isDirectTransfer
                             ? const Color(0xFF00522A)
                             : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: _selectedPaymentMethod == 'Cash'
+                          color: !isDirectTransfer
                               ? const Color(0xFF00522A)
                               : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
-                          width: _selectedPaymentMethod == 'Cash' ? 2 : 1,
+                          width: !isDirectTransfer ? 2 : 1,
                         ),
                       ),
                       child: Center(
                         child: Text(
                           '💵 Cash',
                           style: TextStyle(
-                            color: _selectedPaymentMethod == 'Cash' ? Colors.white : theme.colorScheme.onSurface,
+                            color: !isDirectTransfer ? Colors.white : theme.colorScheme.onSurface,
                             fontWeight: FontWeight.bold,
                             fontSize: 13,
                           ),
@@ -577,9 +830,7 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                 const SizedBox(width: 8),
                 Expanded(
                   child: GestureDetector(
-                    onTap: () => setState(() {
-                      _selectedPaymentMethod = 'Direct Transfer (Paystack)';
-                    }),
+                    onTap: () => ref.read(confirmDeliveryPodProvider.notifier).setPaymentMethod('Direct Transfer (Paystack)'),
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       decoration: BoxDecoration(
@@ -622,7 +873,7 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
             ),
             const SizedBox(height: 16),
 
-            // DYNAMIC SECTION A: DIRECT PAYSTACK PAYMENT BREAKDOWN CARD
+            // DYNAMIC SECTION A: DIRECT PAYSTACK PAYMENT BREAKDOWN CARD (Streamlined Minimalist)
             if (isDirectTransfer) ...[
               Container(
                 width: double.infinity,
@@ -676,7 +927,7 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                     ),
                     const SizedBox(height: 14),
 
-                    // Breakdown List
+                    // Breakdown List with Icons
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -689,7 +940,13 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text('Total Customer Payment (Paystack)', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                              Row(
+                                children: [
+                                  const Icon(Icons.shopping_bag_outlined, size: 14, color: Color(0xFF64748B)),
+                                  const SizedBox(width: 6),
+                                  Text('Total Customer Payment (Paystack)', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                                ],
+                              ),
                               Text(CurrencyFormatter.formatNaira(order.totalAmount), style: GoogleFonts.jetBrainsMono(fontSize: 13, fontWeight: FontWeight.bold)),
                             ],
                           ),
@@ -697,7 +954,13 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text('Settled Directly to Company', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                              Row(
+                                children: [
+                                  const Icon(Icons.account_balance_outlined, size: 14, color: Color(0xFF00A2D3)),
+                                  const SizedBox(width: 6),
+                                  Text('Settled Directly to Company', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                                ],
+                              ),
                               Text(CurrencyFormatter.formatNaira(order.totalAmount), style: GoogleFonts.jetBrainsMono(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF00A2D3))),
                             ],
                           ),
@@ -705,7 +968,13 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text('Physical Cash Held by Rider', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                              Row(
+                                children: [
+                                  const Icon(Icons.payments_outlined, size: 14, color: Color(0xFF64748B)),
+                                  const SizedBox(width: 6),
+                                  Text('Physical Cash Held by Rider', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                                ],
+                              ),
                               Text('₦0.00', style: GoogleFonts.jetBrainsMono(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF64748B))),
                             ],
                           ),
@@ -716,7 +985,13 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text('Rider Commission', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                              Row(
+                                children: [
+                                  const Icon(Icons.percent_rounded, size: 14, color: Color(0xFF16A34A)),
+                                  const SizedBox(width: 6),
+                                  Text('Rider Commission', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                                ],
+                              ),
                               Text('+${CurrencyFormatter.formatNaira(commissionRate)}', style: GoogleFonts.jetBrainsMono(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF16A34A))),
                             ],
                           ),
@@ -724,7 +999,13 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text('Transport / Fuel Allowance', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                              Row(
+                                children: [
+                                  const Icon(Icons.local_shipping_outlined, size: 14, color: Color(0xFF16A34A)),
+                                  const SizedBox(width: 6),
+                                  Text('Transport / Fuel Allowance', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                                ],
+                              ),
                               Text('+${CurrencyFormatter.formatNaira(transportAllowance)}', style: GoogleFonts.jetBrainsMono(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF16A34A))),
                             ],
                           ),
@@ -744,72 +1025,43 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'RETURNING TO "MY BALANCE"',
-                                style: GoogleFonts.jetBrainsMono(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: const Color(0xFF047857),
-                                  letterSpacing: 0.5,
+                          Expanded(
+                            child: Row(
+                              children: [
+                                const Icon(Icons.account_balance_wallet_rounded, size: 18, color: Color(0xFF047857)),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'RETURNING TO "MY BALANCE"',
+                                        style: GoogleFonts.jetBrainsMono(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          color: const Color(0xFF047857),
+                                          letterSpacing: 0.5,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      Text(
+                                        'Credited to your balance upon payment',
+                                        style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF065F46)),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              Text(
-                                'Credited to your balance upon payment',
-                                style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF065F46)),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
+                          const SizedBox(width: 6),
                           Text(
                             '+${CurrencyFormatter.formatNaira(totalRiderCredit)}',
-                            style: GoogleFonts.jetBrainsMono(fontSize: 16, fontWeight: FontWeight.w900, color: const Color(0xFF047857)),
+                            style: GoogleFonts.jetBrainsMono(fontSize: 15, fontWeight: FontWeight.w900, color: const Color(0xFF047857)),
                           ),
                         ],
                       ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Action Buttons (Launch Paystack Screen + Check Status)
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () => _launchPaystackCheckout(order, user),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF00A2D3),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            ),
-                            icon: const Icon(Icons.bolt_rounded, size: 18),
-                            label: Text(
-                              'Proceed to Pay via Paystack',
-                              style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        ElevatedButton.icon(
-                          onPressed: _isVerifyingPaystack ? null : () => _verifyPaystackPayment(order.orderNumber),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _paystackTransferVerified ? const Color(0xFF16A34A) : const Color(0xFF0F172A),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                          icon: _isVerifyingPaystack
-                              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                              : Icon(_paystackTransferVerified ? Icons.check_circle_rounded : Icons.sync_rounded, size: 16),
-                          label: Text(
-                            _paystackTransferVerified
-                                ? 'Verified ✓'
-                                : (_isVerifyingPaystack ? 'Checking...' : 'Check Status'),
-                            style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ],
                     ),
                   ],
                 ),
@@ -829,7 +1081,7 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
               TextField(
                 controller: _amountController,
                 keyboardType: TextInputType.number,
-                onChanged: (_) => setState(() {}),
+                onChanged: (v) => ref.read(confirmDeliveryPodProvider.notifier).setEnteredAmount(double.tryParse(v) ?? 0.0),
                 style: GoogleFonts.jetBrainsMono(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -883,7 +1135,13 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Gross Cash Collected', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                        Row(
+                          children: [
+                            const Icon(Icons.shopping_bag_outlined, size: 14, color: Color(0xFF64748B)),
+                            const SizedBox(width: 6),
+                            Text('Gross Cash Collected', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                          ],
+                        ),
                         Text(CurrencyFormatter.formatNaira(enteredCash), style: GoogleFonts.jetBrainsMono(fontSize: 12.5, fontWeight: FontWeight.bold)),
                       ],
                     ),
@@ -891,7 +1149,13 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Less: Commission Retained', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                        Row(
+                          children: [
+                            const Icon(Icons.percent_rounded, size: 14, color: Color(0xFF16A34A)),
+                            const SizedBox(width: 6),
+                            Text('Less: Commission Retained', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                          ],
+                        ),
                         Text('-${CurrencyFormatter.formatNaira(commissionRate)}', style: GoogleFonts.jetBrainsMono(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF16A34A))),
                       ],
                     ),
@@ -899,7 +1163,13 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Less: Fuel/Transport Retained', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                        Row(
+                          children: [
+                            const Icon(Icons.local_shipping_outlined, size: 14, color: Color(0xFF00A2D3)),
+                            const SizedBox(width: 6),
+                            Text('Less: Fuel/Transport Retained', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                          ],
+                        ),
                         Text('-${CurrencyFormatter.formatNaira(transportAllowance)}', style: GoogleFonts.jetBrainsMono(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF00A2D3))),
                       ],
                     ),
@@ -907,7 +1177,13 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Less: Transfer Fee (Dynamic)', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                        Row(
+                          children: [
+                            const Icon(Icons.receipt_outlined, size: 14, color: Color(0xFFF59E0B)),
+                            const SizedBox(width: 6),
+                            Text('Less: Transfer Fee (Dynamic)', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                          ],
+                        ),
                         Text('-${CurrencyFormatter.formatNaira(cashTransferFee)}', style: GoogleFonts.jetBrainsMono(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFFF59E0B))),
                       ],
                     ),
@@ -958,18 +1234,129 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
               const SizedBox(height: 16),
             ],
 
-            // Digital Signature Canvas
-            Text(
-              'Proof of Delivery (POD) Signature',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: theme.colorScheme.onSurface,
-              ),
+            // Digital Signature Section (Tappable Modal Signature Pad)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Proof of Delivery (POD) Signature',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+                if (podState.signatureBytes != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDCFCE7),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFF86EFAC)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.check_circle_rounded, size: 12, color: Color(0xFF16A34A)),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Signed ✓',
+                          style: GoogleFonts.jetBrainsMono(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF15803D),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
             ),
-            const SizedBox(height: 6),
-            const SignaturePadWidget(
-              height: 150,
+            const SizedBox(height: 8),
+            GestureDetector(
+              onTap: () async {
+                final result = await SignaturePadModal.show(
+                  context: context,
+                  orderId: order.orderNumber,
+                  customerName: order.customerName,
+                );
+                if (result != null) {
+                  ref.read(confirmDeliveryPodProvider.notifier).setSignature(result.pngBytes, result.signatureUrl);
+                }
+              },
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: podState.signatureBytes != null
+                        ? const Color(0xFF10B981)
+                        : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                    width: podState.signatureBytes != null ? 1.5 : 1,
+                  ),
+                ),
+                child: podState.signatureBytes != null
+                    ? Column(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.memory(
+                              podState.signatureBytes!,
+                              height: 85,
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.edit_outlined, size: 14, color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF00A2D3)),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Tap to Re-sign or Change',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF00A2D3),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      )
+                    : Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppColors.orange.withValues(alpha: 0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.draw_rounded, color: AppColors.orange, size: 24),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Tap here to sign POD',
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Opens isolated signature pad with smooth touch ink',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              color: const Color(0xFF64748B),
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
             ),
             const SizedBox(height: 16),
 
@@ -997,38 +1384,38 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                   'Customer has inspected items before handing over payment.',
                   style: TextStyle(fontSize: 11.5, color: theme.colorScheme.onSurfaceVariant),
                 ),
-                value: _hasConfirmedReceipt,
+                value: podState.hasConfirmedReceipt,
                 onChanged: (val) {
-                  if (val != null) setState(() => _hasConfirmedReceipt = val);
+                  if (val != null) ref.read(confirmDeliveryPodProvider.notifier).setConfirmedReceipt(val);
                 },
               ),
             ),
             const SizedBox(height: 20),
 
-            // Dynamic Submit Button
+            // Single Main Action Button (Pay via Paystack / Confirm Delivery)
             SizedBox(
               width: double.infinity,
               height: 52,
               child: ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: isDirectTransfer
-                      ? (_paystackTransferVerified ? const Color(0xFF16A34A) : const Color(0xFF00A2D3))
+                      ? (podState.paystackTransferVerified ? const Color(0xFF16A34A) : const Color(0xFF00A2D3))
                       : const Color(0xFF00522A),
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                onPressed: _isLoading || !_hasConfirmedReceipt ? null : _submitDelivery,
-                icon: _isLoading
+                onPressed: podState.isLoading || !podState.hasConfirmedReceipt ? null : _submitDelivery,
+                icon: podState.isLoading
                     ? const SizedBox.shrink()
                     : Icon(
                         isDirectTransfer
-                            ? (_paystackTransferVerified ? Icons.check_circle_rounded : Icons.bolt_rounded)
+                            ? (podState.paystackTransferVerified ? Icons.check_circle_rounded : Icons.bolt_rounded)
                             : Icons.task_alt_rounded,
                         size: 20,
                       ),
-                label: _isLoading
+                label: podState.isLoading
                     ? const SizedBox(
                         height: 20,
                         width: 20,
@@ -1036,10 +1423,10 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                       )
                     : Text(
                         isDirectTransfer
-                            ? (_paystackTransferVerified
+                            ? (podState.paystackTransferVerified
                                 ? 'Confirm & Complete Delivery (Verified ✓)'
                                 : 'Pay via Paystack / Confirm Delivery')
-                            : 'Confirm & Complete Delivery',
+                            : 'Confirm Cash Collection & POD',
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                       ),
               ),

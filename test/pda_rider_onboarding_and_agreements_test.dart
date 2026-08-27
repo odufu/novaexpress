@@ -10,6 +10,8 @@ import 'package:novexps/features/dc_console/presentation/pages/dc_riders_page.da
 import 'package:novexps/features/dc_console/presentation/providers/dc_console_provider.dart';
 import 'package:novexps/features/dc_console/presentation/widgets/dc_onboard_rider_modal.dart';
 
+import 'package:novexps/features/orders/presentation/providers/orders_provider.dart';
+
 void main() {
   setUpAll(() {
     TestWidgetsFlutterBinding.ensureInitialized();
@@ -80,11 +82,14 @@ void main() {
     });
 
     testWidgets('2. DCRidersPage displays PDA and In-House Fleet summary metrics and roster', (tester) async {
-      await tester.binding.setSurfaceSize(const Size(1280, 900));
+      tester.view.physicalSize = const Size(1280, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
 
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            ordersProvider.overrideWith((ref) => _MockOrdersNotifier()),
             dcConsoleProvider.overrideWith((ref) {
               final notifier = DCConsoleNotifier();
               notifier.state = notifier.state.copyWith(
@@ -322,6 +327,13 @@ class _MockAuthRemoteDSWithRegister implements AuthRemoteDataSource {
     }
     throw Exception('Invalid credentials');
   }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _MockOrdersNotifier extends StateNotifier<OrdersState> implements OrdersNotifier {
+  _MockOrdersNotifier() : super(OrdersState(orders: const []));
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);

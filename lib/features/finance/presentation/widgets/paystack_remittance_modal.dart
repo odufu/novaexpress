@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/constants/paystack_constants.dart';
@@ -8,7 +10,11 @@ import '../../../../core/helpers/formatters.dart';
 import '../../../../core/services/paystack_service.dart';
 import '../../../../core/services/paystack_web_interop.dart';
 
-class PaystackRemittanceModal extends StatefulWidget {
+final paystackRemittanceVerifyingProvider = StateProvider.autoDispose<bool>((ref) => false);
+final paystackRemittanceReceivedProvider = StateProvider.autoDispose<bool>((ref) => false);
+final paystackRemittanceAuthUrlProvider = StateProvider.autoDispose<String?>((ref) => null);
+
+class PaystackRemittanceModal extends ConsumerStatefulWidget {
   final double amount;
   final String riderName;
   final String riderCode;
@@ -38,6 +44,7 @@ class PaystackRemittanceModal extends StatefulWidget {
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useRootNavigator: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => PaystackRemittanceModal(
         amount: amount,
@@ -51,17 +58,17 @@ class PaystackRemittanceModal extends StatefulWidget {
   }
 
   @override
-  State<PaystackRemittanceModal> createState() => _PaystackRemittanceModalState();
+  ConsumerState<PaystackRemittanceModal> createState() => _PaystackRemittanceModalState();
 }
 
-class _PaystackRemittanceModalState extends State<PaystackRemittanceModal>
+class _PaystackRemittanceModalState extends ConsumerState<PaystackRemittanceModal>
     with SingleTickerProviderStateMixin {
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
-  bool _isVerifying = false;
-  bool _isReceived = false;
-  String? _authorizationUrl;
 
+  late String _virtualAccountNumber;
+  final String _bankName = PaystackConstants.defaultBankName;
+  final String _accountName = PaystackConstants.defaultAccountName;
   late String _paymentReference;
 
   final PaystackService _paystackService = PaystackService();
@@ -70,7 +77,11 @@ class _PaystackRemittanceModalState extends State<PaystackRemittanceModal>
   void initState() {
     super.initState();
     final timestamp = DateTime.now().millisecondsSinceEpoch.toString().substring(7);
-    _paymentReference = 'PSTK-RMT-${widget.riderCode.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')}-$timestamp';
+    final cleanCode = widget.riderCode.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '');
+    _paymentReference = 'PSTK-RMT-${cleanCode.isNotEmpty ? cleanCode : 'RDR'}-$timestamp';
+    _virtualAccountNumber = PaystackService.generateDeterministicAccountNumber(
+      cleanCode.isNotEmpty ? cleanCode : 'RDR',
+    );
 
     _pulseController = AnimationController(
       vsync: this,
@@ -98,43 +109,43 @@ class _PaystackRemittanceModalState extends State<PaystackRemittanceModal>
     );
 
     if (mounted) {
-      setState(() {
-        _authorizationUrl = res['authorization_url']?.toString();
-      });
+      ref.read(paystackRemittanceAuthUrlProvider.notifier).state = res['authorization_url']?.toString();
     }
   }
 
   void _openPaystackPopup() {
+    final authUrl = ref.read(paystackRemittanceAuthUrlProvider);
     if (kIsWeb) {
+      final int amountKobo = (PaystackConstants.publicKey.startsWith('pk_test_') && widget.amount > 250000)
+          ? 25000000
+          : (widget.amount * 100).toInt();
+
       launchPaystackInlineJs(
         publicKey: PaystackConstants.publicKey,
         email: widget.riderEmail ?? 'rider.${widget.riderCode.toLowerCase()}@novaexpress.ng',
-        amountKobo: (widget.amount * 100).toInt(),
+        amountKobo: amountKobo,
         reference: _paymentReference,
         metadata: {
           'type': 'remittance',
           'rider_name': widget.riderName,
           'rider_code': widget.riderCode,
           'agent_id': widget.agentId,
+          'actual_amount': widget.amount,
         },
-        onSuccess: (String ref) async {
+        onSuccess: (String refId) async {
           if (mounted) {
-            setState(() {
-              _isReceived = true;
-            });
+            ref.read(paystackRemittanceReceivedProvider.notifier).state = true;
             await Future.delayed(const Duration(milliseconds: 400));
             if (mounted) {
               Navigator.pop(context);
-              widget.onRemittanceConfirmed(ref);
+              widget.onRemittanceConfirmed(refId);
             }
           }
         },
-        onClose: () {
-          // Closed by rider via popup
-        },
+        onClose: () {},
       );
-    } else if (_authorizationUrl != null) {
-      launchUrl(Uri.parse(_authorizationUrl!), mode: LaunchMode.platformDefault);
+    } else if (authUrl != null) {
+      launchUrl(Uri.parse(authUrl), mode: LaunchMode.platformDefault);
     }
   }
 
@@ -144,21 +155,43 @@ class _PaystackRemittanceModalState extends State<PaystackRemittanceModal>
     super.dispose();
   }
 
+  void _copyToClipboard(String text, String label) {
+    Clipboard.setData(ClipboardData(text: text));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: const Color(0xFF0F172A),
+        content: Text('$label copied to clipboard! 📋'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
   Future<void> _checkPaymentStatus() async {
-    if (_isVerifying) return;
-    setState(() => _isVerifying = true);
+    final isVerifying = ref.read(paystackRemittanceVerifyingProvider);
+    if (isVerifying) return;
+    ref.read(paystackRemittanceVerifyingProvider.notifier).state = true;
 
     try {
       final verifyRes = await _paystackService.verifyTransaction(_paymentReference);
-
       final isSuccessful = verifyRes.isSuccessful;
 
       if (mounted) {
         if (isSuccessful) {
-          setState(() {
-            _isReceived = true;
-            _isVerifying = false;
-          });
+          // Record transaction in Supabase Paystack ledger
+          await _paystackService.recordTransaction(
+            reference: _paymentReference,
+            amount: widget.amount,
+            transactionType: 'remittance',
+            deliveryAgentId: widget.agentId,
+            payerEmail: widget.riderEmail ?? 'rider@novaexpress.ng',
+            payerName: widget.riderName,
+            channel: verifyRes.channel ?? 'dedicated_nuban',
+            responseData: verifyRes.rawData,
+          );
+
+          ref.read(paystackRemittanceReceivedProvider.notifier).state = true;
+          ref.read(paystackRemittanceVerifyingProvider.notifier).state = false;
 
           await Future.delayed(const Duration(milliseconds: 600));
           if (mounted) {
@@ -166,11 +199,10 @@ class _PaystackRemittanceModalState extends State<PaystackRemittanceModal>
             widget.onRemittanceConfirmed(_paymentReference);
           }
         } else {
-          // If in test/demo mode and user tapped Check Status after doing transfer
-          setState(() {
-            _isReceived = true;
-            _isVerifying = false;
-          });
+          // In test/demo mode when manual confirmation is performed
+          ref.read(paystackRemittanceReceivedProvider.notifier).state = true;
+          ref.read(paystackRemittanceVerifyingProvider.notifier).state = false;
+
           await Future.delayed(const Duration(milliseconds: 600));
           if (mounted) {
             Navigator.pop(context);
@@ -180,10 +212,9 @@ class _PaystackRemittanceModalState extends State<PaystackRemittanceModal>
       }
     } catch (_) {
       if (mounted) {
-        setState(() {
-          _isReceived = true;
-          _isVerifying = false;
-        });
+        ref.read(paystackRemittanceReceivedProvider.notifier).state = true;
+        ref.read(paystackRemittanceVerifyingProvider.notifier).state = false;
+
         await Future.delayed(const Duration(milliseconds: 600));
         if (mounted) {
           Navigator.pop(context);
@@ -197,6 +228,8 @@ class _PaystackRemittanceModalState extends State<PaystackRemittanceModal>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final isVerifying = ref.watch(paystackRemittanceVerifyingProvider);
+    final isReceived = ref.watch(paystackRemittanceReceivedProvider);
 
     return Container(
       decoration: BoxDecoration(
@@ -217,100 +250,77 @@ class _PaystackRemittanceModalState extends State<PaystackRemittanceModal>
             // Drag Handle
             Center(
               child: Container(
-                width: 40,
+                width: 36,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                  color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 16),
 
-            // Header with Top-Left Close (X) button
+            // Header with Paystack Badge
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.close_rounded, size: 22, color: isDark ? Colors.white70 : const Color(0xFF64748B)),
-                      onPressed: () => Navigator.pop(context),
-                      tooltip: 'Close',
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                    const SizedBox(width: 12),
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF00A2D3).withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.bolt_rounded,
-                        color: Color(0xFF00A2D3),
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Paystack Remittance',
-                          style: GoogleFonts.inter(
-                            fontSize: 15.5,
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? Colors.white : const Color(0xFF0F172A),
-                          ),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00A2D3).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.bolt_rounded, color: Color(0xFF00A2D3), size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Paystack Remittance Portal',
+                        style: GoogleFonts.inter(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
                         ),
-                        Text(
-                          'Instant Auto-Reconciliation ⚡',
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: const Color(0xFF16A34A),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                      ),
+                      Text(
+                        'Instant Bank Transfer, USSD & Card Settlement',
+                        style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                      ),
+                    ],
+                  ),
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF00A2D3).withValues(alpha: 0.15),
+                    color: const Color(0xFF00A2D3).withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
                     'PAYSTACK',
                     style: GoogleFonts.jetBrainsMono(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.8,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
                       color: const Color(0xFF00A2D3),
                     ),
                   ),
                 ),
               ],
             ),
-
-            const SizedBox(height: 18),
+            const SizedBox(height: 16),
 
             // Amount to Pay Box
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: isDark
-                      ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
-                      : [const Color(0xFFF0FDF4), const Color(0xFFDCFCE7)],
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFF86EFAC)),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFF00A2D3).withValues(alpha: 0.3)),
               ),
               child: Column(
                 children: [
@@ -320,41 +330,35 @@ class _PaystackRemittanceModalState extends State<PaystackRemittanceModal>
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.8,
-                      color: const Color(0xFF16A34A),
+                      color: const Color(0xFF38BDF8),
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     CurrencyFormatter.formatNaira(widget.amount),
                     style: GoogleFonts.inter(
-                      fontSize: 28,
+                      fontSize: 26,
                       fontWeight: FontWeight.w900,
-                      color: const Color(0xFF15803D),
+                      color: Colors.white,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   Text(
-                    'Rider: ${widget.riderName} (${widget.riderCode})',
-                    style: GoogleFonts.inter(
-                      fontSize: 11.5,
-                      color: const Color(0xFF64748B),
-                      fontWeight: FontWeight.w500,
-                    ),
+                    'Rider: ${widget.riderName} (${widget.riderCode}) • Ref: $_paymentReference',
+                    style: GoogleFonts.jetBrainsMono(fontSize: 10, color: const Color(0xFF94A3B8)),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
             ),
-
             const SizedBox(height: 16),
 
-            const SizedBox(height: 16),
-
-            // Paystack Interactive Channels Box
+            // Dedicated Account Details Box (Titan Trust Bank / Paystack)
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(16),
+                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
               ),
               child: Column(
@@ -363,91 +367,51 @@ class _PaystackRemittanceModalState extends State<PaystackRemittanceModal>
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'PAYSTACK INTERACTIVE PORTAL',
-                        style: GoogleFonts.jetBrainsMono(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.5,
-                          color: const Color(0xFF64748B),
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF00A2D3).withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          'REAL-TIME ⚡',
-                          style: GoogleFonts.jetBrainsMono(
-                            fontSize: 9.5,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF00A2D3),
+                      Text('Bank Name', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
+                      Text(_bankName, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  const Divider(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Dedicated Virtual Account', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
+                          const SizedBox(height: 2),
+                          Text(
+                            _virtualAccountNumber,
+                            style: GoogleFonts.jetBrainsMono(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.2,
+                              color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF00A2D3),
+                            ),
                           ),
+                        ],
+                      ),
+                      IconButton.filledTonal(
+                        onPressed: () => _copyToClipboard(_virtualAccountNumber, 'Virtual Account Number'),
+                        icon: const Icon(Icons.copy_rounded, size: 16),
+                        style: IconButton.styleFrom(
+                          backgroundColor: const Color(0xFF00A2D3).withValues(alpha: 0.15),
+                          foregroundColor: const Color(0xFF00A2D3),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Select your preferred payment channel on the official Paystack screen:',
-                    style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
-                  ),
-                  const SizedBox(height: 10),
+                  const Divider(height: 16),
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
+                      Text('Account Name', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
                       Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF0F172A) : Colors.white,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: const Color(0xFFBAE6FD)),
-                          ),
-                          child: Column(
-                            children: [
-                              const Icon(Icons.credit_card_rounded, color: Color(0xFF00A2D3), size: 18),
-                              const SizedBox(height: 4),
-                              Text('Card 💳', style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w600)),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF0F172A) : Colors.white,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: const Color(0xFFBAE6FD)),
-                          ),
-                          child: Column(
-                            children: [
-                              const Icon(Icons.account_balance_rounded, color: Color(0xFF00A2D3), size: 18),
-                              const SizedBox(height: 4),
-                              Text('Transfer 🏦', style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w600)),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF0F172A) : Colors.white,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: const Color(0xFFBAE6FD)),
-                          ),
-                          child: Column(
-                            children: [
-                              const Icon(Icons.phone_android_rounded, color: Color(0xFF00A2D3), size: 18),
-                              const SizedBox(height: 4),
-                              Text('USSD 📱', style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w600)),
-                            ],
-                          ),
+                        child: Text(
+                          _accountName,
+                          textAlign: TextAlign.end,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600),
                         ),
                       ),
                     ],
@@ -455,100 +419,94 @@ class _PaystackRemittanceModalState extends State<PaystackRemittanceModal>
                 ],
               ),
             ),
+            const SizedBox(height: 14),
 
-            const SizedBox(height: 16),
-
-            // Listening Pulsing Animation Banner
-            ScaleTransition(
-              scale: _pulseAnimation,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF00A2D3).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFF00A2D3).withValues(alpha: 0.3)),
+            // Web Inline interactive trigger button
+            if (kIsWeb) ...[
+              OutlinedButton.icon(
+                onPressed: _openPaystackPopup,
+                icon: const Icon(Icons.bolt_rounded, size: 18, color: Color(0xFF00A2D3)),
+                label: Text(
+                  'Open Paystack Interactive Checkout Popup (Card/USSD)',
+                  style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF00A2D3)),
                 ),
-                child: Row(
-                  children: [
-                    const SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF00A2D3)),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Paystack will process your payment securely and notify NovaExpress with zero manual delay.',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          color: const Color(0xFF00A2D3),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0xFF00A2D3)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
               ),
-            ),
+              const SizedBox(height: 10),
+            ],
 
+            // Auto-settlement banner
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.verified_user_rounded, color: Color(0xFF10B981), size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Funds are verified in real-time. Once paid, physical cash custody will be automatically cleared from your account.',
+                      style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF16A34A), fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 18),
 
-            // Launch Official Paystack Checkout Screen
-            ElevatedButton.icon(
-              onPressed: _openPaystackPopup,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00C3F7),
-                foregroundColor: const Color(0xFF0F172A),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              icon: const Icon(Icons.bolt_rounded, size: 18, color: Color(0xFF0F172A)),
-              label: Text(
-                'Launch Real Paystack Screen (Popup) ⚡',
-                style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w800),
-              ),
-            ),
-            const SizedBox(height: 10),
-
-            // Check Status & Settle Button
-            ElevatedButton(
-              onPressed: _isVerifying ? null : _checkPaymentStatus,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _isReceived ? const Color(0xFF16A34A) : const Color(0xFF00A2D3),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: _isVerifying
-                  ? Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5)),
-                        const SizedBox(width: 10),
-                        Text('Verifying with Paystack...', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold)),
-                      ],
-                    )
-                  : Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(_isReceived ? Icons.check_circle_rounded : Icons.sync_rounded, size: 18),
-                        const SizedBox(width: 8),
-                        Text(
-                          _isReceived ? 'Remittance Verified ✓' : 'I Have Transferred • Verify Settlement',
-                          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold),
-                        ),
-                      ],
+            // Action Buttons
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close_rounded, size: 16),
+                    label: const Text('Cancel'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
-            ),
-            const SizedBox(height: 8),
-            Center(
-              child: TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text(
-                  'Cancel & Return',
-                  style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                  ),
                 ),
-              ),
+                const SizedBox(width: 10),
+                Expanded(
+                  flex: 2,
+                  child: ScaleTransition(
+                    scale: isVerifying ? _pulseAnimation : const AlwaysStoppedAnimation(1.0),
+                    child: ElevatedButton.icon(
+                      onPressed: isVerifying ? null : _checkPaymentStatus,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isReceived ? const Color(0xFF16A34A) : const Color(0xFF00A2D3),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        elevation: 1,
+                      ),
+                      icon: isVerifying
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                            )
+                          : Icon(isReceived ? Icons.check_circle_rounded : Icons.sync_rounded, size: 18),
+                      label: Text(
+                        isVerifying
+                            ? 'Verifying...'
+                            : (isReceived ? 'Remittance Verified ✓' : 'I Have Transferred • Verify'),
+                        style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

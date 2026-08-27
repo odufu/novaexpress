@@ -9,6 +9,10 @@ import '../../../finance/domain/entities/remittance.dart';
 import '../../../finance/presentation/providers/finance_provider.dart';
 import '../providers/dc_console_provider.dart';
 
+final dcFinanceFilterProvider = StateProvider.autoDispose<String>((ref) => 'all');
+final dcFinanceSearchProvider = StateProvider.autoDispose<String>((ref) => '');
+final dcFinanceDenominationTotalProvider = StateProvider.autoDispose<double>((ref) => 0.0);
+
 class DCFinancePage extends ConsumerStatefulWidget {
   const DCFinancePage({super.key});
 
@@ -18,7 +22,6 @@ class DCFinancePage extends ConsumerStatefulWidget {
 
 class _DCFinancePageState extends ConsumerState<DCFinancePage> {
   final TextEditingController _searchController = TextEditingController();
-  String _selectedFilter = 'all'; // 'all', 'paystack', 'today'
 
   final Map<int, TextEditingController> _denominationControllers = {
     1000: TextEditingController(text: '0'),
@@ -42,22 +45,22 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
     super.dispose();
   }
 
-  double _calculateTotalDenominations() {
+  void _updateDenominations() {
     double total = 0;
     _denominationControllers.forEach((denom, controller) {
       final count = int.tryParse(controller.text) ?? 0;
       total += denom * count;
     });
-    return total;
+    ref.read(dcFinanceDenominationTotalProvider.notifier).state = total;
   }
 
-  List<RemittanceEntity> _getFilteredRemittances(List<RemittanceEntity> list) {
-    final query = _searchController.text.trim().toLowerCase();
+  List<RemittanceEntity> _getFilteredRemittances(List<RemittanceEntity> list, String selectedFilter, String searchQuery) {
+    final query = searchQuery.trim().toLowerCase();
     return list.where((rem) {
-      if (_selectedFilter == 'paystack' && !rem.paymentMethod.toLowerCase().contains('paystack')) {
+      if (selectedFilter == 'paystack' && !rem.paymentMethod.toLowerCase().contains('paystack')) {
         return false;
       }
-      if (_selectedFilter == 'today') {
+      if (selectedFilter == 'today') {
         final now = DateTime.now();
         final isToday = rem.createdAt.year == now.year && rem.createdAt.month == now.month && rem.createdAt.day == now.day;
         if (!isToday) return false;
@@ -78,11 +81,14 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
     final isDark = theme.brightness == Brightness.dark;
     final financeState = ref.watch(financeProvider);
     final dcState = ref.watch(dcConsoleProvider);
+    final selectedFilter = ref.watch(dcFinanceFilterProvider);
+    final searchQuery = ref.watch(dcFinanceSearchProvider);
+    final denomTotal = ref.watch(dcFinanceDenominationTotalProvider);
     final screenWidth = MediaQuery.of(context).size.width;
     final isCompact = screenWidth < 800;
 
     final allRemittances = financeState.remittances;
-    final filteredList = _getFilteredRemittances(allRemittances);
+    final filteredList = _getFilteredRemittances(allRemittances, selectedFilter, searchQuery);
 
     final totalReconciled = allRemittances.fold(0.0, (sum, r) => sum + r.amount);
     final totalSubmissions = allRemittances.length;
@@ -226,11 +232,11 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        _buildFilterChip('all', 'All Settlements', _selectedFilter == 'all', isDark, () => setState(() => _selectedFilter = 'all')),
+                        _buildFilterChip('all', 'All Settlements', selectedFilter == 'all', isDark, () => ref.read(dcFinanceFilterProvider.notifier).state = 'all'),
                         const SizedBox(width: 6),
-                        _buildFilterChip('paystack', 'Paystack ⚡', _selectedFilter == 'paystack', isDark, () => setState(() => _selectedFilter = 'paystack')),
+                        _buildFilterChip('paystack', 'Paystack ⚡', selectedFilter == 'paystack', isDark, () => ref.read(dcFinanceFilterProvider.notifier).state = 'paystack'),
                         const SizedBox(width: 6),
-                        _buildFilterChip('today', 'Today', _selectedFilter == 'today', isDark, () => setState(() => _selectedFilter = 'today')),
+                        _buildFilterChip('today', 'Today', selectedFilter == 'today', isDark, () => ref.read(dcFinanceFilterProvider.notifier).state = 'today'),
                       ],
                     ),
                   ],
@@ -241,15 +247,18 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
                 // Search Bar
                 TextField(
                   controller: _searchController,
-                  onChanged: (_) => setState(() {}),
+                  onChanged: (val) => ref.read(dcFinanceSearchProvider.notifier).state = val,
                   decoration: InputDecoration(
                     hintText: 'Search by reference (e.g. PSTK-RMT...), rider name, or agent code...',
                     hintStyle: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF94A3B8)),
                     prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Color(0xFF64748B)),
-                    suffixIcon: _searchController.text.isNotEmpty
+                    suffixIcon: searchQuery.isNotEmpty
                         ? IconButton(
                             icon: const Icon(Icons.clear_rounded, size: 16),
-                            onPressed: () => setState(() => _searchController.clear()),
+                            onPressed: () {
+                              _searchController.clear();
+                              ref.read(dcFinanceSearchProvider.notifier).state = '';
+                            },
                           )
                         : null,
                     filled: true,
@@ -329,7 +338,7 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
                       child: TextField(
                         controller: e.value,
                         keyboardType: TextInputType.number,
-                        onChanged: (_) => setState(() {}),
+                        onChanged: (_) => _updateDenominations(),
                         decoration: InputDecoration(
                           labelText: '₦${e.key} Notes',
                           labelStyle: const TextStyle(fontSize: 12),
@@ -351,7 +360,7 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text('Counted Physical Cash Sum:', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13)),
-                      Text(CurrencyFormatter.formatNaira(_calculateTotalDenominations()), style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16, color: const Color(0xFF059669))),
+                      Text(CurrencyFormatter.formatNaira(denomTotal), style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16, color: const Color(0xFF059669))),
                     ],
                   ),
                 ),

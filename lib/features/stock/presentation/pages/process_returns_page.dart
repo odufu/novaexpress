@@ -5,18 +5,33 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 
-class ProcessReturnsPage extends ConsumerStatefulWidget {
-  const ProcessReturnsPage({super.key});
+final processReturnsSelectedDCProvider = StateProvider.autoDispose<String>((ref) => 'Wuse Distribution Center');
 
-  @override
-  ConsumerState<ProcessReturnsPage> createState() => _ProcessReturnsPageState();
+class ProcessReturnsSelectedItemsNotifier extends StateNotifier<Set<String>> {
+  ProcessReturnsSelectedItemsNotifier() : super({'RET-001', 'RET-002'});
+
+  void toggle(String id) {
+    if (state.contains(id)) {
+      state = state.where((item) => item != id).toSet();
+    } else {
+      state = {...state, id};
+    }
+  }
+
+  void clear() {
+    state = {};
+  }
 }
 
-class _ProcessReturnsPageState extends ConsumerState<ProcessReturnsPage> {
-  String _selectedDC = 'Wuse Distribution Center';
-  final Set<String> _selectedItems = {'RET-001', 'RET-002'};
+final processReturnsSelectedItemsProvider = StateNotifierProvider.autoDispose<
+    ProcessReturnsSelectedItemsNotifier, Set<String>>((ref) {
+  return ProcessReturnsSelectedItemsNotifier();
+});
 
-  final List<Map<String, dynamic>> _returnItems = [
+class ProcessReturnsPage extends ConsumerWidget {
+  const ProcessReturnsPage({super.key});
+
+  static const List<Map<String, dynamic>> _returnItems = [
     {
       'id': 'RET-001',
       'orderId': 'NX-849202',
@@ -36,16 +51,18 @@ class _ProcessReturnsPageState extends ConsumerState<ProcessReturnsPage> {
   ];
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final authState = ref.watch(authProvider);
+    final selectedDC = ref.watch(processReturnsSelectedDCProvider);
+    final selectedItems = ref.watch(processReturnsSelectedItemsProvider);
 
     final user = authState.user;
     final agentName = user != null && user.firstName.isNotEmpty ? '${user.firstName} ${user.lastName}' : 'John Okafor';
 
     final totalReturnUnits = _returnItems
-        .where((item) => _selectedItems.contains(item['id']))
+        .where((item) => selectedItems.contains(item['id']))
         .fold(0, (sum, item) => sum + (item['quantity'] as int));
 
     return Scaffold(
@@ -90,8 +107,7 @@ class _ProcessReturnsPageState extends ConsumerState<ProcessReturnsPage> {
                 color: isDark ? const Color(0xFF1E293B) : Colors.white,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                ),
+                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -102,7 +118,7 @@ class _ProcessReturnsPageState extends ConsumerState<ProcessReturnsPage> {
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
-                    initialValue: _selectedDC,
+                    value: selectedDC,
                     decoration: InputDecoration(
                       isDense: true,
                       prefixIcon: const Icon(Icons.warehouse_rounded, color: AppColors.primary),
@@ -117,7 +133,9 @@ class _ProcessReturnsPageState extends ConsumerState<ProcessReturnsPage> {
                       DropdownMenuItem(value: 'Ikeja Distribution Center', child: Text('Ikeja Distribution Center')),
                     ],
                     onChanged: (val) {
-                      if (val != null) setState(() => _selectedDC = val);
+                      if (val != null) {
+                        ref.read(processReturnsSelectedDCProvider.notifier).state = val;
+                      }
                     },
                   ),
                 ],
@@ -142,19 +160,13 @@ class _ProcessReturnsPageState extends ConsumerState<ProcessReturnsPage> {
             const SizedBox(height: 12),
 
             ..._returnItems.map((item) {
-              final isChecked = _selectedItems.contains(item['id']);
+              final isChecked = selectedItems.contains(item['id']);
 
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: InkWell(
                   onTap: () {
-                    setState(() {
-                      if (isChecked) {
-                        _selectedItems.remove(item['id']);
-                      } else {
-                        _selectedItems.add(item['id'] as String);
-                      }
-                    });
+                    ref.read(processReturnsSelectedItemsProvider.notifier).toggle(item['id'] as String);
                   },
                   borderRadius: BorderRadius.circular(16),
                   child: Container(
@@ -173,14 +185,8 @@ class _ProcessReturnsPageState extends ConsumerState<ProcessReturnsPage> {
                         Checkbox(
                           value: isChecked,
                           activeColor: AppColors.primary,
-                          onChanged: (val) {
-                            setState(() {
-                              if (val == true) {
-                                _selectedItems.add(item['id'] as String);
-                              } else {
-                                _selectedItems.remove(item['id']);
-                              }
-                            });
+                          onChanged: (_) {
+                            ref.read(processReturnsSelectedItemsProvider.notifier).toggle(item['id'] as String);
                           },
                         ),
                         const SizedBox(width: 8),
@@ -231,13 +237,13 @@ class _ProcessReturnsPageState extends ConsumerState<ProcessReturnsPage> {
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
-                onPressed: _selectedItems.isEmpty
+                onPressed: selectedItems.isEmpty
                     ? null
                     : () {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
-                              'Return manifest generated! Handed over $totalReturnUnits units to $_selectedDC.',
+                              'Return manifest generated! Handed over $totalReturnUnits units to $selectedDC.',
                               style: GoogleFonts.inter(color: Colors.white),
                             ),
                             backgroundColor: const Color(0xFF16A34A),

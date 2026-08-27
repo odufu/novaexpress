@@ -74,6 +74,7 @@ class _PdaHomePageState extends ConsumerState<PdaHomePage> {
       remittances: financeState.remittances,
       user: user,
       manualEarnedBalance: financeState.totalEarnedBalance,
+      transactions: financeState.transactions,
     );
 
     final double cashCollectedToday = summary.cashCollectedToday;

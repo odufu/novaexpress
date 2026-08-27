@@ -10,6 +10,10 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/entities/order.dart';
 import '../providers/orders_provider.dart';
 
+final logFailureSelectedReasonProvider = StateProvider.autoDispose<String>((ref) => 'Customer Unavailable');
+final logFailureLoadingProvider = StateProvider.autoDispose<bool>((ref) => false);
+final logFailureSuccessProvider = StateProvider.autoDispose<bool>((ref) => false);
+
 class LogDeliveryFailurePage extends ConsumerStatefulWidget {
   final String orderId;
 
@@ -23,10 +27,7 @@ class LogDeliveryFailurePage extends ConsumerStatefulWidget {
 }
 
 class _LogDeliveryFailurePageState extends ConsumerState<LogDeliveryFailurePage> {
-  String _selectedReason = 'Customer Unavailable';
   final TextEditingController _notesController = TextEditingController();
-  bool _isLoading = false;
-  bool _isSuccess = false;
 
   final List<Map<String, dynamic>> _reasonsList = [
     {
@@ -71,24 +72,23 @@ class _LogDeliveryFailurePageState extends ConsumerState<LogDeliveryFailurePage>
   }
 
   void _submitFailure() async {
-    setState(() {
-      _isLoading = true;
-    });
+    ref.read(logFailureLoadingProvider.notifier).state = true;
 
     final authState = ref.read(authProvider);
     final agentId = authState.user?.deliveryAgentId ?? authState.user?.id ?? SupabaseConstants.defaultDeliveryAgentId;
+    final selectedReason = ref.read(logFailureSelectedReasonProvider);
     final formattedNotes = _notesController.text.trim().isNotEmpty
-        ? '[$_selectedReason] ${_notesController.text.trim()}'
-        : '[$_selectedReason] Delivery failure reported by PDA.';
+        ? '[$selectedReason] ${_notesController.text.trim()}'
+        : '[$selectedReason] Delivery failure reported by PDA.';
 
     String reasonCode = 'other';
-    if (_selectedReason == 'Customer Unavailable') {
+    if (selectedReason == 'Customer Unavailable') {
       reasonCode = 'customer_unavailable';
-    } else if (_selectedReason == 'Wrong / Incomplete Address') {
+    } else if (selectedReason == 'Wrong / Incomplete Address') {
       reasonCode = 'wrong_address';
-    } else if (_selectedReason == 'Customer Rescheduled') {
+    } else if (selectedReason == 'Customer Rescheduled') {
       reasonCode = 'rescheduled';
-    } else if (_selectedReason == 'Payment Refused') {
+    } else if (selectedReason == 'Payment Refused') {
       reasonCode = 'cash_shortfall';
     }
 
@@ -102,10 +102,8 @@ class _LogDeliveryFailurePageState extends ConsumerState<LogDeliveryFailurePage>
     await Future.delayed(const Duration(milliseconds: 600));
 
     if (mounted) {
-      setState(() {
-        _isLoading = false;
-        _isSuccess = true;
-      });
+      ref.read(logFailureLoadingProvider.notifier).state = false;
+      ref.read(logFailureSuccessProvider.notifier).state = true;
     }
   }
 
@@ -113,6 +111,9 @@ class _LogDeliveryFailurePageState extends ConsumerState<LogDeliveryFailurePage>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final ordersState = ref.watch(ordersProvider);
+    final selectedReason = ref.watch(logFailureSelectedReasonProvider);
+    final isLoading = ref.watch(logFailureLoadingProvider);
+    final isSuccess = ref.watch(logFailureSuccessProvider);
 
     OrderEntity? matchedOrder;
     for (final o in ordersState.orders) {
@@ -144,7 +145,7 @@ class _LogDeliveryFailurePageState extends ConsumerState<LogDeliveryFailurePage>
             createdAt: DateTime.now(),
           ));
 
-    if (_isSuccess) {
+    if (isSuccess) {
       return Scaffold(
         backgroundColor: theme.scaffoldBackgroundColor,
         appBar: AppBar(
@@ -362,7 +363,7 @@ class _LogDeliveryFailurePageState extends ConsumerState<LogDeliveryFailurePage>
             // Failure Reasons Selection Cards matching log_delivery_failure/screen.png
             Column(
               children: _reasonsList.map((reason) {
-                final isSelected = _selectedReason == reason['title'];
+                final isSelected = selectedReason == reason['title'];
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Container(
@@ -378,7 +379,7 @@ class _LogDeliveryFailurePageState extends ConsumerState<LogDeliveryFailurePage>
                       ),
                     ),
                     child: InkWell(
-                      onTap: () => setState(() => _selectedReason = reason['title']),
+                      onTap: () => ref.read(logFailureSelectedReasonProvider.notifier).state = reason['title'] as String,
                       borderRadius: BorderRadius.circular(12),
                       child: Padding(
                         padding: const EdgeInsets.all(14),
@@ -477,9 +478,9 @@ class _LogDeliveryFailurePageState extends ConsumerState<LogDeliveryFailurePage>
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                onPressed: _isLoading ? null : _submitFailure,
+                onPressed: isLoading ? null : _submitFailure,
                 icon: const Icon(Icons.warning_amber_rounded, size: 20),
-                label: _isLoading
+                label: isLoading
                     ? const SizedBox(
                         height: 20,
                         width: 20,

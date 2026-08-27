@@ -6,17 +6,12 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_skeleton_loader.dart';
 import '../providers/stock_provider.dart';
 
-class StockHistoryPage extends ConsumerStatefulWidget {
+final stockHistoryFilterProvider = StateProvider.autoDispose<String>((ref) => 'All');
+
+class StockHistoryPage extends ConsumerWidget {
   const StockHistoryPage({super.key});
 
-  @override
-  ConsumerState<StockHistoryPage> createState() => _StockHistoryPageState();
-}
-
-class _StockHistoryPageState extends ConsumerState<StockHistoryPage> {
-  String _selectedFilter = 'All';
-
-  final List<String> _filters = [
+  static const List<String> _filters = [
     'All',
     'Received',
     'Delivered',
@@ -25,7 +20,7 @@ class _StockHistoryPageState extends ConsumerState<StockHistoryPage> {
     'Adjusted',
   ];
 
-  final List<Map<String, dynamic>> _movements = [
+  static const List<Map<String, dynamic>> _movements = [
     {
       'type': 'RECEIVED',
       'category': 'Received',
@@ -35,7 +30,7 @@ class _StockHistoryPageState extends ConsumerState<StockHistoryPage> {
       'source': 'Wuse Distribution Center',
       'reference': 'STK-00482',
       'timestamp': 'Today • 10:42 AM',
-      'badgeColor': const Color(0xFF16A34A),
+      'badgeColor': Color(0xFF16A34A),
       'icon': Icons.move_to_inbox_rounded,
     },
     {
@@ -47,7 +42,7 @@ class _StockHistoryPageState extends ConsumerState<StockHistoryPage> {
       'source': 'Order NX-00482 • Emeka Nwosu',
       'reference': 'NX-00482',
       'timestamp': 'Today • 02:14 PM',
-      'badgeColor': const Color(0xFFE11D48),
+      'badgeColor': Color(0xFFE11D48),
       'icon': Icons.local_shipping_rounded,
     },
     {
@@ -59,7 +54,7 @@ class _StockHistoryPageState extends ConsumerState<StockHistoryPage> {
       'source': 'Order NX-00471 • Mrs. Folake Adebayo',
       'reference': 'NX-00471',
       'timestamp': 'Today • 04:02 PM',
-      'badgeColor': const Color(0xFFEA580C),
+      'badgeColor': Color(0xFFEA580C),
       'icon': Icons.replay_rounded,
     },
     {
@@ -68,100 +63,114 @@ class _StockHistoryPageState extends ConsumerState<StockHistoryPage> {
       'productName': 'Respira Detox Tea',
       'quantityText': '-1 Unit',
       'isPositive': false,
-      'source': 'Package seal broken during transit',
+      'source': 'Transit Damage Logged',
       'reference': 'AUD-00192',
-      'timestamp': 'Yesterday • 05:30 PM',
-      'badgeColor': const Color(0xFF9333EA),
+      'timestamp': 'Yesterday • 06:30 PM',
+      'badgeColor': Color(0xFFDC2626),
       'icon': Icons.broken_image_rounded,
     },
     {
-      'type': 'ADJUSTMENT',
+      'type': 'ADJUSTED',
       'category': 'Adjusted',
-      'productName': 'Alpha Man Organic',
+      'productName': 'Grazer Herbal Tea',
       'quantityText': '+2 Units',
       'isPositive': true,
-      'source': 'Hub inventory variance reconciliation',
-      'reference': 'ADJ-00891',
-      'timestamp': '16 Aug • 09:15 AM',
-      'badgeColor': const Color(0xFF2563EB),
+      'source': 'Physical Count Reconciliation',
+      'reference': 'AUD-00188',
+      'timestamp': '2 days ago • 11:15 AM',
+      'badgeColor': Color(0xFF2563EB),
       'icon': Icons.tune_rounded,
     },
   ];
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final stockState = ref.watch(stockProvider);
+    final selectedFilter = ref.watch(stockHistoryFilterProvider);
 
-    final filteredMovements = _selectedFilter == 'All'
-        ? _movements
-        : _movements.where((m) => m['category'] == _selectedFilter).toList();
+    final filteredMovements = _movements.where((m) {
+      if (selectedFilter == 'All') return true;
+      return (m['category'] as String).toLowerCase() == selectedFilter.toLowerCase();
+    }).toList();
+
+    final totalReceived = _movements.where((m) => m['category'] == 'Received').length;
+    final totalDelivered = _movements.where((m) => m['category'] == 'Delivered').length;
+    final totalReturned = _movements.where((m) => m['category'] == 'Returned').length;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        title: const Text('Stock Movement History'),
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: theme.colorScheme.onSurface),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
           onPressed: () => context.pop(),
         ),
-        title: Text(
-          'Inventory History',
-          style: GoogleFonts.inter(
-            color: theme.colorScheme.onSurface,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await ref.read(stockProvider.notifier).fetchStockItems();
+        },
+        child: ListView(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           children: [
-            // Daily Movement Summary Card
+            // KPI Overview Banner
             Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(18),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E293B) : const Color(0xFF0F172A),
+                gradient: LinearGradient(
+                  colors: isDark
+                      ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
+                      : [const Color(0xFFEFF6FF), const Color(0xFFDBEAFE)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
                 borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isDark ? const Color(0xFF334155) : const Color(0xFFBFDBFE),
+                ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  const Text(
-                    "TODAY'S STOCK SUMMARY",
-                    style: TextStyle(
-                      color: Color(0xFF94A3B8),
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.5,
+                  Expanded(
+                    child: _buildSummaryMetric(
+                      label: 'Received',
+                      count: totalReceived.toString(),
+                      color: const Color(0xFF16A34A),
+                      icon: Icons.south_west_rounded,
                     ),
                   ),
-                  const SizedBox(height: 14),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const _StatColumn(label: 'Received', value: '+30', color: Color(0xFF4ADE80)),
-                      const _StatColumn(label: 'Delivered', value: '-15', color: Color(0xFFF87171)),
-                      const _StatColumn(label: 'Returned', value: '-2', color: Color(0xFFFB923C)),
-                      _StatColumn(label: 'Current Custody', value: '${stockState.totalInCustody}', color: Colors.white),
-                    ],
+                  Container(width: 1, height: 36, color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                  Expanded(
+                    child: _buildSummaryMetric(
+                      label: 'Delivered',
+                      count: totalDelivered.toString(),
+                      color: const Color(0xFFE11D48),
+                      icon: Icons.north_east_rounded,
+                    ),
+                  ),
+                  Container(width: 1, height: 36, color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                  Expanded(
+                    child: _buildSummaryMetric(
+                      label: 'Returned',
+                      count: totalReturned.toString(),
+                      color: const Color(0xFFEA580C),
+                      icon: Icons.replay_rounded,
+                    ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 16),
 
-            // Filter Chips
+            // Filter Chips Bar
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: _filters.map((filter) {
-                  final isSelected = _selectedFilter == filter;
+                  final isSelected = selectedFilter == filter;
                   return Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: ChoiceChip(
@@ -178,7 +187,9 @@ class _StockHistoryPageState extends ConsumerState<StockHistoryPage> {
                       backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                       onSelected: (val) {
-                        if (val) setState(() => _selectedFilter = filter);
+                        if (val) {
+                          ref.read(stockHistoryFilterProvider.notifier).state = filter;
+                        }
                       },
                     ),
                   );
@@ -217,7 +228,7 @@ class _StockHistoryPageState extends ConsumerState<StockHistoryPage> {
                 ),
                 child: Center(
                   child: Text(
-                    'No movements recorded for "$_selectedFilter"',
+                    'No movements recorded for "$selectedFilter"',
                     style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF64748B)),
                   ),
                 ),
@@ -258,19 +269,16 @@ class _StockHistoryPageState extends ConsumerState<StockHistoryPage> {
                                     m['type'] as String,
                                     style: GoogleFonts.jetBrainsMono(
                                       fontSize: 10,
-                                      fontWeight: FontWeight.bold,
+                                      fontWeight: FontWeight.w800,
                                       color: m['badgeColor'] as Color,
-                                      letterSpacing: 1,
+                                      letterSpacing: 0.5,
                                     ),
                                   ),
                                   Text(
-                                    m['quantityText'] as String,
-                                    style: GoogleFonts.jetBrainsMono(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.bold,
-                                      color: m['isPositive'] as bool
-                                          ? const Color(0xFF16A34A)
-                                          : const Color(0xFFE11D48),
+                                    m['timestamp'] as String,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      color: const Color(0xFF94A3B8),
                                     ),
                                   ),
                                 ],
@@ -278,28 +286,29 @@ class _StockHistoryPageState extends ConsumerState<StockHistoryPage> {
                               const SizedBox(height: 4),
                               Text(
                                 m['productName'] as String,
-                                style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold),
+                                style: GoogleFonts.inter(
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                              const SizedBox(height: 2),
+                              const SizedBox(height: 4),
                               Text(
                                 m['source'] as String,
-                                style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
-                              ),
-                              const SizedBox(height: 6),
-                              Row(
-                                children: [
-                                  Text(
-                                    'Ref: ${m['reference']}',
-                                    style: GoogleFonts.jetBrainsMono(fontSize: 10, color: const Color(0xFF94A3B8)),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Text(
-                                    m['timestamp'] as String,
-                                    style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
-                                  ),
-                                ],
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  color: const Color(0xFF64748B),
+                                ),
                               ),
                             ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          m['quantityText'] as String,
+                          style: GoogleFonts.jetBrainsMono(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: (m['isPositive'] as bool) ? const Color(0xFF16A34A) : const Color(0xFFE11D48),
                           ),
                         ),
                       ],
@@ -308,39 +317,42 @@ class _StockHistoryPageState extends ConsumerState<StockHistoryPage> {
                 );
               }),
             ],
+            const SizedBox(height: 24),
           ],
         ),
       ),
     );
   }
-}
 
-class _StatColumn extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color color;
-
-  const _StatColumn({
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildSummaryMetric({
+    required String label,
+    required String count,
+    required Color color,
+    required IconData icon,
+  }) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF64748B),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 4),
         Text(
-          value,
+          count,
           style: GoogleFonts.inter(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
+            fontSize: 20,
+            fontWeight: FontWeight.w900,
             color: color,
           ),
         ),

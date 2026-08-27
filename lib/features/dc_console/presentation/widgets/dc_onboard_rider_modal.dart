@@ -8,6 +8,79 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
 import '../providers/dc_console_provider.dart';
 
+class DCOnboardDraftState {
+  final int currentStep;
+  final bool isSubmitting;
+  final String personnelType;
+  final String operatingState;
+  final String assignedZone;
+  final bool mustChangePassword;
+  final String vehicleType;
+  final String compensationType;
+  final String selectedBank;
+  final Map<String, dynamic>? createdCredentialsSlip;
+
+  const DCOnboardDraftState({
+    this.currentStep = 0,
+    this.isSubmitting = false,
+    this.personnelType = 'pda',
+    this.operatingState = 'FCT - Abuja',
+    this.assignedZone = 'Wuse 2',
+    this.mustChangePassword = true,
+    this.vehicleType = 'Motorcycle',
+    this.compensationType = 'commission',
+    this.selectedBank = 'Kuda Microfinance Bank',
+    this.createdCredentialsSlip,
+  });
+
+  DCOnboardDraftState copyWith({
+    int? currentStep,
+    bool? isSubmitting,
+    String? personnelType,
+    String? operatingState,
+    String? assignedZone,
+    bool? mustChangePassword,
+    String? vehicleType,
+    String? compensationType,
+    String? selectedBank,
+    Map<String, dynamic>? Function()? createdCredentialsSlip,
+  }) {
+    return DCOnboardDraftState(
+      currentStep: currentStep ?? this.currentStep,
+      isSubmitting: isSubmitting ?? this.isSubmitting,
+      personnelType: personnelType ?? this.personnelType,
+      operatingState: operatingState ?? this.operatingState,
+      assignedZone: assignedZone ?? this.assignedZone,
+      mustChangePassword: mustChangePassword ?? this.mustChangePassword,
+      vehicleType: vehicleType ?? this.vehicleType,
+      compensationType: compensationType ?? this.compensationType,
+      selectedBank: selectedBank ?? this.selectedBank,
+      createdCredentialsSlip: createdCredentialsSlip != null ? createdCredentialsSlip() : this.createdCredentialsSlip,
+    );
+  }
+}
+
+class DCOnboardDraftNotifier extends StateNotifier<DCOnboardDraftState> {
+  DCOnboardDraftNotifier() : super(const DCOnboardDraftState());
+
+  void setStep(int step) => state = state.copyWith(currentStep: step);
+  void nextStep() => state = state.copyWith(currentStep: (state.currentStep + 1).clamp(0, 4));
+  void previousStep() => state = state.copyWith(currentStep: (state.currentStep - 1).clamp(0, 4));
+  void setPersonnelType(String type) => state = state.copyWith(personnelType: type);
+  void setOperatingLocation(String stateVal, String zoneVal) => state = state.copyWith(operatingState: stateVal, assignedZone: zoneVal);
+  void setAssignedZone(String zone) => state = state.copyWith(assignedZone: zone);
+  void setMustChangePassword(bool val) => state = state.copyWith(mustChangePassword: val);
+  void setVehicleType(String type) => state = state.copyWith(vehicleType: type);
+  void setCompensationType(String type) => state = state.copyWith(compensationType: type);
+  void setSelectedBank(String bank) => state = state.copyWith(selectedBank: bank);
+  void setSubmitting(bool val) => state = state.copyWith(isSubmitting: val);
+  void setCredentialsSlip(Map<String, dynamic> slip) => state = state.copyWith(isSubmitting: false, createdCredentialsSlip: () => slip);
+}
+
+final dcOnboardDraftProvider = StateNotifierProvider.autoDispose<DCOnboardDraftNotifier, DCOnboardDraftState>((ref) {
+  return DCOnboardDraftNotifier();
+});
+
 class DCOnboardRiderModal extends ConsumerStatefulWidget {
   const DCOnboardRiderModal({super.key});
 
@@ -24,35 +97,25 @@ class DCOnboardRiderModal extends ConsumerStatefulWidget {
 }
 
 class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
-  int _currentStep = 0;
-  bool _isSubmitting = false;
-  Map<String, dynamic>? _createdCredentialsSlip;
-
   // Step 1: Personnel Type & KYC (All 36 States + FCT)
-  String _personnelType = 'pda'; // 'pda' | 'in_house_rider'
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _guarantorNameController = TextEditingController();
   final _guarantorPhoneController = TextEditingController();
-  String _operatingState = 'FCT - Abuja';
-  String _assignedZone = 'Wuse 2';
 
   // Step 2: Login Credentials & Security
   final _tempPasswordController = TextEditingController(text: 'Password123!');
   final _tempPinController = TextEditingController(text: '1234');
-  bool _mustChangePassword = true;
 
   // Step 3: Vehicle & Asset Setup
-  String _vehicleType = 'Motorcycle';
   final _vehicleModelController = TextEditingController(text: 'Bajaj Boxer 100 (Personal)');
   final _vehiclePlateController = TextEditingController(text: 'ABJ-304-XY');
   final _licenseOrAssetTagController = TextEditingController(text: 'LIC-2026-9912');
   final _fuelCardController = TextEditingController(text: 'FUEL-VOUCH-882');
 
   // Step 4: Unique Compensation Agreement
-  String _compensationType = 'commission'; // 'commission' | 'salary' | 'hybrid'
   final _commissionController = TextEditingController(text: '1000');
   final _transportAllowanceController = TextEditingController(text: '1500');
   final _failedAllowanceController = TextEditingController(text: '500');
@@ -60,7 +123,6 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
   final _upsellBonusController = TextEditingController(text: '10');
 
   // Step 5: Bank Payout Details
-  String _selectedBank = 'Kuda Microfinance Bank';
   final _accountNumberController = TextEditingController();
   final _accountNameController = TextEditingController();
 
@@ -120,28 +182,29 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
   }
 
   void _onPersonnelTypeChanged(String type) {
-    setState(() {
-      _personnelType = type;
-      if (type == 'pda') {
-        _vehicleModelController.text = 'Bajaj Boxer 100 (Personal)';
-        _commissionController.text = '1000';
-        _transportAllowanceController.text = '1500';
-        _failedAllowanceController.text = '500';
-        _baseSalaryController.text = '0';
-        _compensationType = 'commission';
-      } else {
-        _vehicleModelController.text = 'Haojue 125 (Company Fleet)';
-        _commissionController.text = '500';
-        _transportAllowanceController.text = '800';
-        _failedAllowanceController.text = '300';
-        _baseSalaryController.text = '120000';
-        _compensationType = 'salary';
-      }
-    });
+    final notifier = ref.read(dcOnboardDraftProvider.notifier);
+    notifier.setPersonnelType(type);
+    if (type == 'pda') {
+      _vehicleModelController.text = 'Bajaj Boxer 100 (Personal)';
+      _commissionController.text = '1000';
+      _transportAllowanceController.text = '1500';
+      _failedAllowanceController.text = '500';
+      _baseSalaryController.text = '0';
+      notifier.setCompensationType('commission');
+    } else {
+      _vehicleModelController.text = 'Haojue 125 (Company Fleet)';
+      _commissionController.text = '500';
+      _transportAllowanceController.text = '800';
+      _failedAllowanceController.text = '300';
+      _baseSalaryController.text = '120000';
+      notifier.setCompensationType('salary');
+    }
   }
 
   Future<void> _submitOnboarding() async {
-    setState(() => _isSubmitting = true);
+    final draftState = ref.read(dcOnboardDraftProvider);
+    final notifier = ref.read(dcOnboardDraftProvider.notifier);
+    notifier.setSubmitting(true);
 
     final firstName = _firstNameController.text.trim().isEmpty ? 'Samuel' : _firstNameController.text.trim();
     final lastName = _lastNameController.text.trim().isEmpty ? 'Okon' : _lastNameController.text.trim();
@@ -153,7 +216,7 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
     final tempPassword = _tempPasswordController.text.trim().isEmpty ? 'Password123!' : _tempPasswordController.text.trim();
     final tempPin = _tempPinController.text.trim().isEmpty ? '1234' : _tempPinController.text.trim();
 
-    final isPda = _personnelType == 'pda';
+    final isPda = draftState.personnelType == 'pda';
     final randomSuffix = (100 + (DateTime.now().millisecondsSinceEpoch % 899)).toString();
     final driverCode = isPda ? 'PDA-7$randomSuffix' : 'RDR-$randomSuffix';
 
@@ -174,19 +237,19 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
         firstName: firstName,
         lastName: lastName,
         phone: phone,
-        personnelType: _personnelType,
-        compensationType: _compensationType,
+        personnelType: draftState.personnelType,
+        compensationType: draftState.compensationType,
         commissionRate: commission,
         transportAllowance: transport,
         fuelAllowance: isPda ? 0.0 : 800.0,
         baseSalary: salary,
-        vehicleType: _vehicleType,
+        vehicleType: draftState.vehicleType,
         vehiclePlateNumber: _vehiclePlateController.text.trim(),
-        bankName: _selectedBank,
+        bankName: draftState.selectedBank,
         bankAccountNumber: _accountNumberController.text.trim().isEmpty ? '2019847291' : _accountNumberController.text.trim(),
         bankAccountName: _accountNameController.text.trim().isEmpty ? fullName : _accountNameController.text.trim(),
         distributionCenterId: '22222222-2222-4222-8222-222222222222',
-        assignedZone: _assignedZone,
+        assignedZone: draftState.assignedZone,
       );
       if (createdUser.deliveryAgentCode?.isNotEmpty == true) {
         finalDriverCode = createdUser.deliveryAgentCode!;
@@ -208,23 +271,23 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
       avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
       vehicleModel: _vehicleModelController.text.trim(),
       vehiclePlate: _vehiclePlateController.text.trim(),
-      vehicleType: _vehicleType,
+      vehicleType: draftState.vehicleType,
       status: 'active',
-      assignedZone: _assignedZone,
+      assignedZone: draftState.assignedZone,
       totalAssignedOrders: 0,
       completedOrders: 0,
       routeProgressPercent: 0.0,
       efficiencyRating: 100.0,
       cashInCustody: 0.0,
       itemsInCustody: 0,
-      personnelType: _personnelType,
-      compensationType: _compensationType,
+      personnelType: draftState.personnelType,
+      compensationType: draftState.compensationType,
       commissionRate: commission,
       transportAllowance: transport,
       failedDeliveryAllowance: failed,
       baseSalary: salary,
       upsellBonusPercent: upsell,
-      bankName: _selectedBank,
+      bankName: draftState.selectedBank,
       bankAccountNumber: _accountNumberController.text.trim().isEmpty ? '2019847291' : _accountNumberController.text.trim(),
       bankAccountName: _accountNameController.text.trim().isEmpty ? fullName : _accountNameController.text.trim(),
       guarantorName: _guarantorNameController.text.trim().isEmpty ? 'Dr. Chidi Okafor' : _guarantorNameController.text.trim(),
@@ -236,19 +299,16 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
     ref.read(dcConsoleProvider.notifier).loadDriversFromDatabase();
 
     // 3. Prepare credentials confirmation slip with exact login details
-    setState(() {
-      _isSubmitting = false;
-      _createdCredentialsSlip = {
-        'driverCode': finalDriverCode,
-        'name': fullName,
-        'email': email,
-        'password': tempPassword,
-        'pin': tempPin,
-        'personnelType': isPda ? 'PDA (Personal Vehicle)' : 'In-House Rider (Company Fleet)',
-        'hub': 'Wuse Distribution Center (DC-WUSE-01)',
-        'agreement': '₦${commission.toInt()} Comm. + ₦${transport.toInt()} Transport',
-        'salary': salary > 0 ? CurrencyFormatter.formatNaira(salary) : 'Commission Only',
-      };
+    notifier.setCredentialsSlip({
+      'driverCode': finalDriverCode,
+      'name': fullName,
+      'email': email,
+      'password': tempPassword,
+      'pin': tempPin,
+      'personnelType': isPda ? 'PDA (Personal Vehicle)' : 'In-House Rider (Company Fleet)',
+      'hub': 'Wuse Distribution Center (DC-WUSE-01)',
+      'agreement': '₦${commission.toInt()} Comm. + ₦${transport.toInt()} Transport',
+      'salary': salary > 0 ? CurrencyFormatter.formatNaira(salary) : 'Commission Only',
     });
   }
 
@@ -256,18 +316,27 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final draftState = ref.watch(dcOnboardDraftProvider);
 
-    if (_createdCredentialsSlip != null) {
-      return _buildCredentialsSuccessSlip(isDark);
+    if (draftState.createdCredentialsSlip != null) {
+      return _buildCredentialsSuccessSlip(isDark, draftState.createdCredentialsSlip!);
     }
+
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isMobile = screenWidth < 768;
 
     return Dialog(
       backgroundColor: isDark ? const Color(0xFF151D36) : Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 8 : 16,
+        vertical: isMobile ? 12 : 20,
+      ),
       child: Container(
-        width: 860,
-        constraints: const BoxConstraints(maxHeight: 740),
-        padding: const EdgeInsets.all(28),
+        width: isMobile ? double.infinity : 860,
+        constraints: BoxConstraints(maxHeight: isMobile ? screenHeight * 0.96 : 740),
+        padding: EdgeInsets.all(isMobile ? 16 : 28),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -324,15 +393,15 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  _buildStepTab(0, '1. Role & Identity', Icons.badge_outlined),
+                  _buildStepTab(0, '1. Role & Identity', Icons.badge_outlined, draftState.currentStep),
                   const SizedBox(width: 8),
-                  _buildStepTab(1, '2. Login & Security', Icons.lock_outline_rounded),
+                  _buildStepTab(1, '2. Login & Security', Icons.lock_outline_rounded, draftState.currentStep),
                   const SizedBox(width: 8),
-                  _buildStepTab(2, '3. Vehicle & Asset', Icons.two_wheeler_rounded),
+                  _buildStepTab(2, '3. Vehicle & Asset', Icons.two_wheeler_rounded, draftState.currentStep),
                   const SizedBox(width: 8),
-                  _buildStepTab(3, '4. Agreement', Icons.handshake_outlined),
+                  _buildStepTab(3, '4. Agreement', Icons.handshake_outlined, draftState.currentStep),
                   const SizedBox(width: 8),
-                  _buildStepTab(4, '5. Payout Bank', Icons.account_balance_outlined),
+                  _buildStepTab(4, '5. Payout Bank', Icons.account_balance_outlined, draftState.currentStep),
                 ],
               ),
             ),
@@ -344,7 +413,7 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
             // Scrollable Step Body
             Expanded(
               child: SingleChildScrollView(
-                child: _buildCurrentStepView(isDark),
+                child: _buildCurrentStepView(isDark, draftState),
               ),
             ),
 
@@ -356,9 +425,9 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                if (_currentStep > 0)
+                if (draftState.currentStep > 0)
                   OutlinedButton.icon(
-                    onPressed: () => setState(() => _currentStep--),
+                    onPressed: () => ref.read(dcOnboardDraftProvider.notifier).previousStep(),
                     icon: const Icon(Icons.arrow_back_rounded, size: 16),
                     label: const Text('Previous'),
                   )
@@ -372,9 +441,9 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                       child: const Text('Cancel'),
                     ),
                     const SizedBox(width: 10),
-                    if (_currentStep < 4)
+                    if (draftState.currentStep < 4)
                       ElevatedButton.icon(
-                        onPressed: () => setState(() => _currentStep++),
+                        onPressed: () => ref.read(dcOnboardDraftProvider.notifier).nextStep(),
                         icon: const Icon(Icons.arrow_forward_rounded, size: 16, color: Colors.white),
                         label: const Text('Next Step', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                         style: ElevatedButton.styleFrom(
@@ -384,8 +453,8 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                       )
                     else
                       ElevatedButton.icon(
-                        onPressed: _isSubmitting ? null : _submitOnboarding,
-                        icon: _isSubmitting
+                        onPressed: draftState.isSubmitting ? null : _submitOnboarding,
+                        icon: draftState.isSubmitting
                             ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                             : const Icon(Icons.check_circle_rounded, size: 18, color: Colors.white),
                         label: const Text('Issue Credentials & Activate', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -404,12 +473,12 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
     );
   }
 
-  Widget _buildStepTab(int stepIdx, String label, IconData icon) {
-    final isActive = _currentStep == stepIdx;
-    final isDone = _currentStep > stepIdx;
+  Widget _buildStepTab(int stepIdx, String label, IconData icon, int currentStep) {
+    final isActive = currentStep == stepIdx;
+    final isDone = currentStep > stepIdx;
 
     return InkWell(
-      onTap: () => setState(() => _currentStep = stepIdx),
+      onTap: () => ref.read(dcOnboardDraftProvider.notifier).setStep(stepIdx),
       borderRadius: BorderRadius.circular(10),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
@@ -444,18 +513,18 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
     );
   }
 
-  Widget _buildCurrentStepView(bool isDark) {
-    switch (_currentStep) {
+  Widget _buildCurrentStepView(bool isDark, DCOnboardDraftState draftState) {
+    switch (draftState.currentStep) {
       case 0:
-        return _buildStep1RoleAndKyc(isDark);
+        return _buildStep1RoleAndKyc(isDark, draftState);
       case 1:
-        return _buildStep2LoginSecurity(isDark);
+        return _buildStep2LoginSecurity(isDark, draftState);
       case 2:
-        return _buildStep3VehicleAndAssets(isDark);
+        return _buildStep3VehicleAndAssets(isDark, draftState);
       case 3:
-        return _buildStep4CompensationAgreement(isDark);
+        return _buildStep4CompensationAgreement(isDark, draftState);
       case 4:
-        return _buildStep5PayoutBank(isDark);
+        return _buildStep5PayoutBank(isDark, draftState);
       default:
         return const SizedBox.shrink();
     }
@@ -464,7 +533,7 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
   // ---------------------------------------------------------------------------
   // STEP 1: ROLE & KYC
   // ---------------------------------------------------------------------------
-  Widget _buildStep1RoleAndKyc(bool isDark) {
+  Widget _buildStep1RoleAndKyc(bool isDark, DCOnboardDraftState draftState) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -492,7 +561,7 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                     badge: 'Own Vehicle',
                     description: 'Uses personal motorcycle, car, or bicycle. Carries distributed client inventory. Compensated on custom commission & transport allowance.',
                     icon: Icons.two_wheeler_rounded,
-                    isSelected: _personnelType == 'pda',
+                    isSelected: draftState.personnelType == 'pda',
                     onTap: () => _onPersonnelTypeChanged('pda'),
                   ),
                 ),
@@ -504,7 +573,7 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                     badge: 'Company Bike',
                     description: 'Uses NovaExpress company fleet vehicle. Operates on base salary + fuel allowance & delivery milestone bonuses.',
                     icon: Icons.delivery_dining_rounded,
-                    isSelected: _personnelType == 'in_house_rider',
+                    isSelected: draftState.personnelType == 'in_house_rider',
                     onTap: () => _onPersonnelTypeChanged('in_house_rider'),
                   ),
                 ),
@@ -537,17 +606,14 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
           children: [
             Expanded(
               child: DropdownButtonFormField<String>(
-                value: _operatingState,
+                value: draftState.operatingState,
                 isExpanded: true,
                 decoration: const InputDecoration(labelText: 'Operating State (36 States + FCT)'),
                 items: NigeriaLocations.states.map((s) => DropdownMenuItem(value: s, child: Text(s, style: GoogleFonts.inter(fontSize: 13), overflow: TextOverflow.ellipsis))).toList(),
                 onChanged: (val) {
                   if (val != null) {
                     final cities = NigeriaLocations.getCitiesForState(val);
-                    setState(() {
-                      _operatingState = val;
-                      _assignedZone = cities.isNotEmpty ? cities.first : 'Central';
-                    });
+                    ref.read(dcOnboardDraftProvider.notifier).setOperatingLocation(val, cities.isNotEmpty ? cities.first : 'Central');
                   }
                 },
               ),
@@ -555,15 +621,19 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
             const SizedBox(width: 12),
             Expanded(
               child: DropdownButtonFormField<String>(
-                value: NigeriaLocations.getCitiesForState(_operatingState).contains(_assignedZone)
-                    ? _assignedZone
-                    : (NigeriaLocations.getCitiesForState(_operatingState).isNotEmpty
-                        ? NigeriaLocations.getCitiesForState(_operatingState).first
+                value: NigeriaLocations.getCitiesForState(draftState.operatingState).contains(draftState.assignedZone)
+                    ? draftState.assignedZone
+                    : (NigeriaLocations.getCitiesForState(draftState.operatingState).isNotEmpty
+                        ? NigeriaLocations.getCitiesForState(draftState.operatingState).first
                         : null),
                 isExpanded: true,
                 decoration: const InputDecoration(labelText: 'Primary Operational Zone / LGA'),
-                items: NigeriaLocations.getCitiesForState(_operatingState).map((z) => DropdownMenuItem(value: z, child: Text(z, style: GoogleFonts.inter(fontSize: 13), overflow: TextOverflow.ellipsis))).toList(),
-                onChanged: (val) => setState(() => _assignedZone = val ?? _assignedZone),
+                items: NigeriaLocations.getCitiesForState(draftState.operatingState).map((z) => DropdownMenuItem(value: z, child: Text(z, style: GoogleFonts.inter(fontSize: 13), overflow: TextOverflow.ellipsis))).toList(),
+                onChanged: (val) {
+                  if (val != null) {
+                    ref.read(dcOnboardDraftProvider.notifier).setAssignedZone(val);
+                  }
+                },
               ),
             ),
           ],
@@ -652,9 +722,10 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
   }
 
   // ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
   // STEP 2: LOGIN CREDENTIALS & SECURITY
   // ---------------------------------------------------------------------------
-  Widget _buildStep2LoginSecurity(bool isDark) {
+  Widget _buildStep2LoginSecurity(bool isDark, DCOnboardDraftState draftState) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -721,9 +792,9 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
           child: Row(
             children: [
               Checkbox(
-                value: _mustChangePassword,
+                value: draftState.mustChangePassword,
                 activeColor: const Color(0xFF031632),
-                onChanged: (val) => setState(() => _mustChangePassword = val ?? true),
+                onChanged: (val) => ref.read(dcOnboardDraftProvider.notifier).setMustChangePassword(val ?? true),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -745,8 +816,8 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
   // ---------------------------------------------------------------------------
   // STEP 3: VEHICLE & ASSET SETUP
   // ---------------------------------------------------------------------------
-  Widget _buildStep3VehicleAndAssets(bool isDark) {
-    final isPda = _personnelType == 'pda';
+  Widget _buildStep3VehicleAndAssets(bool isDark, DCOnboardDraftState draftState) {
+    final isPda = draftState.personnelType == 'pda';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -760,13 +831,17 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
           children: [
             Expanded(
               child: DropdownButtonFormField<String>(
-                value: _vehicleType,
+                value: draftState.vehicleType,
                 isExpanded: true,
                 decoration: const InputDecoration(labelText: 'Vehicle Category'),
                 items: ['Motorcycle', 'Car', 'Van', 'Tricycle', 'Bicycle']
                     .map((v) => DropdownMenuItem(value: v, child: Text(v, style: GoogleFonts.inter(fontSize: 13), overflow: TextOverflow.ellipsis)))
                     .toList(),
-                onChanged: (val) => setState(() => _vehicleType = val ?? _vehicleType),
+                onChanged: (val) {
+                  if (val != null) {
+                    ref.read(dcOnboardDraftProvider.notifier).setVehicleType(val);
+                  }
+                },
               ),
             ),
             const SizedBox(width: 12),
@@ -822,7 +897,7 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
   // ---------------------------------------------------------------------------
   // STEP 4: COMPENSATION AGREEMENT
   // ---------------------------------------------------------------------------
-  Widget _buildStep4CompensationAgreement(bool isDark) {
+  Widget _buildStep4CompensationAgreement(bool isDark, DCOnboardDraftState draftState) {
     final comm = double.tryParse(_commissionController.text) ?? 0.0;
     final transport = double.tryParse(_transportAllowanceController.text) ?? 0.0;
     final totalPerOrder = comm + transport;
@@ -881,7 +956,7 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
         const SizedBox(height: 16),
 
         DropdownButtonFormField<String>(
-          value: _compensationType,
+          value: draftState.compensationType,
           isExpanded: true,
           decoration: const InputDecoration(labelText: 'Compensation Model Structure'),
           items: const [
@@ -889,7 +964,11 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
             DropdownMenuItem(value: 'salary', child: Text('Fixed Monthly Salary + Fuel Allowance', overflow: TextOverflow.ellipsis)),
             DropdownMenuItem(value: 'hybrid', child: Text('Hybrid: Base Salary + Per Drop Commission', overflow: TextOverflow.ellipsis)),
           ],
-          onChanged: (val) => setState(() => _compensationType = val ?? _compensationType),
+          onChanged: (val) {
+            if (val != null) {
+              ref.read(dcOnboardDraftProvider.notifier).setCompensationType(val);
+            }
+          },
         ),
 
         const SizedBox(height: 14),
@@ -903,7 +982,9 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                   TextField(
                     controller: _commissionController,
                     keyboardType: TextInputType.number,
-                    onChanged: (_) => setState(() {}),
+                    onChanged: (_) {
+                      ref.read(dcOnboardDraftProvider.notifier).setCompensationType(draftState.compensationType);
+                    },
                     decoration: const InputDecoration(
                       labelText: 'Base Commission (₦ per drop)',
                       prefixText: '₦ ',
@@ -916,7 +997,10 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                     children: [500, 1000, 1200, 1500].map((rate) {
                       final isSel = _commissionController.text == rate.toString();
                       return InkWell(
-                        onTap: () => setState(() => _commissionController.text = rate.toString()),
+                        onTap: () {
+                          _commissionController.text = rate.toString();
+                          ref.read(dcOnboardDraftProvider.notifier).setCompensationType(draftState.compensationType);
+                        },
                         borderRadius: BorderRadius.circular(6),
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -947,7 +1031,9 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                   TextField(
                     controller: _transportAllowanceController,
                     keyboardType: TextInputType.number,
-                    onChanged: (_) => setState(() {}),
+                    onChanged: (_) {
+                      ref.read(dcOnboardDraftProvider.notifier).setCompensationType(draftState.compensationType);
+                    },
                     decoration: const InputDecoration(
                       labelText: 'Transport / Fuel Allowance (₦ per drop)',
                       prefixText: '₦ ',
@@ -960,7 +1046,10 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                     children: [800, 1200, 1500, 2000].map((rate) {
                       final isSel = _transportAllowanceController.text == rate.toString();
                       return InkWell(
-                        onTap: () => setState(() => _transportAllowanceController.text = rate.toString()),
+                        onTap: () {
+                          _transportAllowanceController.text = rate.toString();
+                          ref.read(dcOnboardDraftProvider.notifier).setCompensationType(draftState.compensationType);
+                        },
                         borderRadius: BorderRadius.circular(6),
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -1014,7 +1103,7 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
           ],
         ),
 
-        if (_compensationType != 'commission') ...[
+        if (draftState.compensationType != 'commission') ...[
           const SizedBox(height: 14),
           TextField(
             controller: _baseSalaryController,
@@ -1032,7 +1121,7 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
   // ---------------------------------------------------------------------------
   // STEP 5: PAYOUT BANK ACCOUNT DETAILS
   // ---------------------------------------------------------------------------
-  Widget _buildStep5PayoutBank(bool isDark) {
+  Widget _buildStep5PayoutBank(bool isDark, DCOnboardDraftState draftState) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1048,11 +1137,15 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
         const SizedBox(height: 16),
 
         DropdownButtonFormField<String>(
-          value: _selectedBank,
+          value: draftState.selectedBank,
           isExpanded: true,
           decoration: const InputDecoration(labelText: 'Destination Bank Name'),
           items: _banks.map((b) => DropdownMenuItem(value: b, child: Text(b, style: GoogleFonts.inter(fontSize: 13), overflow: TextOverflow.ellipsis))).toList(),
-          onChanged: (val) => setState(() => _selectedBank = val ?? _selectedBank),
+          onChanged: (val) {
+            if (val != null) {
+              ref.read(dcOnboardDraftProvider.notifier).setSelectedBank(val);
+            }
+          },
         ),
         const SizedBox(height: 12),
         Row(
@@ -1097,12 +1190,12 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
             children: [
               Text('Summary of Onboarding Terms', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              _buildSummaryRow('Personnel Model:', _personnelType == 'pda' ? 'PDA (Personal Vehicle)' : 'In-House Rider (Company Fleet)'),
+              _buildSummaryRow('Personnel Model:', draftState.personnelType == 'pda' ? 'PDA (Personal Vehicle)' : 'In-House Rider (Company Fleet)'),
               _buildSummaryRow('Operational Hub:', 'Wuse Distribution Center (DC-WUSE-01)'),
-              _buildSummaryRow('Assigned Zone:', _assignedZone),
+              _buildSummaryRow('Assigned Zone:', draftState.assignedZone),
               _buildSummaryRow('Delivery Commission:', '₦${_commissionController.text} per drop'),
               _buildSummaryRow('Transport Allowance:', '₦${_transportAllowanceController.text} per drop'),
-              _buildSummaryRow('Payout Destination:', '$_selectedBank • ${_accountNumberController.text.isEmpty ? '2019847291' : _accountNumberController.text}'),
+              _buildSummaryRow('Payout Destination:', '${draftState.selectedBank} • ${_accountNumberController.text.isEmpty ? '2019847291' : _accountNumberController.text}'),
             ],
           ),
         ),
@@ -1113,9 +1206,7 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
   // ---------------------------------------------------------------------------
   // SUCCESS / CREDENTIALS SLIP CARD
   // ---------------------------------------------------------------------------
-  Widget _buildCredentialsSuccessSlip(bool isDark) {
-    final slip = _createdCredentialsSlip!;
-
+  Widget _buildCredentialsSuccessSlip(bool isDark, Map<String, dynamic> slip) {
     return Dialog(
       backgroundColor: isDark ? const Color(0xFF151D36) : Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),

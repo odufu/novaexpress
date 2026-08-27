@@ -6,7 +6,33 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/stock_provider.dart';
 
-class StockHandoverPage extends ConsumerStatefulWidget {
+class StockHandoverVerifiedCountsNotifier extends StateNotifier<Map<String, int>> {
+  StockHandoverVerifiedCountsNotifier()
+      : super({
+          'Respira': 10,
+          'Grazer Herbal Tea': 20,
+          'Alpha Man': 5,
+        });
+
+  void increment(String productName) {
+    final current = state[productName] ?? 0;
+    state = {...state, productName: current + 1};
+  }
+
+  void decrement(String productName) {
+    final current = state[productName] ?? 0;
+    if (current > 0) {
+      state = {...state, productName: current - 1};
+    }
+  }
+}
+
+final stockHandoverVerifiedCountsProvider = StateNotifierProvider.autoDispose<
+    StockHandoverVerifiedCountsNotifier, Map<String, int>>((ref) {
+  return StockHandoverVerifiedCountsNotifier();
+});
+
+class StockHandoverPage extends ConsumerWidget {
   final String requestId;
 
   const StockHandoverPage({
@@ -14,41 +40,25 @@ class StockHandoverPage extends ConsumerStatefulWidget {
     required this.requestId,
   });
 
-  @override
-  ConsumerState<StockHandoverPage> createState() => _StockHandoverPageState();
-}
-
-class _StockHandoverPageState extends ConsumerState<StockHandoverPage> {
-  late Map<String, int> _verifiedCounts;
-  late Map<String, int> _expectedCounts;
-  final String _dcName = 'Wuse Distribution Center';
+  static const Map<String, int> _expectedCounts = {
+    'Respira': 10,
+    'Grazer Herbal Tea': 20,
+    'Alpha Man': 5,
+  };
+  static const String _dcName = 'Wuse Distribution Center';
 
   @override
-  void initState() {
-    super.initState();
-    _expectedCounts = {
-      'Respira': 10,
-      'Grazer Herbal Tea': 20,
-      'Alpha Man': 5,
-    };
-    _verifiedCounts = {
-      'Respira': 10,
-      'Grazer Herbal Tea': 20,
-      'Alpha Man': 5,
-    };
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final authState = ref.watch(authProvider);
+    final verifiedCounts = ref.watch(stockHandoverVerifiedCountsProvider);
 
     final user = authState.user;
     final agentName = user != null && user.firstName.isNotEmpty ? '${user.firstName} ${user.lastName}' : 'John Okafor';
     const agentId = 'PDA-0042';
 
-    final hasDiscrepancy = _expectedCounts.entries.any((e) => (_verifiedCounts[e.key] ?? 0) != e.value);
+    final hasDiscrepancy = _expectedCounts.entries.any((e) => (verifiedCounts[e.key] ?? 0) != e.value);
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
@@ -89,13 +99,12 @@ class _StockHandoverPageState extends ConsumerState<StockHandoverPage> {
           children: [
             // Handover Header Card
             Container(
-              padding: const EdgeInsets.all(16),
+              width: double.infinity,
+              padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF1E293B) : Colors.white,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                ),
+                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -103,14 +112,22 @@ class _StockHandoverPageState extends ConsumerState<StockHandoverPage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
+                      Text(
+                        'TRANSFER REQUEST',
+                        style: GoogleFonts.jetBrainsMono(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF64748B),
+                        ),
+                      ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFDCFCE7),
+                          color: const Color(0xFF16A34A).withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          'READY FOR COLLECTION',
+                          'READY FOR PICKUP',
                           style: GoogleFonts.jetBrainsMono(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
@@ -118,60 +135,60 @@ class _StockHandoverPageState extends ConsumerState<StockHandoverPage> {
                           ),
                         ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    requestId,
+                    style: GoogleFonts.jetBrainsMono(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      const Icon(Icons.warehouse_rounded, size: 16, color: Color(0xFF64748B)),
+                      const SizedBox(width: 6),
                       Text(
-                        widget.requestId,
-                        style: GoogleFonts.jetBrainsMono(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: const Color(0xFF2563EB),
-                        ),
+                        'Source: $_dcName',
+                        style: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF64748B)),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 6),
                   Row(
                     children: [
-                      const Icon(Icons.warehouse_rounded, size: 18, color: Color(0xFF64748B)),
-                      const SizedBox(width: 8),
+                      const Icon(Icons.person_pin_rounded, size: 16, color: Color(0xFF64748B)),
+                      const SizedBox(width: 6),
                       Text(
-                        'Issued by: $_dcName',
-                        style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Icon(Icons.person_rounded, size: 18, color: Color(0xFF64748B)),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Received by: $agentId ($agentName)',
-                        style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B)),
+                        'Recipient: $agentName ($agentId)',
+                        style: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF64748B)),
                       ),
                     ],
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
 
-            // Discrepancy Alert Banner
+            // Discrepancy Alert Banner if counts differ
             if (hasDiscrepancy) ...[
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFF1F2),
+                  color: const Color(0xFFFFF7ED),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFFECDD3)),
+                  border: Border.all(color: const Color(0xFFF97316)),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.warning_amber_rounded, color: Color(0xFFE11D48), size: 22),
-                    SizedBox(width: 10),
+                    const Icon(Icons.warning_amber_rounded, color: Color(0xFFEA580C), size: 22),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'Quantity Discrepancy Detected! Scanned units do not match DC expected handover.',
-                        style: TextStyle(color: Color(0xFFE11D48), fontSize: 12, fontWeight: FontWeight.bold),
+                        'Verified count differs from DC allocation. A discrepancy log will be attached to the handover signature.',
+                        style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF9A3412)),
                       ),
                     ),
                   ],
@@ -180,58 +197,53 @@ class _StockHandoverPageState extends ConsumerState<StockHandoverPage> {
               const SizedBox(height: 16),
             ],
 
-            // Expected Items Header
+            // Item Verification Section Header
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Expected Custody Items',
-                  style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold),
+                  'Physical Stock Count Verification',
+                  style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold),
                 ),
                 Text(
-                  'Scan or verify count',
-                  style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                  'Tap +/- to adjust',
+                  style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
                 ),
               ],
             ),
             const SizedBox(height: 12),
 
-            // Item Verification Cards
+            // Item Counter Cards
             ..._expectedCounts.entries.map((entry) {
               final productName = entry.key;
               final expectedQty = entry.value;
-              final verifiedQty = _verifiedCounts[productName] ?? expectedQty;
+              final verifiedQty = verifiedCounts[productName] ?? expectedQty;
               final isMatch = verifiedQty == expectedQty;
 
               return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.only(bottom: 10),
                 child: Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
                     color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(14),
                     border: Border.all(
                       color: isMatch
                           ? (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))
-                          : const Color(0xFFFECDD3),
-                      width: isMatch ? 1 : 1.5,
+                          : const Color(0xFFF43F5E),
                     ),
                   ),
                   child: Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(10),
+                        padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: isMatch ? const Color(0xFFDCFCE7) : const Color(0xFFFFF1F2),
+                          color: const Color(0xFF00A2D3).withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: Icon(
-                          isMatch ? Icons.check_circle_rounded : Icons.pending_rounded,
-                          color: isMatch ? const Color(0xFF16A34A) : const Color(0xFFE11D48),
-                          size: 24,
-                        ),
+                        child: const Icon(Icons.inventory_2_rounded, color: Color(0xFF00A2D3), size: 20),
                       ),
-                      const SizedBox(width: 14),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -253,9 +265,7 @@ class _StockHandoverPageState extends ConsumerState<StockHandoverPage> {
                           IconButton(
                             icon: const Icon(Icons.remove_circle_outline_rounded, color: Color(0xFFE11D48), size: 22),
                             onPressed: () {
-                              if (verifiedQty > 0) {
-                                setState(() => _verifiedCounts[productName] = verifiedQty - 1);
-                              }
+                              ref.read(stockHandoverVerifiedCountsProvider.notifier).decrement(productName);
                             },
                           ),
                           Container(
@@ -273,7 +283,7 @@ class _StockHandoverPageState extends ConsumerState<StockHandoverPage> {
                           IconButton(
                             icon: const Icon(Icons.add_circle_outline_rounded, color: Color(0xFF16A34A), size: 22),
                             onPressed: () {
-                              setState(() => _verifiedCounts[productName] = verifiedQty + 1);
+                              ref.read(stockHandoverVerifiedCountsProvider.notifier).increment(productName);
                             },
                           ),
                         ],
@@ -291,7 +301,7 @@ class _StockHandoverPageState extends ConsumerState<StockHandoverPage> {
               height: 50,
               child: ElevatedButton(
                 onPressed: () {
-                  ref.read(stockProvider.notifier).completeStockHandover(widget.requestId);
+                  ref.read(stockProvider.notifier).completeStockHandover(requestId);
 
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(

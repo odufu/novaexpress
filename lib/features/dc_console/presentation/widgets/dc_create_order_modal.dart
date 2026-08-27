@@ -9,6 +9,121 @@ import '../../domain/entities/product_package.dart';
 import '../providers/dc_console_provider.dart';
 import '../providers/product_catalog_provider.dart';
 
+class DCCreateOrderDraftState {
+  final String selectedState;
+  final String selectedCity;
+  final String? selectedProductId;
+  final String selectedProductName;
+  final ProductPackage? selectedPackage;
+  final double unitPrice;
+  final int quantity;
+  final double upsellAmount;
+  final String paymentType;
+  final String clientName;
+  final String? selectedRiderId;
+  final String? selectedRiderName;
+  final String? selectedRiderCode;
+  final bool assignImmediately;
+  final bool isSubmitting;
+
+  const DCCreateOrderDraftState({
+    this.selectedState = 'FCT - Abuja',
+    this.selectedCity = 'Wuse 2',
+    this.selectedProductId,
+    this.selectedProductName = 'Grazer Tea',
+    this.selectedPackage,
+    this.unitPrice = 22000.0,
+    this.quantity = 1,
+    this.upsellAmount = 0.0,
+    this.paymentType = 'pay_on_delivery',
+    this.clientName = 'Novacare Limited',
+    this.selectedRiderId,
+    this.selectedRiderName,
+    this.selectedRiderCode,
+    this.assignImmediately = false,
+    this.isSubmitting = false,
+  });
+
+  double get totalAmount => (quantity * unitPrice) + upsellAmount;
+
+  DCCreateOrderDraftState copyWith({
+    String? selectedState,
+    String? selectedCity,
+    String? Function()? selectedProductId,
+    String? selectedProductName,
+    ProductPackage? Function()? selectedPackage,
+    double? unitPrice,
+    int? quantity,
+    double? upsellAmount,
+    String? paymentType,
+    String? clientName,
+    String? Function()? selectedRiderId,
+    String? Function()? selectedRiderName,
+    String? Function()? selectedRiderCode,
+    bool? assignImmediately,
+    bool? isSubmitting,
+  }) {
+    return DCCreateOrderDraftState(
+      selectedState: selectedState ?? this.selectedState,
+      selectedCity: selectedCity ?? this.selectedCity,
+      selectedProductId: selectedProductId != null ? selectedProductId() : this.selectedProductId,
+      selectedProductName: selectedProductName ?? this.selectedProductName,
+      selectedPackage: selectedPackage != null ? selectedPackage() : this.selectedPackage,
+      unitPrice: unitPrice ?? this.unitPrice,
+      quantity: quantity ?? this.quantity,
+      upsellAmount: upsellAmount ?? this.upsellAmount,
+      paymentType: paymentType ?? this.paymentType,
+      clientName: clientName ?? this.clientName,
+      selectedRiderId: selectedRiderId != null ? selectedRiderId() : this.selectedRiderId,
+      selectedRiderName: selectedRiderName != null ? selectedRiderName() : this.selectedRiderName,
+      selectedRiderCode: selectedRiderCode != null ? selectedRiderCode() : this.selectedRiderCode,
+      assignImmediately: assignImmediately ?? this.assignImmediately,
+      isSubmitting: isSubmitting ?? this.isSubmitting,
+    );
+  }
+}
+
+class DCCreateOrderDraftNotifier extends StateNotifier<DCCreateOrderDraftState> {
+  DCCreateOrderDraftNotifier() : super(const DCCreateOrderDraftState());
+
+  void setLocation(String stateVal, String cityVal) => state = state.copyWith(selectedState: stateVal, selectedCity: cityVal);
+  void setCity(String cityVal) => state = state.copyWith(selectedCity: cityVal);
+  void setUnitPrice(double price) => state = state.copyWith(unitPrice: price);
+  void setQuantity(int q) => state = state.copyWith(quantity: q);
+  void setPaymentType(String type) => state = state.copyWith(paymentType: type);
+  void setAssignImmediately(bool val) => state = state.copyWith(assignImmediately: val);
+  void setRider(String? id, String? name, String? code) => state = state.copyWith(
+    selectedRiderId: () => id,
+    selectedRiderName: () => name,
+    selectedRiderCode: () => code,
+  );
+  void setSubmitting(bool val) => state = state.copyWith(isSubmitting: val);
+  void selectProduct(CatalogProduct product) {
+    final packages = product.packages;
+    final defaultPkg = packages.isNotEmpty ? packages.first : null;
+    state = state.copyWith(
+      selectedProductId: () => product.id,
+      selectedProductName: product.name,
+      clientName: product.clientName,
+      selectedPackage: () => defaultPkg,
+      quantity: defaultPkg != null ? defaultPkg.quantity : 1,
+      unitPrice: defaultPkg != null ? defaultPkg.packagePrice : product.defaultUnitPrice,
+    );
+  }
+  void selectPackage(ProductPackage pkg) {
+    state = state.copyWith(
+      selectedPackage: () => pkg,
+      selectedProductId: () => pkg.productId,
+      quantity: pkg.quantity,
+      unitPrice: pkg.packagePrice,
+    );
+  }
+}
+
+final dcCreateOrderDraftProvider = StateNotifierProvider.autoDispose<DCCreateOrderDraftNotifier, DCCreateOrderDraftState>((ref) {
+  return DCCreateOrderDraftNotifier();
+});
+
 class DCCreateOrderModal extends ConsumerStatefulWidget {
   const DCCreateOrderModal({super.key});
 
@@ -27,28 +142,9 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
   final _landmarkController = TextEditingController();
   final _notesController = TextEditingController();
 
-  // Commercial & Order Values (Decoupled: Product, Seller Packages, Quantity, Price)
-  String _selectedState = 'FCT - Abuja';
-  String _selectedCity = 'Wuse 2';
-  String? _selectedProductId;
-  String _selectedProductName = 'Grazer Tea';
-  ProductPackage? _selectedPackage;
   final _productNameController = TextEditingController(text: 'Grazer Tea');
   final _priceController = TextEditingController(text: '22000');
   final _quantityController = TextEditingController(text: '1');
-  double _unitPrice = 22000.0;
-  int _quantity = 1;
-  final double _upsellAmount = 0.0;
-  String _paymentType = 'pay_on_delivery'; // 'pay_on_delivery', 'prepaid'
-  String _clientName = 'Novacare Limited';
-
-  // Assignment
-  String? _selectedRiderId;
-  String? _selectedRiderName;
-  String? _selectedRiderCode;
-  bool _assignImmediately = false;
-
-  bool _isSubmitting = false;
 
   @override
   void initState() {
@@ -60,51 +156,39 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
   void _onPriceChanged() {
     final clean = _priceController.text.replaceAll(',', '').replaceAll('₦', '').trim();
     final parsed = double.tryParse(clean) ?? 0.0;
-    if (parsed != _unitPrice) {
-      setState(() => _unitPrice = parsed);
+    final current = ref.read(dcCreateOrderDraftProvider).unitPrice;
+    if (parsed != current) {
+      ref.read(dcCreateOrderDraftProvider.notifier).setUnitPrice(parsed);
     }
   }
 
   void _onQuantityChanged() {
     final clean = _quantityController.text.trim();
     final q = int.tryParse(clean) ?? 1;
-    if (q != _quantity && q > 0) {
-      setState(() => _quantity = q);
+    final current = ref.read(dcCreateOrderDraftProvider).quantity;
+    if (q != current && q > 0) {
+      ref.read(dcCreateOrderDraftProvider.notifier).setQuantity(q);
     }
   }
 
   void _selectProduct(CatalogProduct product) {
     final packages = product.packages;
     final defaultPkg = packages.isNotEmpty ? packages.first : null;
-    setState(() {
-      _selectedProductId = product.id;
-      _selectedProductName = product.name;
-      _productNameController.text = product.name;
-      _clientName = product.clientName;
-      _selectedPackage = defaultPkg;
-      if (defaultPkg != null) {
-        _quantity = defaultPkg.quantity;
-        _quantityController.text = '${defaultPkg.quantity}';
-        _unitPrice = defaultPkg.packagePrice;
-        _priceController.text = defaultPkg.packagePrice.toStringAsFixed(0);
-      } else {
-        _quantity = 1;
-        _quantityController.text = '1';
-        _unitPrice = product.defaultUnitPrice;
-        _priceController.text = product.defaultUnitPrice.toStringAsFixed(0);
-      }
-    });
+    _productNameController.text = product.name;
+    if (defaultPkg != null) {
+      _quantityController.text = '${defaultPkg.quantity}';
+      _priceController.text = defaultPkg.packagePrice.toStringAsFixed(0);
+    } else {
+      _quantityController.text = '1';
+      _priceController.text = product.defaultUnitPrice.toStringAsFixed(0);
+    }
+    ref.read(dcCreateOrderDraftProvider.notifier).selectProduct(product);
   }
 
   void _selectPackage(ProductPackage pkg) {
-    setState(() {
-      _selectedPackage = pkg;
-      _selectedProductId = pkg.productId;
-      _quantity = pkg.quantity;
-      _quantityController.text = '${pkg.quantity}';
-      _unitPrice = pkg.packagePrice;
-      _priceController.text = pkg.packagePrice.toStringAsFixed(0);
-    });
+    _quantityController.text = '${pkg.quantity}';
+    _priceController.text = pkg.packagePrice.toStringAsFixed(0);
+    ref.read(dcCreateOrderDraftProvider.notifier).selectPackage(pkg);
   }
 
   @override
@@ -121,60 +205,60 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
     super.dispose();
   }
 
-  double get _totalAmount => (_quantity * _unitPrice) + _upsellAmount;
-
   void _submitOrder() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isSubmitting = true);
+    final draft = ref.read(dcCreateOrderDraftProvider);
+    final notifier = ref.read(dcCreateOrderDraftProvider.notifier);
+    notifier.setSubmitting(true);
 
     final randomCode = 1000 + Random().nextInt(8999);
     final orderNumber = 'TRK-$randomCode';
     final dcState = ref.read(dcConsoleProvider);
 
-    final fullProductName = _selectedPackage != null
-        ? '$_selectedProductName (${_selectedPackage!.packageName})'
+    final fullProductName = draft.selectedPackage != null
+        ? '${draft.selectedProductName} (${draft.selectedPackage!.packageName})'
         : (_productNameController.text.trim().isNotEmpty
             ? _productNameController.text.trim()
-            : _selectedProductName);
+            : draft.selectedProductName);
 
     final orderPayload = <String, dynamic>{
       'id': 'ord-${DateTime.now().millisecondsSinceEpoch}',
       'order_number': orderNumber,
-      'product_id': _selectedProductId ?? _selectedPackage?.productId,
+      'product_id': draft.selectedProductId ?? draft.selectedPackage?.productId,
       'customer_name': _nameController.text.trim(),
       'customer_phone': _phoneController.text.trim(),
       'customer_alt_phone': _altPhoneController.text.trim().isNotEmpty ? _altPhoneController.text.trim() : null,
-      'delivery_state': _selectedState,
-      'delivery_city': _selectedCity,
+      'delivery_state': draft.selectedState,
+      'delivery_city': draft.selectedCity,
       'delivery_address': _addressController.text.trim(),
       'landmark': _landmarkController.text.trim().isNotEmpty ? _landmarkController.text.trim() : null,
       'product_name': fullProductName,
-      'quantity': _quantity,
-      'paid_quantity': _quantity,
+      'quantity': draft.quantity,
+      'paid_quantity': draft.quantity,
       'free_quantity': 0,
-      'base_price': _unitPrice,
-      'upsell_amount': _upsellAmount,
-      'total_amount': _totalAmount,
-      'payment_type': _paymentType,
-      'payment_status': _paymentType == 'prepaid' ? 'paid' : 'pending',
+      'base_price': draft.unitPrice,
+      'upsell_amount': draft.upsellAmount,
+      'total_amount': draft.totalAmount,
+      'payment_type': draft.paymentType,
+      'payment_status': draft.paymentType == 'prepaid' ? 'paid' : 'pending',
       'fulfillment_type': 'distributed_inventory',
-      'client_name': _clientName,
+      'client_name': draft.clientName,
       'client_delivery_fee': 5000.0,
       'agent_entitlement': 2500.0,
       'delivery_notes': _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
-      'status': _assignImmediately && _selectedRiderId != null ? 'assigned' : 'pending',
+      'status': draft.assignImmediately && draft.selectedRiderId != null ? 'assigned' : 'pending',
       'distribution_center_id': dcState.activeHubId,
-      'delivery_agent_id': _assignImmediately ? _selectedRiderId : null,
-      'delivery_agent_name': _assignImmediately ? _selectedRiderName : null,
-      'delivery_agent_code': _assignImmediately ? _selectedRiderCode : null,
+      'delivery_agent_id': draft.assignImmediately ? draft.selectedRiderId : null,
+      'delivery_agent_name': draft.assignImmediately ? draft.selectedRiderName : null,
+      'delivery_agent_code': draft.assignImmediately ? draft.selectedRiderCode : null,
       'created_at': DateTime.now().toIso8601String(),
     };
 
     final success = await ref.read(ordersProvider.notifier).createOrder(orderPayload);
 
     if (mounted) {
-      setState(() => _isSubmitting = false);
+      ref.read(dcCreateOrderDraftProvider.notifier).setSubmitting(false);
       if (success) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -212,7 +296,8 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
     final dcState = ref.watch(dcConsoleProvider);
     final ordersState = ref.watch(ordersProvider);
     final catalogState = ref.watch(productCatalogProvider);
-    final availablePackages = catalogState.getPackagesForProduct(_selectedProductName);
+    final draft = ref.watch(dcCreateOrderDraftProvider);
+    final availablePackages = catalogState.getPackagesForProduct(draft.selectedProductName);
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 650;
 
@@ -387,7 +472,7 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                       // Responsive State & Zone Pickers (All 36 Nigerian States + FCT)
                       if (isMobile) ...[
                         DropdownButtonFormField<String>(
-                          value: _selectedState,
+                          value: draft.selectedState,
                           isExpanded: true,
                           style: GoogleFonts.inter(fontSize: 13.5, color: isDark ? Colors.white : Colors.black87),
                           dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
@@ -406,19 +491,19 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                           onChanged: (v) {
                             if (v != null) {
                               final newCities = NigeriaLocations.getCitiesForState(v);
-                              setState(() {
-                                _selectedState = v;
-                                _selectedCity = newCities.isNotEmpty ? newCities.first : 'Central';
-                              });
+                              ref.read(dcCreateOrderDraftProvider.notifier).setLocation(
+                                    v,
+                                    newCities.isNotEmpty ? newCities.first : 'Central',
+                                  );
                             }
                           },
                         ),
                         const SizedBox(height: 12),
                         DropdownButtonFormField<String>(
-                          value: NigeriaLocations.getCitiesForState(_selectedState).contains(_selectedCity)
-                              ? _selectedCity
-                              : (NigeriaLocations.getCitiesForState(_selectedState).isNotEmpty
-                                  ? NigeriaLocations.getCitiesForState(_selectedState).first
+                          value: NigeriaLocations.getCitiesForState(draft.selectedState).contains(draft.selectedCity)
+                              ? draft.selectedCity
+                              : (NigeriaLocations.getCitiesForState(draft.selectedState).isNotEmpty
+                                  ? NigeriaLocations.getCitiesForState(draft.selectedState).first
                                   : null),
                           isExpanded: true,
                           style: GoogleFonts.inter(fontSize: 13.5, color: isDark ? Colors.white : Colors.black87),
@@ -429,20 +514,24 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                             icon: Icons.location_city_rounded,
                             isDark: isDark,
                           ),
-                          items: NigeriaLocations.getCitiesForState(_selectedState).map((z) {
+                          items: NigeriaLocations.getCitiesForState(draft.selectedState).map((z) {
                             return DropdownMenuItem(
                               value: z,
                               child: Text(z, overflow: TextOverflow.ellipsis),
                             );
                           }).toList(),
-                          onChanged: (v) => setState(() => _selectedCity = v ?? _selectedCity),
+                          onChanged: (v) {
+                            if (v != null) {
+                              ref.read(dcCreateOrderDraftProvider.notifier).setCity(v);
+                            }
+                          },
                         ),
                       ] else ...[
                         Row(
                           children: [
                             Expanded(
                               child: DropdownButtonFormField<String>(
-                                value: _selectedState,
+                                value: draft.selectedState,
                                 isExpanded: true,
                                 style: GoogleFonts.inter(fontSize: 13.5, color: isDark ? Colors.white : Colors.black87),
                                 dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
@@ -461,10 +550,10 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                                 onChanged: (v) {
                                   if (v != null) {
                                     final newCities = NigeriaLocations.getCitiesForState(v);
-                                    setState(() {
-                                      _selectedState = v;
-                                      _selectedCity = newCities.isNotEmpty ? newCities.first : 'Central';
-                                    });
+                                    ref.read(dcCreateOrderDraftProvider.notifier).setLocation(
+                                          v,
+                                          newCities.isNotEmpty ? newCities.first : 'Central',
+                                        );
                                   }
                                 },
                               ),
@@ -472,10 +561,10 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                             const SizedBox(width: 12),
                             Expanded(
                               child: DropdownButtonFormField<String>(
-                                value: NigeriaLocations.getCitiesForState(_selectedState).contains(_selectedCity)
-                                    ? _selectedCity
-                                    : (NigeriaLocations.getCitiesForState(_selectedState).isNotEmpty
-                                        ? NigeriaLocations.getCitiesForState(_selectedState).first
+                                value: NigeriaLocations.getCitiesForState(draft.selectedState).contains(draft.selectedCity)
+                                    ? draft.selectedCity
+                                    : (NigeriaLocations.getCitiesForState(draft.selectedState).isNotEmpty
+                                        ? NigeriaLocations.getCitiesForState(draft.selectedState).first
                                         : null),
                                 isExpanded: true,
                                 style: GoogleFonts.inter(fontSize: 13.5, color: isDark ? Colors.white : Colors.black87),
@@ -486,13 +575,17 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                                   icon: Icons.location_city_rounded,
                                   isDark: isDark,
                                 ),
-                                items: NigeriaLocations.getCitiesForState(_selectedState).map((z) {
+                                items: NigeriaLocations.getCitiesForState(draft.selectedState).map((z) {
                                   return DropdownMenuItem(
                                     value: z,
                                     child: Text(z, overflow: TextOverflow.ellipsis),
                                   );
                                 }).toList(),
-                                onChanged: (v) => setState(() => _selectedCity = v ?? _selectedCity),
+                                onChanged: (v) {
+                                  if (v != null) {
+                                    ref.read(dcCreateOrderDraftProvider.notifier).setCity(v);
+                                  }
+                                },
                               ),
                             ),
                           ],
@@ -570,7 +663,7 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                         child: Row(
                           children: [
                             ...catalogState.products.map((p) {
-                              final isSelected = p.name == _selectedProductName;
+                              final isSelected = p.name == draft.selectedProductName;
                               return Padding(
                                 padding: const EdgeInsets.only(right: 6),
                                 child: ActionChip(
@@ -631,7 +724,7 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                                     const Icon(Icons.local_offer_outlined, size: 15, color: Color(0xFFF37021)),
                                     const SizedBox(width: 6),
                                     Text(
-                                      'Seller Packages for $_selectedProductName',
+                                      'Seller Packages for ${draft.selectedProductName}',
                                       style: GoogleFonts.inter(
                                         fontSize: 12,
                                         fontWeight: FontWeight.bold,
@@ -670,7 +763,7 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                                 runSpacing: 8,
                                 children: [
                                   ...availablePackages.map((pkg) {
-                                    final isSelected = _selectedPackage?.id == pkg.id;
+                                    final isSelected = draft.selectedPackage?.id == pkg.id;
                                     return ChoiceChip(
                                       selected: isSelected,
                                       onSelected: (selected) {
@@ -762,9 +855,9 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                                           icon: const Icon(Icons.remove_circle_outline, size: 20),
                                           padding: EdgeInsets.zero,
                                           constraints: const BoxConstraints(),
-                                          onPressed: _quantity > 1
+                                          onPressed: draft.quantity > 1
                                               ? () {
-                                                  final next = _quantity - 1;
+                                                  final next = draft.quantity - 1;
                                                   _quantityController.text = '$next';
                                                 }
                                               : null,
@@ -787,7 +880,7 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                                           padding: EdgeInsets.zero,
                                           constraints: const BoxConstraints(),
                                           onPressed: () {
-                                            final next = _quantity + 1;
+                                            final next = draft.quantity + 1;
                                             _quantityController.text = '$next';
                                           },
                                         ),
@@ -827,7 +920,7 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                         const SizedBox(height: 12),
                         // Payment Type Full Width
                         DropdownButtonFormField<String>(
-                          value: _paymentType,
+                          value: draft.paymentType,
                           isExpanded: true,
                           style: GoogleFonts.inter(fontSize: 13.5, color: isDark ? Colors.white : Colors.black87),
                           dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
@@ -841,7 +934,11 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                             DropdownMenuItem(value: 'pay_on_delivery', child: Text('POD (Cash on Delivery)')),
                             DropdownMenuItem(value: 'prepaid', child: Text('Prepaid (Direct Transfer)')),
                           ],
-                          onChanged: (v) => setState(() => _paymentType = v ?? _paymentType),
+                          onChanged: (v) {
+                            if (v != null) {
+                              ref.read(dcCreateOrderDraftProvider.notifier).setPaymentType(v);
+                            }
+                          },
                         ),
                       ] else ...[
                         Row(
@@ -873,9 +970,9 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                                           icon: const Icon(Icons.remove_circle_outline, size: 18),
                                           padding: EdgeInsets.zero,
                                           constraints: const BoxConstraints(),
-                                          onPressed: _quantity > 1
+                                          onPressed: draft.quantity > 1
                                               ? () {
-                                                  final next = _quantity - 1;
+                                                  final next = draft.quantity - 1;
                                                   _quantityController.text = '$next';
                                                 }
                                               : null,
@@ -898,7 +995,7 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                                           padding: EdgeInsets.zero,
                                           constraints: const BoxConstraints(),
                                           onPressed: () {
-                                            final next = _quantity + 1;
+                                            final next = draft.quantity + 1;
                                             _quantityController.text = '$next';
                                           },
                                         ),
@@ -938,7 +1035,7 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                             Expanded(
                               flex: 4,
                               child: DropdownButtonFormField<String>(
-                                value: _paymentType,
+                                value: draft.paymentType,
                                 isExpanded: true,
                                 style: GoogleFonts.inter(fontSize: 13.5, color: isDark ? Colors.white : Colors.black87),
                                 dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
@@ -952,7 +1049,11 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                                   DropdownMenuItem(value: 'pay_on_delivery', child: Text('POD (Cash on Delivery)')),
                                   DropdownMenuItem(value: 'prepaid', child: Text('Prepaid (Direct Transfer)')),
                                 ],
-                                onChanged: (v) => setState(() => _paymentType = v ?? _paymentType),
+                                onChanged: (v) {
+                                  if (v != null) {
+                                    ref.read(dcCreateOrderDraftProvider.notifier).setPaymentType(v);
+                                  }
+                                },
                               ),
                             ),
                           ],
@@ -982,7 +1083,7 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                                         style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B), fontWeight: FontWeight.w600),
                                       ),
                                       const SizedBox(width: 6),
-                                      if (_selectedPackage != null)
+                                      if (draft.selectedPackage != null)
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                                           decoration: BoxDecoration(
@@ -990,7 +1091,7 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                                             borderRadius: BorderRadius.circular(6),
                                           ),
                                           child: Text(
-                                            _selectedPackage!.packageName,
+                                            draft.selectedPackage!.packageName,
                                             style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF2563EB), fontWeight: FontWeight.bold),
                                           ),
                                         ),
@@ -998,7 +1099,7 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    CurrencyFormatter.formatNaira(_totalAmount),
+                                    CurrencyFormatter.formatNaira(draft.totalAmount),
                                     style: GoogleFonts.inter(fontSize: isMobile ? 18 : 20, fontWeight: FontWeight.w900, color: const Color(0xFF2563EB)),
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -1009,15 +1110,15 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                               decoration: BoxDecoration(
-                                color: _paymentType == 'pay_on_delivery' ? const Color(0xFFFEF3C7) : const Color(0xFFD1FAE5),
+                                color: draft.paymentType == 'pay_on_delivery' ? const Color(0xFFFEF3C7) : const Color(0xFFD1FAE5),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
-                                _paymentType == 'pay_on_delivery' ? 'POD Cash' : 'Prepaid Cleared',
+                                draft.paymentType == 'pay_on_delivery' ? 'POD Cash' : 'Prepaid Cleared',
                                 style: GoogleFonts.inter(
                                   fontSize: 11.5,
                                   fontWeight: FontWeight.bold,
-                                  color: _paymentType == 'pay_on_delivery' ? const Color(0xFFD97706) : const Color(0xFF059669),
+                                  color: draft.paymentType == 'pay_on_delivery' ? const Color(0xFFD97706) : const Color(0xFF059669),
                                 ),
                               ),
                             ),
@@ -1035,12 +1136,12 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                       const SizedBox(height: 8),
 
                       SwitchListTile(
-                        value: _assignImmediately,
-                        onChanged: (val) => setState(() => _assignImmediately = val),
+                        value: draft.assignImmediately,
+                        onChanged: (val) => ref.read(dcCreateOrderDraftProvider.notifier).setAssignImmediately(val),
                         contentPadding: EdgeInsets.zero,
                         title: Text('Assign immediately to a Rider', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold)),
                         subtitle: Text(
-                          _assignImmediately
+                          draft.assignImmediately
                               ? 'Order routes directly to selected rider terminal'
                               : 'Order enters DC Unassigned Pool for queue dispatching',
                           style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
@@ -1048,10 +1149,10 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                         activeColor: const Color(0xFF2563EB),
                       ),
 
-                      if (_assignImmediately) ...[
+                      if (draft.assignImmediately) ...[
                         const SizedBox(height: 10),
                         DropdownButtonFormField<String>(
-                          value: _selectedRiderId,
+                          value: draft.selectedRiderId,
                           isExpanded: true,
                           style: GoogleFonts.inter(fontSize: 13.5, color: isDark ? Colors.white : Colors.black87),
                           dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
@@ -1080,15 +1181,11 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                           onChanged: (val) {
                             if (val != null) {
                               final driver = dcState.drivers.firstWhere((d) => d.id == val);
-                              setState(() {
-                                _selectedRiderId = driver.id;
-                                _selectedRiderName = driver.name;
-                                _selectedRiderCode = driver.driverCode;
-                              });
+                              ref.read(dcCreateOrderDraftProvider.notifier).setRider(driver.id, driver.name, driver.driverCode);
                             }
                           },
                           validator: (v) {
-                            if (_assignImmediately && (v == null || v.isEmpty)) {
+                            if (draft.assignImmediately && (v == null || v.isEmpty)) {
                               return 'Please select a rider or toggle off immediate assignment';
                             }
                             return null;
@@ -1117,7 +1214,7 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                       children: [
                         Expanded(
                           child: TextButton(
-                            onPressed: _isSubmitting ? null : () => Navigator.pop(context),
+                            onPressed: draft.isSubmitting ? null : () => Navigator.pop(context),
                             child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.bold)),
                           ),
                         ),
@@ -1125,12 +1222,12 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                         Expanded(
                           flex: 2,
                           child: ElevatedButton.icon(
-                            onPressed: _isSubmitting ? null : _submitOrder,
-                            icon: _isSubmitting
+                            onPressed: draft.isSubmitting ? null : _submitOrder,
+                            icon: draft.isSubmitting
                                 ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                                 : const Icon(Icons.check_rounded, size: 18, color: Colors.white),
                             label: Text(
-                              _isSubmitting ? 'Creating...' : 'Create Order',
+                              draft.isSubmitting ? 'Creating...' : 'Create Order',
                               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
                             ),
                             style: ElevatedButton.styleFrom(
@@ -1146,17 +1243,17 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         TextButton(
-                          onPressed: _isSubmitting ? null : () => Navigator.pop(context),
+                          onPressed: draft.isSubmitting ? null : () => Navigator.pop(context),
                           child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.bold)),
                         ),
                         const SizedBox(width: 12),
                         ElevatedButton.icon(
-                          onPressed: _isSubmitting ? null : _submitOrder,
-                          icon: _isSubmitting
+                          onPressed: draft.isSubmitting ? null : _submitOrder,
+                          icon: draft.isSubmitting
                               ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                               : const Icon(Icons.check_rounded, size: 18, color: Colors.white),
                           label: Text(
-                            _isSubmitting ? 'Creating...' : 'Create Order & Log Waybill',
+                            draft.isSubmitting ? 'Creating...' : 'Create Order & Log Waybill',
                             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                           ),
                           style: ElevatedButton.styleFrom(
@@ -1238,7 +1335,7 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'New Package for $_selectedProductName',
+                'New Package for ${ref.read(dcCreateOrderDraftProvider).selectedProductName}',
                 style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold),
               ),
             ),
@@ -1334,12 +1431,13 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
               final qty = int.parse(qtyCtrl.text.trim());
               final price = double.parse(priceCtrl.text.replaceAll(',', '').replaceAll('₦', '').trim());
 
+              final draft = ref.read(dcCreateOrderDraftProvider);
               final newPkg = ref.read(productCatalogProvider.notifier).addPackageToProduct(
-                    productName: _selectedProductName,
+                    productName: draft.selectedProductName,
                     packageName: name,
                     quantity: qty,
                     packagePrice: price,
-                    clientName: _clientName,
+                    clientName: draft.clientName,
                   );
 
               _selectPackage(newPkg);
@@ -1431,7 +1529,7 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                       separatorBuilder: (_, __) => const Divider(height: 1),
                       itemBuilder: (ctx, idx) {
                         final p = filtered[idx];
-                        final isSelected = p.name == _selectedProductName;
+                        final isSelected = p.name == ref.read(dcCreateOrderDraftProvider).selectedProductName;
                         return ListTile(
                           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                           leading: CircleAvatar(

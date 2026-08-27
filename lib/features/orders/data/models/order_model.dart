@@ -37,6 +37,8 @@ class OrderModel extends OrderEntity {
     super.geocodingStatus,
     super.geocodedAddress,
     super.locationConfidence,
+    super.customerSignatureUrl,
+    super.photoProofUrl,
     super.isLocationVerified = false,
     required super.createdAt,
   });
@@ -102,6 +104,8 @@ class OrderModel extends OrderEntity {
       geocodingStatus: json['geocoding_status']?.toString(),
       geocodedAddress: json['geocoded_address']?.toString(),
       locationConfidence: json['location_confidence']?.toString() ?? (lat != null && lng != null ? 'high' : null),
+      customerSignatureUrl: json['customer_signature_url']?.toString(),
+      photoProofUrl: json['proof_photo_url']?.toString() ?? json['photo_proof_url']?.toString(),
       isLocationVerified: json['is_location_verified'] == true || json['is_location_verified'] == 'true',
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])
@@ -146,6 +150,8 @@ class OrderModel extends OrderEntity {
       geocodingStatus: entity.geocodingStatus,
       geocodedAddress: entity.geocodedAddress,
       locationConfidence: entity.locationConfidence,
+      customerSignatureUrl: entity.customerSignatureUrl,
+      photoProofUrl: entity.photoProofUrl,
       isLocationVerified: entity.isLocationVerified,
       createdAt: entity.createdAt,
     );
@@ -187,6 +193,8 @@ class OrderModel extends OrderEntity {
       'geocoding_status': geocodingStatus,
       'geocoded_address': geocodedAddress,
       'location_confidence': locationConfidence,
+      'customer_signature_url': customerSignatureUrl,
+      'proof_photo_url': photoProofUrl,
       'is_location_verified': isLocationVerified,
     };
   }

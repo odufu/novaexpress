@@ -70,26 +70,30 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
         String? targetAgentCode;
         final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
 
-        final agentLookup = await dbClient
-            .from('delivery_agents')
-            .select('id, user_id, agent_code')
-            .or('id.eq.$cleanId,user_id.eq.$cleanId,agent_code.eq.$cleanId')
-            .maybeSingle();
+        try {
+          final agentLookup = await dbClient
+              .from('delivery_agents')
+              .select('id, user_id, agent_code')
+              .or('id.eq.$cleanId,user_id.eq.$cleanId,agent_code.eq.$cleanId')
+              .limit(1);
 
-        if (agentLookup != null) {
-          if (agentLookup['id'] != null) targetAgentId = agentLookup['id'].toString();
-          if (agentLookup['agent_code'] != null) targetAgentCode = agentLookup['agent_code'].toString();
-        }
+          if ((agentLookup as List).isNotEmpty) {
+            final first = agentLookup.first;
+            if (first['id'] != null) targetAgentId = first['id'].toString();
+            if (first['agent_code'] != null) targetAgentCode = first['agent_code'].toString();
+          }
+        } catch (_) {}
 
         // 2. Query strictly for orders assigned to this rider's delivery_agent_id
-        final filter = uuidRegex.hasMatch(targetAgentId)
-            ? 'delivery_agent_id.eq.$targetAgentId'
-            : 'delivery_agent_id.eq.$cleanId';
+        final filterList = <String>[];
+        if (uuidRegex.hasMatch(targetAgentId)) filterList.add('delivery_agent_id.eq.$targetAgentId');
+        if (uuidRegex.hasMatch(cleanId) && cleanId != targetAgentId) filterList.add('delivery_agent_id.eq.$cleanId');
+        final filterStr = filterList.isNotEmpty ? filterList.join(',') : 'delivery_agent_id.eq.$targetAgentId';
 
         final response = await dbClient
             .from(SupabaseConstants.ordersTable)
             .select('*, products(name, sku, base_price)')
-            .or(filter)
+            .or(filterStr)
             .order('created_at', ascending: false);
 
         final list = (response as List)
@@ -406,27 +410,29 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
           final agentRow = await dbClient
               .from(SupabaseConstants.deliveryAgentsTable)
               .select('id')
-              .eq('agent_code', query)
-              .maybeSingle();
-          if (agentRow != null && agentRow['id'] != null && uuidRegex.hasMatch(agentRow['id'].toString())) {
-            validRiderUuid = agentRow['id'].toString();
+              .or('agent_code.eq.$query,id.eq.$query,user_id.eq.$query')
+              .limit(1);
+          if ((agentRow as List).isNotEmpty && agentRow.first['id'] != null) {
+            validRiderUuid = agentRow.first['id'].toString();
           }
         } catch (_) {}
       }
 
       if (validRiderUuid == null || !uuidRegex.hasMatch(validRiderUuid)) {
-        validRiderUuid = 'b1111111-1111-4111-8111-111111111111';
+        validRiderUuid = riderId.isNotEmpty && uuidRegex.hasMatch(riderId) ? riderId : null;
       }
 
-      // 3. Update orders table in Supabase (status MUST be 'in_transit' for active assignment check constraint)
-      await dbClient
-          .from(SupabaseConstants.ordersTable)
-          .update({
-            'delivery_agent_id': validRiderUuid,
-            'status': 'in_transit',
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', orderId);
+      if (validRiderUuid != null) {
+        // 3. Update orders table in Supabase (status MUST be 'in_transit' for active assignment check constraint)
+        await dbClient
+            .from(SupabaseConstants.ordersTable)
+            .update({
+              'delivery_agent_id': validRiderUuid,
+              'status': 'in_transit',
+              'updated_at': DateTime.now().toIso8601String(),
+            })
+            .eq('id', orderId);
+      }
 
       // 4. Immediately insert real notification in database for rider
       try {
@@ -478,6 +484,8 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
     String? paymentStatus,
     String? paymentType,
     String? notes,
+    String? customerSignatureUrl,
+    String? photoProofUrl,
   }) async {
     final updateData = <String, dynamic>{
       'status': status,
@@ -491,6 +499,12 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
     }
     if (notes != null) {
       updateData['delivery_notes'] = notes;
+    }
+    if (customerSignatureUrl != null) {
+      updateData['customer_signature_url'] = customerSignatureUrl;
+    }
+    if (photoProofUrl != null) {
+      updateData['proof_photo_url'] = photoProofUrl;
     }
 
     try {
@@ -557,6 +571,8 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
           'delivered',
           paymentStatus: resolvedPaymentStatus,
           paymentType: resolvedPaymentType,
+          customerSignatureUrl: customerSignatureUrl,
+          photoProofUrl: photoProofUrl,
           notes: notes,
         );
         return response.data as Map<String, dynamic>? ?? {'status': 'success'};
@@ -569,6 +585,8 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
         'delivered',
         paymentStatus: resolvedPaymentStatus,
         paymentType: resolvedPaymentType,
+        customerSignatureUrl: customerSignatureUrl,
+        photoProofUrl: photoProofUrl,
         notes: notes,
       );
       return {'status': 'offline_fallback', 'error': e.toString()};

@@ -1,6 +1,7 @@
 import '../../../auth/domain/entities/user.dart';
 import '../../../orders/domain/entities/order.dart';
 import 'remittance.dart';
+import 'transaction_item.dart';
 
 class FinancialSummary {
   final double cashCollectedAllTime;
@@ -37,6 +38,8 @@ class FinancialSummary {
     required this.deliveredPrepaidOrdersCount,
   });
 
+  double get totalRemittedAllTime => totalVerifiedRemitted + totalPendingApprovalRemitted;
+
   static bool _isSameDay(DateTime a, DateTime b) {
     final localA = a.toLocal();
     final localB = b.toLocal();
@@ -50,6 +53,7 @@ class FinancialSummary {
     required List<RemittanceEntity> remittances,
     UserEntity? user,
     double manualEarnedBalance = 0.0,
+    List<TransactionItem>? transactions,
   }) {
     final bool isSalaried = user?.compensationType == 'salary' || user?.personnelType == 'in_house_rider';
 
@@ -61,8 +65,8 @@ class FinancialSummary {
     final totalEarningPerOrder = commissionPerOrder + transportPerOrder;
 
     final now = DateTime.now();
-    final deliveredOrders = orders.where((o) => o.status == 'delivered').toList();
-    final failedOrders = orders.where((o) => o.status == 'failed').toList();
+    final deliveredOrders = orders.where((o) => o.isDelivered).toList();
+    final failedOrders = orders.where((o) => o.isFailed).toList();
     final todayDeliveredOrders = deliveredOrders.where((o) => _isSameDay(o.createdAt, now)).toList();
 
     final deliveredCashOrders = deliveredOrders.where((o) => o.isCashPod).toList();
@@ -74,12 +78,9 @@ class FinancialSummary {
 
     final double totalCommissionRetained = deliveredCashOrders.length * commissionPerOrder;
     final double totalTransportRetained = deliveredCashOrders.length * transportPerOrder;
-    final double totalTransferFeesRetained = deliveredCashOrders.fold(
-      0.0,
-      (acc, o) => acc + ((o.totalAmount > 0) ? ((o.totalAmount / 5000.0).ceil() * 100.0) : 0.0),
-    );
+    const double totalTransferFeesRetained = 0.0;
     final double totalFailedAllowanceEarned = failedOrders.length * failedPerOrder;
-    final double totalEarningRetained = totalCommissionRetained + totalTransportRetained;
+    final double totalEarningRetained = totalCommissionRetained + totalTransportRetained + totalFailedAllowanceEarned;
 
     final double totalVerifiedRemitted = remittances
         .where((r) => r.isVerified)
@@ -91,18 +92,27 @@ class FinancialSummary {
 
     final double pendingRemittanceToDC = isSalaried
         ? (cashCollectedAllTime - totalVerifiedRemitted - totalPendingApprovalRemitted).clamp(0.0, double.infinity)
-        : (cashCollectedAllTime - totalEarningRetained - totalTransferFeesRetained - totalVerifiedRemitted - totalPendingApprovalRemitted).clamp(0.0, double.infinity);
+        : (cashCollectedAllTime - totalEarningRetained - totalVerifiedRemitted - totalPendingApprovalRemitted).clamp(0.0, double.infinity);
 
     final double directTransfersEarnings = deliveredPrepaidOrders.fold<double>(
       0.0,
       (acc, o) => acc + (o.agentEntitlement > 0 ? o.agentEntitlement : totalEarningPerOrder),
     );
 
+    final double payoutsDeducted = (transactions ?? const [])
+        .where((t) =>
+            (t.category.toLowerCase() == 'payout' || t.title.toLowerCase().contains('payout')) &&
+            t.status.toLowerCase() != 'rejected' &&
+            t.status.toLowerCase() != 'cancelled')
+        .fold(0.0, (acc, t) => acc + t.amount);
+
+    final double dynamicDirectTransfersBalance = (directTransfersEarnings + totalFailedAllowanceEarned - payoutsDeducted).clamp(0.0, double.infinity);
+
     final double myDirectTransfersBalance = isSalaried
         ? 0.0
-        : (manualEarnedBalance > 0
-            ? manualEarnedBalance
-            : (directTransfersEarnings + totalFailedAllowanceEarned));
+        : (dynamicDirectTransfersBalance > 0
+            ? dynamicDirectTransfersBalance
+            : (manualEarnedBalance > 0 ? manualEarnedBalance : 0.0));
 
     final double totalDeliveredEarnings = deliveredOrders.fold<double>(
       0.0,

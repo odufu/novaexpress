@@ -7,6 +7,9 @@ import '../../../../core/helpers/formatters.dart';
 import '../../../notifications/presentation/providers/notifications_provider.dart';
 import '../../../orders/domain/entities/order.dart';
 
+final contactAlertLoadingProvider = StateProvider.autoDispose<bool>((ref) => false);
+final contactAlertSentProvider = StateProvider.autoDispose<bool>((ref) => false);
+
 class DCContactRiderModal extends ConsumerStatefulWidget {
   final OrderEntity order;
   final String riderName;
@@ -53,8 +56,6 @@ class DCContactRiderModal extends ConsumerStatefulWidget {
 }
 
 class _DCContactRiderModalState extends ConsumerState<DCContactRiderModal> {
-  bool _isSendingInAppAlert = false;
-  bool _inAppAlertSent = false;
   final TextEditingController _customNoteController = TextEditingController();
 
   @override
@@ -134,7 +135,7 @@ ${customNote.isNotEmpty ? "Note: $customNote\n" : ""}Kindly remit the cash custo
   }
 
   void _sendInAppPushAlert() async {
-    setState(() => _isSendingInAppAlert = true);
+    ref.read(contactAlertLoadingProvider.notifier).state = true;
 
     const title = 'Cash Remittance Notice ⚠️';
     final customNote = _customNoteController.text.trim();
@@ -152,10 +153,8 @@ ${customNote.isNotEmpty ? "Note: $customNote\n" : ""}Kindly remit the cash custo
     await Future.delayed(const Duration(milliseconds: 600));
 
     if (mounted) {
-      setState(() {
-        _isSendingInAppAlert = false;
-        _inAppAlertSent = true;
-      });
+      ref.read(contactAlertLoadingProvider.notifier).state = false;
+      ref.read(contactAlertSentProvider.notifier).state = true;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
@@ -392,24 +391,31 @@ ${customNote.isNotEmpty ? "Note: $customNote\n" : ""}Kindly remit the cash custo
               const SizedBox(height: 10),
 
               // Action 3: Send In-App Remittance Push Alert
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: _isSendingInAppAlert ? null : _sendInAppPushAlert,
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: _inAppAlertSent ? const Color(0xFF16A34A) : const Color(0xFFF37021)),
-                    foregroundColor: _inAppAlertSent ? const Color(0xFF16A34A) : const Color(0xFFF37021),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  icon: _isSendingInAppAlert
-                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                      : Icon(_inAppAlertSent ? Icons.check_circle_rounded : Icons.notifications_active_rounded, size: 18),
-                  label: Text(
-                    _inAppAlertSent ? 'In-App Notice Dispatched ✓' : 'Send Instant In-App Remittance Alert',
-                    style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold),
-                  ),
-                ),
+              Consumer(
+                builder: (context, ref, _) {
+                  final isSending = ref.watch(contactAlertLoadingProvider);
+                  final isSent = ref.watch(contactAlertSentProvider);
+
+                  return SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: isSending ? null : _sendInAppPushAlert,
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: isSent ? const Color(0xFF16A34A) : const Color(0xFFF37021)),
+                        foregroundColor: isSent ? const Color(0xFF16A34A) : const Color(0xFFF37021),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      icon: isSending
+                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                          : Icon(isSent ? Icons.check_circle_rounded : Icons.notifications_active_rounded, size: 18),
+                      label: Text(
+                        isSent ? 'In-App Notice Dispatched ✓' : 'Send Instant In-App Remittance Alert',
+                        style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 16),
 

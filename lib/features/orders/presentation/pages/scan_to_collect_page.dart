@@ -4,6 +4,10 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../providers/orders_provider.dart';
 
+final scanFlashlightProvider = StateProvider.autoDispose<bool>((ref) => false);
+final scanIsScannedProvider = StateProvider.autoDispose<bool>((ref) => false);
+final scannedTrackingNoProvider = StateProvider.autoDispose<String>((ref) => 'TRK-8924-NIG');
+
 class ScanToCollectPage extends ConsumerStatefulWidget {
   const ScanToCollectPage({super.key});
 
@@ -14,9 +18,6 @@ class ScanToCollectPage extends ConsumerStatefulWidget {
 class _ScanToCollectPageState extends ConsumerState<ScanToCollectPage> with SingleTickerProviderStateMixin {
   late AnimationController _scanAnimationController;
   final TextEditingController _manualController = TextEditingController();
-  bool _isFlashlightOn = false;
-  bool _isScanned = false;
-  String _scannedTrackingNo = 'TRK-8924-NIG';
 
   @override
   void initState() {
@@ -35,9 +36,7 @@ class _ScanToCollectPageState extends ConsumerState<ScanToCollectPage> with Sing
   }
 
   void _triggerSimulatedScan() {
-    setState(() {
-      _isScanned = true;
-    });
+    ref.read(scanIsScannedProvider.notifier).state = true;
   }
 
   void _showManualEntryDialog() {
@@ -68,10 +67,8 @@ class _ScanToCollectPageState extends ConsumerState<ScanToCollectPage> with Sing
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.orange),
             onPressed: () {
               if (_manualController.text.trim().isNotEmpty) {
-                setState(() {
-                  _scannedTrackingNo = _manualController.text.trim().toUpperCase();
-                  _isScanned = true;
-                });
+                ref.read(scannedTrackingNoProvider.notifier).state = _manualController.text.trim().toUpperCase();
+                ref.read(scanIsScannedProvider.notifier).state = true;
                 Navigator.pop(context);
               }
             },
@@ -85,6 +82,9 @@ class _ScanToCollectPageState extends ConsumerState<ScanToCollectPage> with Sing
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isFlashlightOn = ref.watch(scanFlashlightProvider);
+    final isScanned = ref.watch(scanIsScannedProvider);
+    final scannedTrackingNo = ref.watch(scannedTrackingNoProvider);
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -107,13 +107,11 @@ class _ScanToCollectPageState extends ConsumerState<ScanToCollectPage> with Sing
         actions: [
           IconButton(
             icon: Icon(
-              _isFlashlightOn ? Icons.flashlight_on_rounded : Icons.flashlight_off_rounded,
-              color: _isFlashlightOn ? AppColors.orange : Colors.white,
+              isFlashlightOn ? Icons.flashlight_on_rounded : Icons.flashlight_off_rounded,
+              color: isFlashlightOn ? AppColors.orange : Colors.white,
             ),
             onPressed: () {
-              setState(() {
-                _isFlashlightOn = !_isFlashlightOn;
-              });
+              ref.read(scanFlashlightProvider.notifier).state = !isFlashlightOn;
             },
           ),
         ],
@@ -262,7 +260,7 @@ class _ScanToCollectPageState extends ConsumerState<ScanToCollectPage> with Sing
           ),
 
           // Scanned Success Sheet Overlay
-          if (_isScanned)
+          if (isScanned)
             Positioned(
               left: 0,
               right: 0,
@@ -343,7 +341,7 @@ class _ScanToCollectPageState extends ConsumerState<ScanToCollectPage> with Sing
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
-                              '#$_scannedTrackingNo',
+                              '#$scannedTrackingNo',
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
@@ -369,7 +367,7 @@ class _ScanToCollectPageState extends ConsumerState<ScanToCollectPage> with Sing
                         onPressed: () async {
                           final orders = ref.read(ordersProvider).orders;
                           final match = orders.firstWhere(
-                            (o) => o.orderNumber == _scannedTrackingNo || o.id == _scannedTrackingNo,
+                            (o) => o.orderNumber == scannedTrackingNo || o.id == scannedTrackingNo,
                             orElse: () => orders.isNotEmpty ? orders.first : orders.first,
                           );
                           await ref.read(ordersProvider.notifier).updateOrderStatus(
@@ -408,9 +406,7 @@ class _ScanToCollectPageState extends ConsumerState<ScanToCollectPage> with Sing
                           ),
                         ),
                         onPressed: () {
-                          setState(() {
-                            _isScanned = false;
-                          });
+                          ref.read(scanIsScannedProvider.notifier).state = false;
                         },
                         child: const Text(
                           'RESCAN PACKAGE',

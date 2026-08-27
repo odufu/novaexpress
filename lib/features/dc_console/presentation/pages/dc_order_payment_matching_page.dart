@@ -8,6 +8,11 @@ import '../../../orders/domain/entities/order.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
 import '../widgets/dc_contact_rider_modal.dart';
 
+final dcOrderMatchingSearchProvider = StateProvider.autoDispose<String>((ref) => '');
+final dcOrderMatchingFilterProvider = StateProvider.autoDispose<String>((ref) => 'all');
+final dcOrderMatchingRiderFilterProvider = StateProvider.autoDispose<String?>((ref) => null);
+final dcOrderMatchingTableViewProvider = StateProvider.autoDispose<bool>((ref) => false);
+
 class DCOrderPaymentMatchingPage extends ConsumerStatefulWidget {
   const DCOrderPaymentMatchingPage({super.key});
 
@@ -17,9 +22,6 @@ class DCOrderPaymentMatchingPage extends ConsumerStatefulWidget {
 
 class _DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchingPage> {
   final TextEditingController _searchController = TextEditingController();
-  String _selectedFilter = 'all'; // 'all', 'direct_paystack', 'cash_awaiting_remittance', 'remitted_verified', 'in_transit'
-  String? _selectedRiderFilter; // Filter by specific rider code or null
-  bool _isTableView = false; // View mode: Table View vs Card View
 
   @override
   void initState() {
@@ -62,27 +64,33 @@ class _DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatch
     return (order.totalAmount - totalDeduction).clamp(0.0, order.totalAmount);
   }
 
-  List<OrderEntity> _filterOrders(List<OrderEntity> orders, List<RemittanceEntity> remittances) {
-    final query = _searchController.text.trim().toLowerCase();
+  List<OrderEntity> _filterOrders(
+    List<OrderEntity> orders,
+    List<RemittanceEntity> remittances,
+    String selectedFilter,
+    String? selectedRiderFilter,
+    String searchQuery,
+  ) {
+    final query = searchQuery.trim().toLowerCase();
     return orders.where((order) {
       final category = _getOrderPaymentCategory(order, remittances);
 
-      if (_selectedFilter == 'direct_paystack' && category != 'direct_paystack') {
+      if (selectedFilter == 'direct_paystack' && category != 'direct_paystack') {
         return false;
       }
-      if (_selectedFilter == 'cash_awaiting_remittance' && category != 'cash_awaiting_remittance') {
+      if (selectedFilter == 'cash_awaiting_remittance' && category != 'cash_awaiting_remittance') {
         return false;
       }
-      if (_selectedFilter == 'remitted_verified' && category != 'remitted_verified') {
+      if (selectedFilter == 'remitted_verified' && category != 'remitted_verified') {
         return false;
       }
-      if (_selectedFilter == 'in_transit' && category != 'in_transit') {
+      if (selectedFilter == 'in_transit' && category != 'in_transit') {
         return false;
       }
 
-      if (_selectedRiderFilter != null && _selectedRiderFilter!.isNotEmpty) {
+      if (selectedRiderFilter != null && selectedRiderFilter.isNotEmpty) {
         final riderCode = order.deliveryAgentCode ?? order.deliveryAgentId ?? '';
-        if (riderCode != _selectedRiderFilter) {
+        if (riderCode != selectedRiderFilter) {
           return false;
         }
       }
@@ -108,12 +116,16 @@ class _DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatch
     final isDark = theme.brightness == Brightness.dark;
     final ordersState = ref.watch(ordersProvider);
     final financeState = ref.watch(financeProvider);
+    final selectedFilter = ref.watch(dcOrderMatchingFilterProvider);
+    final selectedRiderFilter = ref.watch(dcOrderMatchingRiderFilterProvider);
+    final searchQuery = ref.watch(dcOrderMatchingSearchProvider);
+    final isTableView = ref.watch(dcOrderMatchingTableViewProvider);
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 768;
 
     final allOrders = ordersState.orders;
     final allRemittances = financeState.remittances;
-    final filteredOrders = _filterOrders(allOrders, allRemittances);
+    final filteredOrders = _filterOrders(allOrders, allRemittances, selectedFilter, selectedRiderFilter, searchQuery);
 
     // Compute Key Metrics
     final totalOrderValue = allOrders.fold(0.0, (sum, o) => sum + o.totalAmount);
@@ -283,7 +295,7 @@ class _DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatch
                       Expanded(
                         child: TextField(
                           controller: _searchController,
-                          onChanged: (_) => setState(() {}),
+                          onChanged: (val) => ref.read(dcOrderMatchingSearchProvider.notifier).state = val,
                           style: GoogleFonts.inter(fontSize: 13),
                           decoration: InputDecoration(
                             hintText: 'Search by Order #, Customer, City, or Rider...',
@@ -312,7 +324,7 @@ class _DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatch
                           ),
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton<String?>(
-                              value: _selectedRiderFilter,
+                              value: selectedRiderFilter,
                               hint: Text('All Riders', style: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF64748B))),
                               icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18),
                               items: [
@@ -327,7 +339,7 @@ class _DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatch
                                   ),
                                 ),
                               ],
-                              onChanged: (val) => setState(() => _selectedRiderFilter = val),
+                              onChanged: (val) => ref.read(dcOrderMatchingRiderFilterProvider.notifier).state = val,
                             ),
                           ),
                         ),
@@ -374,16 +386,16 @@ class _DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatch
                             _buildViewToggleBtn(
                               icon: Icons.table_chart_rounded,
                               label: 'Table',
-                              isSelected: _isTableView,
+                              isSelected: isTableView,
                               isDark: isDark,
-                              onTap: () => setState(() => _isTableView = true),
+                              onTap: () => ref.read(dcOrderMatchingTableViewProvider.notifier).state = true,
                             ),
                             _buildViewToggleBtn(
                               icon: Icons.view_agenda_rounded,
                               label: 'Cards',
-                              isSelected: !_isTableView,
+                              isSelected: !isTableView,
                               isDark: isDark,
-                              onTap: () => setState(() => _isTableView = false),
+                              onTap: () => ref.read(dcOrderMatchingTableViewProvider.notifier).state = false,
                             ),
                           ],
                         ),
@@ -422,7 +434,7 @@ class _DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatch
                   ],
                 ),
               )
-            else if (_isTableView)
+            else if (isTableView)
               _buildOrderPaymentTableView(filteredOrders, allRemittances, isDark, isMobile)
             else
               ListView.separated(
@@ -940,11 +952,12 @@ class _DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatch
   }
 
   Widget _buildFilterChip(String key, String label, IconData icon, {Color? color}) {
-    final isSelected = _selectedFilter == key;
+    final selectedFilter = ref.watch(dcOrderMatchingFilterProvider);
+    final isSelected = selectedFilter == key;
     final activeColor = color ?? const Color(0xFFF37021);
 
     return GestureDetector(
-      onTap: () => setState(() => _selectedFilter = key),
+      onTap: () => ref.read(dcOrderMatchingFilterProvider.notifier).state = key,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(

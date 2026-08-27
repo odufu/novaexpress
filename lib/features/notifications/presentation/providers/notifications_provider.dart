@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -121,6 +122,11 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
   }
 
   void _startHeartbeatTimer() {
+    if (!kIsWeb) {
+      try {
+        if (Platform.environment.containsKey('FLUTTER_TEST')) return;
+      } catch (_) {}
+    }
     _heartbeatTimer?.cancel();
     _heartbeatTimer = Timer.periodic(const Duration(seconds: 3), (_) {
       if (!mounted) return;

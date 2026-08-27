@@ -8,31 +8,66 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../notifications/presentation/providers/notifications_provider.dart';
 import '../providers/stock_provider.dart';
 
-class RequestStockPage extends ConsumerStatefulWidget {
-  const RequestStockPage({super.key});
+final requestStockStepProvider = StateProvider.autoDispose<int>((ref) => 0);
+final requestStockSelectedDCProvider = StateProvider.autoDispose<String>((ref) => 'Wuse Distribution Center');
 
-  @override
-  ConsumerState<RequestStockPage> createState() => _RequestStockPageState();
+class RequestStockQuantitiesNotifier extends StateNotifier<Map<String, int>> {
+  RequestStockQuantitiesNotifier() : super({});
+
+  void increment(String itemName) {
+    final current = state[itemName] ?? 0;
+    state = {...state, itemName: current + 1};
+  }
+
+  void decrement(String itemName) {
+    final current = state[itemName] ?? 0;
+    if (current > 0) {
+      state = {...state, itemName: current - 1};
+    }
+  }
+
+  void clear() {
+    state = {};
+  }
 }
 
-class _RequestStockPageState extends ConsumerState<RequestStockPage> {
-  int _currentStep = 0;
-  String _selectedDC = 'Wuse Distribution Center';
-  final Map<String, int> _requestedQuantities = {};
+final requestStockQuantitiesProvider = StateNotifierProvider.autoDispose<
+    RequestStockQuantitiesNotifier, Map<String, int>>((ref) {
+  return RequestStockQuantitiesNotifier();
+});
 
-  final List<String> _distributionCenters = [
+class RequestStockPage extends ConsumerWidget {
+  const RequestStockPage({super.key});
+
+  static const List<String> _distributionCenters = [
     'Wuse Distribution Center',
     'Garki Distribution Center',
     'Kubwa Distribution Center',
     'Ikeja Distribution Center',
   ];
 
+  String _getStepTitle(int currentStep) {
+    switch (currentStep) {
+      case 0:
+        return 'Request Stock: Select Hub';
+      case 1:
+        return 'Request Stock: Quantities';
+      case 2:
+        return 'Request Stock: Confirmation';
+      default:
+        return 'Request Stock';
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final stockState = ref.watch(stockProvider);
     final authState = ref.watch(authProvider);
+    final currentStep = ref.watch(requestStockStepProvider);
+    final selectedDC = ref.watch(requestStockSelectedDCProvider);
+    final requestedQuantities = ref.watch(requestStockQuantitiesProvider);
 
     final user = authState.user;
     final agentName = user != null && user.firstName.isNotEmpty ? '${user.firstName} ${user.lastName}' : 'John Okafor';
@@ -46,15 +81,15 @@ class _RequestStockPageState extends ConsumerState<RequestStockPage> {
         leading: IconButton(
           icon: Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: theme.colorScheme.onSurface),
           onPressed: () {
-            if (_currentStep > 0) {
-              setState(() => _currentStep--);
+            if (currentStep > 0) {
+              ref.read(requestStockStepProvider.notifier).state = currentStep - 1;
             } else {
               context.pop();
             }
           },
         ),
         title: Text(
-          _getStepTitle(),
+          _getStepTitle(currentStep),
           style: GoogleFonts.inter(
             color: theme.colorScheme.onSurface,
             fontSize: 18,
@@ -70,11 +105,11 @@ class _RequestStockPageState extends ConsumerState<RequestStockPage> {
             color: isDark ? const Color(0xFF1E293B) : Colors.white,
             child: Row(
               children: [
-                _buildStepIndicator(0, 'Select DC', isDark),
-                _buildStepConnector(_currentStep >= 1, isDark),
-                _buildStepIndicator(1, 'Products', isDark),
-                _buildStepConnector(_currentStep >= 2, isDark),
-                _buildStepIndicator(2, 'Review', isDark),
+                _buildStepIndicator(0, 'Select DC', isDark, currentStep),
+                _buildStepConnector(currentStep >= 1, isDark),
+                _buildStepIndicator(1, 'Products', isDark, currentStep),
+                _buildStepConnector(currentStep >= 2, isDark),
+                _buildStepIndicator(2, 'Review', isDark, currentStep),
               ],
             ),
           ),
@@ -84,7 +119,17 @@ class _RequestStockPageState extends ConsumerState<RequestStockPage> {
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(16),
-              child: _buildStepBody(stockState, agentName, agentId, isDark),
+              child: _buildStepBody(
+                context: context,
+                ref: ref,
+                currentStep: currentStep,
+                stockState: stockState,
+                agentName: agentName,
+                agentId: agentId,
+                selectedDC: selectedDC,
+                requestedQuantities: requestedQuantities,
+                isDark: isDark,
+              ),
             ),
           ),
 
@@ -99,15 +144,15 @@ class _RequestStockPageState extends ConsumerState<RequestStockPage> {
             ),
             child: SizedBox(
               width: double.infinity,
-              height: 48,
+              height: 50,
               child: ElevatedButton(
-                onPressed: _onNextPressed,
+                onPressed: () => _onNextPressed(context, ref, currentStep, selectedDC, requestedQuantities),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 child: Text(
-                  _currentStep == 2 ? 'Submit Stock Request' : 'Continue',
+                  currentStep == 2 ? 'Submit Transfer Request 🚀' : 'Continue',
                   style: GoogleFonts.inter(
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
@@ -122,78 +167,80 @@ class _RequestStockPageState extends ConsumerState<RequestStockPage> {
     );
   }
 
-  String _getStepTitle() {
-    switch (_currentStep) {
-      case 0:
-        return 'Select Distribution Center';
-      case 1:
-        return 'Select Products & Quantity';
-      case 2:
-        return 'Review Stock Request';
-      default:
-        return 'Request Stock';
+  Widget _buildStepIndicator(int stepIndex, String title, bool isDark, int currentStep) {
+    final isActive = currentStep == stepIndex;
+    final isDone = currentStep > stepIndex;
+
+    Color bgColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    Color textColor = const Color(0xFF64748B);
+
+    if (isActive) {
+      bgColor = AppColors.primary;
+      textColor = Colors.white;
+    } else if (isDone) {
+      bgColor = const Color(0xFF16A34A);
+      textColor = Colors.white;
     }
-  }
 
-  Widget _buildStepIndicator(int stepIndex, String title, bool isDark) {
-    final isActive = _currentStep == stepIndex;
-    final isDone = _currentStep > stepIndex;
-
-    return Column(
+    return Row(
       children: [
         Container(
-          width: 28,
-          height: 28,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: isDone
-                ? const Color(0xFF16A34A)
-                : (isActive ? AppColors.primary : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
-          ),
-          child: Center(
-            child: isDone
-                ? const Icon(Icons.check_rounded, size: 16, color: Colors.white)
-                : Text(
-                    '${stepIndex + 1}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: isActive ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF64748B)),
-                    ),
+          width: 26,
+          height: 26,
+          decoration: BoxDecoration(color: bgColor, shape: BoxShape.circle),
+          alignment: Alignment.center,
+          child: isDone
+              ? const Icon(Icons.check_rounded, color: Colors.white, size: 16)
+              : Text(
+                  '${stepIndex + 1}',
+                  style: GoogleFonts.jetBrainsMono(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: textColor,
                   ),
-          ),
+                ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(width: 6),
         Text(
           title,
           style: GoogleFonts.inter(
-            fontSize: 10,
+            fontSize: 12,
             fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-            color: isActive ? AppColors.primary : const Color(0xFF64748B),
+            color: isActive ? (isDark ? Colors.white : const Color(0xFF0F172A)) : const Color(0xFF64748B),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildStepConnector(bool isFilled, bool isDark) {
+  Widget _buildStepConnector(bool isDone, bool isDark) {
     return Expanded(
       child: Container(
         height: 2,
-        margin: const EdgeInsets.only(bottom: 14, left: 4, right: 4),
-        color: isFilled ? const Color(0xFF16A34A) : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+        margin: const EdgeInsets.symmetric(horizontal: 8),
+        color: isDone ? const Color(0xFF16A34A) : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
       ),
     );
   }
 
-  Widget _buildStepBody(StockState stockState, String agentName, String agentId, bool isDark) {
-    switch (_currentStep) {
+  Widget _buildStepBody({
+    required BuildContext context,
+    required WidgetRef ref,
+    required int currentStep,
+    required StockState stockState,
+    required String agentName,
+    required String agentId,
+    required String selectedDC,
+    required Map<String, int> requestedQuantities,
+    required bool isDark,
+  }) {
+    switch (currentStep) {
       case 0:
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Authorized Distribution Centers',
+              'Select Source Distribution Center',
               style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 4),
@@ -203,11 +250,11 @@ class _RequestStockPageState extends ConsumerState<RequestStockPage> {
             ),
             const SizedBox(height: 16),
             ..._distributionCenters.map((dc) {
-              final isSelected = _selectedDC == dc;
+              final isSelected = selectedDC == dc;
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: InkWell(
-                  onTap: () => setState(() => _selectedDC = dc),
+                  onTap: () => ref.read(requestStockSelectedDCProvider.notifier).state = dc,
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
                     padding: const EdgeInsets.all(16),
@@ -248,10 +295,8 @@ class _RequestStockPageState extends ConsumerState<RequestStockPage> {
                             ],
                           ),
                         ),
-                        Icon(
-                          isSelected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
-                          color: isSelected ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
-                        ),
+                        if (isSelected)
+                          const Icon(Icons.check_circle_rounded, color: Color(0xFF2563EB), size: 20),
                       ],
                     ),
                   ),
@@ -266,17 +311,18 @@ class _RequestStockPageState extends ConsumerState<RequestStockPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Select Restock Quantities',
+              'Select Product Quantities',
               style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 4),
             Text(
-              'Fulfillment DC: $_selectedDC',
-              style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF2563EB), fontWeight: FontWeight.w600),
+              'Specify how many units of each product you need restocked in your vehicle.',
+              style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B)),
             ),
             const SizedBox(height: 16),
             ...stockState.stockItems.map((item) {
-              final qty = _requestedQuantities[item.name] ?? 0;
+              final qty = requestedQuantities[item.name] ?? 0;
+              final isRequested = qty > 0;
 
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
@@ -286,24 +332,19 @@ class _RequestStockPageState extends ConsumerState<RequestStockPage> {
                     color: isDark ? const Color(0xFF1E293B) : Colors.white,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                      color: isRequested ? AppColors.primary : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                      width: isRequested ? 1.5 : 1,
                     ),
                   ),
                   child: Row(
                     children: [
                       Container(
-                        width: 48,
-                        height: 48,
+                        padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                          color: const Color(0xFF00A2D3).withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: item.imageAsset != null
-                              ? Image.asset(item.imageAsset!, fit: BoxFit.contain)
-                              : const Icon(Icons.inventory_2_rounded, size: 24, color: AppColors.primary),
-                        ),
+                        child: const Icon(Icons.inventory_2_rounded, color: Color(0xFF00A2D3), size: 20),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -326,9 +367,7 @@ class _RequestStockPageState extends ConsumerState<RequestStockPage> {
                           IconButton(
                             icon: const Icon(Icons.remove_circle_outline_rounded, color: Color(0xFFE11D48), size: 22),
                             onPressed: () {
-                              if (qty > 0) {
-                                setState(() => _requestedQuantities[item.name] = qty - 1);
-                              }
+                              ref.read(requestStockQuantitiesProvider.notifier).decrement(item.name);
                             },
                           ),
                           Container(
@@ -342,7 +381,7 @@ class _RequestStockPageState extends ConsumerState<RequestStockPage> {
                           IconButton(
                             icon: const Icon(Icons.add_circle_outline_rounded, color: Color(0xFF16A34A), size: 22),
                             onPressed: () {
-                              setState(() => _requestedQuantities[item.name] = qty + 1);
+                              ref.read(requestStockQuantitiesProvider.notifier).increment(item.name);
                             },
                           ),
                         ],
@@ -356,88 +395,72 @@ class _RequestStockPageState extends ConsumerState<RequestStockPage> {
         );
 
       case 2:
-        final selectedItems = _requestedQuantities.entries.where((e) => e.value > 0).toList();
+        final selectedItems = requestedQuantities.entries.where((e) => e.value > 0).toList();
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Text(
+              'Review Stock Request',
+              style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Verify restock allocation details before transmitting to warehouse.',
+              style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                ),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
               ),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildReviewRow('Requester', '$agentId — $agentName', isDark),
-                  const Divider(height: 16),
-                  _buildReviewRow('Fulfillment DC', _selectedDC, isDark),
-                  const Divider(height: 16),
-                  _buildReviewRow('Request Date', 'Today (Instant Dispatch)', isDark),
+                  _buildReviewRow('Source Distribution Center:', selectedDC, isDark),
+                  const Divider(height: 20),
+                  _buildReviewRow('Assigned Field Agent:', '$agentName ($agentId)', isDark),
+                  const Divider(height: 20),
+                  _buildReviewRow('Requested Items Count:', '${selectedItems.length} Products', isDark),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             Text(
-              'Requested Products (${selectedItems.length})',
-              style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold),
+              'Item Allocation Breakdown',
+              style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 10),
-            if (selectedItems.isEmpty)
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFF1F2),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFFECDD3)),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.warning_amber_rounded, color: Color(0xFFE11D48)),
-                    SizedBox(width: 10),
-                    Expanded(child: Text('No products selected. Please go back and select at least 1 unit.')),
-                  ],
-                ),
-              )
-            else
-              Container(
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+            ...selectedItems.map((entry) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(entry.key, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600)),
+                      Text(
+                        '+${entry.value} units',
+                        style: GoogleFonts.jetBrainsMono(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF16A34A),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: selectedItems.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
-                  itemBuilder: (context, idx) {
-                    final item = selectedItems[idx];
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(item.key, style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14)),
-                          Text(
-                            '+${item.value} Units',
-                            style: GoogleFonts.jetBrainsMono(
-                              fontWeight: FontWeight.bold,
-                              color: const Color(0xFF16A34A),
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
+              );
+            }),
           ],
         );
 
@@ -456,11 +479,17 @@ class _RequestStockPageState extends ConsumerState<RequestStockPage> {
     );
   }
 
-  void _onNextPressed() {
-    if (_currentStep == 0) {
-      setState(() => _currentStep = 1);
-    } else if (_currentStep == 1) {
-      final hasSelected = _requestedQuantities.values.any((qty) => qty > 0);
+  void _onNextPressed(
+    BuildContext context,
+    WidgetRef ref,
+    int currentStep,
+    String selectedDC,
+    Map<String, int> requestedQuantities,
+  ) {
+    if (currentStep == 0) {
+      ref.read(requestStockStepProvider.notifier).state = 1;
+    } else if (currentStep == 1) {
+      final hasSelected = requestedQuantities.values.any((qty) => qty > 0);
       if (!hasSelected) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -470,11 +499,11 @@ class _RequestStockPageState extends ConsumerState<RequestStockPage> {
         );
         return;
       }
-      setState(() => _currentStep = 2);
-    } else if (_currentStep == 2) {
+      ref.read(requestStockStepProvider.notifier).state = 2;
+    } else if (currentStep == 2) {
       // Submit stock request
       final cleanQuantities = Map<String, int>.fromEntries(
-        _requestedQuantities.entries.where((e) => e.value > 0),
+        requestedQuantities.entries.where((e) => e.value > 0),
       );
 
       final auth = ref.read(authProvider);
@@ -482,39 +511,35 @@ class _RequestStockPageState extends ConsumerState<RequestStockPage> {
       final companyId = auth.user?.companyId ?? '11111111-1111-4111-8111-111111111111';
 
       ref.read(stockProvider.notifier).addStockRequest(
-            dcName: _selectedDC,
+            dcName: selectedDC,
             quantities: cleanQuantities,
           );
 
       // Call Edge Function
       ref.read(stockProvider.notifier).requestStockTransfer(
-        agentId: agentId,
-        companyId: companyId,
-        sourceWarehouseId: '22222222-2222-4222-8222-222222222222',
-        items: cleanQuantities.entries.map((e) => {
-          'productId': e.key,
-          'quantityRequested': e.value,
-        }).toList(),
-        notes: 'Restock request submitted to $_selectedDC',
-      );
+            agentId: agentId,
+            companyId: companyId,
+            sourceWarehouseId: selectedDC,
+            items: cleanQuantities.entries.map((e) => {'product_name': e.key, 'quantity': e.value}).toList(),
+            notes: 'Field PDA Stock Transfer Request to $selectedDC',
+          );
 
       ref.read(notificationsProvider.notifier).emitNotification(
-            title: 'Stock Transfer Requested 🏷️',
-            message: 'Inventory replenishment request submitted to $_selectedDC.',
+            title: 'Stock Request Transmitted 📦',
+            message: 'Your restock allocation of ${cleanQuantities.values.fold(0, (a, b) => a + b)} units was sent to $selectedDC.',
             category: 'stock',
-            actionRoute: '/orders/scan',
+            actionRoute: '/stock',
           );
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Stock Request submitted successfully to $_selectedDC!',
-            style: GoogleFonts.inter(color: Colors.white),
-          ),
-          backgroundColor: const Color(0xFF16A34A),
+        const SnackBar(
+          content: Text('Stock transfer request submitted to distribution center!'),
+          backgroundColor: Color(0xFF16A34A),
         ),
       );
 
+      ref.read(requestStockQuantitiesProvider.notifier).clear();
+      ref.read(requestStockStepProvider.notifier).state = 0;
       context.pop();
     }
   }

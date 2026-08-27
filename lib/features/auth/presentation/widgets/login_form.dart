@@ -5,6 +5,10 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../providers/auth_provider.dart';
 
+final loginObscurePasswordProvider = StateProvider.autoDispose<bool>((ref) => true);
+final loginRememberMeProvider = StateProvider.autoDispose<bool>((ref) => true);
+final loginSelectedRoleProvider = StateProvider.autoDispose<String>((ref) => 'rider');
+
 class LoginForm extends ConsumerStatefulWidget {
   const LoginForm({super.key});
 
@@ -16,9 +20,6 @@ class _LoginFormState extends ConsumerState<LoginForm> {
   final _formKey = GlobalKey<FormState>();
   final _agentIdController = TextEditingController(text: 'emeka.rider@novaexpress.ng');
   final _passwordController = TextEditingController(text: 'Password123!');
-  bool _obscurePassword = true;
-  bool _rememberMe = true;
-  String _selectedRole = 'rider'; // 'rider' | 'dc_manager'
 
   @override
   void initState() {
@@ -30,10 +31,9 @@ class _LoginFormState extends ConsumerState<LoginForm> {
     final text = _agentIdController.text.trim().toLowerCase();
     final isDc = text.contains('dc.') || text.contains('supervisor') || text.contains('dc-mgr') || text.contains('dc.wuse');
     final expectedRole = isDc ? 'dc_manager' : 'rider';
-    if (_selectedRole != expectedRole && mounted) {
-      setState(() {
-        _selectedRole = expectedRole;
-      });
+    final currentRole = ref.read(loginSelectedRoleProvider);
+    if (currentRole != expectedRole && mounted) {
+      ref.read(loginSelectedRoleProvider.notifier).state = expectedRole;
     }
   }
 
@@ -46,16 +46,14 @@ class _LoginFormState extends ConsumerState<LoginForm> {
   }
 
   void _selectRole(String role) {
-    setState(() {
-      _selectedRole = role;
-      if (role == 'rider') {
-        _agentIdController.text = 'emeka.rider@novaexpress.ng';
-        _passwordController.text = 'Password123!';
-      } else {
-        _agentIdController.text = 'dc.supervisor@novaexpress.ng';
-        _passwordController.text = 'Password123!';
-      }
-    });
+    ref.read(loginSelectedRoleProvider.notifier).state = role;
+    if (role == 'rider') {
+      _agentIdController.text = 'emeka.rider@novaexpress.ng';
+      _passwordController.text = 'Password123!';
+    } else {
+      _agentIdController.text = 'dc.supervisor@novaexpress.ng';
+      _passwordController.text = 'Password123!';
+    }
   }
 
   void _submit() async {
@@ -63,7 +61,8 @@ class _LoginFormState extends ConsumerState<LoginForm> {
     if (_formKey.currentState!.validate()) {
       final email = _agentIdController.text.trim();
       final password = _passwordController.text;
-      debugPrint('[AUTH_UI] 📝 Form valid. Dispatching login request for: "$email", PasswordLength=${password.length}, RememberMe=$_rememberMe');
+      final rememberMe = ref.read(loginRememberMeProvider);
+      debugPrint('[AUTH_UI] 📝 Form valid. Dispatching login request for: "$email", PasswordLength=${password.length}, RememberMe=$rememberMe');
 
       final success = await ref.read(authProvider.notifier).login(email, password);
 
@@ -90,6 +89,9 @@ class _LoginFormState extends ConsumerState<LoginForm> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
+    final obscurePassword = ref.watch(loginObscurePasswordProvider);
+    final rememberMe = ref.watch(loginRememberMeProvider);
+    final selectedRole = ref.watch(loginSelectedRoleProvider);
 
     return Form(
       key: _formKey,
@@ -149,7 +151,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                   tag: 'PDA Mobile View',
                   icon: Icons.two_wheeler_rounded,
                   activeColor: AppColors.orange,
-                  isSelected: _selectedRole == 'rider',
+                  isSelected: selectedRole == 'rider',
                   onTap: () => _selectRole('rider'),
                 ),
 
@@ -163,7 +165,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                   tag: 'DC Console Mode',
                   icon: Icons.admin_panel_settings_rounded,
                   activeColor: const Color(0xFF0B192C),
-                  isSelected: _selectedRole == 'dc_manager',
+                  isSelected: selectedRole == 'dc_manager',
                   onTap: () => _selectRole('dc_manager'),
                 ),
               ],
@@ -248,7 +250,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
           const SizedBox(height: 6),
           TextFormField(
             controller: _passwordController,
-            obscureText: _obscurePassword,
+            obscureText: obscurePassword,
             style: const TextStyle(color: Color(0xFF181C1E), fontSize: 14),
             decoration: InputDecoration(
               hintText: 'Enter your Password',
@@ -259,13 +261,11 @@ class _LoginFormState extends ConsumerState<LoginForm> {
               prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF75777E)),
               suffixIcon: IconButton(
                 icon: Icon(
-                  _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                  obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
                   color: const Color(0xFF75777E),
                 ),
                 onPressed: () {
-                  setState(() {
-                    _obscurePassword = !_obscurePassword;
-                  });
+                  ref.read(loginObscurePasswordProvider.notifier).state = !obscurePassword;
                 },
               ),
               border: OutlineInputBorder(
@@ -294,9 +294,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
             children: [
               InkWell(
                 onTap: () {
-                  setState(() {
-                    _rememberMe = !_rememberMe;
-                  });
+                  ref.read(loginRememberMeProvider.notifier).state = !rememberMe;
                 },
                 borderRadius: BorderRadius.circular(4),
                 child: Row(
@@ -306,16 +304,14 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                       width: 20,
                       height: 20,
                       child: Checkbox(
-                        value: _rememberMe,
+                        value: rememberMe,
                         activeColor: AppColors.orange,
                         side: const BorderSide(color: Color(0xFFC5C6CE), width: 1.5),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(4),
                         ),
                         onChanged: (val) {
-                          setState(() {
-                            _rememberMe = val ?? true;
-                          });
+                          ref.read(loginRememberMeProvider.notifier).state = val ?? true;
                         },
                       ),
                     ),
@@ -351,7 +347,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
             height: 50,
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: _selectedRole == 'dc_manager' ? const Color(0xFF0B192C) : AppColors.orange,
+                backgroundColor: selectedRole == 'dc_manager' ? const Color(0xFF0B192C) : AppColors.orange,
                 foregroundColor: Colors.white,
                 elevation: 1,
                 shape: RoundedRectangleBorder(
@@ -369,7 +365,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          _selectedRole == 'dc_manager' ? 'Sign In to DC Console' : 'Sign In to PDA App',
+                          selectedRole == 'dc_manager' ? 'Sign In to DC Console' : 'Sign In to PDA App',
                           style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,

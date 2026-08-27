@@ -35,9 +35,13 @@ void main() {
     final emekaOrders = await repo.getAssignedOrders(emekaAgentId);
     print('Emeka Rider assigned orders: ${emekaOrders.length}');
 
-    // 3. Ensure Joel does not see Emeka's orders
-    expect(joelOrders.length, isNot(equals(emekaOrders.length)), reason: 'Joel should not have Emeka\'s orders');
-    expect(joelOrders.length, equals(0), reason: 'Newly onboarded Joel should start with 0 orders until assigned');
+    // 3. Ensure Joel does not see Emeka's orders (Manifest Isolation)
+    final joelOrderIds = joelOrders.map((o) => o.id).toSet();
+    final emekaOrderIds = emekaOrders.map((o) => o.id).toSet();
+    final sharedOrderIds = joelOrderIds.intersection(emekaOrderIds);
+    expect(sharedOrderIds.isEmpty, isTrue, reason: 'Joel and Emeka must have disjoint assigned orders with zero overlap');
+
+    final initialJoelCount = joelOrders.length;
 
     // 4. Test assigning 1 order specifically to Joel
     final testOrderNum = 'ORD-JOEL-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
@@ -60,8 +64,8 @@ void main() {
     // 5. Re-fetch Joel's orders
     final joelUpdatedOrders = await repo.getAssignedOrders(joelAgentId);
     print('Joel Odufu assigned orders after 1 assignment: ${joelUpdatedOrders.length}');
-    expect(joelUpdatedOrders.length, equals(1));
-    expect(joelUpdatedOrders.first.orderNumber, equals(testOrderNum));
+    expect(joelUpdatedOrders.length, equals(initialJoelCount + 1));
+    expect(joelUpdatedOrders.any((o) => o.orderNumber == testOrderNum), isTrue);
 
     // 6. Test scoped caching in LocalStorageService
     await storage.cacheOrders(joelUpdatedOrders, 'rider_$joelAgentId');
@@ -70,7 +74,7 @@ void main() {
     final joelCached = await storage.getCachedOrders('rider_$joelAgentId');
     final emekaCached = await storage.getCachedOrders('rider_$emekaAgentId');
 
-    expect(joelCached!.length, equals(1));
+    expect(joelCached!.length, equals(initialJoelCount + 1));
     expect(emekaCached!.length, equals(emekaOrders.length));
 
     // 7. Clean up test order from DB

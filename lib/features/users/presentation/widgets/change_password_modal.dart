@@ -3,6 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 
+final changePasswordObscureCurrentProvider = StateProvider.autoDispose<bool>((ref) => true);
+final changePasswordObscureNewProvider = StateProvider.autoDispose<bool>((ref) => true);
+final changePasswordObscureConfirmProvider = StateProvider.autoDispose<bool>((ref) => true);
+final changePasswordSubmittingProvider = StateProvider.autoDispose<bool>((ref) => false);
+
 class ChangePasswordModal extends ConsumerStatefulWidget {
   const ChangePasswordModal({super.key});
 
@@ -25,11 +30,6 @@ class _ChangePasswordModalState extends ConsumerState<ChangePasswordModal> {
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
-  bool _obscureCurrent = true;
-  bool _obscureNew = true;
-  bool _obscureConfirm = true;
-  bool _isSubmitting = false;
-
   @override
   void dispose() {
     _currentPasswordController.dispose();
@@ -41,7 +41,7 @@ class _ChangePasswordModalState extends ConsumerState<ChangePasswordModal> {
   void _submitChangePassword() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isSubmitting = true);
+    ref.read(changePasswordSubmittingProvider.notifier).state = true;
 
     final res = await ref.read(authProvider.notifier).changePassword(
           oldPassword: _currentPasswordController.text,
@@ -49,7 +49,7 @@ class _ChangePasswordModalState extends ConsumerState<ChangePasswordModal> {
         );
 
     if (mounted) {
-      setState(() => _isSubmitting = false);
+      ref.read(changePasswordSubmittingProvider.notifier).state = false;
       if (res['success'] == true) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -73,6 +73,10 @@ class _ChangePasswordModalState extends ConsumerState<ChangePasswordModal> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final obscureCurrent = ref.watch(changePasswordObscureCurrentProvider);
+    final obscureNew = ref.watch(changePasswordObscureNewProvider);
+    final obscureConfirm = ref.watch(changePasswordObscureConfirmProvider);
+    final isSubmitting = ref.watch(changePasswordSubmittingProvider);
 
     return Container(
       padding: EdgeInsets.only(
@@ -128,13 +132,13 @@ class _ChangePasswordModalState extends ConsumerState<ChangePasswordModal> {
               // Current Password
               TextFormField(
                 controller: _currentPasswordController,
-                obscureText: _obscureCurrent,
+                obscureText: obscureCurrent,
                 decoration: InputDecoration(
                   labelText: 'Current Password',
                   prefixIcon: const Icon(Icons.lock_outline_rounded, size: 18),
                   suffixIcon: IconButton(
-                    icon: Icon(_obscureCurrent ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 18),
-                    onPressed: () => setState(() => _obscureCurrent = !_obscureCurrent),
+                    icon: Icon(obscureCurrent ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 18),
+                    onPressed: () => ref.read(changePasswordObscureCurrentProvider.notifier).state = !obscureCurrent,
                   ),
                 ),
                 validator: (v) => v == null || v.isEmpty ? 'Enter your current password' : null,
@@ -144,13 +148,13 @@ class _ChangePasswordModalState extends ConsumerState<ChangePasswordModal> {
               // New Password
               TextFormField(
                 controller: _newPasswordController,
-                obscureText: _obscureNew,
+                obscureText: obscureNew,
                 decoration: InputDecoration(
                   labelText: 'New Password',
                   prefixIcon: const Icon(Icons.key_rounded, size: 18),
                   suffixIcon: IconButton(
-                    icon: Icon(_obscureNew ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 18),
-                    onPressed: () => setState(() => _obscureNew = !_obscureNew),
+                    icon: Icon(obscureNew ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 18),
+                    onPressed: () => ref.read(changePasswordObscureNewProvider.notifier).state = !obscureNew,
                   ),
                 ),
                 validator: (v) {
@@ -164,13 +168,13 @@ class _ChangePasswordModalState extends ConsumerState<ChangePasswordModal> {
               // Confirm New Password
               TextFormField(
                 controller: _confirmPasswordController,
-                obscureText: _obscureConfirm,
+                obscureText: obscureConfirm,
                 decoration: InputDecoration(
                   labelText: 'Confirm New Password',
                   prefixIcon: const Icon(Icons.check_circle_outline_rounded, size: 18),
                   suffixIcon: IconButton(
-                    icon: Icon(_obscureConfirm ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 18),
-                    onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                    icon: Icon(obscureConfirm ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 18),
+                    onPressed: () => ref.read(changePasswordObscureConfirmProvider.notifier).state = !obscureConfirm,
                   ),
                 ),
                 validator: (v) {
@@ -191,12 +195,12 @@ class _ChangePasswordModalState extends ConsumerState<ChangePasswordModal> {
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  onPressed: _isSubmitting ? null : _submitChangePassword,
-                  icon: _isSubmitting
+                  onPressed: isSubmitting ? null : _submitChangePassword,
+                  icon: isSubmitting
                       ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                       : const Icon(Icons.save_rounded, size: 18),
                   label: Text(
-                    _isSubmitting ? 'UPDATING PASSWORD...' : 'UPDATE PASSWORD',
+                    isSubmitting ? 'UPDATING PASSWORD...' : 'UPDATE PASSWORD',
                     style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14.5),
                   ),
                 ),
