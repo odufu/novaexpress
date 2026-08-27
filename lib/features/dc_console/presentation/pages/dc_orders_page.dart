@@ -7,6 +7,7 @@ import '../../../../core/helpers/geo_proximity_calculator.dart';
 import '../../../../core/widgets/app_skeleton_loader.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
+import '../../../stock/domain/entities/stock_item.dart';
 import '../../../stock/presentation/providers/stock_provider.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
 import '../providers/dc_console_provider.dart';
@@ -1003,6 +1004,33 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
                               ? '🔴 Heavy Load ($activeOrdersCount Active)'
                               : '🟡 Moderate ($activeOrdersCount Active)'));
 
+                  // Connected Stock Custody Check for this order
+                  final stockState = ref.read(stockProvider);
+                  final requiredProduct = order.productName.isNotEmpty ? order.productName : 'Respira Detox Tea';
+                  final requiredQuantity = order.quantity > 0 ? order.quantity : 1;
+
+                  final driverAllocations = stockState.getAllocationsForRider(driver.id, driver.driverCode);
+                  int riderCustodyUnits = 0;
+                  for (final a in driverAllocations) {
+                    if (a.productName.toLowerCase().contains(requiredProduct.toLowerCase()) ||
+                        requiredProduct.toLowerCase().contains(a.productName.toLowerCase()) ||
+                        (a.sku.isNotEmpty && requiredProduct.toLowerCase().contains(a.sku.toLowerCase()))) {
+                      riderCustodyUnits += a.inCustodyUnits;
+                    }
+                  }
+
+                  final targetWarehouseItem = stockState.stockItems.firstWhere(
+                    (i) => i.name.toLowerCase().contains(requiredProduct.toLowerCase()) ||
+                           requiredProduct.toLowerCase().contains(i.name.toLowerCase()) ||
+                           i.sku.toLowerCase().contains(requiredProduct.toLowerCase()),
+                    orElse: () => stockState.stockItems.isNotEmpty
+                        ? stockState.stockItems.first
+                        : const StockItemEntity(id: '', sku: '', name: '', description: '', price: 0, assignedCount: 0, deliveredCount: 0, availableCount: 0, returnedCount: 0, category: ''),
+                  );
+
+                  final warehouseAvailable = targetWarehouseItem.availableCount;
+                  final bool hasSufficientStock = riderCustodyUnits >= requiredQuantity;
+
                   return Container(
                     margin: const EdgeInsets.only(bottom: 10),
                     padding: const EdgeInsets.all(12),
@@ -1059,6 +1087,27 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
+                              const SizedBox(height: 5),
+                              // Live Stock in Custody Status Badge
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: hasSufficientStock
+                                      ? const Color(0xFF10B981).withValues(alpha: 0.12)
+                                      : const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  hasSufficientStock
+                                      ? '📦 In Vehicle: $riderCustodyUnits units (Ready for ${requiredQuantity}x $requiredProduct)'
+                                      : '⚠️ In Vehicle: $riderCustodyUnits units (Needs ${requiredQuantity}x $requiredProduct • DC Shelf: $warehouseAvailable)',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: hasSufficientStock ? const Color(0xFF059669) : const Color(0xFFD97706),
+                                  ),
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -1066,7 +1115,66 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
                         ElevatedButton(
                           onPressed: () async {
                             final messenger = ScaffoldMessenger.of(context);
-                            Navigator.pop(ctx);
+
+                            if (!hasSufficientStock) {
+                              final neededUnits = requiredQuantity - riderCustodyUnits;
+                              if (warehouseAvailable >= neededUnits) {
+                                // Prompt to allocate stock and dispatch
+                                final shouldAllocate = await showDialog<bool>(
+                                  context: context,
+                                  builder: (dlgCtx) => AlertDialog(
+                                    backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                    title: Row(
+                                      children: [
+                                        const Icon(Icons.inventory_2_rounded, color: Color(0xFF2563EB), size: 22),
+                                        const SizedBox(width: 8),
+                                        const Text('Allocate Stock & Dispatch', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                      ],
+                                    ),
+                                    content: Text(
+                                      '${driver.name} currently holds $riderCustodyUnits units of $requiredProduct (Order requires $requiredQuantity units).\n\n'
+                                      'DC Warehouse currently possesses $warehouseAvailable shelf units.\n\n'
+                                      'Would you like to allocate the needed $neededUnits units from warehouse possession to ${driver.name} and dispatch this order?',
+                                      style: GoogleFonts.inter(fontSize: 12.5),
+                                    ),
+                                    actions: [
+                                      TextButton(onPressed: () => Navigator.pop(dlgCtx, false), child: const Text('Cancel')),
+                                      ElevatedButton(
+                                        onPressed: () => Navigator.pop(dlgCtx, true),
+                                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
+                                        child: Text('Allocate $neededUnits Units & Dispatch', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                      ),
+                                    ],
+                                  ),
+                                );
+
+                                if (shouldAllocate != true) return;
+
+                                // 1. Allocate stock to rider
+                                await ref.read(stockProvider.notifier).assignStockToRider(
+                                  productIdOrSku: targetWarehouseItem.id,
+                                  riderId: driver.id,
+                                  riderName: driver.name,
+                                  riderCode: driver.driverCode,
+                                  quantity: neededUnits,
+                                );
+                              } else {
+                                messenger.showSnackBar(
+                                  SnackBar(
+                                    content: Text('❌ Cannot assign order. ${driver.name} has only $riderCustodyUnits units and DC Warehouse possesses only $warehouseAvailable units of $requiredProduct. Please intake/receive stock first.'),
+                                    backgroundColor: const Color(0xFFEF4444),
+                                    duration: const Duration(seconds: 4),
+                                  ),
+                                );
+                                return;
+                              }
+                            }
+
+                            if (ctx.mounted) {
+                              Navigator.pop(ctx);
+                            }
+
                             final success = await ref.read(ordersProvider.notifier).assignOrderToRider(
                               orderId: order.id,
                               riderId: driver.id,

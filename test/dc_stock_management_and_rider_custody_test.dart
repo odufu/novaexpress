@@ -125,6 +125,7 @@ void main() {
     setUp(() {
       mockRepo = MockStockRepository();
       mockStorage = MockLocalStorageService();
+      mockStorage.cachedAllocations = [];
       stockNotifier = StockNotifier(
         repository: mockRepo,
         storageService: mockStorage,
@@ -275,6 +276,36 @@ void main() {
       final alloc = riderAllocations.firstWhere((a) => a.sku == 'SKU-RESP-01');
       expect(alloc.inCustodyUnits, 6); // 10 - 4
     });
+
+    test('recordComplaintOrDamage increments complaint count and decrements rider custody', () async {
+      await Future.delayed(const Duration(milliseconds: 10));
+
+      // 1. Assign 10 units
+      await stockNotifier.assignStockToRider(
+        productIdOrSku: 'SKU-RESP-01',
+        riderId: 'driver_1',
+        riderName: 'Musa Ibrahim',
+        riderCode: 'DRV-001',
+        quantity: 10,
+      );
+
+      // 2. Report 2 damaged units
+      final complaintRes = await stockNotifier.recordComplaintOrDamage(
+        productIdOrSku: 'SKU-RESP-01',
+        riderId: 'driver_1',
+        quantity: 2,
+        reason: 'Crushed packaging during transit',
+      );
+
+      expect(complaintRes['success'], isTrue);
+      final state = stockNotifier.state;
+      final updatedItem = state.stockItems.firstWhere((i) => i.sku == 'SKU-RESP-01');
+      expect(updatedItem.complaintCount, 2);
+
+      final riderAllocations = state.getAllocationsForRider('driver_1');
+      final alloc = riderAllocations.firstWhere((a) => a.sku == 'SKU-RESP-01');
+      expect(alloc.inCustodyUnits, 8); // 10 - 2
+    });
   });
 
   group('DC Stock Page & Rider Detail Modal UI Widget Tests', () {
@@ -313,6 +344,15 @@ void main() {
       // Verify products rendered
       expect(find.text('Respira Detox Tea'), findsOneWidget);
       expect(find.text('Grazer Herbal Tea'), findsOneWidget);
+
+      // Verify tapping product row opens details modal
+      await tester.tap(find.text('Respira Detox Tea'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Merchant / Company:'), findsOneWidget);
+      expect(find.textContaining('Novacare Limited'), findsWidgets);
+      expect(find.text('🏢 In DC Possession'), findsOneWidget);
+      expect(find.text('🛵 In Rider Custody'), findsWidgets);
     });
 
     testWidgets('DCRiderDetailModal Stock tab shows vehicle custody and Assign New Product CTA', (tester) async {
@@ -354,7 +394,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Switch to Stock tab (Tab index 3: Profile, Orders, Remittances, Stock)
-      final stockTab = find.text('Stock (0)');
+      final stockTab = find.text('Stock (2)');
       expect(stockTab, findsOneWidget);
       await tester.tap(stockTab);
       await tester.pumpAndSettle();

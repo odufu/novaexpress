@@ -1700,22 +1700,26 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
   }
 
   void _showAssignProductToThisRiderDialog(BuildContext context, bool isDark, DCFleetDriver driver, List<StockItemEntity> stockItems) {
-    if (stockItems.isEmpty) {
+    final availableProducts = stockItems.where((p) => p.availableCount > 0).toList();
+    if (availableProducts.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('⚠️ No products found in DC inventory catalogue.'), backgroundColor: Color(0xFFEF4444)),
+        const SnackBar(
+          content: Text('⚠️ No stock currently in DC warehouse possession to allocate. Please receive or add stock to warehouse first.'),
+          backgroundColor: Color(0xFFEF4444),
+        ),
       );
       return;
     }
 
-    String selectedProdId = stockItems.first.id;
-    final qtyCtrl = TextEditingController(text: '5');
+    String selectedProdId = availableProducts.first.id;
+    final qtyCtrl = TextEditingController(text: availableProducts.first.availableCount >= 5 ? '5' : '1');
     final messenger = ScaffoldMessenger.of(context);
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
-          final targetProd = stockItems.firstWhere((p) => p.id == selectedProdId, orElse: () => stockItems.first);
+          final targetProd = availableProducts.firstWhere((p) => p.id == selectedProdId, orElse: () => availableProducts.first);
 
           return AlertDialog(
             backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
@@ -1736,16 +1740,20 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
                   children: [
                     DropdownButtonFormField<String>(
                       value: selectedProdId,
-                      decoration: const InputDecoration(labelText: 'Select Product *'),
-                      items: stockItems.map((p) {
+                      decoration: const InputDecoration(labelText: 'Select Product in DC Possession *'),
+                      items: availableProducts.map((p) {
                         return DropdownMenuItem(
                           value: p.id,
-                          child: Text('${p.name} (${p.sku}) • Avail: ${p.availableCount}'),
+                          child: Text('${p.name} (${p.sku}) • In DC: ${p.availableCount} units'),
                         );
                       }).toList(),
                       onChanged: (val) {
                         if (val != null) {
-                          setDialogState(() => selectedProdId = val);
+                          setDialogState(() {
+                            selectedProdId = val;
+                            final newTarget = availableProducts.firstWhere((p) => p.id == val, orElse: () => availableProducts.first);
+                            qtyCtrl.text = newTarget.availableCount >= 5 ? '5' : '${newTarget.availableCount}';
+                          });
                         }
                       },
                     ),

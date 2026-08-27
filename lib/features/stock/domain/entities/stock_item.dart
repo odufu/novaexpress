@@ -24,11 +24,13 @@ class StockItemEntity {
   final int availableCount;
   final int returnedCount;
   final int awaitingReturnCount;
+  final int complaintCount;
   final int lowStockThreshold;
   final int reorderLevel;
   final String category;
   final String? imageAsset;
   final String? batchNumber;
+  final String? binLocation;
   final String? lastAuditDate;
 
   const StockItemEntity({
@@ -46,11 +48,13 @@ class StockItemEntity {
     required this.availableCount,
     required this.returnedCount,
     this.awaitingReturnCount = 0,
+    this.complaintCount = 0,
     this.lowStockThreshold = 3,
     this.reorderLevel = 5,
     required this.category,
     this.imageAsset,
     this.batchNumber,
+    this.binLocation = 'BIN-A1-01',
     this.lastAuditDate,
   });
 
@@ -124,11 +128,13 @@ class StockItemEntity {
     int? availableCount,
     int? returnedCount,
     int? awaitingReturnCount,
+    int? complaintCount,
     int? lowStockThreshold,
     int? reorderLevel,
     String? category,
     String? imageAsset,
     String? batchNumber,
+    String? binLocation,
     String? lastAuditDate,
   }) {
     return StockItemEntity(
@@ -146,11 +152,13 @@ class StockItemEntity {
       availableCount: availableCount ?? this.availableCount,
       returnedCount: returnedCount ?? this.returnedCount,
       awaitingReturnCount: awaitingReturnCount ?? this.awaitingReturnCount,
+      complaintCount: complaintCount ?? this.complaintCount,
       lowStockThreshold: lowStockThreshold ?? this.lowStockThreshold,
       reorderLevel: reorderLevel ?? this.reorderLevel,
       category: category ?? this.category,
       imageAsset: imageAsset ?? this.imageAsset,
       batchNumber: batchNumber ?? this.batchNumber,
+      binLocation: binLocation ?? this.binLocation,
       lastAuditDate: lastAuditDate ?? this.lastAuditDate,
     );
   }
