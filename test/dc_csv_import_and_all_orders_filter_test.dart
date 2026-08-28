@@ -398,6 +398,7 @@ ORD-9002,Hon. Maryam Ali,08097654321,,5 Ahmadu Bello Way,Abuja,FCT,Grazer Herbal
       final searchInput = find.byKey(const Key('dc_master_search_input'));
       expect(searchInput, findsOneWidget);
       await tester.enterText(searchInput, 'Aisha');
+      await tester.pump(const Duration(milliseconds: 300));
       await tester.pumpAndSettle();
 
       expect(find.text('Aisha Bello'), findsOneWidget);
@@ -406,6 +407,7 @@ ORD-9002,Hon. Maryam Ali,08097654321,,5 Ahmadu Bello Way,Abuja,FCT,Grazer Herbal
 
       // Clear search
       await tester.enterText(searchInput, '');
+      await tester.pump(const Duration(milliseconds: 300));
       await tester.pumpAndSettle();
       expect(find.text('Chidi Okafor'), findsOneWidget);
 

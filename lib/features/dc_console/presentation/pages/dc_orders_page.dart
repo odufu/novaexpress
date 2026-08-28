@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -36,6 +37,18 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
   late TabController _tabController;
   final TextEditingController _deliveredSearchController = TextEditingController();
   final TextEditingController _masterSearchController = TextEditingController();
+  Timer? _searchDebounceTimer;
+  int _masterCurrentPage = 0;
+  int _masterPageSize = 25;
+
+  void _onDebouncedSearch(void Function() action) {
+    _searchDebounceTimer?.cancel();
+    _searchDebounceTimer = Timer(const Duration(milliseconds: 250), () {
+      if (mounted) {
+        action();
+      }
+    });
+  }
 
   @override
   void initState() {
@@ -48,6 +61,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
 
   @override
   void dispose() {
+    _searchDebounceTimer?.cancel();
     _tabController.dispose();
     _deliveredSearchController.dispose();
     _masterSearchController.dispose();
@@ -587,7 +601,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
                       child: TextField(
                         key: const Key('dc_master_search_input'),
                         controller: _masterSearchController,
-                        onChanged: (val) => ref.read(dcMasterSearchProvider.notifier).state = val,
+                        onChanged: (val) => _onDebouncedSearch(() => ref.read(dcMasterSearchProvider.notifier).state = val),
                         decoration: InputDecoration(
                           hintText: 'Search by Order #, Customer Name, Phone, Address, Product, Client, or Rider...',
                           hintStyle: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)),
@@ -831,6 +845,13 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
     DCConsoleState dcState,
     OrdersState ordersState,
   ) {
+    final totalCount = orders.length;
+    final totalPages = (totalCount / _masterPageSize).ceil().clamp(1, 9999);
+    final currentPage = _masterCurrentPage.clamp(0, totalPages - 1);
+    final startIndex = currentPage * _masterPageSize;
+    final endIndex = (startIndex + _masterPageSize).clamp(0, totalCount);
+    final pagedOrders = totalCount == 0 ? <OrderEntity>[] : orders.sublist(startIndex, endIndex);
+
     return Container(
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
@@ -846,244 +867,254 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: DataTable(
-            headingRowColor: WidgetStateProperty.all(isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
-            headingRowHeight: 46,
-            dataRowMaxHeight: 64,
-            columnSpacing: 18,
-            columns: [
-              const DataColumn(label: Text('Order # & Date', style: TextStyle(fontWeight: FontWeight.bold))),
-              const DataColumn(label: Text('Customer & Phone', style: TextStyle(fontWeight: FontWeight.bold))),
-              const DataColumn(label: Text('Destination', style: TextStyle(fontWeight: FontWeight.bold))),
-              const DataColumn(label: Text('Product & Qty', style: TextStyle(fontWeight: FontWeight.bold))),
-              const DataColumn(label: Text('Amount & Payment', style: TextStyle(fontWeight: FontWeight.bold))),
-              const DataColumn(label: Text('Client', style: TextStyle(fontWeight: FontWeight.bold))),
-              const DataColumn(label: Text('Assigned Rider', style: TextStyle(fontWeight: FontWeight.bold))),
-              const DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.bold))),
-              const DataColumn(label: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold))),
-            ],
-            rows: orders.map((order) {
-              final isUnassigned = order.deliveryAgentId == null || order.deliveryAgentId!.isEmpty;
-              final isDelivered = order.status == 'delivered';
-              final isFailed = order.status == 'cancelled' || order.status == 'failed' || order.status == 'call_back';
-              final isReturned = order.status == 'returned';
-              final isPrepaid = order.paymentType == 'prepaid' || order.isDirectTransfer;
+        child: Column(
+          children: [
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                headingRowColor: WidgetStateProperty.all(isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
+                headingRowHeight: 46,
+                dataRowMaxHeight: 64,
+                columnSpacing: 18,
+                columns: [
+                  const DataColumn(label: Text('Order # & Date', style: TextStyle(fontWeight: FontWeight.bold))),
+                  const DataColumn(label: Text('Customer & Phone', style: TextStyle(fontWeight: FontWeight.bold))),
+                  const DataColumn(label: Text('Destination', style: TextStyle(fontWeight: FontWeight.bold))),
+                  const DataColumn(label: Text('Product & Qty', style: TextStyle(fontWeight: FontWeight.bold))),
+                  const DataColumn(label: Text('Amount & Payment', style: TextStyle(fontWeight: FontWeight.bold))),
+                  const DataColumn(label: Text('Client', style: TextStyle(fontWeight: FontWeight.bold))),
+                  const DataColumn(label: Text('Assigned Rider', style: TextStyle(fontWeight: FontWeight.bold))),
+                  const DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.bold))),
+                  const DataColumn(label: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold))),
+                ],
+                rows: pagedOrders.map((order) {
+                  final isUnassigned = order.deliveryAgentId == null || order.deliveryAgentId!.isEmpty;
+                  final isDelivered = order.status == 'delivered';
+                  final isFailed = order.status == 'cancelled' || order.status == 'failed' || order.status == 'call_back';
+                  final isReturned = order.status == 'returned';
+                  final isPrepaid = order.paymentType == 'prepaid' || order.isDirectTransfer;
 
-              return DataRow(
-                cells: [
-                  // 1. Order # & Date
-                  DataCell(
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          '#${order.orderNumber}',
-                          style: GoogleFonts.jetBrainsMono(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
+                  return DataRow(
+                    cells: [
+                      // 1. Order # & Date
+                      DataCell(
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              '#${order.orderNumber}',
+                              style: GoogleFonts.jetBrainsMono(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
+                            ),
+                            Text(
+                              DateTimeFormatter.formatRelativeTime(order.createdAt),
+                              style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF94A3B8)),
+                            ),
+                          ],
                         ),
-                        Text(
-                          DateTimeFormatter.formatRelativeTime(order.createdAt),
-                          style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF94A3B8)),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // 2. Customer & Phone
-                  DataCell(
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          order.customerName,
-                          style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Text(
-                          order.customerPhone,
-                          style: GoogleFonts.jetBrainsMono(fontSize: 11, color: const Color(0xFF64748B)),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // 3. Destination
-                  DataCell(
-                    Container(
-                      constraints: const BoxConstraints(maxWidth: 180),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            order.deliveryAddress,
-                            style: GoogleFonts.inter(fontSize: 11.5),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Text(
-                            '${order.deliveryCity}, ${order.deliveryState}',
-                            style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
                       ),
-                    ),
-                  ),
 
-                  // 4. Product & Qty
-                  DataCell(
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF8B5CF6).withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            '${order.quantity}x',
-                            style: GoogleFonts.jetBrainsMono(fontSize: 10.5, fontWeight: FontWeight.bold, color: const Color(0xFF7C3AED)),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Container(
-                          constraints: const BoxConstraints(maxWidth: 140),
-                          child: Text(
-                            order.productName,
-                            style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // 5. Amount & Payment
-                  DataCell(
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          CurrencyFormatter.formatNaira(order.totalAmount),
-                          style: GoogleFonts.jetBrainsMono(fontSize: 12.5, fontWeight: FontWeight.bold),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: isPrepaid ? const Color(0xFFE0E7FF) : const Color(0xFFFEF3C7),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            isPrepaid ? 'PREPAID' : 'POD CASH',
-                            style: GoogleFonts.jetBrainsMono(
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
-                              color: isPrepaid ? const Color(0xFF4338CA) : const Color(0xFFB45309),
+                      // 2. Customer & Phone
+                      DataCell(
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              order.customerName,
+                              style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                          ),
+                            Text(
+                              order.customerPhone,
+                              style: GoogleFonts.jetBrainsMono(fontSize: 11, color: const Color(0xFF64748B)),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  ),
+                      ),
 
-                  // 6. Client
-                  DataCell(
-                    Text(
-                      order.clientName.isNotEmpty ? order.clientName : 'Novacare Limited',
-                      style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-
-                  // 7. Assigned Rider
-                  DataCell(
-                    isUnassigned
-                        ? Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF37021).withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              'Unassigned',
-                              style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFFF37021)),
-                            ),
-                          )
-                        : Row(
-                            mainAxisSize: MainAxisSize.min,
+                      // 3. Destination
+                      DataCell(
+                        Container(
+                          constraints: const BoxConstraints(maxWidth: 180),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(Icons.two_wheeler_rounded, size: 14, color: Color(0xFF2563EB)),
-                              const SizedBox(width: 4),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    order.deliveryAgentName ?? 'Assigned Rider',
-                                    style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold),
-                                  ),
-                                  Text(
-                                    order.deliveryAgentCode ?? 'PDA-7000',
-                                    style: GoogleFonts.jetBrainsMono(fontSize: 9.5, color: const Color(0xFF64748B)),
-                                  ),
-                                ],
+                              Text(
+                                order.deliveryAddress,
+                                style: GoogleFonts.inter(fontSize: 11.5),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Text(
+                                '${order.deliveryCity}, ${order.deliveryState}',
+                                style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ],
                           ),
-                  ),
-
-                  // 8. Status Badge
-                  DataCell(
-                    _buildOrderStatusBadge(order),
-                  ),
-
-                  // 9. Actions
-                  DataCell(
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (isUnassigned && !isDelivered && !isFailed && !isReturned) ...[
-                          ElevatedButton.icon(
-                            onPressed: () {
-                              _showAssignRiderModal(context, isDark, order, dcState, ordersState);
-                            },
-                            icon: const Icon(Icons.send_rounded, size: 13, color: Colors.white),
-                            label: const Text('Assign Rider', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFF37021),
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                        ],
-                        IconButton(
-                          icon: const Icon(Icons.visibility_outlined, size: 16, color: Color(0xFF2563EB)),
-                          tooltip: 'View Order Details & Audit Trail',
-                          onPressed: () {
-                            showDialog(
-                              context: context,
-                              builder: (ctx) => DCOrderDetailModal(order: order),
-                            );
-                          },
                         ),
-                      ],
-                    ),
+                      ),
+
+                      // 4. Product & Qty
+                      DataCell(
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF8B5CF6).withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                '${order.quantity}x',
+                                style: GoogleFonts.jetBrainsMono(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF8B5CF6)),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(order.productName, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500)),
+                          ],
+                        ),
+                      ),
+
+                      // 5. Amount & Payment
+                      DataCell(
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              CurrencyFormatter.formatNaira(order.totalAmount),
+                              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF16A34A)),
+                            ),
+                            Text(
+                              isPrepaid ? '⚡ Prepaid' : '💵 Pay on Del',
+                              style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B)),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // 6. Client
+                      DataCell(
+                        Text(order.clientName.isNotEmpty ? order.clientName : 'Novacare', style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B))),
+                      ),
+
+                      // 7. Assigned Rider
+                      DataCell(
+                        Text(
+                          isUnassigned ? 'Unassigned' : (order.deliveryAgentName ?? order.deliveryAgentCode ?? 'Assigned'),
+                          style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w500, color: isUnassigned ? const Color(0xFFEA580C) : const Color(0xFF2563EB)),
+                        ),
+                      ),
+
+                      // 8. Status
+                      DataCell(_buildOrderStatusBadge(order)),
+
+                      // 9. Actions
+                      DataCell(
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (isUnassigned && !isDelivered && !isFailed && !isReturned) ...[
+                              ElevatedButton.icon(
+                                onPressed: () {
+                                  _showAssignRiderModal(context, isDark, order, dcState, ordersState);
+                                },
+                                icon: const Icon(Icons.send_rounded, size: 13, color: Colors.white),
+                                label: const Text('Assign Rider', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFF37021),
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                            ],
+                            IconButton(
+                              icon: const Icon(Icons.visibility_outlined, size: 16, color: Color(0xFF2563EB)),
+                              tooltip: 'View Order Details & Audit Trail',
+                              onPressed: () {
+                                showDialog(
+                                  context: context,
+                                  builder: (ctx) => DCOrderDetailModal(order: order),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  );
+                }).toList(),
+              ),
+            ),
+
+            // Pagination Controls Toolbar
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                border: Border(top: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    totalCount == 0
+                        ? 'No orders found'
+                        : 'Showing ${startIndex + 1} to $endIndex of $totalCount orders',
+                    style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B), fontWeight: FontWeight.w500),
+                  ),
+                  Row(
+                    children: [
+                      Text('Per page:', style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B))),
+                      const SizedBox(width: 6),
+                      DropdownButton<int>(
+                        value: _masterPageSize,
+                        isDense: true,
+                        underline: const SizedBox(),
+                        items: const [
+                          DropdownMenuItem(value: 25, child: Text('25')),
+                          DropdownMenuItem(value: 50, child: Text('50')),
+                          DropdownMenuItem(value: 100, child: Text('100')),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() {
+                              _masterPageSize = val;
+                              _masterCurrentPage = 0;
+                            });
+                          }
+                        },
+                      ),
+                      const SizedBox(width: 14),
+                      IconButton(
+                        icon: const Icon(Icons.chevron_left_rounded, size: 20),
+                        onPressed: currentPage > 0
+                            ? () => setState(() => _masterCurrentPage = currentPage - 1)
+                            : null,
+                      ),
+                      Text(
+                        'Page ${currentPage + 1} of $totalPages',
+                        style: GoogleFonts.jetBrainsMono(fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.chevron_right_rounded, size: 20),
+                        onPressed: currentPage < totalPages - 1
+                            ? () => setState(() => _masterCurrentPage = currentPage + 1)
+                            : null,
+                      ),
+                    ],
                   ),
                 ],
-              );
-            }).toList(),
-          ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1336,20 +1367,18 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
               ),
-              child: Column(
-                children: [
-                  for (int i = 0; i < orders.length; i++) ...[
-                    _buildOrderRow(
-                      context: context,
-                      isDark: isDark,
-                      order: orders[i],
-                      isUnassigned: true,
-                      onAssign: () => _showAssignRiderModal(context, isDark, orders[i], dcState, ordersState),
-                    ),
-                    if (i < orders.length - 1)
-                      Divider(height: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                  ],
-                ],
+              child: ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: orders.length,
+                separatorBuilder: (_, __) => Divider(height: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                itemBuilder: (ctx, i) => _buildOrderRow(
+                  context: context,
+                  isDark: isDark,
+                  order: orders[i],
+                  isUnassigned: true,
+                  onAssign: () => _showAssignRiderModal(context, isDark, orders[i], dcState, ordersState),
+                ),
               ),
             ),
         ],
@@ -1429,20 +1458,18 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
               ),
-              child: Column(
-                children: [
-                  for (int i = 0; i < orders.length; i++) ...[
-                    _buildOrderRow(
-                      context: context,
-                      isDark: isDark,
-                      order: orders[i],
-                      statusPill: 'IN-TRANSIT',
-                      isUnassigned: false,
-                    ),
-                    if (i < orders.length - 1)
-                      Divider(height: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                  ],
-                ],
+              child: ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: orders.length,
+                separatorBuilder: (_, __) => Divider(height: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                itemBuilder: (ctx, i) => _buildOrderRow(
+                  context: context,
+                  isDark: isDark,
+                  order: orders[i],
+                  statusPill: 'IN-TRANSIT',
+                  isUnassigned: false,
+                ),
               ),
             ),
         ],
@@ -1590,7 +1617,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
               children: [
                 TextField(
                   controller: _deliveredSearchController,
-                  onChanged: (val) => ref.read(dcDeliveredSearchProvider.notifier).state = val,
+                  onChanged: (val) => _onDebouncedSearch(() => ref.read(dcDeliveredSearchProvider.notifier).state = val),
                   style: GoogleFonts.inter(fontSize: 13),
                   decoration: InputDecoration(
                     hintText: 'Search by Order #, Customer, Phone, Rider, Ref #, or Address...',
@@ -1669,10 +1696,11 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
                   : 'Delivered orders will appear here once fulfilled by riders.',
             )
           else
-            Column(
-              children: filteredOrders.map((o) {
-                return _buildDeliveredOrderCard(context, isDark, o, stockState);
-              }).toList(),
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: filteredOrders.length,
+              itemBuilder: (ctx, i) => _buildDeliveredOrderCard(context, isDark, filteredOrders[i], stockState),
             ),
         ],
       ),
@@ -1728,19 +1756,17 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
               ),
-              child: Column(
-                children: [
-                  for (int i = 0; i < orders.length; i++) ...[
-                    _buildOrderRow(
-                      context: context,
-                      isDark: isDark,
-                      order: orders[i],
-                      statusPill: 'FAILED (RETURN PENDING)',
-                    ),
-                    if (i < orders.length - 1)
-                      Divider(height: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                  ],
-                ],
+              child: ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: orders.length,
+                separatorBuilder: (_, __) => Divider(height: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                itemBuilder: (ctx, i) => _buildOrderRow(
+                  context: context,
+                  isDark: isDark,
+                  order: orders[i],
+                  statusPill: 'FAILED (RETURN PENDING)',
+                ),
               ),
             ),
         ],

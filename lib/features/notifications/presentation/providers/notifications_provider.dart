@@ -137,7 +137,7 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
       } catch (_) {}
     }
     _heartbeatTimer?.cancel();
-    _heartbeatTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 20), (_) {
       if (!mounted) return;
       final agentId = _getAgentId();
       if (agentId.isNotEmpty) {

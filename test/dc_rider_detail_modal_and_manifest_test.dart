@@ -195,12 +195,14 @@ void main() {
 
       // Search for non-existent driver
       await tester.enterText(find.byType(TextField), 'NonExistentPerson');
+      await tester.pump(const Duration(milliseconds: 300));
       await tester.pumpAndSettle();
 
       expect(find.textContaining('No delivery personnel found matching'), findsOneWidget);
 
       // Clear search
       await tester.enterText(find.byType(TextField), 'Emeka');
+      await tester.pump(const Duration(milliseconds: 300));
       await tester.pumpAndSettle();
 
       expect(find.text('Emeka Rider'), findsOneWidget);

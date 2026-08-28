@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -10,7 +11,7 @@ import '../../domain/entities/dc_fleet_driver.dart';
 final manifestSearchProvider = StateProvider.autoDispose<String>((ref) => '');
 final manifestFilterProvider = StateProvider.autoDispose<String>((ref) => 'all');
 
-class DCDriverManifestTable extends ConsumerWidget {
+class DCDriverManifestTable extends ConsumerStatefulWidget {
   final List<DCFleetDriver> drivers;
   final VoidCallback? onAddDriver;
   final VoidCallback? onExportCSV;
@@ -25,7 +26,31 @@ class DCDriverManifestTable extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DCDriverManifestTable> createState() => _DCDriverManifestTableState();
+}
+
+class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
+  final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounceTimer;
+
+  void _onDebouncedSearch(String val) {
+    _searchDebounceTimer?.cancel();
+    _searchDebounceTimer = Timer(const Duration(milliseconds: 250), () {
+      if (mounted) {
+        ref.read(manifestSearchProvider.notifier).state = val;
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchDebounceTimer?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
@@ -35,7 +60,7 @@ class DCDriverManifestTable extends ConsumerWidget {
     final allOrders = ordersState.orders;
 
     // Filter drivers by search query and model filter
-    final filteredDrivers = drivers.where((d) {
+    final filteredDrivers = widget.drivers.where((d) {
       if (personnelFilter != 'all') {
         if (personnelFilter == 'pda' && !d.isPda) return false;
         if (personnelFilter == 'in_house' && !d.isInHouseRider) return false;
@@ -119,9 +144,9 @@ class DCDriverManifestTable extends ConsumerWidget {
                   spacing: 10,
                   runSpacing: 8,
                   children: [
-                    if (onAddDriver != null)
+                    if (widget.onAddDriver != null)
                       ElevatedButton.icon(
-                        onPressed: onAddDriver,
+                        onPressed: widget.onAddDriver,
                         icon: const Icon(Icons.person_add_rounded, size: 16, color: Colors.white),
                         label: Text('Onboard Agent', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
                         style: ElevatedButton.styleFrom(
@@ -131,9 +156,9 @@ class DCDriverManifestTable extends ConsumerWidget {
                           elevation: 0,
                         ),
                       ),
-                    if (onExportCSV != null)
+                    if (widget.onExportCSV != null)
                       OutlinedButton.icon(
-                        onPressed: onExportCSV,
+                        onPressed: widget.onExportCSV,
                         icon: const Icon(Icons.download_rounded, size: 16, color: Color(0xFF64748B)),
                         label: Text('Export CSV', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: isDark ? Colors.white70 : const Color(0xFF334155))),
                         style: OutlinedButton.styleFrom(
@@ -178,7 +203,8 @@ class DCDriverManifestTable extends ConsumerWidget {
                 final searchField = SizedBox(
                   height: 38,
                   child: TextField(
-                    onChanged: (val) => ref.read(manifestSearchProvider.notifier).state = val,
+                    controller: _searchController,
+                    onChanged: _onDebouncedSearch,
                     style: GoogleFonts.inter(fontSize: 12.5),
                     decoration: InputDecoration(
                       hintText: 'Search riders by name, code, phone, vehicle, or zone...',
@@ -187,7 +213,10 @@ class DCDriverManifestTable extends ConsumerWidget {
                       suffixIcon: searchQuery.isNotEmpty
                           ? IconButton(
                               icon: const Icon(Icons.clear_rounded, size: 16),
-                              onPressed: () => ref.read(manifestSearchProvider.notifier).state = '',
+                              onPressed: () {
+                                _searchController.clear();
+                                ref.read(manifestSearchProvider.notifier).state = '';
+                              },
                             )
                           : null,
                       isDense: true,
@@ -327,7 +356,7 @@ class DCDriverManifestTable extends ConsumerWidget {
                       final int progressPercent = (progressRatio * 100).toInt();
 
                       return DataRow(
-                        onSelectChanged: (_) => onDriverTap?.call(driver),
+                        onSelectChanged: (_) => widget.onDriverTap?.call(driver),
                         cells: [
                           // Agent Code
                           DataCell(
@@ -552,7 +581,7 @@ class DCDriverManifestTable extends ConsumerWidget {
                             IconButton(
                               icon: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF64748B)),
                               tooltip: 'Open Rider Financials & Order Breakdown',
-                              onPressed: () => onDriverTap?.call(driver),
+                              onPressed: () => widget.onDriverTap?.call(driver),
                             ),
                           ),
                         ],
@@ -627,7 +656,7 @@ class DCDriverManifestTable extends ConsumerWidget {
         final int progressPercent = (progressRatio * 100).toInt();
 
         return InkWell(
-          onTap: () => onDriverTap?.call(driver),
+          onTap: () => widget.onDriverTap?.call(driver),
           borderRadius: BorderRadius.circular(14),
           child: Container(
             padding: const EdgeInsets.all(14),

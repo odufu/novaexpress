@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -50,6 +51,16 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
   final TextEditingController _ordersSearchController = TextEditingController();
   final TextEditingController _remittanceSearchController = TextEditingController();
   final TextEditingController _stockSearchController = TextEditingController();
+  Timer? _searchDebounceTimer;
+
+  void _onDebouncedSearch(void Function() action) {
+    _searchDebounceTimer?.cancel();
+    _searchDebounceTimer = Timer(const Duration(milliseconds: 250), () {
+      if (mounted) {
+        action();
+      }
+    });
+  }
 
   // Profile & Terms Edit Controllers
   late TextEditingController _nameController;
@@ -103,6 +114,7 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
 
   @override
   void dispose() {
+    _searchDebounceTimer?.cancel();
     _tabController.dispose();
     _ordersSearchController.dispose();
     _remittanceSearchController.dispose();
@@ -620,7 +632,7 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
             isDark: isDark,
             searchController: _ordersSearchController,
             searchHint: 'Search orders by code, customer, phone, or address...',
-            onSearchChanged: (val) => ref.read(riderOrdersSearchProvider.notifier).state = val,
+            onSearchChanged: (val) => _onDebouncedSearch(() => ref.read(riderOrdersSearchProvider.notifier).state = val),
             filterChips: [
               _buildFilterButton('All ($totalAssigned)', 'all', ordersFilter, (val) => ref.read(riderOrdersFilterProvider.notifier).state = val),
               _buildFilterButton('✅ Delivered ($deliveredCount)', 'delivered', ordersFilter, (val) => ref.read(riderOrdersFilterProvider.notifier).state = val, activeColor: const Color(0xFF10B981)),
@@ -988,7 +1000,7 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
             isDark: isDark,
             searchController: _remittanceSearchController,
             searchHint: 'Search remittances by TX code, order ref, or gateway reference...',
-            onSearchChanged: (val) => ref.read(riderRemittanceSearchProvider.notifier).state = val,
+            onSearchChanged: (val) => _onDebouncedSearch(() => ref.read(riderRemittanceSearchProvider.notifier).state = val),
             filterChips: [
               _buildFilterButton('All (${transactions.length})', 'all', remittanceFilter, (val) => ref.read(riderRemittanceFilterProvider.notifier).state = val),
               _buildFilterButton('⚡ Paystack', 'paystack', remittanceFilter, (val) => ref.read(riderRemittanceFilterProvider.notifier).state = val, activeColor: const Color(0xFF2563EB)),
@@ -1377,7 +1389,7 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
             isDark: isDark,
             searchController: _stockSearchController,
             searchHint: 'Search stock items by SKU, product name, or merchant client...',
-            onSearchChanged: (val) => ref.read(riderStockSearchProvider.notifier).state = val,
+            onSearchChanged: (val) => _onDebouncedSearch(() => ref.read(riderStockSearchProvider.notifier).state = val),
             filterChips: [
               _buildFilterButton('All (${custodyItems.length})', 'all', stockFilter, (val) => ref.read(riderStockFilterProvider.notifier).state = val),
               _buildFilterButton('⚠️ Low Stock ($lowStockCount)', 'low_stock', stockFilter, (val) => ref.read(riderStockFilterProvider.notifier).state = val, activeColor: const Color(0xFFF59E0B)),

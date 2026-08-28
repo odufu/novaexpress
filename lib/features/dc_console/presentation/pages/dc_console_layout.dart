@@ -47,19 +47,6 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
     final authState = ref.watch(authProvider);
     final user = authState.user;
 
-    final pages = [
-      const DCDashboardPage(),
-      const DCOrdersPage(),
-      const DCOrderPaymentMatchingPage(),
-      const DCStockPage(),
-      const DCFinancePage(),
-      const DCTransactionsPage(),
-      const DCReturnsPage(),
-      const DCPayoutsPage(),
-      const DCRidersPage(),
-      const DCSettingsPage(),
-    ];
-
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: isDark ? const Color(0xFF0B1120) : const Color(0xFFF8FAFC),
@@ -77,12 +64,9 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
                 // Top Header Bar
                 _buildTopAppBar(context, isDesktop, isDark, dcState, dcNotifier, notifState.unreadCount, user),
 
-                // Active Tab Screen
+                // Active Tab Screen (Lazily Mounted for High Performance)
                 Expanded(
-                  child: IndexedStack(
-                    index: dcState.activeTabIndex,
-                    children: pages,
-                  ),
+                  child: _buildActiveTab(dcState.activeTabIndex),
                 ),
               ],
             ),
@@ -90,6 +74,33 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
         ],
       ),
     );
+  }
+
+  Widget _buildActiveTab(int activeIndex) {
+    switch (activeIndex) {
+      case 0:
+        return const DCDashboardPage();
+      case 1:
+        return const DCOrdersPage();
+      case 2:
+        return const DCOrderPaymentMatchingPage();
+      case 3:
+        return const DCStockPage();
+      case 4:
+        return const DCFinancePage();
+      case 5:
+        return const DCTransactionsPage();
+      case 6:
+        return const DCReturnsPage();
+      case 7:
+        return const DCPayoutsPage();
+      case 8:
+        return const DCRidersPage();
+      case 9:
+        return const DCSettingsPage();
+      default:
+        return const DCDashboardPage();
+    }
   }
 
   Widget _buildSidebar(
