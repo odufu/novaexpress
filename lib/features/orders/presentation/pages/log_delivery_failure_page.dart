@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/constants/supabase_constants.dart';
 import '../../../../core/providers/navigation_provider.dart';
+import '../../../../core/services/rider_location_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_logo_widget.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -92,11 +93,21 @@ class _LogDeliveryFailurePageState extends ConsumerState<LogDeliveryFailurePage>
       reasonCode = 'cash_shortfall';
     }
 
+    final riderLoc = ref.read(riderLocationProvider);
+    final ordersState = ref.read(ordersProvider);
+    final orderObj = ordersState.orders.where((o) => o.id == widget.orderId || o.orderNumber == widget.orderId).firstOrNull;
+    final gatePin = orderObj?.effectiveGatePin ?? 'GT-${(widget.orderId.length >= 4 ? widget.orderId.substring(widget.orderId.length - 4) : "7182").toUpperCase()}';
+
+    final fullNotes = '$formattedNotes • [Gate PIN: $gatePin • GPS: ${riderLoc.latitude.toStringAsFixed(4)}, ${riderLoc.longitude.toStringAsFixed(4)}]';
+
     await ref.read(ordersProvider.notifier).logDeliveryFailure(
           orderId: widget.orderId,
           agentId: agentId,
           reasonCode: reasonCode,
-          notes: formattedNotes,
+          notes: fullNotes,
+          gatePassCode: gatePin,
+          latitude: riderLoc.latitude,
+          longitude: riderLoc.longitude,
         );
 
     await Future.delayed(const Duration(milliseconds: 600));

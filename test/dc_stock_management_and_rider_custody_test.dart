@@ -126,9 +126,15 @@ void main() {
       mockRepo = MockStockRepository();
       mockStorage = MockLocalStorageService();
       mockStorage.cachedAllocations = [];
+      mockStorage.cachedItems = mockRepo.items;
       stockNotifier = StockNotifier(
         repository: mockRepo,
         storageService: mockStorage,
+      );
+      stockNotifier.state = StockState(
+        isLoading: false,
+        stockItems: mockRepo.items,
+        riderAllocations: [],
       );
     });
 
@@ -312,9 +318,15 @@ void main() {
     testWidgets('DCStockPage displays Master Products tab, KPI cards, and Add Product button', (tester) async {
       await tester.binding.setSurfaceSize(const Size(1200, 900));
 
+      final mockRepo = MockStockRepository();
       final container = ProviderContainer(
         overrides: [
-          stockProvider.overrideWith((ref) => StockNotifier(repository: MockStockRepository(), storageService: MockLocalStorageService())),
+          stockProvider.overrideWith((ref) => StockNotifier(repository: mockRepo, storageService: MockLocalStorageService())
+            ..state = StockState(
+              stockItems: mockRepo.items,
+              riderAllocations: StockNotifier.defaultAllocations,
+              isLoading: false,
+            )),
         ],
       );
 
@@ -377,12 +389,18 @@ void main() {
         itemsInCustody: 4,
       );
 
+      final mockRepo = MockStockRepository();
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
             ordersProvider.overrideWith((ref) => _MockOrdersNotifier(const [])),
             dcConsoleProvider.overrideWith((ref) => _MockDCConsoleNotifier(const [testDriver])),
-            stockProvider.overrideWith((ref) => StockNotifier(repository: MockStockRepository(), storageService: MockLocalStorageService())),
+            stockProvider.overrideWith((ref) => StockNotifier(repository: mockRepo, storageService: MockLocalStorageService())
+              ..state = StockState(
+                stockItems: mockRepo.items,
+                riderAllocations: StockNotifier.defaultAllocations,
+                isLoading: false,
+              )),
           ],
           child: const MaterialApp(
             home: Scaffold(

@@ -317,10 +317,16 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(DCOrdersPage), findsOneWidget);
-      expect(find.textContaining('Unassigned Pool'), findsOneWidget);
-      expect(find.textContaining('In-Transit Routes'), findsOneWidget);
-      expect(find.textContaining('Delivered / POD'), findsOneWidget);
-      expect(find.textContaining('Failed / Rescheduled'), findsOneWidget);
+      expect(find.textContaining('All Orders'), findsWidgets);
+      expect(find.textContaining('Unassigned Pool'), findsWidgets);
+      expect(find.textContaining('In-Transit Routes'), findsWidgets);
+      expect(find.textContaining('Delivered / POD'), findsWidgets);
+      expect(find.textContaining('Failed / Rescheduled'), findsWidgets);
+      expect(find.text('Master Orders Directory'), findsOneWidget);
+
+      // Navigate to Unassigned Pool tab
+      await tester.tap(find.textContaining('Unassigned Pool').first);
+      await tester.pumpAndSettle();
       expect(find.text('Unassigned Orders Pool'), findsOneWidget);
       expect(find.text('TRK-8930 • Senator Kashim Shettima (08091112233)'), findsOneWidget);
     });
@@ -340,9 +346,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(DCStockPage), findsOneWidget);
-      expect(find.text('Warehouse Bins & Batches'), findsOneWidget);
+      expect(find.textContaining('Master Products & Inventory'), findsOneWidget);
+      expect(find.textContaining('DC Warehouse Stock Batches'), findsOneWidget);
       expect(find.text('Bulk Stock Intake (Waybill)'), findsOneWidget);
-      expect(find.text('Rider Picking Queue (REQ)'), findsOneWidget);
+      expect(find.textContaining('Rider Picking Queue'), findsOneWidget);
       expect(find.text('Dispatch Handover Counter'), findsOneWidget);
     });
 

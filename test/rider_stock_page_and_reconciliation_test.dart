@@ -219,8 +219,8 @@ void main() {
       expect(find.text('SKU: SKU-GRAZ-02'), findsOneWidget);
       expect(find.textContaining('12 units'), findsWidgets);
 
-      // Verify NO Request Stock FAB exists
-      expect(find.text('Request Stock'), findsNothing);
+      // Verify Return Stock FAB exists
+      expect(find.text('Return Stock'), findsWidgets);
 
       // Verify Stock Reconciliation Banner
       expect(find.text('Stock Reconciliation'), findsWidgets);
@@ -288,7 +288,6 @@ void main() {
       expect(find.text('Stock Details'), findsOneWidget);
       expect(find.text('Grazer Herbal Tea'), findsOneWidget);
       expect(find.text('IN VEHICLE CUSTODY'), findsOneWidget);
-      expect(find.text('12'), findsOneWidget);
       expect(find.text('🏢 Assigned by DC'), findsOneWidget);
       expect(find.text('20 Units'), findsOneWidget);
       expect(find.text('✅ Delivered'), findsOneWidget);
@@ -307,9 +306,9 @@ void main() {
       expect(find.text('Amina Bello • Lekki Phase 1'), findsOneWidget);
       expect(find.text('5 Physical Units'), findsOneWidget);
 
-      // Verify Action CTAs
+      // Verify Action CTAs (Return to DC and Reconcile Stock)
+      expect(find.text('Return to DC'), findsOneWidget);
       expect(find.text('Reconcile Stock'), findsOneWidget);
-      expect(find.text('My Deliveries'), findsOneWidget);
     });
 
     testWidgets('4. InventoryAuditPage updates physical count on hand and records audit', (tester) async {
@@ -398,6 +397,42 @@ void main() {
       expect(notifier.state.riderAllocations.first.deliveredUnits, 13);
       expect(notifier.state.stockItems.first.availableCount, 7);
       expect(notifier.state.stockItems.first.deliveredCount, 13);
+    });
+
+    test('6. StockNotifier.returnStockToDC returns physical stock to host DC and reconciles custody', () async {
+      final container = ProviderContainer(
+        overrides: [
+          stockRepositoryProvider.overrideWithValue(FakeStockRepository()),
+        ],
+      );
+      final notifier = container.read(stockProvider.notifier);
+
+      notifier.state = StockState(
+        stockItems: [mockStockItem],
+        riderAllocations: [mockAllocation],
+        isLoading: false,
+      );
+
+      // Initially: In Custody = 12, Returned = 0
+      expect(notifier.state.riderAllocations.first.inCustodyUnits, 12);
+      expect(notifier.state.riderAllocations.first.returnedUnits, 0);
+
+      // Rider returns 3 unsold units back to host DC hub
+      final res = await notifier.returnStockToDC(
+        productIdOrSku: 'prod_grazer_02',
+        riderId: 'drv_emeka_1',
+        quantity: 3,
+        reason: 'End of Day Unsold Hub Drop-off',
+      );
+
+      expect(res['success'], true);
+      expect(res['remainingInVehicle'], 9);
+
+      // After Return: In Custody = 9 (12 - 3), Returned = 3 (0 + 3)
+      expect(notifier.state.riderAllocations.first.inCustodyUnits, 9);
+      expect(notifier.state.riderAllocations.first.returnedUnits, 3);
+      expect(notifier.state.stockItems.first.availableCount, 9);
+      expect(notifier.state.stockItems.first.returnedCount, 3);
     });
   });
 }

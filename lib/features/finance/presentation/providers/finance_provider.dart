@@ -1,13 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import '../../../../core/constants/supabase_constants.dart';
+import '../../../../core/services/local_storage_service.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/datasources/finance_remote_datasource.dart';
 import '../../data/repositories/finance_repository_impl.dart';
 import '../../domain/entities/remittance.dart';
 import '../../domain/entities/transaction_item.dart';
 import '../../domain/repositories/finance_repository.dart';
-
-import '../../../../core/services/local_storage_service.dart';
 
 final financeRemoteDataSourceProvider = Provider<FinanceRemoteDataSource>((ref) {
   return FinanceRemoteDataSourceImpl(Supabase.instance.client);
@@ -77,12 +77,23 @@ class FinanceState {
 class FinanceNotifier extends StateNotifier<FinanceState> {
   final FinanceRepository _repository;
   final LocalStorageService _storageService;
+  final Ref? _ref;
 
-  FinanceNotifier(this._repository, [LocalStorageService? storageService])
+  String? _lastAgentId;
+
+  FinanceNotifier(this._repository, {LocalStorageService? storageService, Ref? ref})
       : _storageService = storageService ?? LocalStorageServiceImpl(),
+        _ref = ref,
         super(FinanceState()) {
     _initCache();
-    loadRemittances();
+    if (_ref != null) {
+      _ref.listen<AuthState>(authProvider, (previous, next) {
+        final nextAgentId = next.user?.deliveryAgentId ?? next.user?.id;
+        if (nextAgentId != null && nextAgentId.isNotEmpty && nextAgentId != _lastAgentId) {
+          loadRemittances(nextAgentId);
+        }
+      });
+    }
   }
 
   Future<void> _initCache() async {
@@ -96,14 +107,26 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
     }
   }
 
-  Future<void> fetchRemittances() async {
-    await loadRemittances();
+  Future<void> fetchRemittances([String? agentId]) async {
+    await loadRemittances(agentId);
   }
 
   Future<void> loadRemittances([String? agentId]) async {
+    String? targetAgentId = (agentId != null && agentId.isNotEmpty) ? agentId : _lastAgentId;
+    if ((targetAgentId == null || targetAgentId.isEmpty) && _ref != null) {
+      final user = _ref.read(authProvider).user;
+      final role = user?.role.toLowerCase() ?? '';
+      if (role.contains('rider') || role.contains('agent') || role.contains('driver') || user?.isPda == true) {
+        targetAgentId = user?.deliveryAgentId ?? user?.id;
+      }
+    }
+    if (targetAgentId == null || targetAgentId.isEmpty) {
+      return;
+    }
+    _lastAgentId = targetAgentId;
+
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      final targetAgentId = agentId ?? SupabaseConstants.defaultDeliveryAgentId;
       final remoteItems = await _repository.getAgentRemittances(targetAgentId);
       final txns = await _repository.getRiderTransactions(targetAgentId);
 
@@ -127,10 +150,16 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
 
   Future<void> loadTransactions([String? agentId]) async {
     try {
-      final targetAgentId = agentId ?? SupabaseConstants.defaultDeliveryAgentId;
-      final txns = await _repository.getRiderTransactions(targetAgentId);
-      state = state.copyWith(transactions: txns);
-      _storageService.cacheTransactions(txns);
+      String? targetAgentId = (agentId != null && agentId.isNotEmpty) ? agentId : _lastAgentId;
+      if ((targetAgentId == null || targetAgentId.isEmpty) && _ref != null) {
+        final user = _ref.read(authProvider).user;
+        targetAgentId = user?.deliveryAgentId ?? user?.id;
+      }
+      if (targetAgentId != null && targetAgentId.isNotEmpty) {
+        final txns = await _repository.getRiderTransactions(targetAgentId);
+        state = state.copyWith(transactions: txns);
+        _storageService.cacheTransactions(txns);
+      }
     } catch (_) {}
   }
 
@@ -161,7 +190,7 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
     try {
       final targetAgentId = (agentId != null && agentId.isNotEmpty)
           ? agentId
-          : SupabaseConstants.defaultDeliveryAgentId;
+          : (_lastAgentId != null && _lastAgentId!.isNotEmpty ? _lastAgentId! : SupabaseConstants.defaultDeliveryAgentId);
       final targetCompanyId = (companyId != null && companyId.isNotEmpty)
           ? companyId
           : '11111111-1111-4111-8111-111111111111';
@@ -191,9 +220,15 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
         (r.id.isEmpty || r.id != newRemittance.id)
       ).toList();
 
-      final updatedList = [newRemittance, ...otherRemittances];
-      state = state.copyWith(isLoading: false, remittances: updatedList);
-      _storageService.cacheRemittances(updatedList);
+      final updated = [newRemittance, ...otherRemittances];
+      updated.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+      state = state.copyWith(
+        isLoading: false,
+        remittances: updated,
+      );
+
+      await _storageService.cacheRemittances(updated);
       return true;
     } catch (e) {
       state = state.copyWith(
@@ -256,5 +291,5 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
 final financeProvider = StateNotifierProvider<FinanceNotifier, FinanceState>((ref) {
   final repo = ref.watch(financeRepositoryProvider);
   final storage = ref.watch(localStorageServiceProvider);
-  return FinanceNotifier(repo, storage);
+  return FinanceNotifier(repo, storageService: storage, ref: ref);
 });

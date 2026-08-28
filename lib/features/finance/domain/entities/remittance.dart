@@ -171,17 +171,29 @@ class RemittanceEntity {
       status.toLowerCase() == 'approved' ||
       status.toLowerCase() == 'settled' ||
       status.toLowerCase() == 'completed' ||
-      status.toLowerCase() == 'paid';
+      status.toLowerCase() == 'paid' ||
+      paymentMethod.toLowerCase() == 'paystack' ||
+      paymentMethod.toLowerCase() == 'paystack_transfer' ||
+      referenceNumber.toUpperCase().startsWith('PSTK') ||
+      verifiedAt != null;
 
   bool get isPending =>
-      status.toLowerCase() == 'pending' ||
-      status.toLowerCase() == 'submitted' ||
-      status.toLowerCase() == 'in_review';
+      !isVerified &&
+      (status.toLowerCase() == 'pending' ||
+          status.toLowerCase() == 'submitted' ||
+          status.toLowerCase() == 'in_review');
 
   bool get isRejected => status.toLowerCase() == 'rejected';
   bool get isDisputed => status.toLowerCase() == 'disputed';
 
   String get statusDisplay {
+    if (isRejected) return 'Rejected';
+    if (isDisputed) return 'Disputed';
+    if (isVerified) return 'Verified';
+    return 'Submitted';
+  }
+
+  String get settlementDisplay {
     if (isRejected) return 'Rejected';
     if (isDisputed) return 'Disputed';
     if (isPartialRemittance) return 'Partial Remittance';

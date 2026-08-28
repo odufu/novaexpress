@@ -152,12 +152,15 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
             'discrepancyReason': discrepancyReason,
             'notes': remittanceNotes,
             'associatedOrders': associatedOrders.map((o) => o.toJson()).toList(),
+            'status': isPaystack ? 'verified' : initialStatus,
+            if (isPaystack) 'verifiedAt': DateTime.now().toIso8601String(),
           },
         );
 
         if (edgeResponse.status >= 200 && edgeResponse.status < 300) {
           final data = edgeResponse.data as Map<String, dynamic>;
           final rem = data['remittance'] as Map<String, dynamic>? ?? {};
+          final actualStatus = isPaystack ? 'verified' : (rem['status'] ?? initialStatus);
           return RemittanceModel(
             id: rem['id'] ?? 'rem-${DateTime.now().millisecondsSinceEpoch}',
             referenceNumber: rem['remittance_number'] ?? ref,
@@ -171,7 +174,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
             posFee: posFee,
             paymentMethod: paymentMethod,
             depositReceiptUrl: depositReceiptUrl,
-            status: rem['status'] ?? initialStatus,
+            status: actualStatus,
             expectedAmount: expectedAmount,
             isPartial: actualIsPartial,
             discrepancyAmount: actualDiscrepancy,
@@ -179,6 +182,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
             notes: remittanceNotes,
             associatedOrders: associatedOrders,
             createdAt: DateTime.now(),
+            verifiedAt: isPaystack ? DateTime.now() : null,
           );
         }
       } catch (_) {}
@@ -190,7 +194,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
         'distribution_center_id': '22222222-2222-4222-8222-222222222222',
         'amount': amount,
         'deposit_receipt_url': depositReceiptUrl,
-        'status': initialStatus,
+        'status': isPaystack ? 'verified' : initialStatus,
         'notes': remittanceNotes,
         'payment_method': isPaystack ? 'paystack' : paymentMethod,
         'reference_number': ref,
@@ -206,6 +210,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       };
       if (isPaystack) {
         insertData['verified_at'] = DateTime.now().toIso8601String();
+        insertData['status'] = 'verified';
       }
 
       final response = await supabaseClient

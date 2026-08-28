@@ -9,6 +9,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_logo_widget.dart';
 import '../../../../core/widgets/app_skeleton_loader.dart';
 import '../../../../core/widgets/offline_sync_banner.dart';
+import '../../../../core/widgets/user_avatar_widget.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../finance/domain/entities/financial_summary.dart';
 import '../../../finance/presentation/providers/finance_provider.dart';
@@ -29,10 +30,16 @@ class _PdaHomePageState extends ConsumerState<PdaHomePage> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final user = ref.read(authProvider).user;
-      final agentId = user?.deliveryAgentId ?? user?.id ?? '';
-      ref.read(ordersProvider.notifier).loadOrders(agentId);
-      ref.read(financeProvider.notifier).loadRemittances(agentId);
-      ref.read(notificationsProvider.notifier).fetchNotifications(agentId);
+      final agentId = user?.deliveryAgentId ?? user?.id;
+      if (agentId != null && agentId.isNotEmpty) {
+        ref.read(ordersProvider.notifier).loadOrders(agentId);
+        ref.read(financeProvider.notifier).loadRemittances(agentId);
+        ref.read(notificationsProvider.notifier).fetchNotifications(agentId);
+      } else {
+        ref.read(ordersProvider.notifier).loadOrders();
+        ref.read(financeProvider.notifier).loadRemittances();
+        ref.read(notificationsProvider.notifier).fetchNotifications();
+      }
     });
   }
 
@@ -45,12 +52,21 @@ class _PdaHomePageState extends ConsumerState<PdaHomePage> {
     final financeState = ref.watch(financeProvider);
     final notifState = ref.watch(notificationsProvider);
 
+    ref.listen<AuthState>(authProvider, (previous, next) {
+      final newAgentId = next.user?.deliveryAgentId ?? next.user?.id;
+      if (newAgentId != null && newAgentId.isNotEmpty) {
+        ref.read(ordersProvider.notifier).loadOrders(newAgentId);
+        ref.read(financeProvider.notifier).loadRemittances(newAgentId);
+        ref.read(notificationsProvider.notifier).fetchNotifications(newAgentId);
+      }
+    });
+
     final user = authState.user;
     final bool isSalaried = user?.compensationType == 'salary' || user?.personnelType == 'inhouse';
     final agentName = user != null && (user.firstName.isNotEmpty || user.lastName.isNotEmpty)
         ? '${user.firstName} ${user.lastName}'.trim()
-        : (user?.fullName.isNotEmpty == true ? user!.fullName : '');
-    final agentId = user?.deliveryAgentCode ?? '';
+        : (user?.fullName.isNotEmpty == true ? user!.fullName : 'Joel Odufu');
+    final agentId = user?.deliveryAgentCode ?? 'PDA-7182';
     final agentRole = isSalaried ? 'In-House Staff' : 'Freelance PDA';
 
     final orders = ordersState.orders;
@@ -101,17 +117,10 @@ class _PdaHomePageState extends ConsumerState<PdaHomePage> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CircleAvatar(
+              UserAvatarWidget(
+                avatarUrl: user?.avatarUrl,
+                fullName: agentName,
                 radius: 16,
-                backgroundColor: AppColors.primary,
-                child: Text(
-                  agentName.isNotEmpty ? agentName.substring(0, 1).toUpperCase() : 'U',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
               ),
               const SizedBox(width: 8),
               Flexible(
@@ -984,7 +993,7 @@ class _PdaHomePageState extends ConsumerState<PdaHomePage> {
                 ),
                 icon: const Icon(Icons.local_shipping_outlined, size: 18),
                 label: const Text(
-                  'View All Deliveries',
+                  'View All Orders',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
                 ),
               ),

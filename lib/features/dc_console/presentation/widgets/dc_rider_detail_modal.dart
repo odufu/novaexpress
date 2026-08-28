@@ -1,9 +1,9 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/helpers/formatters.dart';
+import '../../../../core/widgets/user_avatar_widget.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
 import '../../../stock/domain/entities/rider_stock_allocation.dart';
@@ -357,38 +357,12 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
     Color? backgroundColor,
     Color? textColor,
   }) {
-    final avatar = driver.avatarUrl.trim();
-    final hasNetworkAvatar = avatar.isNotEmpty && (avatar.startsWith('http://') || avatar.startsWith('https://'));
-    final hasDataAvatar = avatar.isNotEmpty && avatar.startsWith('data:image');
-
-    ImageProvider? imageProvider;
-    if (hasNetworkAvatar) {
-      imageProvider = NetworkImage(avatar);
-    } else if (hasDataAvatar) {
-      try {
-        final commaIdx = avatar.indexOf(',');
-        if (commaIdx != -1) {
-          final bytes = base64Decode(avatar.substring(commaIdx + 1));
-          imageProvider = MemoryImage(bytes);
-        }
-      } catch (_) {}
-    }
-
-    return CircleAvatar(
+    return UserAvatarWidget(
+      avatarUrl: driver.avatarUrl,
+      fullName: driver.name,
       radius: radius,
       backgroundColor: backgroundColor ?? const Color(0xFF2563EB).withValues(alpha: 0.15),
-      backgroundImage: imageProvider,
-      onBackgroundImageError: imageProvider != null ? (_, __) {} : null,
-      child: imageProvider == null
-          ? Text(
-              driver.name.isNotEmpty ? driver.name.substring(0, 1).toUpperCase() : 'R',
-              style: GoogleFonts.inter(
-                fontSize: radius * 0.85,
-                fontWeight: FontWeight.w900,
-                color: textColor ?? const Color(0xFF2563EB),
-              ),
-            )
-          : null,
+      textColor: textColor ?? const Color(0xFF2563EB),
     );
   }
 
@@ -876,12 +850,14 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
     final cashTransportRetained = deliveredCashOrders.length * driver.transportAllowance;
     final cashEarningsRetained = cashCommissionRetained + cashTransportRetained;
 
-    // Retained POS / Transfer fees factoring active DC policy (Flat vs Dynamic)
+    // Retained POS / Transfer fees factoring active DC policy (Flat vs Dynamic applied per remittance transaction)
     final totalTransferFeesRetained = settings.isPosFeeReimbursable
-        ? deliveredCashOrders.fold<double>(
-            0.0,
-            (acc, o) => acc + settings.computePosFee(o.totalAmount),
-          )
+        ? transactions
+            .where((t) => t.isRemittance && t.isVerified)
+            .fold<double>(
+              0.0,
+              (acc, t) => acc + (t.transactionFee > 0 ? t.transactionFee : settings.computePosFee(t.amount)),
+            )
         : 0.0;
 
     // Total Cash POD remittances completed & verified into company Paystack account
@@ -2766,6 +2742,70 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
                     const SizedBox(width: 8),
                     Text('Personal & Contact Information', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w900)),
                   ],
+                ),
+                const SizedBox(height: 16),
+
+                // Rider Uploaded Profile Picture Display
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: borderColor),
+                  ),
+                  child: Row(
+                    children: [
+                      UserAvatarWidget(
+                        avatarUrl: driver.avatarUrl,
+                        fullName: driver.name,
+                        radius: 28,
+                        showBorder: true,
+                        borderColor: const Color(0xFF2563EB),
+                        borderWidth: 2,
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  driver.avatarUrl.trim().isNotEmpty
+                                      ? Icons.verified_user_rounded
+                                      : Icons.account_circle_outlined,
+                                  size: 16,
+                                  color: driver.avatarUrl.trim().isNotEmpty
+                                      ? const Color(0xFF10B981)
+                                      : const Color(0xFF64748B),
+                                ),
+                                const SizedBox(width: 5),
+                                Text(
+                                  driver.avatarUrl.trim().isNotEmpty
+                                      ? 'Rider Profile Photo (Active)'
+                                      : 'No Profile Photo Uploaded',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: driver.avatarUrl.trim().isNotEmpty
+                                        ? const Color(0xFF10B981)
+                                        : const Color(0xFF64748B),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              driver.avatarUrl.trim().isNotEmpty
+                                  ? 'Synced from rider mobile profile image.'
+                                  : 'System is currently displaying initials fallback. Rider can upload a photo via his Profile.',
+                              style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 16),
                 LayoutBuilder(

@@ -2,21 +2,28 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/helpers/formatters.dart';
-import '../../../../core/helpers/geo_proximity_calculator.dart';
 import '../../../../core/widgets/app_skeleton_loader.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
-import '../../../stock/domain/entities/stock_item.dart';
 import '../../../stock/presentation/providers/stock_provider.dart';
-import '../../domain/entities/dc_fleet_driver.dart';
 import '../providers/dc_console_provider.dart';
 import '../widgets/dc_create_order_modal.dart';
 import '../widgets/dc_order_detail_modal.dart';
+import '../widgets/dc_csv_order_import_modal.dart';
+import '../widgets/dc_assign_order_modal.dart';
 
 final dcDeliveredSearchProvider = StateProvider.autoDispose<String>((ref) => '');
 final dcDeliveredFilterProvider = StateProvider.autoDispose<String>((ref) => 'all');
 final dcOrdersDateFilterProvider = StateProvider.autoDispose<String>((ref) => 'all_time');
 final dcOrdersCustomDateRangeProvider = StateProvider.autoDispose<DateTimeRange?>((ref) => null);
+
+// Master Orders Directory Multi-Attribute Filters
+final dcMasterSearchProvider = StateProvider.autoDispose<String>((ref) => '');
+final dcMasterStatusFilterProvider = StateProvider.autoDispose<String>((ref) => 'all');
+final dcMasterRiderFilterProvider = StateProvider.autoDispose<String>((ref) => 'all');
+final dcMasterProductFilterProvider = StateProvider.autoDispose<String>((ref) => 'all');
+final dcMasterClientFilterProvider = StateProvider.autoDispose<String>((ref) => 'all');
+final dcMasterViewModeProvider = StateProvider.autoDispose<String>((ref) => 'table');
 
 class DCOrdersPage extends ConsumerStatefulWidget {
   const DCOrdersPage({super.key});
@@ -28,11 +35,12 @@ class DCOrdersPage extends ConsumerStatefulWidget {
 class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final TextEditingController _deliveredSearchController = TextEditingController();
+  final TextEditingController _masterSearchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(ordersProvider.notifier).loadDcOrders('22222222-2222-4222-8222-222222222222');
     });
@@ -42,6 +50,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
   void dispose() {
     _tabController.dispose();
     _deliveredSearchController.dispose();
+    _masterSearchController.dispose();
     super.dispose();
   }
 
@@ -102,10 +111,12 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
     final deliveredOrders = dateFilteredOrders.where((o) => o.status == 'delivered').toList();
     final failedOrders = dateFilteredOrders.where((o) => o.status == 'cancelled' || o.status == 'failed' || o.status == 'call_back').toList();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Sub-Tab Navigation Bar
+    return Material(
+      color: Colors.transparent,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+        // Sub-Tab Navigation Bar (5 Business Tabs)
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           decoration: BoxDecoration(
@@ -122,6 +133,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
             labelStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
             unselectedLabelStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500),
             tabs: [
+              Tab(icon: const Icon(Icons.list_alt_rounded, size: 18), text: 'All Orders (${dateFilteredOrders.length})'),
               Tab(icon: const Icon(Icons.outbox_rounded, size: 18), text: 'Unassigned Pool (${unassignedOrders.length})'),
               Tab(icon: const Icon(Icons.local_shipping_rounded, size: 18), text: 'In-Transit Routes (${inTransitOrders.length})'),
               Tab(icon: const Icon(Icons.check_circle_outline_rounded, size: 18), text: 'Delivered / POD (${deliveredOrders.length})'),
@@ -138,6 +150,9 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
           child: TabBarView(
             controller: _tabController,
             children: [
+              // 0. Master All Orders Directory (with Multi-attribute Filters & Fulfillment Tracker)
+              _buildAllOrdersView(isDark, dateFilteredOrders, dcState, ordersState, unassignedOrders.length, inTransitOrders.length, deliveredOrders.length, failedOrders.length),
+
               // 1. Unassigned Orders Pool
               _buildUnassignedPoolView(isDark, unassignedOrders, dcState, ordersState),
 
@@ -147,12 +162,13 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
               // 3. Delivered & POD Verified
               _buildDeliveredView(isDark, deliveredOrders),
 
-              // 4. Failed / Rescheduled Deliveries
-              _buildFailedView(isDark, failedOrders),
-            ],
+                // 4. Failed / Rescheduled Deliveries
+                _buildFailedView(isDark, failedOrders),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -261,6 +277,951 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
     );
   }
 
+  // ==========================================
+  // 0. MASTER ALL ORDERS DIRECTORY VIEW
+  // ==========================================
+
+  Widget _buildAllOrdersView(
+    bool isDark,
+    List<OrderEntity> allOrders,
+    DCConsoleState dcState,
+    OrdersState ordersState,
+    int unassignedCount,
+    int inTransitCount,
+    int deliveredCount,
+    int failedCount,
+  ) {
+    final masterSearch = ref.watch(dcMasterSearchProvider).trim().toLowerCase();
+    final masterStatus = ref.watch(dcMasterStatusFilterProvider);
+    final masterRider = ref.watch(dcMasterRiderFilterProvider);
+    final masterProduct = ref.watch(dcMasterProductFilterProvider);
+    final masterClient = ref.watch(dcMasterClientFilterProvider);
+    final viewMode = ref.watch(dcMasterViewModeProvider);
+
+    // Apply multi-attribute filters
+    final filtered = allOrders.where((o) {
+      // 1. Status Filter
+      if (masterStatus != 'all') {
+        if (masterStatus == 'unassigned') {
+          final isUnassigned = o.deliveryAgentId == null || o.deliveryAgentId!.isEmpty;
+          if (!isUnassigned || o.status == 'delivered' || o.status == 'cancelled' || o.status == 'failed') return false;
+        } else if (masterStatus == 'in_transit') {
+          final isAssigned = o.deliveryAgentId != null && o.deliveryAgentId!.isNotEmpty;
+          if (!isAssigned || o.status == 'delivered' || o.status == 'cancelled' || o.status == 'failed') return false;
+        } else if (masterStatus == 'delivered') {
+          if (o.status != 'delivered') return false;
+        } else if (masterStatus == 'failed') {
+          if (o.status != 'cancelled' && o.status != 'failed' && o.status != 'call_back') return false;
+        } else if (masterStatus == 'returned') {
+          if (o.status != 'returned') return false;
+        }
+      }
+
+      // 2. Rider Filter
+      if (masterRider != 'all') {
+        if (masterRider == 'unassigned') {
+          if (o.deliveryAgentId != null && o.deliveryAgentId!.isNotEmpty) return false;
+        } else {
+          final matchesId = o.deliveryAgentId == masterRider;
+          final matchesCode = o.deliveryAgentCode == masterRider;
+          final matchesName = o.deliveryAgentName != null && o.deliveryAgentName!.toLowerCase() == masterRider.toLowerCase();
+          if (!matchesId && !matchesCode && !matchesName) return false;
+        }
+      }
+
+      // 3. Product Filter
+      if (masterProduct != 'all') {
+        if (!o.productName.toLowerCase().contains(masterProduct.toLowerCase()) &&
+            !masterProduct.toLowerCase().contains(o.productName.toLowerCase())) {
+          return false;
+        }
+      }
+
+      // 4. Client Filter
+      if (masterClient != 'all') {
+        if (!o.clientName.toLowerCase().contains(masterClient.toLowerCase()) &&
+            !masterClient.toLowerCase().contains(o.clientName.toLowerCase())) {
+          return false;
+        }
+      }
+
+      // 5. Search Query Filter
+      if (masterSearch.isNotEmpty) {
+        final matchOrderNo = o.orderNumber.toLowerCase().contains(masterSearch);
+        final matchCust = o.customerName.toLowerCase().contains(masterSearch);
+        final matchPhone = o.customerPhone.toLowerCase().contains(masterSearch);
+        final matchAddress = o.deliveryAddress.toLowerCase().contains(masterSearch);
+        final matchCity = o.deliveryCity.toLowerCase().contains(masterSearch);
+        final matchState = o.deliveryState.toLowerCase().contains(masterSearch);
+        final matchProd = o.productName.toLowerCase().contains(masterSearch);
+        final matchClient = o.clientName.toLowerCase().contains(masterSearch);
+        final matchRiderName = o.deliveryAgentName != null && o.deliveryAgentName!.toLowerCase().contains(masterSearch);
+        final matchRiderCode = o.deliveryAgentCode != null && o.deliveryAgentCode!.toLowerCase().contains(masterSearch);
+
+        if (!matchOrderNo && !matchCust && !matchPhone && !matchAddress && !matchCity && !matchState && !matchProd && !matchClient && !matchRiderName && !matchRiderCode) {
+          return false;
+        }
+      }
+
+      return true;
+    }).toList();
+
+    final double totalValuation = filtered.fold(0.0, (acc, o) => acc + o.totalAmount);
+    final double deliveredRevenue = filtered.where((o) => o.status == 'delivered').fold(0.0, (acc, o) => acc + o.totalAmount);
+
+    // Extract dynamic dropdown items
+    final uniqueProducts = allOrders.map((o) => o.productName).where((p) => p.isNotEmpty).toSet().toList()..sort();
+    final uniqueClients = allOrders.map((o) => o.clientName).where((c) => c.isNotEmpty).toSet().toList()..sort();
+    final fleetDrivers = dcState.drivers;
+
+    final bool hasActiveFilters = masterSearch.isNotEmpty ||
+        masterStatus != 'all' ||
+        masterRider != 'all' ||
+        masterProduct != 'all' ||
+        masterClient != 'all';
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. Header Toolbar with Action Buttons
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isMobile = constraints.maxWidth < 750;
+              final headerCol = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 10,
+                    runSpacing: 4,
+                    children: [
+                      Text(
+                        'Master Orders Directory',
+                        style: GoogleFonts.inter(fontSize: isMobile ? 18 : 22, fontWeight: FontWeight.bold),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2563EB).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '${filtered.length} of ${allOrders.length} Orders',
+                          style: GoogleFonts.jetBrainsMono(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF2563EB),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Complete overview of all DC shipments including unassigned pool, in-transit routes, and completed deliveries',
+                    style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                  ),
+                ],
+              );
+
+              final actionsWrap = Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (ctx) => const DCCreateOrderModal(),
+                      );
+                    },
+                    icon: const Icon(Icons.add_rounded, size: 16, color: Colors.white),
+                    label: const Text('Create New Order', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFF37021),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (ctx) => const DCCsvOrderImportModal(),
+                      );
+                    },
+                    icon: const Icon(Icons.upload_file_rounded, size: 16, color: Colors.white),
+                    label: const Text('Import CSV', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF16A34A),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  if (unassignedCount > 0)
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        final unassignedList = allOrders.where((o) => (o.deliveryAgentId == null || o.deliveryAgentId!.isEmpty) && o.status != 'delivered').toList();
+                        _autoAssignPool(unassignedList, dcState, ordersState);
+                      },
+                      icon: const Icon(Icons.auto_awesome, size: 16, color: Colors.white),
+                      label: const Text('Auto-Assign Pool', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2563EB),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                ],
+              );
+
+              if (isMobile) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    headerCol,
+                    const SizedBox(height: 12),
+                    actionsWrap,
+                  ],
+                );
+              }
+
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(child: headerCol),
+                  const SizedBox(width: 14),
+                  actionsWrap,
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+
+          // 2. Summary KPI Metric Cards (5 Cards)
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 950;
+              final cardWidth = isNarrow ? (constraints.maxWidth - 12) / 2 : (constraints.maxWidth - 48) / 5;
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  _buildDeliveredKpiCard(
+                    isDark,
+                    title: 'Total Filtered Orders',
+                    value: '${filtered.length} Orders',
+                    subtitle: 'Gross: ${CurrencyFormatter.formatNaira(totalValuation)}',
+                    icon: Icons.inventory_2_rounded,
+                    iconColor: const Color(0xFF2563EB),
+                    width: cardWidth,
+                  ),
+                  _buildDeliveredKpiCard(
+                    isDark,
+                    title: '📦 Unassigned Pool',
+                    value: '$unassignedCount Pending',
+                    subtitle: 'Awaiting rider dispatch',
+                    icon: Icons.outbox_rounded,
+                    iconColor: const Color(0xFFF37021),
+                    width: cardWidth,
+                  ),
+                  _buildDeliveredKpiCard(
+                    isDark,
+                    title: '🚴 In-Transit Live',
+                    value: '$inTransitCount Active',
+                    subtitle: 'Out on delivery routes',
+                    icon: Icons.local_shipping_rounded,
+                    iconColor: const Color(0xFF0284C7),
+                    width: cardWidth,
+                  ),
+                  _buildDeliveredKpiCard(
+                    isDark,
+                    title: '🟢 Fulfilled / POD',
+                    value: '$deliveredCount Delivered',
+                    subtitle: 'Rev: ${CurrencyFormatter.formatNaira(deliveredRevenue)}',
+                    icon: Icons.check_circle_rounded,
+                    iconColor: const Color(0xFF16A34A),
+                    width: cardWidth,
+                  ),
+                  _buildDeliveredKpiCard(
+                    isDark,
+                    title: '⚠️ Failed / Returns',
+                    value: '$failedCount Issues',
+                    subtitle: 'Call backs & returns',
+                    icon: Icons.warning_amber_rounded,
+                    iconColor: const Color(0xFFDC2626),
+                    width: cardWidth,
+                  ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+
+          // 3. Multi-Attribute Filter Toolbar Card
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E293B) : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Top Row: Search & View Mode Switcher
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        key: const Key('dc_master_search_input'),
+                        controller: _masterSearchController,
+                        onChanged: (val) => ref.read(dcMasterSearchProvider.notifier).state = val,
+                        decoration: InputDecoration(
+                          hintText: 'Search by Order #, Customer Name, Phone, Address, Product, Client, or Rider...',
+                          hintStyle: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)),
+                          prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Color(0xFF64748B)),
+                          suffixIcon: masterSearch.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear_rounded, size: 16),
+                                  onPressed: () {
+                                    _masterSearchController.clear();
+                                    ref.read(dcMasterSearchProvider.notifier).state = '';
+                                  },
+                                )
+                              : null,
+                          filled: true,
+                          fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                          contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+
+                    // View Mode Switcher Toggle
+                    Container(
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                      ),
+                      child: Row(
+                        children: [
+                          IconButton(
+                            icon: Icon(
+                              Icons.table_rows_rounded,
+                              size: 18,
+                              color: viewMode == 'table' ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+                            ),
+                            tooltip: 'Data Table View',
+                            onPressed: () => ref.read(dcMasterViewModeProvider.notifier).state = 'table',
+                          ),
+                          IconButton(
+                            icon: Icon(
+                              Icons.grid_view_rounded,
+                              size: 18,
+                              color: viewMode == 'grid' ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+                            ),
+                            tooltip: 'Cards Grid View',
+                            onPressed: () => ref.read(dcMasterViewModeProvider.notifier).state = 'grid',
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Bottom Row: Dropdown Filters (Status, Rider, Product, Client, Reset)
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    // 1. Status Filter Dropdown
+                    _buildFilterDropdown(
+                      label: 'Status',
+                      icon: Icons.filter_alt_outlined,
+                      value: masterStatus,
+                      isDark: isDark,
+                      items: const [
+                        DropdownMenuItem(value: 'all', child: Text('All Statuses')),
+                        DropdownMenuItem(value: 'unassigned', child: Text('📦 Unassigned (Pending)')),
+                        DropdownMenuItem(value: 'in_transit', child: Text('🚴 In Transit (Assigned)')),
+                        DropdownMenuItem(value: 'delivered', child: Text('🟢 Delivered (Fulfilled)')),
+                        DropdownMenuItem(value: 'failed', child: Text('⚠️ Failed / Call Back')),
+                        DropdownMenuItem(value: 'returned', child: Text('↩️ Returned to DC')),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) ref.read(dcMasterStatusFilterProvider.notifier).state = val;
+                      },
+                    ),
+
+                    // 2. Rider Filter Dropdown
+                    _buildFilterDropdown(
+                      label: 'Rider',
+                      icon: Icons.two_wheeler_rounded,
+                      value: masterRider,
+                      isDark: isDark,
+                      items: [
+                        const DropdownMenuItem(value: 'all', child: Text('All Riders')),
+                        const DropdownMenuItem(value: 'unassigned', child: Text('📦 Unassigned Only')),
+                        ...fleetDrivers.map((d) {
+                          return DropdownMenuItem(
+                            value: d.id,
+                            child: Text('🚴 ${d.name} (${d.driverCode})'),
+                          );
+                        }),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) ref.read(dcMasterRiderFilterProvider.notifier).state = val;
+                      },
+                    ),
+
+                    // 3. Product Filter Dropdown
+                    _buildFilterDropdown(
+                      label: 'Product',
+                      icon: Icons.inventory_2_outlined,
+                      value: masterProduct,
+                      isDark: isDark,
+                      items: [
+                        const DropdownMenuItem(value: 'all', child: Text('All Products')),
+                        ...uniqueProducts.map((p) {
+                          return DropdownMenuItem(
+                            value: p,
+                            child: Text(p),
+                          );
+                        }),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) ref.read(dcMasterProductFilterProvider.notifier).state = val;
+                      },
+                    ),
+
+                    // 4. Client Filter Dropdown
+                    _buildFilterDropdown(
+                      label: 'Client',
+                      icon: Icons.business_rounded,
+                      value: masterClient,
+                      isDark: isDark,
+                      items: [
+                        const DropdownMenuItem(value: 'all', child: Text('All Clients')),
+                        ...uniqueClients.map((c) {
+                          return DropdownMenuItem(
+                            value: c,
+                            child: Text(c),
+                          );
+                        }),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) ref.read(dcMasterClientFilterProvider.notifier).state = val;
+                      },
+                    ),
+
+                    // Reset Filters Button
+                    if (hasActiveFilters)
+                      TextButton.icon(
+                        onPressed: () {
+                          _masterSearchController.clear();
+                          ref.read(dcMasterSearchProvider.notifier).state = '';
+                          ref.read(dcMasterStatusFilterProvider.notifier).state = 'all';
+                          ref.read(dcMasterRiderFilterProvider.notifier).state = 'all';
+                          ref.read(dcMasterProductFilterProvider.notifier).state = 'all';
+                          ref.read(dcMasterClientFilterProvider.notifier).state = 'all';
+                        },
+                        icon: const Icon(Icons.restart_alt_rounded, size: 16, color: Color(0xFFEF4444)),
+                        label: const Text('Reset Filters', style: TextStyle(fontSize: 12, color: Color(0xFFEF4444), fontWeight: FontWeight.bold)),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // 4. Orders Directory View (Table or Grid)
+          if (ordersState.isLoading)
+            Column(
+              children: List.generate(4, (index) => const OrderCardSkeleton()),
+            )
+          else if (filtered.isEmpty)
+            _buildEmptyState(
+              isDark,
+              icon: Icons.search_off_rounded,
+              title: 'No Orders Match Your Filters',
+              subtitle: 'Try adjusting your search query, status, rider, product, or date filters to find matching shipments.',
+            )
+          else if (viewMode == 'table')
+            _buildMasterOrdersTable(context, isDark, filtered, dcState, ordersState)
+          else
+            _buildMasterOrdersGrid(context, isDark, filtered, dcState, ordersState),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterDropdown({
+    required String label,
+    required IconData icon,
+    required String value,
+    required bool isDark,
+    required List<DropdownMenuItem<String>> items,
+    required ValueChanged<String?> onChanged,
+  }) {
+    // Ensure value exists in items
+    final bool valueExists = items.any((item) => item.value == value);
+    final safeValue = valueExists ? value : 'all';
+
+    return Container(
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: safeValue != 'all' ? const Color(0xFF2563EB) : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: safeValue != 'all' ? const Color(0xFF2563EB) : const Color(0xFF64748B)),
+          const SizedBox(width: 6),
+          DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: safeValue,
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                fontWeight: safeValue != 'all' ? FontWeight.bold : FontWeight.w500,
+                color: safeValue != 'all' ? const Color(0xFF2563EB) : (isDark ? Colors.white : const Color(0xFF0F172A)),
+              ),
+              dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+              items: items,
+              onChanged: onChanged,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMasterOrdersTable(
+    BuildContext context,
+    bool isDark,
+    List<OrderEntity> orders,
+    DCConsoleState dcState,
+    OrdersState ordersState,
+  ) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: DataTable(
+            headingRowColor: WidgetStateProperty.all(isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
+            headingRowHeight: 46,
+            dataRowMaxHeight: 64,
+            columnSpacing: 18,
+            columns: [
+              const DataColumn(label: Text('Order # & Date', style: TextStyle(fontWeight: FontWeight.bold))),
+              const DataColumn(label: Text('Customer & Phone', style: TextStyle(fontWeight: FontWeight.bold))),
+              const DataColumn(label: Text('Destination', style: TextStyle(fontWeight: FontWeight.bold))),
+              const DataColumn(label: Text('Product & Qty', style: TextStyle(fontWeight: FontWeight.bold))),
+              const DataColumn(label: Text('Amount & Payment', style: TextStyle(fontWeight: FontWeight.bold))),
+              const DataColumn(label: Text('Client', style: TextStyle(fontWeight: FontWeight.bold))),
+              const DataColumn(label: Text('Assigned Rider', style: TextStyle(fontWeight: FontWeight.bold))),
+              const DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.bold))),
+              const DataColumn(label: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold))),
+            ],
+            rows: orders.map((order) {
+              final isUnassigned = order.deliveryAgentId == null || order.deliveryAgentId!.isEmpty;
+              final isDelivered = order.status == 'delivered';
+              final isFailed = order.status == 'cancelled' || order.status == 'failed' || order.status == 'call_back';
+              final isReturned = order.status == 'returned';
+              final isPrepaid = order.paymentType == 'prepaid' || order.isDirectTransfer;
+
+              return DataRow(
+                cells: [
+                  // 1. Order # & Date
+                  DataCell(
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          '#${order.orderNumber}',
+                          style: GoogleFonts.jetBrainsMono(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
+                        ),
+                        Text(
+                          DateTimeFormatter.formatRelativeTime(order.createdAt),
+                          style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF94A3B8)),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // 2. Customer & Phone
+                  DataCell(
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          order.customerName,
+                          style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          order.customerPhone,
+                          style: GoogleFonts.jetBrainsMono(fontSize: 11, color: const Color(0xFF64748B)),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // 3. Destination
+                  DataCell(
+                    Container(
+                      constraints: const BoxConstraints(maxWidth: 180),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            order.deliveryAddress,
+                            style: GoogleFonts.inter(fontSize: 11.5),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            '${order.deliveryCity}, ${order.deliveryState}',
+                            style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // 4. Product & Qty
+                  DataCell(
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF8B5CF6).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '${order.quantity}x',
+                            style: GoogleFonts.jetBrainsMono(fontSize: 10.5, fontWeight: FontWeight.bold, color: const Color(0xFF7C3AED)),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          constraints: const BoxConstraints(maxWidth: 140),
+                          child: Text(
+                            order.productName,
+                            style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // 5. Amount & Payment
+                  DataCell(
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          CurrencyFormatter.formatNaira(order.totalAmount),
+                          style: GoogleFonts.jetBrainsMono(fontSize: 12.5, fontWeight: FontWeight.bold),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: isPrepaid ? const Color(0xFFE0E7FF) : const Color(0xFFFEF3C7),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            isPrepaid ? 'PREPAID' : 'POD CASH',
+                            style: GoogleFonts.jetBrainsMono(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: isPrepaid ? const Color(0xFF4338CA) : const Color(0xFFB45309),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // 6. Client
+                  DataCell(
+                    Text(
+                      order.clientName.isNotEmpty ? order.clientName : 'Novacare Limited',
+                      style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+
+                  // 7. Assigned Rider
+                  DataCell(
+                    isUnassigned
+                        ? Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF37021).withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              'Unassigned',
+                              style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFFF37021)),
+                            ),
+                          )
+                        : Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.two_wheeler_rounded, size: 14, color: Color(0xFF2563EB)),
+                              const SizedBox(width: 4),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    order.deliveryAgentName ?? 'Assigned Rider',
+                                    style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold),
+                                  ),
+                                  Text(
+                                    order.deliveryAgentCode ?? 'PDA-7000',
+                                    style: GoogleFonts.jetBrainsMono(fontSize: 9.5, color: const Color(0xFF64748B)),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                  ),
+
+                  // 8. Status Badge
+                  DataCell(
+                    _buildOrderStatusBadge(order),
+                  ),
+
+                  // 9. Actions
+                  DataCell(
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isUnassigned && !isDelivered && !isFailed && !isReturned) ...[
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              _showAssignRiderModal(context, isDark, order, dcState, ordersState);
+                            },
+                            icon: const Icon(Icons.send_rounded, size: 13, color: Colors.white),
+                            label: const Text('Assign Rider', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFF37021),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                        ],
+                        IconButton(
+                          icon: const Icon(Icons.visibility_outlined, size: 16, color: Color(0xFF2563EB)),
+                          tooltip: 'View Order Details & Audit Trail',
+                          onPressed: () {
+                            showDialog(
+                              context: context,
+                              builder: (ctx) => DCOrderDetailModal(order: order),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            }).toList(),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMasterOrdersGrid(
+    BuildContext context,
+    bool isDark,
+    List<OrderEntity> orders,
+    DCConsoleState dcState,
+    OrdersState ordersState,
+  ) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final crossAxisCount = constraints.maxWidth < 650 ? 1 : (constraints.maxWidth < 1100 ? 2 : 3);
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            childAspectRatio: 1.6,
+            crossAxisSpacing: 14,
+            mainAxisSpacing: 14,
+          ),
+          itemCount: orders.length,
+          itemBuilder: (ctx, idx) {
+            final order = orders[idx];
+            final isUnassigned = order.deliveryAgentId == null || order.deliveryAgentId!.isEmpty;
+            final isDelivered = order.status == 'delivered';
+            final isFailed = order.status == 'cancelled' || order.status == 'failed' || order.status == 'call_back';
+
+            return Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('#${order.orderNumber}', style: GoogleFonts.jetBrainsMono(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB))),
+                      _buildOrderStatusBadge(order),
+                    ],
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(order.customerName, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold)),
+                      Text('${order.customerPhone} • ${order.deliveryAddress}, ${order.deliveryCity}', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: 4),
+                      Text('${order.quantity}x ${order.productName} • ${CurrencyFormatter.formatNaira(order.totalAmount)}', style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w600, color: const Color(0xFF16A34A))),
+                    ],
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        isUnassigned ? 'Unassigned' : '🚴 ${order.deliveryAgentName ?? "Rider"}',
+                        style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: isUnassigned ? const Color(0xFFF37021) : const Color(0xFF2563EB)),
+                      ),
+                      Row(
+                        children: [
+                          if (isUnassigned && !isDelivered && !isFailed)
+                            ElevatedButton(
+                              onPressed: () => _showAssignRiderModal(context, isDark, order, dcState, ordersState),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFF37021),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                              ),
+                              child: const Text('Assign', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                            ),
+                          const SizedBox(width: 6),
+                          OutlinedButton(
+                            onPressed: () => showDialog(context: context, builder: (ctx) => DCOrderDetailModal(order: order)),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                            ),
+                            child: const Text('Details', style: TextStyle(fontSize: 11)),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildOrderStatusBadge(OrderEntity order) {
+    final status = order.status.toLowerCase();
+    final isUnassigned = order.deliveryAgentId == null || order.deliveryAgentId!.isEmpty;
+
+    if (status == 'delivered') {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+        decoration: BoxDecoration(color: const Color(0xFFDCFCE7), borderRadius: BorderRadius.circular(6)),
+        child: Text('DELIVERED', style: GoogleFonts.jetBrainsMono(fontSize: 9.5, fontWeight: FontWeight.bold, color: const Color(0xFF16A34A))),
+      );
+    }
+    if (status == 'returned') {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+        decoration: BoxDecoration(color: const Color(0xFFFEF3C7), borderRadius: BorderRadius.circular(6)),
+        child: Text('RETURNED', style: GoogleFonts.jetBrainsMono(fontSize: 9.5, fontWeight: FontWeight.bold, color: const Color(0xFFB45309))),
+      );
+    }
+    if (status == 'failed' || status == 'cancelled' || status == 'call_back') {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+        decoration: BoxDecoration(color: const Color(0xFFFEE2E2), borderRadius: BorderRadius.circular(6)),
+        child: Text('FAILED / CB', style: GoogleFonts.jetBrainsMono(fontSize: 9.5, fontWeight: FontWeight.bold, color: const Color(0xFFDC2626))),
+      );
+    }
+    if (isUnassigned) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+        decoration: BoxDecoration(color: const Color(0xFFFFF7ED), borderRadius: BorderRadius.circular(6), border: Border.all(color: const Color(0xFFFFEDD5))),
+        child: Text('UNASSIGNED', style: GoogleFonts.jetBrainsMono(fontSize: 9.5, fontWeight: FontWeight.bold, color: const Color(0xFFEA580C))),
+      );
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+      decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(6)),
+      child: Text('IN TRANSIT', style: GoogleFonts.jetBrainsMono(fontSize: 9.5, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB))),
+    );
+  }
+
   Widget _buildUnassignedPoolView(
     bool isDark,
     List<OrderEntity> orders,
@@ -300,6 +1261,22 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
                     label: const Text('Create New Order', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFF37021),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (ctx) => const DCCsvOrderImportModal(),
+                      );
+                    },
+                    icon: const Icon(Icons.upload_file_rounded, size: 16, color: Colors.white),
+                    label: const Text('Import CSV', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF16A34A),
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
@@ -1055,398 +2032,8 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
   ) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: isDark ? const Color(0xFF151D36) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2563EB).withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.person_pin_circle_rounded, color: Color(0xFF2563EB), size: 20),
-                ),
-                const SizedBox(width: 10),
-                Text('Dispatch Order ${order.orderNumber}', style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.bold)),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              '${order.customerName} • ${order.deliveryAddress}',
-              style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-        content: SizedBox(
-          width: 580,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF0B1021) : const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Order Amount: ${CurrencyFormatter.formatNaira(order.totalAmount)}', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold)),
-                      Text('Payment: ${order.paymentType == "pay_on_delivery" ? "POD Cash" : "Prepaid"}', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF2563EB), fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                ),
-                if (order.hasCoordinates) ...[
-                  const SizedBox(height: 12),
-                  Builder(
-                    builder: (context) {
-                      DCFleetDriver? nearestDriver;
-                      double minDistanceKm = 999999.0;
-
-                      for (final driver in dcState.drivers) {
-                        double dLat = 9.0765;
-                        double dLng = 7.4832;
-                        if (driver.id.contains('sanni')) {
-                          dLat = 9.0882;
-                          dLng = 7.4933;
-                        } else if (driver.id.contains('b1111111') || driver.driverCode == 'PDA-7000') {
-                          dLat = 9.0765;
-                          dLng = 7.4832;
-                        } else {
-                          dLat = 9.0345;
-                          dLng = 7.4891;
-                        }
-
-                        final dist = GeoProximityCalculator.calculateDistanceKm(
-                          lat1: order.latitude!,
-                          lon1: order.longitude!,
-                          lat2: dLat,
-                          lon2: dLng,
-                        );
-
-                        if (dist < minDistanceKm) {
-                          minDistanceKm = dist;
-                          nearestDriver = driver;
-                        }
-                      }
-
-                      if (nearestDriver != null) {
-                        return Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: isDark
-                                  ? [const Color(0xFF1E3A8A).withValues(alpha: 0.35), const Color(0xFF1E293B)]
-                                  : [const Color(0xFFEFF6FF), const Color(0xFFDBEAFE)],
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFF3B82F6), width: 1.2),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF2563EB).withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Icon(Icons.radar_rounded, color: Color(0xFF2563EB), size: 20),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      '🎯 GIS Nearest Rider Match',
-                                      style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
-                                    ),
-                                    Text(
-                                      '${nearestDriver.name} (${nearestDriver.driverCode}) • ${GeoProximityCalculator.formatDistance(minDistanceKm)} away',
-                                      style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w600),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF2563EB),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                ),
-                                onPressed: () async {
-                                  final messenger = ScaffoldMessenger.of(context);
-                                  Navigator.pop(ctx);
-                                  await ref.read(ordersProvider.notifier).assignOrderToRider(
-                                    orderId: order.id,
-                                    riderId: nearestDriver!.id,
-                                    riderName: nearestDriver.name,
-                                    riderCode: nearestDriver.driverCode,
-                                  );
-                                  messenger.showSnackBar(
-                                    SnackBar(
-                                      content: Text('⚡ Auto-matched order ${order.orderNumber} to nearest rider ${nearestDriver.name}!'),
-                                      backgroundColor: const Color(0xFF10B981),
-                                    ),
-                                  );
-                                },
-                                icon: const Icon(Icons.flash_on_rounded, size: 14),
-                                label: const Text('Auto-Dispatch', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
-                              ),
-                            ],
-                          ),
-                        );
-                      }
-                      return const SizedBox.shrink();
-                    },
-                  ),
-                ],
-                const SizedBox(height: 14),
-                Text('Select an active rider (ordered by lightest workload):', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
-                const SizedBox(height: 10),
-                ...dcState.drivers.map((driver) {
-                  // Calculate live workload for this rider
-                  final activeOrdersCount = ordersState.orders.where((o) {
-                    final isMatchingAgent = o.deliveryAgentId == driver.id || 
-                                           o.deliveryAgentCode == driver.driverCode ||
-                                           (driver.id.contains('sanni') && (o.deliveryAgentId?.contains('sanni') == true || o.deliveryAgentCode == 'PDA-7588')) ||
-                                           (driver.id == 'b1111111-1111-4111-8111-111111111111' && o.deliveryAgentCode == 'PDA-7000');
-                    return isMatchingAgent && o.status != 'delivered' && o.status != 'cancelled' && o.status != 'failed';
-                  }).length;
-
-                  final bool isAvailable = activeOrdersCount == 0;
-                  final bool isLightLoad = activeOrdersCount <= 3;
-                  final bool isHeavyLoad = activeOrdersCount > 6;
-
-                  final workloadColor = isAvailable || isLightLoad
-                      ? const Color(0xFF10B981)
-                      : (isHeavyLoad ? const Color(0xFFEF4444) : const Color(0xFFF59E0B));
-
-                  final workloadLabel = isAvailable
-                      ? '🟢 Available (0 Active)'
-                      : (isLightLoad
-                          ? '🟢 Light Load ($activeOrdersCount Active)'
-                          : (isHeavyLoad
-                              ? '🔴 Heavy Load ($activeOrdersCount Active)'
-                              : '🟡 Moderate ($activeOrdersCount Active)'));
-
-                  // Connected Stock Custody Check for this order
-                  final stockState = ref.read(stockProvider);
-                  final requiredProduct = order.productName.isNotEmpty ? order.productName : 'Respira Detox Tea';
-                  final requiredQuantity = order.quantity > 0 ? order.quantity : 1;
-
-                  final driverAllocations = stockState.getAllocationsForRider(driver.id, driver.driverCode);
-                  int riderCustodyUnits = 0;
-                  for (final a in driverAllocations) {
-                    if (a.productName.toLowerCase().contains(requiredProduct.toLowerCase()) ||
-                        requiredProduct.toLowerCase().contains(a.productName.toLowerCase()) ||
-                        (a.sku.isNotEmpty && requiredProduct.toLowerCase().contains(a.sku.toLowerCase()))) {
-                      riderCustodyUnits += a.inCustodyUnits;
-                    }
-                  }
-
-                  final targetWarehouseItem = stockState.stockItems.firstWhere(
-                    (i) => i.name.toLowerCase().contains(requiredProduct.toLowerCase()) ||
-                           requiredProduct.toLowerCase().contains(i.name.toLowerCase()) ||
-                           i.sku.toLowerCase().contains(requiredProduct.toLowerCase()),
-                    orElse: () => stockState.stockItems.isNotEmpty
-                        ? stockState.stockItems.first
-                        : const StockItemEntity(id: '', sku: '', name: '', description: '', price: 0, assignedCount: 0, deliveredCount: 0, availableCount: 0, returnedCount: 0, category: ''),
-                  );
-
-                  final warehouseAvailable = targetWarehouseItem.availableCount;
-                  final bool hasSufficientStock = riderCustodyUnits >= requiredQuantity;
-
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: isAvailable ? const Color(0xFF10B981).withValues(alpha: 0.5) : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                        width: isAvailable ? 1.5 : 1,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 20,
-                          backgroundColor: const Color(0xFF2563EB).withValues(alpha: 0.15),
-                          child: Text(driver.name.substring(0, 1), style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Text(driver.name, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13)),
-                                  const SizedBox(width: 6),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF2563EB).withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(driver.driverCode, style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB))),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: workloadColor.withValues(alpha: 0.15),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      workloadLabel,
-                                      style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: workloadColor),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                '${driver.vehicleModel} • Zone: ${driver.assignedZone}',
-                                style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 5),
-                              // Live Stock in Custody Status Badge
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: hasSufficientStock
-                                      ? const Color(0xFF10B981).withValues(alpha: 0.12)
-                                      : const Color(0xFFF59E0B).withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  hasSufficientStock
-                                      ? '📦 In Vehicle: $riderCustodyUnits units (Ready for ${requiredQuantity}x $requiredProduct)'
-                                      : '⚠️ In Vehicle: $riderCustodyUnits units (Needs ${requiredQuantity}x $requiredProduct • DC Shelf: $warehouseAvailable)',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    color: hasSufficientStock ? const Color(0xFF059669) : const Color(0xFFD97706),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        ElevatedButton(
-                          onPressed: () async {
-                            final messenger = ScaffoldMessenger.of(context);
-
-                            if (!hasSufficientStock) {
-                              final neededUnits = requiredQuantity - riderCustodyUnits;
-                              if (warehouseAvailable >= neededUnits) {
-                                // Prompt to allocate stock and dispatch
-                                final shouldAllocate = await showDialog<bool>(
-                                  context: context,
-                                  builder: (dlgCtx) => AlertDialog(
-                                    backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                    title: Row(
-                                      children: [
-                                        const Icon(Icons.inventory_2_rounded, color: Color(0xFF2563EB), size: 22),
-                                        const SizedBox(width: 8),
-                                        const Text('Allocate Stock & Dispatch', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                      ],
-                                    ),
-                                    content: Text(
-                                      '${driver.name} currently holds $riderCustodyUnits units of $requiredProduct (Order requires $requiredQuantity units).\n\n'
-                                      'DC Warehouse currently possesses $warehouseAvailable shelf units.\n\n'
-                                      'Would you like to allocate the needed $neededUnits units from warehouse possession to ${driver.name} and dispatch this order?',
-                                      style: GoogleFonts.inter(fontSize: 12.5),
-                                    ),
-                                    actions: [
-                                      TextButton(onPressed: () => Navigator.pop(dlgCtx, false), child: const Text('Cancel')),
-                                      ElevatedButton(
-                                        onPressed: () => Navigator.pop(dlgCtx, true),
-                                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
-                                        child: Text('Allocate $neededUnits Units & Dispatch', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                      ),
-                                    ],
-                                  ),
-                                );
-
-                                if (shouldAllocate != true) return;
-
-                                // 1. Allocate stock to rider
-                                await ref.read(stockProvider.notifier).assignStockToRider(
-                                  productIdOrSku: targetWarehouseItem.id,
-                                  riderId: driver.id,
-                                  riderName: driver.name,
-                                  riderCode: driver.driverCode,
-                                  quantity: neededUnits,
-                                );
-                              } else {
-                                messenger.showSnackBar(
-                                  SnackBar(
-                                    content: Text('❌ Cannot assign order. ${driver.name} has only $riderCustodyUnits units and DC Warehouse possesses only $warehouseAvailable units of $requiredProduct. Please intake/receive stock first.'),
-                                    backgroundColor: const Color(0xFFEF4444),
-                                    duration: const Duration(seconds: 4),
-                                  ),
-                                );
-                                return;
-                              }
-                            }
-
-                            if (ctx.mounted) {
-                              Navigator.pop(ctx);
-                            }
-
-                            final success = await ref.read(ordersProvider.notifier).assignOrderToRider(
-                              orderId: order.id,
-                              riderId: driver.id,
-                              riderName: driver.name,
-                              riderCode: driver.driverCode,
-                            );
-
-                            messenger.showSnackBar(
-                              SnackBar(
-                                content: Text(success
-                                    ? '✅ Order ${order.orderNumber} successfully dispatched to ${driver.name} (${driver.driverCode}).'
-                                    : '⚠️ Failed to assign order. Please retry.'),
-                                backgroundColor: success ? const Color(0xFF10B981) : const Color(0xFFEF4444),
-                              ),
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF2563EB),
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                          ),
-                          child: const Text('Dispatch', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                        ),
-                      ],
-                    ),
-                  );
-                }),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-        ],
-      ),
+      barrierDismissible: false,
+      builder: (ctx) => DCAssignOrderModal(order: order),
     );
   }
 
@@ -1603,8 +2190,8 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
     StockState stockState,
   ) {
     final isDirect = order.isDirectTransfer;
-    final riderName = order.deliveryAgentName ?? 'Emeka Rider';
-    final riderCode = order.deliveryAgentCode ?? 'PDA-7000';
+    final riderName = order.deliveryAgentName ?? 'Assigned Rider';
+    final riderCode = order.deliveryAgentCode ?? 'PDA-RIDER';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -1853,6 +2440,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
       ),
     );
   }
+
 
   void _openOrderFinanceModal(BuildContext context, bool isDark, OrderEntity order) {
     showDialog(

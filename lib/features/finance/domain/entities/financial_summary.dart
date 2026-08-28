@@ -56,12 +56,16 @@ class FinancialSummary {
     List<TransactionItem>? transactions,
   }) {
     final bool isSalaried = user?.compensationType == 'salary' || user?.personnelType == 'in_house_rider';
-
-    final commissionPerOrder = user?.commissionRate ?? 1000.0;
-    final transportPerOrder = user?.isPda == false
-        ? (user?.fuelAllowance ?? 800.0)
-        : (user?.transportAllowance ?? 1500.0);
-    final failedPerOrder = user?.failedDeliveryAllowance ?? (user?.isPda == true ? 500.0 : 300.0);
+    final isInHouse = user?.isInHouseRider == true || user?.isPda == false;
+    final commissionPerOrder = (user?.commissionRate != null && user!.commissionRate > 0)
+        ? user.commissionRate
+        : (isInHouse ? 700.0 : 1000.0);
+    final transportPerOrder = isInHouse
+        ? ((user?.fuelAllowance != null && user!.fuelAllowance > 0) ? user.fuelAllowance : 800.0)
+        : ((user?.transportAllowance != null && user!.transportAllowance > 0) ? user.transportAllowance : 1500.0);
+    final failedPerOrder = (user?.failedDeliveryAllowance != null && user!.failedDeliveryAllowance > 0)
+        ? user.failedDeliveryAllowance
+        : (isInHouse ? 300.0 : 500.0);
     final totalEarningPerOrder = commissionPerOrder + transportPerOrder;
 
     final now = DateTime.now();

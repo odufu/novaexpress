@@ -68,7 +68,7 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
               ),
               Tab(
                 icon: const Icon(Icons.inventory_2_outlined, size: 17),
-                text: 'Warehouse Bins & Batches (${dcState.warehouseBatches.length})',
+                text: 'DC Warehouse Stock Batches (${dcState.warehouseBatches.length})',
               ),
               const Tab(
                 icon: Icon(Icons.add_box_outlined, size: 17),

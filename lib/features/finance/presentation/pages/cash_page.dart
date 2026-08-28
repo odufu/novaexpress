@@ -27,9 +27,14 @@ class _CashPageState extends ConsumerState<CashPage> {
     super.initState();
     Future.microtask(() {
       final user = ref.read(authProvider).user;
-      final agentId = user?.deliveryAgentId ?? 'b1111111-1111-4111-8111-111111111111';
-      ref.read(ordersProvider.notifier).loadOrders(agentId);
-      ref.read(financeProvider.notifier).loadRemittances(agentId);
+      final agentId = user?.deliveryAgentId ?? user?.id;
+      if (agentId != null && agentId.isNotEmpty) {
+        ref.read(ordersProvider.notifier).loadOrders(agentId);
+        ref.read(financeProvider.notifier).loadRemittances(agentId);
+      } else {
+        ref.read(ordersProvider.notifier).loadOrders();
+        ref.read(financeProvider.notifier).loadRemittances();
+      }
     });
   }
 
@@ -48,11 +53,10 @@ class _CashPageState extends ConsumerState<CashPage> {
     final user = authState.user;
     final agentName = user != null && (user.firstName.isNotEmpty || user.lastName.isNotEmpty)
         ? '${user.firstName} ${user.lastName}'.trim()
-        : (user?.fullName.isNotEmpty == true ? user!.fullName : '');
-    final agentCode = user?.deliveryAgentCode ?? '';
+        : 'Joel Odufu';
+    final agentCode = user?.deliveryAgentCode ?? 'PDA-7182';
 
-    // Dynamically calculate from unified financial summary
-    final summary = FinancialSummary.calculate(
+    final financialSummary = FinancialSummary.calculate(
       orders: ordersState.orders,
       remittances: financeState.remittances,
       user: user,
@@ -60,55 +64,60 @@ class _CashPageState extends ConsumerState<CashPage> {
       transactions: financeState.transactions,
     );
 
-    final approvedRemittances = financeState.remittances
-        .where((r) => r.isVerified || r.status.toLowerCase() == 'approved')
+    final recentDeliveredOrders = ordersState.orders
+        .where((o) => o.isDelivered)
         .toList();
-    final pendingRemittances = financeState.remittances
-        .where((r) => r.isPending || r.status.toLowerCase() == 'submitted')
-        .toList();
-    final int deliveredCashCount = summary.todayDeliveredOrdersCount > 0
-        ? summary.todayDeliveredOrdersCount
-        : summary.deliveredCashOrdersCount;
-
-    final double cashCollected = summary.cashCollectedAllTime > 0
-        ? summary.cashCollectedAllTime
-        : summary.cashCollectedToday;
-    final double totalRemitted = summary.totalRemittedAllTime;
-    final double totalCommission = summary.totalCommissionRetained;
-    final double totalTransport = summary.totalTransportRetained;
-    final double toRemit = summary.pendingRemittanceToDC;
-    final double riderBalance = summary.myDirectTransfersBalance;
-
-    // Detect if latest remittance was a partial settlement
-    final latestRemittance = financeState.remittances.isNotEmpty ? financeState.remittances.first : null;
-    final bool hasPartialSettlement = latestRemittance?.isPartialRemittance == true;
-
-    // Most Recent Delivered Transaction Metrics
-    final deliveredOrders = ordersState.orders
-        .where((o) => o.status.toLowerCase() == 'delivered')
-        .toList();
-    deliveredOrders.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    final mostRecentOrder = deliveredOrders.isNotEmpty ? deliveredOrders.first : null;
-
-    final double recentCollected = mostRecentOrder != null
-        ? (mostRecentOrder.isCashPod ? mostRecentOrder.totalAmount : 0.0)
+    final mostRecentOrder = recentDeliveredOrders.isNotEmpty ? recentDeliveredOrders.first : null;
+    final double recentCollected = mostRecentOrder != null && mostRecentOrder.isCashPod
+        ? mostRecentOrder.totalAmount
         : 0.0;
-    final double recentCommission = mostRecentOrder != null
-        ? (user?.commissionRate ?? (mostRecentOrder.agentEntitlement > 0 ? mostRecentOrder.agentEntitlement : 1000.0))
+    final double recentCommission = mostRecentOrder != null && mostRecentOrder.isCashPod
+        ? (user?.commissionRate ?? 1000.0)
         : 0.0;
-    final double recentTransport = mostRecentOrder != null
+    final double recentTransport = mostRecentOrder != null && mostRecentOrder.isCashPod
         ? (user?.fuelAllowance ?? 1500.0)
         : 0.0;
     final double recentToRemit = mostRecentOrder != null && mostRecentOrder.isCashPod
         ? (recentCollected - recentCommission - recentTransport).clamp(0.0, double.infinity)
         : 0.0;
 
+    final approvedRemittances = financeState.remittances
+        .where((r) => r.isVerified || r.status.toLowerCase() == 'approved')
+        .toList();
+    final pendingRemittances = financeState.remittances
+        .where((r) => r.isPending || r.status.toLowerCase() == 'submitted')
+        .toList();
+    
+    // Detect if latest remittance was a partial settlement
+    final latestRemittance = financeState.remittances.isNotEmpty ? financeState.remittances.first : null;
+    final bool hasPartialSettlement = latestRemittance?.isPartialRemittance == true;
+    final int deliveredCashCount = financialSummary.todayDeliveredOrdersCount > 0
+        ? financialSummary.todayDeliveredOrdersCount
+        : financialSummary.deliveredCashOrdersCount;
+
+    final double cashCollected = financialSummary.cashCollectedAllTime > 0
+        ? financialSummary.cashCollectedAllTime
+        : financialSummary.cashCollectedToday;
+    final double totalRemitted = financialSummary.totalRemittedAllTime;
+    final double totalCommission = financialSummary.totalCommissionRetained;
+    final double totalTransport = financialSummary.totalTransportRetained;
+    final double toRemit = financialSummary.pendingRemittanceToDC;
+    final double riderBalance = financialSummary.myDirectTransfersBalance;
+
+    ref.listen<AuthState>(authProvider, (previous, next) {
+      final newAgentId = next.user?.deliveryAgentId ?? next.user?.id;
+      if (newAgentId != null && newAgentId.isNotEmpty) {
+        ref.read(financeProvider.notifier).loadRemittances(newAgentId);
+        ref.read(ordersProvider.notifier).loadOrders(newAgentId);
+      }
+    });
+
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0B132B) : const Color(0xFFF8FAFC),
       body: RefreshIndicator(
         onRefresh: () async {
           final user = ref.read(authProvider).user;
-          final agentId = user?.deliveryAgentId ?? 'b1111111-1111-4111-8111-111111111111';
+          final agentId = user?.deliveryAgentId ?? user?.id;
           await Future.wait([
             ref.read(financeProvider.notifier).loadRemittances(agentId),
             ref.read(ordersProvider.notifier).loadOrders(agentId),

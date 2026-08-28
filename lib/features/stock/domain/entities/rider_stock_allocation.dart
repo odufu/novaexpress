@@ -10,6 +10,7 @@ class RiderStockAllocation {
   final int allocatedUnits;
   final int deliveredUnits;
   final int inCustodyUnits;
+  final int returnedUnits;
   final double unitPrice;
   final DateTime allocatedAt;
   final String fulfillmentType;
@@ -26,6 +27,7 @@ class RiderStockAllocation {
     required this.allocatedUnits,
     this.deliveredUnits = 0,
     required this.inCustodyUnits,
+    this.returnedUnits = 0,
     required this.unitPrice,
     required this.allocatedAt,
     this.fulfillmentType = 'distributed_inventory',
@@ -45,6 +47,7 @@ class RiderStockAllocation {
     int? allocatedUnits,
     int? deliveredUnits,
     int? inCustodyUnits,
+    int? returnedUnits,
     double? unitPrice,
     DateTime? allocatedAt,
     String? fulfillmentType,
@@ -61,6 +64,7 @@ class RiderStockAllocation {
       allocatedUnits: allocatedUnits ?? this.allocatedUnits,
       deliveredUnits: deliveredUnits ?? this.deliveredUnits,
       inCustodyUnits: inCustodyUnits ?? this.inCustodyUnits,
+      returnedUnits: returnedUnits ?? this.returnedUnits,
       unitPrice: unitPrice ?? this.unitPrice,
       allocatedAt: allocatedAt ?? this.allocatedAt,
       fulfillmentType: fulfillmentType ?? this.fulfillmentType,
@@ -80,6 +84,7 @@ class RiderStockAllocation {
       allocatedUnits: (json['allocated_units'] as num?)?.toInt() ?? (json['allocatedUnits'] as num?)?.toInt() ?? 0,
       deliveredUnits: (json['delivered_units'] as num?)?.toInt() ?? (json['deliveredUnits'] as num?)?.toInt() ?? 0,
       inCustodyUnits: (json['in_custody_units'] as num?)?.toInt() ?? (json['inCustodyUnits'] as num?)?.toInt() ?? 0,
+      returnedUnits: (json['returned_units'] as num?)?.toInt() ?? (json['returnedUnits'] as num?)?.toInt() ?? 0,
       unitPrice: (json['unit_price'] as num?)?.toDouble() ?? (json['unitPrice'] as num?)?.toDouble() ?? 0.0,
       allocatedAt: json['allocated_at'] != null
           ? DateTime.tryParse(json['allocated_at'].toString()) ?? DateTime.now()
@@ -101,6 +106,7 @@ class RiderStockAllocation {
       'allocated_units': allocatedUnits,
       'delivered_units': deliveredUnits,
       'in_custody_units': inCustodyUnits,
+      'returned_units': returnedUnits,
       'unit_price': unitPrice,
       'allocated_at': allocatedAt.toIso8601String(),
       'fulfillment_type': fulfillmentType,

@@ -54,9 +54,7 @@ class PaystackService {
     String? callbackUrl,
   }) async {
     final url = Uri.parse('$baseUrl/transaction/initialize');
-    final int amountInKobo = (secretKey.startsWith('sk_test_') && amount > 250000)
-        ? 25000000
-        : (amount * 100).toInt();
+    final int amountInKobo = (amount * 100).toInt();
 
     try {
       final response = await http.post(

@@ -117,15 +117,15 @@ class OrderDetailPage extends ConsumerWidget {
             ),
             ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.orange,
+                backgroundColor: const Color(0xFF2563EB),
                 foregroundColor: Colors.white,
               ),
               onPressed: () {
                 Navigator.pop(ctx);
-                context.push('/stock/request');
+                context.push('/stock/audit');
               },
-              icon: const Icon(Icons.inventory_2_outlined, size: 16),
-              label: const Text('Request Stock Transfer'),
+              icon: const Icon(Icons.all_inbox_rounded, size: 16),
+              label: const Text('Stock Reconciliation'),
             ),
           ],
         ),
@@ -250,6 +250,36 @@ class OrderDetailPage extends ConsumerWidget {
         break;
     }
 
+    // Dynamic Payment Status Badge styling
+    Color payBg;
+    Color payTextColor;
+    String payLabel;
+    IconData payIcon;
+
+    if (order.isDirectTransfer) {
+      payBg = const Color(0xFFE0F2FE);
+      payTextColor = const Color(0xFF0369A1);
+      payLabel = 'CLEARED ⚡';
+      payIcon = Icons.bolt_rounded;
+    } else if (order.status == 'delivered') {
+      if (order.isRemitted) {
+        payBg = const Color(0xFFDCFCE7);
+        payTextColor = const Color(0xFF15803D);
+        payLabel = 'REMITTED 💵';
+        payIcon = Icons.check_circle_rounded;
+      } else {
+        payBg = const Color(0xFFFEF3C7);
+        payTextColor = const Color(0xFFB45309);
+        payLabel = 'UNREMITTED ⏳';
+        payIcon = Icons.timer_outlined;
+      }
+    } else {
+      payBg = const Color(0xFFF1F5F9);
+      payTextColor = const Color(0xFF475569);
+      payLabel = 'UNPAID 💳';
+      payIcon = Icons.credit_card_outlined;
+    }
+
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
@@ -288,7 +318,7 @@ class OrderDetailPage extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 1. Hero Card: Tracking Number & Dynamic Status Badge
+            // 1. Hero Card: Tracking Number & Dynamic Status Badges
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -305,6 +335,7 @@ class OrderDetailPage extends ConsumerWidget {
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
                     child: Column(
@@ -352,28 +383,56 @@ class OrderDetailPage extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: statusBg,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(statusIcon, color: statusTextColor, size: 14),
-                        const SizedBox(width: 6),
-                        Text(
-                          statusLabel,
-                          style: GoogleFonts.inter(
-                            color: statusTextColor,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.4,
-                          ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: statusBg,
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                      ],
-                    ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(statusIcon, color: statusTextColor, size: 13),
+                            const SizedBox(width: 5),
+                            Text(
+                              statusLabel,
+                              style: GoogleFonts.inter(
+                                color: statusTextColor,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: payBg,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(payIcon, size: 11, color: payTextColor),
+                            const SizedBox(width: 4),
+                            Text(
+                              payLabel,
+                              style: GoogleFonts.jetBrainsMono(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.bold,
+                                color: payTextColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -749,20 +808,48 @@ class OrderDetailPage extends ConsumerWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: order.isPod ? AppColors.orange : const Color(0xFF008844),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          order.isPod ? 'PAY ON DELIVERY' : 'PREPAID',
-                          style: GoogleFonts.jetBrainsMono(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: order.isPod ? AppColors.orange : const Color(0xFF008844),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              order.isPod ? 'PAY ON DELIVERY' : 'PREPAID',
+                              style: GoogleFonts.jetBrainsMono(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
-                        ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: payBg,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(payIcon, size: 10, color: payTextColor),
+                                const SizedBox(width: 3),
+                                Text(
+                                  payLabel,
+                                  style: GoogleFonts.jetBrainsMono(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: payTextColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -825,7 +912,7 @@ class OrderDetailPage extends ConsumerWidget {
             const SizedBox(height: 24),
 
             // 7. Dynamic Contextual Action Buttons (Strictly tailored to status)
-            if (order.status == 'accepted' || order.status == 'pending' || order.status == 'assigned') ...[
+            if (order.status == 'accepted' || order.status == 'pending' || order.status == 'assigned' || order.status == 'unassigned') ...[
               // Context: Ready for departure / intake
               SizedBox(
                 width: double.infinity,
@@ -841,9 +928,12 @@ class OrderDetailPage extends ConsumerWidget {
                   ),
                   onPressed: () => _startDelivery(context, ref, order),
                   icon: const Icon(Icons.navigation_outlined, size: 20),
-                  label: const Text(
-                    'START DELIVERY JOURNEY',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, letterSpacing: 0.5),
+                  label: const FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      'ACCEPT & START DELIVERY TRIP',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5, letterSpacing: 0.4),
+                    ),
                   ),
                 ),
               ),
@@ -958,9 +1048,12 @@ class OrderDetailPage extends ConsumerWidget {
                   ),
                   onPressed: () => context.push('/orders/${order.id}/deliver-pod'),
                   icon: const Icon(Icons.check_circle_outline_rounded, size: 20),
-                  label: const Text(
-                    'LOG DELIVERY SUCCESS (CONFIRM POD)',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, letterSpacing: 0.4),
+                  label: const FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      'LOG DELIVERY SUCCESS (CONFIRM POD)',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, letterSpacing: 0.3),
+                    ),
                   ),
                 ),
               ),

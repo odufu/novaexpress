@@ -132,7 +132,12 @@ class RemittanceModel extends RemittanceEntity {
       posFee: posFee,
       paymentMethod: json['payment_method']?.toString() ?? 'bank_transfer',
       depositReceiptUrl: json['deposit_receipt_url']?.toString(),
-      status: json['status']?.toString() ?? 'pending',
+      status: ((json['payment_method']?.toString() == 'paystack' ||
+                  json['payment_method']?.toString() == 'paystack_transfer' ||
+                  ref.toUpperCase().startsWith('PSTK')) &&
+              (json['status'] == null || json['status'] == 'pending' || json['status'] == 'submitted'))
+          ? 'verified'
+          : (json['status']?.toString() ?? 'pending'),
       verifiedByUserId: json['verified_by_finance_user_id']?.toString() ?? json['verified_by_user_id']?.toString(),
       verifiedByName: json['verified_by_name']?.toString() ?? 'Paystack Settlement Gateway',
       discrepancyAmount: discrepancyAmount,
@@ -152,7 +157,7 @@ class RemittanceModel extends RemittanceEntity {
       notes: json['notes']?.toString(),
       associatedOrders: orders,
       createdAt: parsedCreated,
-      verifiedAt: parsedVerified,
+      verifiedAt: parsedVerified ?? ((json['payment_method']?.toString() == 'paystack' || ref.toUpperCase().startsWith('PSTK')) ? parsedCreated : null),
     );
   }
 

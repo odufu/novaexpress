@@ -84,7 +84,7 @@ class FakeFinanceRepository implements FinanceRepository {
 
 class TestFinanceNotifier extends FinanceNotifier {
   TestFinanceNotifier(List<RemittanceEntity> initialList)
-      : super(FakeFinanceRepository(predefinedRemittances: initialList), LocalStorageServiceImpl()) {
+      : super(FakeFinanceRepository(predefinedRemittances: initialList), storageService: LocalStorageServiceImpl()) {
     state = state.copyWith(remittances: initialList);
   }
 }

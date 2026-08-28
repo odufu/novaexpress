@@ -25,9 +25,14 @@ class _TransactionHistoryPageState extends ConsumerState<TransactionHistoryPage>
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final user = ref.read(authProvider).user;
-      final agentId = user?.deliveryAgentId ?? 'b1111111-1111-4111-8111-111111111111';
-      ref.read(financeProvider.notifier).loadRemittances(agentId);
-      ref.read(ordersProvider.notifier).loadOrders(agentId);
+      final agentId = user?.deliveryAgentId ?? user?.id;
+      if (agentId != null && agentId.isNotEmpty) {
+        ref.read(financeProvider.notifier).loadRemittances(agentId);
+        ref.read(ordersProvider.notifier).loadOrders(agentId);
+      } else {
+        ref.read(financeProvider.notifier).loadRemittances();
+        ref.read(ordersProvider.notifier).loadOrders();
+      }
     });
   }
 
@@ -245,7 +250,7 @@ class _TransactionHistoryPageState extends ConsumerState<TransactionHistoryPage>
       body: RefreshIndicator(
         onRefresh: () async {
           final user = ref.read(authProvider).user;
-          final agentId = user?.deliveryAgentId ?? 'b1111111-1111-4111-8111-111111111111';
+          final agentId = user?.deliveryAgentId ?? user?.id;
           await Future.wait([
             ref.read(financeProvider.notifier).loadRemittances(agentId),
             ref.read(ordersProvider.notifier).loadOrders(agentId),

@@ -3,20 +3,34 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:novexps/core/constants/supabase_constants.dart';
 
 void main() {
-  test('Check Supabase instance tables & connection', () async {
+  test('Inspect stock_transfers and stock_transfer_requests columns via insert error hint', () async {
     final client = SupabaseClient(
       SupabaseConstants.supabaseUrl,
       SupabaseConstants.supabaseServiceRoleKey,
     );
 
-    print('URL: ${SupabaseConstants.supabaseUrl}');
     try {
-      final orders = await client.from('orders').select().limit(5);
-      print('Orders table count/sample: ${orders.length}');
-      final agents = await client.from('delivery_agents').select().limit(5);
-      print('Delivery Agents count/sample: ${agents.length}');
+      await client.from('stock_transfers').insert({'test_col_xyz': 'val'}).select();
     } catch (e) {
-      print('Remote check note: $e');
+      print('stock_transfers insert: $e');
+    }
+
+    try {
+      await client.from('stock_transfer_requests').insert({'test_col_xyz': 'val'}).select();
+    } catch (e) {
+      print('stock_transfer_requests insert: $e');
+    }
+
+    try {
+      await client.from('stock_returns').insert({'test_col_xyz': 'val'}).select();
+    } catch (e) {
+      print('stock_returns insert: $e');
+    }
+
+    try {
+      await client.from('inventory_audits').insert({'test_col_xyz': 'val'}).select();
+    } catch (e) {
+      print('inventory_audits insert: $e');
     }
   });
 }

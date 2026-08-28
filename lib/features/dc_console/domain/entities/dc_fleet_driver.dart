@@ -143,13 +143,26 @@ class DCFleetDriver {
   }
 
   factory DCFleetDriver.fromJson(Map<String, dynamic> json) {
-    final user = json['users'] as Map<String, dynamic>?;
+    Map<String, dynamic>? user;
+    if (json['users'] is Map<String, dynamic>) {
+      user = json['users'] as Map<String, dynamic>;
+    } else if (json['users'] is List && (json['users'] as List).isNotEmpty) {
+      user = (json['users'] as List).first as Map<String, dynamic>;
+    }
+
     final firstName = user?['first_name'] as String? ?? json['first_name'] as String? ?? 'Delivery';
     final lastName = user?['last_name'] as String? ?? json['last_name'] as String? ?? 'Agent';
     final fullName = json['name'] as String? ?? '$firstName $lastName';
     final email = user?['email'] as String? ?? json['email'] as String? ?? '';
     final phone = user?['phone_number'] as String? ?? user?['phone'] as String? ?? json['phone'] as String? ?? '08031234567';
-    final avatar = user?['avatar_url'] as String? ?? json['avatar_url'] as String? ?? 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150';
+    
+    final avatar = (user?['avatar_url'] as String?)?.trim().isNotEmpty == true
+        ? (user!['avatar_url'] as String).trim()
+        : (json['avatar_url'] as String?)?.trim().isNotEmpty == true
+            ? (json['avatar_url'] as String).trim()
+            : (json['avatarUrl'] as String?)?.trim().isNotEmpty == true
+                ? (json['avatarUrl'] as String).trim()
+                : '';
 
     final agentCode = json['agent_code'] as String? ?? json['driver_code'] as String? ?? json['driverCode'] as String? ?? 'PDA-7000';
     final pType = json['personnel_type'] as String? ?? json['personnelType'] as String? ?? 'pda';

@@ -402,7 +402,7 @@ class _InventoryAuditPageState extends ConsumerState<InventoryAuditPage> {
               child: ElevatedButton(
                 onPressed: () {
                   final user = ref.read(authProvider).user;
-                  final agentId = user?.deliveryAgentId ?? 'b1111111-1111-4111-8111-111111111111';
+                  final agentId = user?.deliveryAgentId ?? user?.id ?? '';
                   final physical = ref.read(inventoryAuditPhysicalCountsProvider);
                   final reasons = ref.read(inventoryAuditVarianceReasonsProvider);
 

@@ -376,19 +376,24 @@ class UserProfilePage extends ConsumerWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.person_outline_rounded, color: AppColors.orange, size: 20),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Personal & Contact Details',
-                              style: GoogleFonts.inter(
-                                fontSize: 14.5,
-                                fontWeight: FontWeight.bold,
-                                color: theme.colorScheme.onSurface,
+                        Expanded(
+                          child: Row(
+                            children: [
+                              const Icon(Icons.person_outline_rounded, color: AppColors.orange, size: 20),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Personal & Contact Details',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: theme.colorScheme.onSurface,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                         IconButton(
                           icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.orange),
@@ -436,19 +441,24 @@ class UserProfilePage extends ConsumerWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.account_balance_wallet_outlined, color: Color(0xFF16A34A), size: 20),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Compensation & Settlement Bank',
-                              style: GoogleFonts.inter(
-                                fontSize: 14.5,
-                                fontWeight: FontWeight.bold,
-                                color: theme.colorScheme.onSurface,
+                        Expanded(
+                          child: Row(
+                            children: [
+                              const Icon(Icons.account_balance_wallet_outlined, color: Color(0xFF16A34A), size: 20),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Compensation & Settlement Bank',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: theme.colorScheme.onSurface,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                         IconButton(
                           icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF16A34A)),
@@ -517,19 +527,24 @@ class UserProfilePage extends ConsumerWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.two_wheeler_rounded, color: Color(0xFF2563EB), size: 20),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Vehicle & Fleet License',
-                              style: GoogleFonts.inter(
-                                fontSize: 14.5,
-                                fontWeight: FontWeight.bold,
-                                color: theme.colorScheme.onSurface,
+                        Expanded(
+                          child: Row(
+                            children: [
+                              const Icon(Icons.two_wheeler_rounded, color: Color(0xFF2563EB), size: 20),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Vehicle & Fleet License',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: theme.colorScheme.onSurface,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                         IconButton(
                           icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF2563EB)),
@@ -579,12 +594,15 @@ class UserProfilePage extends ConsumerWidget {
                       children: [
                         const Icon(Icons.shield_rounded, color: Color(0xFF2563EB), size: 20),
                         const SizedBox(width: 8),
-                        Text(
-                          'Security & Authentication',
-                          style: GoogleFonts.inter(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.bold,
-                            color: theme.colorScheme.onSurface,
+                        Expanded(
+                          child: Text(
+                            'Security & Authentication',
+                            style: GoogleFonts.inter(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],

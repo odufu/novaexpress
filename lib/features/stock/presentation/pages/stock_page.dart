@@ -8,6 +8,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_skeleton_loader.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../notifications/presentation/providers/notifications_provider.dart';
+import '../widgets/return_stock_modal.dart';
 import '../../domain/entities/stock_item.dart';
 import '../providers/stock_provider.dart';
 
@@ -26,8 +27,12 @@ class _StockPageState extends ConsumerState<StockPage> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final user = ref.read(authProvider).user;
-      final agentId = user?.deliveryAgentId ?? 'b1111111-1111-4111-8111-111111111111';
-      ref.read(stockProvider.notifier).fetchStockItems(agentId);
+      final agentId = user?.deliveryAgentId ?? user?.id;
+      if (agentId != null && agentId.isNotEmpty) {
+        ref.read(stockProvider.notifier).fetchStockItems(agentId);
+      } else {
+        ref.read(stockProvider.notifier).fetchStockItems();
+      }
     });
   }
 
@@ -44,6 +49,15 @@ class _StockPageState extends ConsumerState<StockPage> {
     final stockState = ref.watch(stockProvider);
     final stockNotifier = ref.read(stockProvider.notifier);
     final notifState = ref.watch(notificationsProvider);
+    final user = ref.watch(authProvider).user;
+    final agentId = user?.deliveryAgentId ?? user?.id ?? '';
+
+    ref.listen<AuthState>(authProvider, (previous, next) {
+      final newAgentId = next.user?.deliveryAgentId ?? next.user?.id ?? '';
+      if (newAgentId.isNotEmpty) {
+        stockNotifier.fetchStockItems(newAgentId);
+      }
+    });
 
     final currentTimeStr = DateFormat('h:mm a').format(DateTime.now());
     final inboundRequests = stockState.inboundRequests.where((r) => r.status != 'Completed').toList();
@@ -126,13 +140,25 @@ class _StockPageState extends ConsumerState<StockPage> {
             ),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             onSelected: (val) {
-              if (val == 'reconcile') {
+              if (val == 'return') {
+                ReturnStockModal.show(context);
+              } else if (val == 'reconcile') {
                 context.push('/stock/audit');
               } else if (val == 'refresh') {
-                stockNotifier.fetchStockItems();
+                stockNotifier.fetchStockItems(agentId);
               }
             },
             itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'return',
+                child: Row(
+                  children: [
+                    Icon(Icons.assignment_return_rounded, size: 18, color: Color(0xFFEA580C)),
+                    SizedBox(width: 10),
+                    Text('Return Stock to DC'),
+                  ],
+                ),
+              ),
               const PopupMenuItem(
                 value: 'reconcile',
                 child: Row(
@@ -158,10 +184,17 @@ class _StockPageState extends ConsumerState<StockPage> {
           const SizedBox(width: 4),
         ],
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => ReturnStockModal.show(context),
+        icon: const Icon(Icons.assignment_return_rounded, color: Colors.white, size: 20),
+        label: Text(
+          'Return Stock',
+          style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+        ),
+        backgroundColor: const Color(0xFFEA580C),
+      ),
       body: RefreshIndicator(
         onRefresh: () async {
-          final user = ref.read(authProvider).user;
-          final agentId = user?.deliveryAgentId ?? 'b1111111-1111-4111-8111-111111111111';
           await stockNotifier.fetchStockItems(agentId);
         },
         color: AppColors.primary,
@@ -257,7 +290,7 @@ class _StockPageState extends ConsumerState<StockPage> {
                       ),
                       const SizedBox(width: 4),
                       InkWell(
-                        onTap: () => stockNotifier.fetchStockItems(),
+                        onTap: () => stockNotifier.fetchStockItems(agentId),
                         borderRadius: BorderRadius.circular(12),
                         child: const Padding(
                           padding: EdgeInsets.all(4.0),
@@ -541,7 +574,7 @@ class _StockPageState extends ConsumerState<StockPage> {
               ] else if (stockState.filteredStockItems.isEmpty) ...[
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.all(32),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
                   decoration: BoxDecoration(
                     color: isDark ? const Color(0xFF1E293B) : Colors.white,
                     borderRadius: BorderRadius.circular(16),
@@ -551,18 +584,53 @@ class _StockPageState extends ConsumerState<StockPage> {
                   ),
                   child: Column(
                     children: [
-                      Icon(
-                        Icons.inventory_2_outlined,
-                        size: 48,
-                        color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2563EB).withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.two_wheeler_rounded,
+                          size: 40,
+                          color: Color(0xFF2563EB),
+                        ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 14),
                       Text(
-                        'No matching products found',
+                        stockState.searchQuery.isNotEmpty
+                            ? 'No matching products found'
+                            : (stockState.stockItems.isNotEmpty
+                                ? 'No products in "${stockState.activeFilter.name}" category'
+                                : 'No Vehicle Stock Allocated'),
                         style: GoogleFonts.inter(
                           fontSize: 16,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.bold,
                           color: theme.colorScheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        stockState.searchQuery.isNotEmpty
+                            ? 'No products matched your search query "${stockState.searchQuery}".'
+                            : (stockState.stockItems.isNotEmpty
+                                ? 'Switch filter tabs above to view all ${stockState.stockItems.length} products in your manifest.'
+                                : 'Your host Distribution Center has not assigned any physical stock to your vehicle yet. Stock will appear here once allocated by your DC Supervisor.'),
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: const Color(0xFF64748B),
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      OutlinedButton.icon(
+                        onPressed: () => stockNotifier.fetchStockItems(agentId),
+                        icon: const Icon(Icons.sync_rounded, size: 16),
+                        label: const Text('Sync Stock with DC'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
                       ),
                     ],

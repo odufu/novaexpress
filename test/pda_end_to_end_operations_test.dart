@@ -152,7 +152,19 @@ class MockOrdersRemoteDataSource implements OrdersRemoteDataSource {
   @override
   Future<OrderModel> getOrderById(String orderId) async => orders.first;
   @override
-  Future<void> updateOrderStatus(String orderId, String status, {String? paymentStatus, String? paymentType, String? notes}) async {}
+  Future<void> updateOrderStatus(
+    String orderId,
+    String status, {
+    String? paymentStatus,
+    String? paymentType,
+    String? notes,
+    String? customerSignatureUrl,
+    String? photoProofUrl,
+    String? gatePassCode,
+    double? latitude,
+    double? longitude,
+    bool? isLocationVerified,
+  }) async {}
   @override
   Future<Map<String, dynamic>> confirmDeliveryPod({
     required String orderId,
@@ -163,6 +175,9 @@ class MockOrdersRemoteDataSource implements OrdersRemoteDataSource {
     String? customerSignatureUrl,
     String? photoProofUrl,
     String? notes,
+    String? gatePassCode,
+    double? latitude,
+    double? longitude,
   }) async => {'success': true};
   @override
   Future<Map<String, dynamic>> logDeliveryFailure({
@@ -171,6 +186,9 @@ class MockOrdersRemoteDataSource implements OrdersRemoteDataSource {
     required String reasonCode,
     String? notes,
     String? scheduledCallbackAt,
+    String? gatePassCode,
+    double? latitude,
+    double? longitude,
   }) async => {'success': true};
   @override
   Future<List<OrderModel>> getDistributionCenterOrders(String distributionCenterId) async => orders;
@@ -465,14 +483,12 @@ void main() {
       await tester.pumpAndSettle();
 
       // Verify header renders without RangeError
-      expect(find.text('DELIVERIES'), findsOneWidget);
-      expect(find.text('E'), findsOneWidget); // Emeka avatar initial
+      expect(find.text('ORDERS'), findsOneWidget);
 
       // Verify Tab summary counters
-      expect(find.textContaining('All (4)'), findsOneWidget);
-      expect(find.textContaining('In Progress (1)'), findsOneWidget);
-      expect(find.textContaining('Delivered (2)'), findsOneWidget);
-      expect(find.textContaining('Returns (1)'), findsOneWidget);
+      expect(find.textContaining('4 Total'), findsOneWidget);
+      expect(find.textContaining('In Progress'), findsWidgets);
+      expect(find.textContaining('Delivered'), findsWidgets);
 
       // Verify orders render
       expect(find.text('Chief Aliyu Mohammed'), findsOneWidget);

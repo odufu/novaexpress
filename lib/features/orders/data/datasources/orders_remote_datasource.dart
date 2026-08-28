@@ -14,7 +14,19 @@ abstract class OrdersRemoteDataSource {
     required String riderCode,
   });
   Future<OrderModel> getOrderById(String orderId);
-  Future<void> updateOrderStatus(String orderId, String status, {String? paymentStatus, String? paymentType, String? notes});
+  Future<void> updateOrderStatus(
+    String orderId,
+    String status, {
+    String? paymentStatus,
+    String? paymentType,
+    String? notes,
+    String? customerSignatureUrl,
+    String? photoProofUrl,
+    String? gatePassCode,
+    double? latitude,
+    double? longitude,
+    bool? isLocationVerified,
+  });
   Future<Map<String, dynamic>> confirmDeliveryPod({
     required String orderId,
     required String agentId,
@@ -24,6 +36,9 @@ abstract class OrdersRemoteDataSource {
     String? customerSignatureUrl,
     String? photoProofUrl,
     String? notes,
+    String? gatePassCode,
+    double? latitude,
+    double? longitude,
   });
   Future<Map<String, dynamic>> logDeliveryFailure({
     required String orderId,
@@ -31,6 +46,9 @@ abstract class OrdersRemoteDataSource {
     required String reasonCode,
     String? notes,
     String? scheduledCallbackAt,
+    String? gatePassCode,
+    double? latitude,
+    double? longitude,
   });
   Future<void> updateOrderCoordinates({
     required String orderId,
@@ -219,7 +237,9 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
         'total_amount': totalAmount,
         'payment_type': paymentType,
         'payment_status': paymentStatus,
-        'status': 'in_transit',
+        'status': (insertPayload['status']?.toString() == 'pending' || insertPayload['status']?.toString() == 'unassigned')
+            ? 'new'
+            : (insertPayload['status']?.toString() ?? (validRiderId != null ? 'in_transit' : 'new')),
         'delivery_method': 'cash',
         'client_delivery_fee': (insertPayload['client_delivery_fee'] as num?)?.toDouble() ?? 5000.0,
         'agent_entitlement': (insertPayload['agent_entitlement'] as num?)?.toDouble() ?? 2500.0,
@@ -486,6 +506,10 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
     String? notes,
     String? customerSignatureUrl,
     String? photoProofUrl,
+    String? gatePassCode,
+    double? latitude,
+    double? longitude,
+    bool? isLocationVerified,
   }) async {
     final updateData = <String, dynamic>{
       'status': status,
@@ -502,9 +526,22 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
     }
     if (customerSignatureUrl != null) {
       updateData['customer_signature_url'] = customerSignatureUrl;
+      updateData['proof_of_delivery_url'] = customerSignatureUrl;
     }
     if (photoProofUrl != null) {
       updateData['proof_photo_url'] = photoProofUrl;
+    }
+    if (gatePassCode != null) {
+      updateData['gate_pass_code'] = gatePassCode;
+    }
+    if (latitude != null) {
+      updateData['latitude'] = latitude;
+    }
+    if (longitude != null) {
+      updateData['longitude'] = longitude;
+    }
+    if (isLocationVerified != null) {
+      updateData['is_location_verified'] = isLocationVerified;
     }
 
     try {
@@ -542,6 +579,9 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
     String? customerSignatureUrl,
     String? photoProofUrl,
     String? notes,
+    String? gatePassCode,
+    double? latitude,
+    double? longitude,
   }) async {
     final isDirectTransfer = paymentMethod == 'bank_transfer' ||
         paymentType == 'prepaid' ||
@@ -560,6 +600,9 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
           'amountCollected': amountCollected,
           'customerSignatureUrl': customerSignatureUrl,
           'photoProofUrl': photoProofUrl,
+          'gatePassCode': gatePassCode,
+          'latitude': latitude,
+          'longitude': longitude,
           'notes': notes,
         },
       );
@@ -573,6 +616,10 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
           paymentType: resolvedPaymentType,
           customerSignatureUrl: customerSignatureUrl,
           photoProofUrl: photoProofUrl,
+          gatePassCode: gatePassCode,
+          latitude: latitude,
+          longitude: longitude,
+          isLocationVerified: true,
           notes: notes,
         );
         return response.data as Map<String, dynamic>? ?? {'status': 'success'};
@@ -587,6 +634,10 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
         paymentType: resolvedPaymentType,
         customerSignatureUrl: customerSignatureUrl,
         photoProofUrl: photoProofUrl,
+        gatePassCode: gatePassCode,
+        latitude: latitude,
+        longitude: longitude,
+        isLocationVerified: true,
         notes: notes,
       );
       return {'status': 'offline_fallback', 'error': e.toString()};
@@ -600,6 +651,9 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
     required String reasonCode,
     String? notes,
     String? scheduledCallbackAt,
+    String? gatePassCode,
+    double? latitude,
+    double? longitude,
   }) async {
     final isCallback = reasonCode == 'rescheduled' || scheduledCallbackAt != null;
     final newStatus = isCallback ? 'call_back' : 'failed';
@@ -612,16 +666,35 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
           'reasonCode': reasonCode,
           'notes': notes,
           'scheduledCallbackAt': scheduledCallbackAt,
+          'gatePassCode': gatePassCode,
+          'latitude': latitude,
+          'longitude': longitude,
         },
       );
 
       if (response.status >= 200 && response.status < 300) {
-        await updateOrderStatus(orderId, newStatus, notes: notes);
+        await updateOrderStatus(
+          orderId,
+          newStatus,
+          notes: notes,
+          gatePassCode: gatePassCode,
+          latitude: latitude,
+          longitude: longitude,
+          isLocationVerified: true,
+        );
         return response.data as Map<String, dynamic>? ?? {'status': 'success'};
       }
       throw Exception('Server returned ${response.status}: ${response.data}');
     } catch (e) {
-      await updateOrderStatus(orderId, newStatus, notes: notes);
+      await updateOrderStatus(
+        orderId,
+        newStatus,
+        notes: notes,
+        gatePassCode: gatePassCode,
+        latitude: latitude,
+        longitude: longitude,
+        isLocationVerified: true,
+      );
       return {'status': 'offline_fallback', 'error': e.toString()};
     }
   }

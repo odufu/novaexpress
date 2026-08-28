@@ -13,6 +13,67 @@ class StockRepositoryImpl implements StockRepository {
   }
 
   @override
+  Future<StockItemEntity> createProduct({
+    required String name,
+    required String sku,
+    required String category,
+    required double price,
+    String? description,
+    String? ownerName,
+    int stockQuantity = 0,
+    int lowStockThreshold = 3,
+    String? binLocation,
+    String? companyId,
+  }) async {
+    return await remoteDataSource.createProduct(
+      name: name,
+      sku: sku,
+      category: category,
+      price: price,
+      description: description,
+      ownerName: ownerName,
+      stockQuantity: stockQuantity,
+      lowStockThreshold: lowStockThreshold,
+      binLocation: binLocation,
+      companyId: companyId,
+    );
+  }
+
+  @override
+  Future<Map<String, dynamic>> assignStockToRider({
+    required String productIdOrSku,
+    required String riderId,
+    required String riderName,
+    required String riderCode,
+    required int quantity,
+    String? distributionCenterId,
+  }) async {
+    return await remoteDataSource.assignStockToRider(
+      productIdOrSku: productIdOrSku,
+      riderId: riderId,
+      riderName: riderName,
+      riderCode: riderCode,
+      quantity: quantity,
+      distributionCenterId: distributionCenterId,
+    );
+  }
+
+  @override
+  Future<bool> receiveStock({
+    required String productIdOrSku,
+    required int quantity,
+    String? waybillNumber,
+    String? supplierName,
+  }) async {
+    return await remoteDataSource.receiveStock(
+      productIdOrSku: productIdOrSku,
+      quantity: quantity,
+      waybillNumber: waybillNumber,
+      supplierName: supplierName,
+    );
+  }
+
+  @override
   Future<Map<String, dynamic>> requestStockTransfer({
     required String agentId,
     required String companyId,

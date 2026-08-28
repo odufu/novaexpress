@@ -8,6 +8,7 @@ import '../../../orders/presentation/providers/orders_provider.dart';
 import '../../domain/entities/product_package.dart';
 import '../providers/dc_console_provider.dart';
 import '../providers/product_catalog_provider.dart';
+import 'dc_csv_order_import_modal.dart';
 
 class DCCreateOrderDraftState {
   final String selectedState;
@@ -19,7 +20,11 @@ class DCCreateOrderDraftState {
   final int quantity;
   final double upsellAmount;
   final String paymentType;
+  final String? clientId;
   final String clientName;
+  final String clientCompany;
+  final String? clientPhone;
+  final String? clientEmail;
   final String? selectedRiderId;
   final String? selectedRiderName;
   final String? selectedRiderCode;
@@ -36,7 +41,11 @@ class DCCreateOrderDraftState {
     this.quantity = 1,
     this.upsellAmount = 0.0,
     this.paymentType = 'pay_on_delivery',
-    this.clientName = 'Novacare Limited',
+    this.clientId = 'cli-novacale-001',
+    this.clientName = 'Dr. Chuka Okafor',
+    this.clientCompany = 'Novacale Limited',
+    this.clientPhone = '08034455667',
+    this.clientEmail = 'orders@novacale.com',
     this.selectedRiderId,
     this.selectedRiderName,
     this.selectedRiderCode,
@@ -61,7 +70,11 @@ class DCCreateOrderDraftState {
     int? quantity,
     double? upsellAmount,
     String? paymentType,
+    String? clientId,
     String? clientName,
+    String? clientCompany,
+    String? clientPhone,
+    String? clientEmail,
     String? Function()? selectedRiderId,
     String? Function()? selectedRiderName,
     String? Function()? selectedRiderCode,
@@ -78,7 +91,11 @@ class DCCreateOrderDraftState {
       quantity: quantity ?? this.quantity,
       upsellAmount: upsellAmount ?? this.upsellAmount,
       paymentType: paymentType ?? this.paymentType,
+      clientId: clientId ?? this.clientId,
       clientName: clientName ?? this.clientName,
+      clientCompany: clientCompany ?? this.clientCompany,
+      clientPhone: clientPhone ?? this.clientPhone,
+      clientEmail: clientEmail ?? this.clientEmail,
       selectedRiderId: selectedRiderId != null ? selectedRiderId() : this.selectedRiderId,
       selectedRiderName: selectedRiderName != null ? selectedRiderName() : this.selectedRiderName,
       selectedRiderCode: selectedRiderCode != null ? selectedRiderCode() : this.selectedRiderCode,
@@ -96,6 +113,7 @@ class DCCreateOrderDraftNotifier extends StateNotifier<DCCreateOrderDraftState> 
   void setUnitPrice(double price) => state = state.copyWith(unitPrice: price);
   void setQuantity(int q) => state = state.copyWith(quantity: q);
   void setPaymentType(String type) => state = state.copyWith(paymentType: type);
+  void setClientCompany(String company) => state = state.copyWith(clientCompany: company, clientName: company);
   void setAssignImmediately(bool val) => state = state.copyWith(assignImmediately: val);
   void setRider(String? id, String? name, String? code) => state = state.copyWith(
     selectedRiderId: () => id,
@@ -254,11 +272,18 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
       'payment_type': draft.paymentType,
       'payment_status': draft.paymentType == 'prepaid' ? 'paid' : 'pending',
       'fulfillment_type': 'distributed_inventory',
+      'client_id': draft.clientId,
       'client_name': draft.clientName,
+      'client_company': draft.clientCompany,
+      'client_phone': draft.clientPhone,
+      'client_email': draft.clientEmail,
+      'package_deal_id': draft.selectedPackage?.id,
+      'package_deal_name': draft.selectedPackage?.packageName,
       'client_delivery_fee': 5000.0,
       'agent_entitlement': 2500.0,
       'delivery_notes': _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
-      'status': draft.assignImmediately && draft.selectedRiderId != null ? 'assigned' : 'pending',
+      'status': draft.assignImmediately && draft.selectedRiderId != null ? 'assigned' : 'unassigned',
+      'financial_settlement_status': draft.paymentType == 'prepaid' ? 'direct_transfer_settled' : 'pending_remittance',
       'distribution_center_id': dcState.activeHubId,
       'delivery_agent_id': draft.assignImmediately ? draft.selectedRiderId : null,
       'delivery_agent_name': draft.assignImmediately ? draft.selectedRiderName : null,
@@ -389,6 +414,55 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // CSV Bulk Import Prompt Banner
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2563EB).withValues(alpha: isDark ? 0.15 : 0.08),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF2563EB).withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.file_upload_outlined, color: Color(0xFF2563EB), size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Need to create multiple orders at once?',
+                                    style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
+                                  ),
+                                  Text(
+                                    'Import a spreadsheet / CSV file to batch upload orders.',
+                                    style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                showDialog(
+                                  context: context,
+                                  barrierDismissible: false,
+                                  builder: (ctx) => const DCCsvOrderImportModal(),
+                                );
+                              },
+                              icon: const Icon(Icons.upload_file_rounded, size: 14, color: Colors.white),
+                              label: const Text('Import CSV', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Colors.white)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF2563EB),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
                       // SECTION 1: CUSTOMER INFORMATION
                       _buildSectionTitle(
                         icon: Icons.person_outline_rounded,

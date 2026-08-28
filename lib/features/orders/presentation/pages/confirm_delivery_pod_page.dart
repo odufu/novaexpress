@@ -8,6 +8,7 @@ import '../../../../core/constants/supabase_constants.dart';
 import '../../../../core/helpers/formatters.dart';
 import '../../../../core/providers/navigation_provider.dart';
 import '../../../../core/services/paystack_web_interop.dart';
+import '../../../../core/services/rider_location_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_logo_widget.dart';
 import '../../../../core/widgets/signature_pad_modal.dart';
@@ -240,13 +241,17 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
       final paymentMethod = isDirectTransfer ? 'bank_transfer' : 'cash';
       final amount = double.tryParse(_amountController.text.trim()) ?? 0.0;
       final refNo = _referenceController.text.trim();
-      final orderIdPrefix = (widget.orderId.length >= 4 ? widget.orderId.substring(0, 4) : widget.orderId).toUpperCase();
-      final paymentRef = refNo.isNotEmpty ? refNo : 'PSTK-$orderIdPrefix';
+      final paymentRef = refNo.isNotEmpty ? refNo : 'PAY-${DateTime.now().millisecondsSinceEpoch}';
+      final riderLoc = ref.read(riderLocationProvider);
+      final ordersState = ref.read(ordersProvider);
+      final orderObj = ordersState.orders.where((o) => o.id == widget.orderId || o.orderNumber == widget.orderId).firstOrNull;
+      final gatePin = orderObj?.effectiveGatePin ?? 'GT-${(widget.orderId.length >= 4 ? widget.orderId.substring(widget.orderId.length - 4) : "7182").toUpperCase()}';
+
       final notes = isDirectTransfer
-          ? '[POD Paid via Paystack Direct Transfer • Ref: $paymentRef] ₦0 cash held by PDA. Commission credited to My Balance.'
+          ? '[POD Paid via Paystack Direct Transfer • Ref: $paymentRef • Gate PIN: $gatePin • GPS: ${riderLoc.latitude.toStringAsFixed(4)}, ${riderLoc.longitude.toStringAsFixed(4)}] ₦0 cash held by PDA. Commission credited to My Balance.'
           : (refNo.isNotEmpty
-              ? '[POD Collected via Cash (Ref: $refNo)] Cash in custody.'
-              : '[POD Collected via Cash] Cash in custody.');
+              ? '[POD Collected via Cash (Ref: $refNo) • Gate PIN: $gatePin • GPS: ${riderLoc.latitude.toStringAsFixed(4)}, ${riderLoc.longitude.toStringAsFixed(4)}] Cash in custody.'
+              : '[POD Collected via Cash • Gate PIN: $gatePin • GPS: ${riderLoc.latitude.toStringAsFixed(4)}, ${riderLoc.longitude.toStringAsFixed(4)}] Cash in custody.');
 
       await ref.read(ordersProvider.notifier).confirmDeliveryPod(
             orderId: widget.orderId,
@@ -255,10 +260,11 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
             paymentMethod: paymentMethod,
             amountCollected: isDirectTransfer ? 0.0 : amount,
             customerSignatureUrl: podState.signatureUrl,
+            gatePassCode: gatePin,
+            latitude: riderLoc.latitude,
+            longitude: riderLoc.longitude,
             notes: notes,
           );
-
-      final orderObj = ref.read(ordersProvider).orders.where((o) => o.id == widget.orderId || o.orderNumber == widget.orderId).firstOrNull;
       
       // Automatically deduct delivered physical stock units from vehicle custody
       if (orderObj != null) {
@@ -843,38 +849,40 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                   child: GestureDetector(
                     onTap: () => ref.read(confirmDeliveryPodProvider.notifier).setPaymentMethod('Direct Transfer (Paystack)'),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
                       decoration: BoxDecoration(
                         color: isDirectTransfer
                             ? const Color(0xFF00A2D3)
                             : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: isDirectTransfer
-                              ? const Color(0xFF00A2D3)
-                              : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
-                          width: isDirectTransfer ? 2 : 1,
-                        ),
+                            color: isDirectTransfer
+                                ? const Color(0xFF00A2D3)
+                                : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                            width: isDirectTransfer ? 2 : 1),
                       ),
                       child: Center(
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.bolt_rounded,
-                              size: 16,
-                              color: isDirectTransfer ? Colors.white : const Color(0xFF00A2D3),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Direct Transfer (Paystack)',
-                              style: TextStyle(
-                                color: isDirectTransfer ? Colors.white : theme.colorScheme.onSurface,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.bolt_rounded,
+                                size: 16,
+                                color: isDirectTransfer ? Colors.white : const Color(0xFF00A2D3),
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 4),
+                              Text(
+                                'Direct Transfer (Paystack)',
+                                style: TextStyle(
+                                  color: isDirectTransfer ? Colors.white : theme.colorScheme.onSurface,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),

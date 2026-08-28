@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import '../../../../core/services/local_storage_service.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/datasources/stock_remote_datasource.dart';
 import '../../data/repositories/stock_repository_impl.dart';
 import '../../domain/entities/rider_stock_allocation.dart';
@@ -119,7 +120,7 @@ class StockState {
       case StockFilter.all:
         break;
       case StockFilter.available:
-        list = list.where((i) => i.availableCount > i.lowStockThreshold).toList();
+        list = list.where((i) => i.availableCount > 0).toList();
         break;
       case StockFilter.lowStock:
         list = list.where((i) => i.status == StockStatus.lowStock || (i.availableCount <= i.lowStockThreshold && i.availableCount > 0)).toList();
@@ -303,70 +304,131 @@ class StockNotifier extends StateNotifier<StockState> {
     ),
   ];
 
+  final Ref? _ref;
+  String? _lastAgentId;
+
   StockNotifier({
     required this.repository,
     LocalStorageService? storageService,
+    Ref? ref,
   })  : _storageService = storageService ?? LocalStorageServiceImpl(),
-        super(const StockState(stockItems: defaultStockCatalogue)) {
+        _ref = ref,
+        super(const StockState(stockItems: [])) {
     _initCache();
-    fetchStockItems();
+    if (_ref != null) {
+      _ref.listen<AuthState>(authProvider, (previous, next) {
+        final nextAgentId = next.user?.deliveryAgentId ?? next.user?.id;
+        if (nextAgentId != null && nextAgentId.isNotEmpty && nextAgentId != _lastAgentId) {
+          fetchStockItems(nextAgentId);
+        }
+      });
+    }
   }
 
   Future<void> _initCache() async {
     final cached = await _storageService.getCachedStockItems();
     final cachedAllocations = await _storageService.getCachedRiderStockAllocations();
-    if (cached != null || cachedAllocations != null) {
-      state = state.copyWith(
-        isLoading: false,
-        stockItems: cached ?? (state.stockItems.isNotEmpty ? state.stockItems : defaultStockCatalogue),
-        riderAllocations: cachedAllocations ?? (state.riderAllocations.isNotEmpty ? state.riderAllocations : defaultAllocations),
-      );
-    } else {
-      state = state.copyWith(
-        isLoading: false,
-        stockItems: state.stockItems.isNotEmpty ? state.stockItems : defaultStockCatalogue,
-        riderAllocations: state.riderAllocations.isNotEmpty ? state.riderAllocations : defaultAllocations,
-      );
+    if (state.stockItems.isEmpty) {
+      if (cached != null && cached.isNotEmpty) {
+        state = state.copyWith(stockItems: cached);
+      }
     }
+    if (state.riderAllocations.isEmpty) {
+      if (cachedAllocations != null && cachedAllocations.isNotEmpty) {
+        state = state.copyWith(riderAllocations: cachedAllocations);
+      }
+    }
+    state = state.copyWith(isLoading: false);
   }
 
   Future<void> fetchStockItems([String? agentId]) async {
     state = state.copyWith(isLoading: state.stockItems.isEmpty, errorMessage: null);
     try {
-      final items = await repository.getVehicleStockItems(agentId);
-      final defaultRequests = [
-        const InboundStockRequest(
-          requestId: 'REQ-00482',
-          dcName: 'Wuse Distribution Center',
-          status: 'Ready for Collection',
-          requestDate: null,
-          requestedQuantities: {
-            'Respira Detox Tea': 10,
-            'Grazer Herbal Tea': 20,
-          },
-          approvedQuantities: {
-            'Respira Detox Tea': 10,
-            'Grazer Herbal Tea': 20,
-          },
-        ),
-      ];
+      String? targetAgentId = (agentId != null && agentId.isNotEmpty) ? agentId : _lastAgentId;
+      if ((targetAgentId == null || targetAgentId.isEmpty) && _ref != null) {
+        final user = _ref.read(authProvider).user;
+        final role = user?.role.toLowerCase() ?? '';
+        if (role.contains('rider') || role.contains('agent') || role.contains('driver') || user?.isPda == true) {
+          targetAgentId = user?.deliveryAgentId ?? user?.id;
+        }
+      }
+      if (targetAgentId != null && targetAgentId.isNotEmpty) {
+        _lastAgentId = targetAgentId;
+      }
 
-      final finalItems = (items.isNotEmpty) ? items : (state.stockItems.isNotEmpty ? state.stockItems : defaultStockCatalogue);
+      if (targetAgentId != null && targetAgentId.isNotEmpty) {
+        final resolvedAgentId = targetAgentId;
+        // Fetch real stock assigned to this specific rider
+        final items = await repository.getVehicleStockItems(resolvedAgentId);
 
-      state = state.copyWith(
-        isLoading: false,
-        stockItems: finalItems,
-        riderAllocations: state.riderAllocations.isNotEmpty ? state.riderAllocations : defaultAllocations,
-        inboundRequests: state.inboundRequests.isNotEmpty ? state.inboundRequests : defaultRequests,
-        lastAuditedTime: DateTime.now().subtract(const Duration(hours: 4)),
-        isAuditRequired: false,
-      );
-      _storageService.cacheStockItems(finalItems);
+        // Merge with local/DC rider allocations if DC console allocated stock
+        final myAllocations = state.riderAllocations.where((a) =>
+            (a.riderId.toLowerCase() == resolvedAgentId.toLowerCase() ||
+                a.riderCode.toLowerCase() == resolvedAgentId.toLowerCase()) &&
+            (a.inCustodyUnits > 0 || a.deliveredUnits > 0 || a.allocatedUnits > 0)).toList();
+
+        final Map<String, StockItemEntity> itemMap = {
+          for (final it in items) it.name.toLowerCase(): it,
+        };
+
+        for (final alloc in myAllocations) {
+          final key = alloc.productName.toLowerCase();
+          if (itemMap.containsKey(key)) {
+            final existing = itemMap[key]!;
+            final mergedAvailable = existing.availableCount > 0 ? existing.availableCount : alloc.inCustodyUnits;
+            final mergedAssigned = existing.assignedCount > 0 ? existing.assignedCount : alloc.allocatedUnits;
+            itemMap[key] = existing.copyWith(
+              availableCount: mergedAvailable,
+              assignedCount: mergedAssigned,
+              totalInCustody: mergedAvailable,
+            );
+          } else {
+            itemMap[key] = StockItemEntity(
+              id: alloc.productId,
+              sku: alloc.sku,
+              name: alloc.productName,
+              description: '${alloc.productName} - Vehicle custody allocated by DC',
+              price: alloc.unitPrice,
+              ownerName: alloc.clientName,
+              inventoryType: InventoryType.distributedInventory,
+              totalInCustody: alloc.inCustodyUnits,
+              assignedCount: alloc.allocatedUnits,
+              deliveredCount: alloc.deliveredUnits,
+              availableCount: alloc.inCustodyUnits,
+              returnedCount: alloc.returnedUnits,
+              complaintCount: 0,
+              lowStockThreshold: 3,
+              category: 'Vehicle Stock',
+              binLocation: 'Motorbike / Vehicle',
+              batchNumber: 'LOT-2026-08',
+              lastAuditDate: DateTime.now().toIso8601String().substring(0, 10),
+            );
+          }
+        }
+
+        final List<StockItemEntity> riderItems = itemMap.values.toList();
+
+        state = state.copyWith(
+          isLoading: false,
+          stockItems: riderItems,
+          lastAuditedTime: DateTime.now().subtract(const Duration(hours: 4)),
+          isAuditRequired: false,
+        );
+        _storageService.cacheStockItems(riderItems);
+      } else {
+        // DC Master Overview
+        final items = await repository.getVehicleStockItems();
+        final finalItems = items.isNotEmpty ? items : defaultStockCatalogue;
+        state = state.copyWith(
+          isLoading: false,
+          stockItems: finalItems,
+          riderAllocations: state.riderAllocations.isNotEmpty ? state.riderAllocations : defaultAllocations,
+        );
+        _storageService.cacheStockItems(finalItems);
+      }
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
-        stockItems: state.stockItems.isNotEmpty ? state.stockItems : defaultStockCatalogue,
-        riderAllocations: state.riderAllocations.isNotEmpty ? state.riderAllocations : defaultAllocations,
         errorMessage: 'Failed to sync vehicle stock.',
       );
     }
@@ -483,29 +545,46 @@ class StockNotifier extends StateNotifier<StockState> {
     String description = '',
     String? binLocation,
   }) async {
-    final newId = 'prod_${DateTime.now().millisecondsSinceEpoch}';
-    final newItem = StockItemEntity(
-      id: newId,
-      sku: sku.trim().toUpperCase(),
-      name: name.trim(),
-      description: description.trim().isNotEmpty ? description.trim() : '$name - Distributed Inventory',
-      price: price,
-      ownerName: ownerName.trim().isNotEmpty ? ownerName.trim() : 'Novacare Limited',
-      inventoryType: InventoryType.distributedInventory,
-      totalInCustody: initialQuantity,
-      assignedCount: 0,
-      deliveredCount: 0,
-      availableCount: initialQuantity,
-      returnedCount: 0,
-      lowStockThreshold: lowStockThreshold,
-      category: category.trim().isNotEmpty ? category.trim() : 'General',
-      batchNumber: 'LOT-${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}',
-      lastAuditDate: DateTime.now().toIso8601String().split('T').first,
-    );
+    // 1. Create on remote backend via repository
+    StockItemEntity newItem;
+    try {
+      newItem = await repository.createProduct(
+        name: name,
+        sku: sku,
+        category: category,
+        price: price,
+        ownerName: ownerName,
+        stockQuantity: initialQuantity,
+        lowStockThreshold: lowStockThreshold,
+        description: description,
+        binLocation: binLocation,
+      );
+    } catch (_) {
+      final newId = 'prod_${DateTime.now().millisecondsSinceEpoch}';
+      newItem = StockItemEntity(
+        id: newId,
+        sku: sku.trim().toUpperCase(),
+        name: name.trim(),
+        description: description.trim().isNotEmpty ? description.trim() : '$name - Distributed Inventory',
+        price: price,
+        ownerName: ownerName.trim().isNotEmpty ? ownerName.trim() : 'Novacare Limited',
+        inventoryType: InventoryType.distributedInventory,
+        totalInCustody: initialQuantity,
+        assignedCount: 0,
+        deliveredCount: 0,
+        availableCount: initialQuantity,
+        returnedCount: 0,
+        lowStockThreshold: lowStockThreshold,
+        category: category.trim().isNotEmpty ? category.trim() : 'General',
+        batchNumber: 'LOT-${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}',
+        lastAuditDate: DateTime.now().toIso8601String().split('T').first,
+      );
+    }
 
-    final updatedItems = [newItem, ...state.stockItems];
+    final updatedItems = [newItem, ...state.stockItems.where((i) => i.id != newItem.id && i.sku.toLowerCase() != newItem.sku.toLowerCase())];
     state = state.copyWith(stockItems: updatedItems);
     await _storageService.cacheStockItems(updatedItems);
+
     return newItem;
   }
 
@@ -519,6 +598,17 @@ class StockNotifier extends StateNotifier<StockState> {
   }) async {
     if (quantity <= 0) return false;
 
+    // 1. Update remote backend via repository
+    try {
+      await repository.receiveStock(
+        productIdOrSku: productIdOrSku,
+        quantity: quantity,
+        waybillNumber: waybillNumber,
+        supplierName: supplierName,
+      );
+    } catch (_) {}
+
+    // 2. Update local state & cache
     bool found = false;
     final updatedItems = state.stockItems.map((item) {
       if (item.id == productIdOrSku ||
@@ -620,6 +710,17 @@ class StockNotifier extends StateNotifier<StockState> {
 
     await _storageService.cacheStockItems(updatedItems);
     await _storageService.cacheRiderStockAllocations(updatedAllocations);
+
+    // 3. Persist stock transfer to Supabase backend
+    try {
+      await repository.assignStockToRider(
+        productIdOrSku: target.id,
+        riderId: riderId,
+        riderName: riderName,
+        riderCode: riderCode,
+        quantity: quantity,
+      );
+    } catch (_) {}
 
     return {
       'success': true,
@@ -807,6 +908,87 @@ class StockNotifier extends StateNotifier<StockState> {
     }
   }
 
+  /// Rider initiates a return of physical stock from their vehicle custody back to the host DC warehouse
+  Future<Map<String, dynamic>> returnStockToDC({
+    required String productIdOrSku,
+    required String riderId,
+    required int quantity,
+    required String reason,
+    String? notes,
+  }) async {
+    if (quantity <= 0) {
+      return {'success': false, 'message': 'Quantity must be greater than 0'};
+    }
+
+    // 1. Find allocation for this rider
+    final allocIdx = state.riderAllocations.indexWhere((a) =>
+        (a.riderId.toLowerCase() == riderId.toLowerCase() || a.riderCode.toLowerCase() == riderId.toLowerCase()) &&
+        (a.productId == productIdOrSku ||
+            a.sku.toLowerCase() == productIdOrSku.toLowerCase() ||
+            a.productName.toLowerCase() == productIdOrSku.toLowerCase()));
+
+    RiderStockAllocation? targetAlloc;
+    List<RiderStockAllocation> updatedAllocations = List<RiderStockAllocation>.from(state.riderAllocations);
+
+    if (allocIdx != -1) {
+      final alloc = state.riderAllocations[allocIdx];
+      if (alloc.inCustodyUnits < quantity) {
+        return {
+          'success': false,
+          'message': 'Cannot return more than units held in vehicle custody (${alloc.inCustodyUnits} units)',
+        };
+      }
+      targetAlloc = alloc.copyWith(
+        inCustodyUnits: (alloc.inCustodyUnits - quantity).clamp(0, 999999),
+        returnedUnits: alloc.returnedUnits + quantity,
+      );
+      updatedAllocations[allocIdx] = targetAlloc;
+    }
+
+    // 2. Update Rider's StockItemEntity
+    final updatedItems = state.stockItems.map((item) {
+      final matches = item.id == productIdOrSku ||
+          item.sku.toLowerCase() == productIdOrSku.toLowerCase() ||
+          item.name.toLowerCase() == productIdOrSku.toLowerCase();
+
+      if (matches) {
+        return item.copyWith(
+          availableCount: (item.availableCount - quantity).clamp(0, 999999),
+          returnedCount: item.returnedCount + quantity,
+        );
+      }
+      return item;
+    }).toList();
+
+    state = state.copyWith(
+      stockItems: updatedItems,
+      riderAllocations: updatedAllocations,
+    );
+
+    await _storageService.cacheStockItems(updatedItems);
+    await _storageService.cacheRiderStockAllocations(updatedAllocations);
+
+    // 3. Process backend stock return if Supabase is connected
+    try {
+      await repository.processStockReturn(
+        returnNumber: 'RET-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
+        orderId: 'DC-VEHICLE-RETURN',
+        deliveryAgentId: riderId,
+        productId: targetAlloc?.productId ?? productIdOrSku,
+        quantity: quantity,
+        reason: reason,
+        notes: notes,
+      );
+    } catch (_) {}
+
+    final productName = targetAlloc?.productName ?? productIdOrSku;
+    return {
+      'success': true,
+      'message': 'Successfully returned $quantity units of $productName to host DC ($reason).',
+      'remainingInVehicle': targetAlloc?.inCustodyUnits ?? 0,
+    };
+  }
+
   Future<Map<String, dynamic>> processStockReturn({
     required String returnNumber,
     required String orderId,
@@ -827,7 +1009,7 @@ class StockNotifier extends StateNotifier<StockState> {
         reason: reason,
         notes: notes,
       );
-      await fetchStockItems();
+      await fetchStockItems(deliveryAgentId);
       return result;
     } catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
@@ -1020,5 +1202,5 @@ final stockRepositoryProvider = Provider<StockRepository>((ref) {
 final stockProvider = StateNotifierProvider<StockNotifier, StockState>((ref) {
   final repo = ref.watch(stockRepositoryProvider);
   final storage = ref.watch(localStorageServiceProvider);
-  return StockNotifier(repository: repo, storageService: storage);
+  return StockNotifier(repository: repo, storageService: storage, ref: ref);
 });

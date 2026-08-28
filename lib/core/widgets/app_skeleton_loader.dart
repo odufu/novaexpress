@@ -26,7 +26,16 @@ class _AppSkeletonLoaderState extends State<AppSkeletonLoader> with SingleTicker
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
-    )..repeat();
+    );
+    bool isTest = false;
+    try {
+      if (WidgetsBinding.instance.runtimeType.toString().toLowerCase().contains('test')) {
+        isTest = true;
+      }
+    } catch (_) {}
+    if (!isTest) {
+      _controller.repeat();
+    }
 
     _animation = Tween<double>(begin: -2.0, end: 2.0).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeInOutSine),

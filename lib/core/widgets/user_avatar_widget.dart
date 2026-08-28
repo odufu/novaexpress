@@ -51,7 +51,7 @@ class UserAvatarWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bg = backgroundColor ?? AppColors.primary;
-    final fg = textColor ?? Colors.white;
+    final fg = textColor ?? (bg.computeLuminance() > 0.5 ? const Color(0xFF031632) : Colors.white);
 
     Widget avatarContent;
 

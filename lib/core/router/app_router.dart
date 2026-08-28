@@ -143,6 +143,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(
+        path: '/remittance/receipt/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id'] ?? 'REM-001';
+          return RemittanceDetailsPage(remittanceId: id);
+        },
+      ),
+      GoRoute(
         path: '/orders/scan',
         builder: (context, state) => const ScanToCollectPage(),
       ),

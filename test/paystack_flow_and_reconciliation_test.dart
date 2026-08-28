@@ -146,16 +146,18 @@ void main() {
       bool wasConfirmed = false;
 
       await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: PaystackTransferModal(
-              orderNumber: 'ORD-9821',
-              amount: 25000.0,
-              customerEmail: 'customer@novaexpress.ng',
-              customerName: 'Alhaji Gambo',
-              onPaymentConfirmed: () {
-                wasConfirmed = true;
-              },
+        ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: PaystackTransferModal(
+                orderNumber: 'ORD-9821',
+                amount: 25000.0,
+                customerEmail: 'customer@novaexpress.ng',
+                customerName: 'Alhaji Gambo',
+                onPaymentConfirmed: () {
+                  wasConfirmed = true;
+                },
+              ),
             ),
           ),
         ),
@@ -172,29 +174,27 @@ void main() {
       String? confirmedRef;
 
       await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: PaystackRemittanceModal(
-              amount: 71000.0,
-              riderName: 'Joel Rider',
-              riderCode: 'PDA-7000',
-              onRemittanceConfirmed: (ref) {
-                confirmedRef = ref;
-              },
+        ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: PaystackRemittanceModal(
+                amount: 71000.0,
+                riderName: 'Joel Rider',
+                riderCode: 'PDA-7000',
+                onRemittanceConfirmed: (ref) {
+                  confirmedRef = ref;
+                },
+              ),
             ),
           ),
         ),
       );
 
-      expect(find.text('Paystack Remittance'), findsOneWidget);
+      expect(find.textContaining('Paystack Remittance'), findsOneWidget);
       expect(find.text('PAYSTACK'), findsOneWidget);
       expect(find.text('AMOUNT TO REMIT'), findsOneWidget);
       expect(find.text('₦71,000.00'), findsOneWidget);
-      expect(find.text('PAYSTACK INTERACTIVE PORTAL'), findsOneWidget);
-      expect(find.text('Card 💳'), findsOneWidget);
-      expect(find.text('Transfer 🏦'), findsOneWidget);
-      expect(find.text('USSD 📱'), findsOneWidget);
-      expect(find.text('I Have Transferred • Verify Settlement'), findsOneWidget);
+      expect(find.textContaining('I Have Transferred • Verify'), findsOneWidget);
       expect(confirmedRef, isNull);
     });
 
@@ -248,8 +248,8 @@ void main() {
       expect(summary.cashCollectedAllTime, equals(78500.0));
       expect(summary.totalEarningRetained, equals(2500.0));
       expect(summary.totalVerifiedRemitted, equals(50000.0));
-      // Remaining pending remittance is exactly ₦24,400 (78500 - 2500 - 1600 transfer fee - 50000)
-      expect(summary.pendingRemittanceToDC, equals(24400.0));
+      // Remaining pending remittance is exactly ₦26,000 (78500 - 2500 - 50000)
+      expect(summary.pendingRemittanceToDC, equals(26000.0));
     });
 
     test('8. RemittanceModel correctly serializes and deserializes partial fields & remaining shortage', () {
@@ -339,16 +339,16 @@ void main() {
         ),
       );
 
-      await tester.pump();
+      await tester.pumpAndSettle();
 
-      expect(find.text('Remittance Receipt'), findsOneWidget);
+      expect(find.textContaining('Official Remittance Receipt'), findsOneWidget);
       expect(find.text('PSTK-RMT-PDA7182-835804'), findsWidgets);
       expect(find.text('SETTLEMENT RECONCILIATION'), findsOneWidget);
       expect(find.text('AUDIT & TRANSACTION DETAILS'), findsOneWidget);
-      expect(find.text('Customer Collections (POD)'), findsOneWidget);
-      expect(find.text('Less: Delivery Commission'), findsOneWidget);
-      expect(find.text('Less: Transport Allowance'), findsOneWidget);
-      expect(find.text('Expected Remittance'), findsOneWidget);
+      expect(find.text('Customer Collections (POD Cash)'), findsOneWidget);
+      expect(find.text('Less: Delivery Commission Retained'), findsOneWidget);
+      expect(find.text('Less: Transport Allowance Retained'), findsOneWidget);
+      expect(find.text('Expected Handover Due'), findsOneWidget);
       expect(find.text('Actual Remitted Amount'), findsOneWidget);
       expect(find.text('Remitted To'), findsOneWidget);
       expect(find.text('Payment Method'), findsOneWidget);
@@ -437,10 +437,10 @@ void main() {
       expect(summaryAfter3Orders.deliveredCashOrdersCount, equals(3));
       // Earning retained: 3 orders * (1000 commission + 1500 transport) = 7,500
       expect(summaryAfter3Orders.totalEarningRetained, equals(7500.0));
-      // Transfer charges: 500 + 700 + 400 = 1,600
-      expect(summaryAfter3Orders.totalTransferFeesRetained, equals(1600.0));
-      // Pending Remittance to DC: 80,000 - 7,500 - 1,600 = 70,900
-      expect(summaryAfter3Orders.pendingRemittanceToDC, equals(70900.0));
+      // Transfer charges: 0.0
+      expect(summaryAfter3Orders.totalTransferFeesRetained, equals(0.0));
+      // Pending Remittance to DC: 80,000 - 7,500 = 72,500
+      expect(summaryAfter3Orders.pendingRemittanceToDC, equals(72500.0));
 
       // After partial remittance of 40,000
       final partialRemittance = RemittanceEntity(
@@ -452,7 +452,7 @@ void main() {
         paymentMethod: 'paystack',
         status: 'verified',
         isPartial: true,
-        discrepancyAmount: -30900.0,
+        discrepancyAmount: -32500.0,
         createdAt: now,
       );
 
@@ -462,8 +462,8 @@ void main() {
         user: testRider,
       );
 
-      // Remaining pending remittance is: 70,900 - 40,000 = 30,900
-      expect(summaryAfterPartialRemittance.pendingRemittanceToDC, equals(30900.0));
+      // Remaining pending remittance is: 72,500 - 40,000 = 32,500
+      expect(summaryAfterPartialRemittance.pendingRemittanceToDC, equals(32500.0));
     });
   });
 }

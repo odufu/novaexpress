@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/helpers/formatters.dart';
+import '../../../../core/widgets/user_avatar_widget.dart';
 import '../../../finance/domain/entities/remittance.dart';
 import '../../../finance/presentation/providers/finance_provider.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
+import '../../domain/entities/dc_fleet_driver.dart';
+import '../providers/dc_console_provider.dart';
 import '../widgets/dc_contact_rider_modal.dart';
 
 final dcOrderMatchingSearchProvider = StateProvider.autoDispose<String>((ref) => '');
@@ -561,9 +564,18 @@ class _DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatch
               rows: orders.map((order) {
                 final paymentCategory = _getOrderPaymentCategory(order, remittances);
                 final netRemittanceDue = _calculateNetRemittanceDue(order);
-                final riderName = order.deliveryAgentName ?? (order.deliveryAgentCode != null ? 'Rider ${order.deliveryAgentCode}' : 'Unassigned Rider');
-                final riderCode = order.deliveryAgentCode ?? 'PDA-7182';
-                const riderPhone = '08031234567';
+                final dcDrivers = ref.watch(dcConsoleProvider).drivers;
+                final matchedDriver = dcDrivers.cast<DCFleetDriver?>().firstWhere(
+                      (d) =>
+                          d != null &&
+                          ((order.deliveryAgentId != null && d.id == order.deliveryAgentId) ||
+                              (order.deliveryAgentCode != null && d.driverCode.toLowerCase() == order.deliveryAgentCode!.toLowerCase())),
+                      orElse: () => null,
+                    );
+                final riderName = matchedDriver?.name ?? order.deliveryAgentName ?? (order.deliveryAgentCode != null ? 'Rider ${order.deliveryAgentCode}' : 'Unassigned Rider');
+                final riderCode = matchedDriver?.driverCode ?? order.deliveryAgentCode ?? 'PDA-7182';
+                final riderPhone = matchedDriver?.phone.isNotEmpty == true ? matchedDriver!.phone : '08031234567';
+                final riderAvatarUrl = matchedDriver?.avatarUrl ?? '';
                 final isDirectPaystack = paymentCategory == 'direct_paystack';
                 final isCashAwaiting = paymentCategory == 'cash_awaiting_remittance';
                 final isRemitted = paymentCategory == 'remitted_verified';
@@ -806,13 +818,10 @@ class _DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatch
                     DataCell(
                       Row(
                         children: [
-                          CircleAvatar(
+                          UserAvatarWidget(
+                            avatarUrl: riderAvatarUrl,
+                            fullName: riderName,
                             radius: 13,
-                            backgroundColor: const Color(0xFF00A2D3).withValues(alpha: 0.2),
-                            child: Text(
-                              riderName.isNotEmpty ? riderName.substring(0, 1).toUpperCase() : 'R',
-                              style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF00A2D3)),
-                            ),
                           ),
                           const SizedBox(width: 8),
                           Column(
@@ -844,6 +853,7 @@ class _DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatch
                             riderCode: riderCode,
                             riderPhone: riderPhone,
                             riderId: order.deliveryAgentId,
+                            riderAvatarUrl: riderAvatarUrl,
                             amountAwaitingRemittance: netRemittanceDue,
                           );
                         },
@@ -990,9 +1000,18 @@ class _DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatch
   Widget _buildOrderPaymentMatchCard(OrderEntity order, List<RemittanceEntity> remittances, bool isDark, bool isMobile) {
     final paymentCategory = _getOrderPaymentCategory(order, remittances);
     final netRemittanceDue = _calculateNetRemittanceDue(order);
-    final riderName = order.deliveryAgentName ?? (order.deliveryAgentCode != null ? 'Rider ${order.deliveryAgentCode}' : 'Unassigned Rider');
-    final riderCode = order.deliveryAgentCode ?? 'PDA-7182';
-    const riderPhone = '08031234567'; // authoritative fallback if not populated on order
+    final dcDrivers = ref.watch(dcConsoleProvider).drivers;
+    final matchedDriver = dcDrivers.cast<DCFleetDriver?>().firstWhere(
+          (d) =>
+              d != null &&
+              ((order.deliveryAgentId != null && d.id == order.deliveryAgentId) ||
+                  (order.deliveryAgentCode != null && d.driverCode.toLowerCase() == order.deliveryAgentCode!.toLowerCase())),
+          orElse: () => null,
+        );
+    final riderName = matchedDriver?.name ?? order.deliveryAgentName ?? (order.deliveryAgentCode != null ? 'Rider ${order.deliveryAgentCode}' : 'Unassigned Rider');
+    final riderCode = matchedDriver?.driverCode ?? order.deliveryAgentCode ?? 'PDA-7182';
+    final riderPhone = matchedDriver?.phone.isNotEmpty == true ? matchedDriver!.phone : '08031234567';
+    final riderAvatarUrl = matchedDriver?.avatarUrl ?? '';
     final isDirectPaystack = paymentCategory == 'direct_paystack';
     final isCashAwaiting = paymentCategory == 'cash_awaiting_remittance';
     final isRemitted = paymentCategory == 'remitted_verified';
@@ -1167,10 +1186,10 @@ class _DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatch
               // Rider Info Tile
               Row(
                 children: [
-                  CircleAvatar(
+                  UserAvatarWidget(
+                    avatarUrl: riderAvatarUrl,
+                    fullName: riderName,
                     radius: 16,
-                    backgroundColor: const Color(0xFF00A2D3).withValues(alpha: 0.2),
-                    child: const Icon(Icons.delivery_dining_rounded, size: 18, color: Color(0xFF00A2D3)),
                   ),
                   const SizedBox(width: 8),
                   Column(
@@ -1206,6 +1225,7 @@ class _DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatch
                         riderCode: riderCode,
                         riderPhone: riderPhone,
                         riderId: order.deliveryAgentId,
+                        riderAvatarUrl: riderAvatarUrl,
                         amountAwaitingRemittance: netRemittanceDue,
                       );
                     },

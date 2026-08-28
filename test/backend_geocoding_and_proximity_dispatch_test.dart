@@ -144,7 +144,19 @@ class MockOrdersRepository implements OrdersRepository {
   Future<OrderEntity> getOrderById(String orderId) async => list.firstWhere((o) => o.id == orderId);
 
   @override
-  Future<void> updateOrderStatus(String orderId, String status, {String? paymentStatus, String? paymentType, String? notes}) async {}
+  Future<void> updateOrderStatus(
+    String orderId,
+    String status, {
+    String? paymentStatus,
+    String? paymentType,
+    String? notes,
+    String? customerSignatureUrl,
+    String? photoProofUrl,
+    String? gatePassCode,
+    double? latitude,
+    double? longitude,
+    bool? isLocationVerified,
+  }) async {}
 
   @override
   Future<Map<String, dynamic>> confirmDeliveryPod({
@@ -156,6 +168,9 @@ class MockOrdersRepository implements OrdersRepository {
     String? customerSignatureUrl,
     String? photoProofUrl,
     String? notes,
+    String? gatePassCode,
+    double? latitude,
+    double? longitude,
   }) async => {'status': 'success'};
 
   @override
@@ -165,6 +180,9 @@ class MockOrdersRepository implements OrdersRepository {
     required String reasonCode,
     String? notes,
     String? scheduledCallbackAt,
+    String? gatePassCode,
+    double? latitude,
+    double? longitude,
   }) async => {'status': 'success'};
 
   @override

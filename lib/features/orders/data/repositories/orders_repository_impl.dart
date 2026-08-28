@@ -43,8 +43,32 @@ class OrdersRepositoryImpl implements OrdersRepository {
   }
 
   @override
-  Future<void> updateOrderStatus(String orderId, String status, {String? paymentStatus, String? paymentType, String? notes}) async {
-    await remoteDataSource.updateOrderStatus(orderId, status, paymentStatus: paymentStatus, paymentType: paymentType, notes: notes);
+  Future<void> updateOrderStatus(
+    String orderId,
+    String status, {
+    String? paymentStatus,
+    String? paymentType,
+    String? notes,
+    String? customerSignatureUrl,
+    String? photoProofUrl,
+    String? gatePassCode,
+    double? latitude,
+    double? longitude,
+    bool? isLocationVerified,
+  }) async {
+    await remoteDataSource.updateOrderStatus(
+      orderId,
+      status,
+      paymentStatus: paymentStatus,
+      paymentType: paymentType,
+      notes: notes,
+      customerSignatureUrl: customerSignatureUrl,
+      photoProofUrl: photoProofUrl,
+      gatePassCode: gatePassCode,
+      latitude: latitude,
+      longitude: longitude,
+      isLocationVerified: isLocationVerified,
+    );
   }
 
   @override
@@ -57,6 +81,9 @@ class OrdersRepositoryImpl implements OrdersRepository {
     String? customerSignatureUrl,
     String? photoProofUrl,
     String? notes,
+    String? gatePassCode,
+    double? latitude,
+    double? longitude,
   }) async {
     return await remoteDataSource.confirmDeliveryPod(
       orderId: orderId,
@@ -67,6 +94,9 @@ class OrdersRepositoryImpl implements OrdersRepository {
       customerSignatureUrl: customerSignatureUrl,
       photoProofUrl: photoProofUrl,
       notes: notes,
+      gatePassCode: gatePassCode,
+      latitude: latitude,
+      longitude: longitude,
     );
   }
 
@@ -77,6 +107,9 @@ class OrdersRepositoryImpl implements OrdersRepository {
     required String reasonCode,
     String? notes,
     String? scheduledCallbackAt,
+    String? gatePassCode,
+    double? latitude,
+    double? longitude,
   }) async {
     return await remoteDataSource.logDeliveryFailure(
       orderId: orderId,
@@ -84,6 +117,9 @@ class OrdersRepositoryImpl implements OrdersRepository {
       reasonCode: reasonCode,
       notes: notes,
       scheduledCallbackAt: scheduledCallbackAt,
+      gatePassCode: gatePassCode,
+      latitude: latitude,
+      longitude: longitude,
     );
   }
 

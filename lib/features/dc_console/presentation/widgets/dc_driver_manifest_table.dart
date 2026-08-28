@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/helpers/formatters.dart';
+import '../../../../core/widgets/user_avatar_widget.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
@@ -352,17 +353,10 @@ class DCDriverManifestTable extends ConsumerWidget {
                             Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                CircleAvatar(
+                                UserAvatarWidget(
+                                  avatarUrl: driver.avatarUrl,
+                                  fullName: driver.name,
                                   radius: 15,
-                                  backgroundColor: const Color(0xFF031632).withValues(alpha: 0.15),
-                                  child: Text(
-                                    driver.name.isNotEmpty ? driver.name.substring(0, 1).toUpperCase() : 'R',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      color: const Color(0xFF031632),
-                                    ),
-                                  ),
                                 ),
                                 const SizedBox(width: 8),
                                 Column(
@@ -653,13 +647,10 @@ class DCDriverManifestTable extends ConsumerWidget {
                     Expanded(
                       child: Row(
                         children: [
-                          CircleAvatar(
+                          UserAvatarWidget(
+                            avatarUrl: driver.avatarUrl,
+                            fullName: driver.name,
                             radius: 16,
-                            backgroundColor: const Color(0xFF031632).withValues(alpha: 0.15),
-                            child: Text(
-                              driver.name.isNotEmpty ? driver.name.substring(0, 1).toUpperCase() : 'R',
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF031632)),
-                            ),
                           ),
                           const SizedBox(width: 10),
                           Expanded(

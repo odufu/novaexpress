@@ -23,7 +23,13 @@ class OrderModel extends OrderEntity {
     required super.paymentType,
     required super.paymentStatus,
     super.fulfillmentType,
+    super.clientId,
     super.clientName,
+    super.clientCompany,
+    super.clientPhone,
+    super.clientEmail,
+    super.packageDealId,
+    super.packageDealName,
     super.packageCustodyId,
     super.clientDeliveryFee,
     super.agentEntitlement,
@@ -40,9 +46,11 @@ class OrderModel extends OrderEntity {
     super.locationConfidence,
     super.customerSignatureUrl,
     super.photoProofUrl,
+    super.gatePassCode,
     super.isLocationVerified = false,
     super.failureReason,
     super.remittanceStatus = 'unremitted',
+    super.financialSettlementStatus = 'pending_remittance',
     super.remittanceReference,
     super.remittedAt,
     super.assignedAt,
@@ -81,13 +89,13 @@ class OrderModel extends OrderEntity {
     final lat = (json['latitude'] as num?)?.toDouble() ?? (json['lat'] as num?)?.toDouble();
     final lng = (json['longitude'] as num?)?.toDouble() ?? (json['lng'] as num?)?.toDouble();
 
+    final pType = (json['payment_type']?.toString() ?? '').toLowerCase();
+    final pStatus = (json['payment_status']?.toString() ?? '').toLowerCase();
+    final orderStatus = (json['status']?.toString() ?? '').toLowerCase();
+
     // Determine smart remittance status
     String rStatus = json['remittance_status']?.toString() ?? '';
     if (rStatus.isEmpty) {
-      final orderStatus = (json['status']?.toString() ?? '').toLowerCase();
-      final pType = (json['payment_type']?.toString() ?? '').toLowerCase();
-      final pStatus = (json['payment_status']?.toString() ?? '').toLowerCase();
-
       if (orderStatus == 'delivered' || orderStatus == 'completed') {
         if (pType == 'paystack' || pType == 'direct_transfer' || pType == 'prepaid' || pStatus == 'transfer_verified') {
           rStatus = 'direct_transfer';
@@ -133,6 +141,28 @@ class OrderModel extends OrderEntity {
       remittedDate = deliveredDate ?? DateTime.now();
     }
 
+    // Determine financial settlement status
+    String fStatus = json['financial_settlement_status']?.toString() ?? '';
+    if (fStatus.isEmpty) {
+      if (rStatus == 'direct_transfer' || pType == 'paystack' || pType == 'direct_transfer') {
+        fStatus = 'direct_transfer_settled';
+      } else if (rStatus == 'cleared') {
+        fStatus = 'cash_remitted_verified';
+      } else {
+        fStatus = 'pending_remittance';
+      }
+    }
+
+    String? gateCode = json['gate_pass_code']?.toString() ?? json['gate_pin']?.toString();
+    if (gateCode == null && notes.isNotEmpty) {
+      final pinMatch = RegExp(r'\[(?:Audit\s+)?Gate\s+PIN:\s*([A-Z0-9-]+)\]', caseSensitive: false).firstMatch(notes);
+      if (pinMatch != null) gateCode = pinMatch.group(1);
+    }
+
+    final sigUrl = json['customer_signature_url']?.toString() ??
+        json['proof_of_delivery_url']?.toString() ??
+        json['signature_url']?.toString();
+
     return OrderModel(
       id: json['id'] ?? '',
       orderNumber: json['order_number'] ?? '',
@@ -145,7 +175,7 @@ class OrderModel extends OrderEntity {
       landmark: json['landmark'],
       lga: json['lga'],
       productName: name,
-      status: json['status'] ?? 'accepted',
+      status: (json['status'] == 'new' || json['status'] == 'unassigned') ? 'pending' : (json['status'] ?? 'pending'),
       quantity: json['quantity'] ?? 1,
       paidQuantity: paid,
       freeQuantity: free,
@@ -155,7 +185,13 @@ class OrderModel extends OrderEntity {
       paymentType: json['payment_type'] ?? 'pay_on_delivery',
       paymentStatus: json['payment_status'] ?? 'pending',
       fulfillmentType: fulfillment,
-      clientName: json['client_name'] ?? 'Novacare Limited',
+      clientId: json['client_id']?.toString(),
+      clientName: json['client_name'] ?? 'Novacale Limited',
+      clientCompany: json['client_company'] ?? json['client_name'] ?? 'Novacale Limited',
+      clientPhone: json['client_phone']?.toString(),
+      clientEmail: json['client_email']?.toString(),
+      packageDealId: json['package_deal_id']?.toString(),
+      packageDealName: json['package_deal_name']?.toString(),
       packageCustodyId: json['package_custody_id'],
       clientDeliveryFee: (json['client_delivery_fee'] as num?)?.toDouble() ?? 5000.0,
       agentEntitlement: (json['agent_entitlement'] as num?)?.toDouble() ?? 2500.0,
@@ -170,11 +206,13 @@ class OrderModel extends OrderEntity {
       geocodingStatus: json['geocoding_status']?.toString(),
       geocodedAddress: json['geocoded_address']?.toString(),
       locationConfidence: json['location_confidence']?.toString() ?? (lat != null && lng != null ? 'high' : null),
-      customerSignatureUrl: json['customer_signature_url']?.toString(),
+      customerSignatureUrl: sigUrl,
       photoProofUrl: json['proof_photo_url']?.toString() ?? json['photo_proof_url']?.toString(),
+      gatePassCode: gateCode,
       isLocationVerified: json['is_location_verified'] == true || json['is_location_verified'] == 'true',
       failureReason: failReason,
       remittanceStatus: rStatus,
+      financialSettlementStatus: fStatus,
       remittanceReference: json['remittance_reference']?.toString() ?? (rStatus == 'cleared' ? 'RMT-00402' : null),
       remittedAt: remittedDate,
       assignedAt: assignedDate,
@@ -212,7 +250,13 @@ class OrderModel extends OrderEntity {
       paymentType: entity.paymentType,
       paymentStatus: entity.paymentStatus,
       fulfillmentType: entity.fulfillmentType,
+      clientId: entity.clientId,
       clientName: entity.clientName,
+      clientCompany: entity.clientCompany,
+      clientPhone: entity.clientPhone,
+      clientEmail: entity.clientEmail,
+      packageDealId: entity.packageDealId,
+      packageDealName: entity.packageDealName,
       packageCustodyId: entity.packageCustodyId,
       clientDeliveryFee: entity.clientDeliveryFee,
       agentEntitlement: entity.agentEntitlement,
@@ -229,9 +273,11 @@ class OrderModel extends OrderEntity {
       locationConfidence: entity.locationConfidence,
       customerSignatureUrl: entity.customerSignatureUrl,
       photoProofUrl: entity.photoProofUrl,
+      gatePassCode: entity.gatePassCode,
       isLocationVerified: entity.isLocationVerified,
       failureReason: entity.failureReason,
       remittanceStatus: entity.remittanceStatus,
+      financialSettlementStatus: entity.financialSettlementStatus,
       remittanceReference: entity.remittanceReference,
       remittedAt: entity.remittedAt,
       assignedAt: entity.assignedAt,
@@ -266,12 +312,18 @@ class OrderModel extends OrderEntity {
       'payment_type': paymentType,
       'payment_status': paymentStatus,
       'fulfillment_type': fulfillmentType,
+      'client_id': clientId,
+      'client_name': clientName,
+      'client_company': clientCompany,
+      'client_phone': clientPhone,
+      'client_email': clientEmail,
+      'package_deal_id': packageDealId,
+      'package_deal_name': packageDealName,
       'delivery_agent_id': deliveryAgentId,
       'delivery_agent_name': deliveryAgentName,
       'delivery_agent_code': deliveryAgentCode,
       'delivery_agent_phone': deliveryAgentPhone,
       'distribution_center_id': distributionCenterId,
-      'client_name': clientName,
       'package_custody_id': packageCustodyId,
       'client_delivery_fee': clientDeliveryFee,
       'agent_entitlement': agentEntitlement,
@@ -283,9 +335,11 @@ class OrderModel extends OrderEntity {
       'location_confidence': locationConfidence,
       'customer_signature_url': customerSignatureUrl,
       'proof_photo_url': photoProofUrl,
+      'gate_pass_code': gatePassCode,
       'is_location_verified': isLocationVerified,
       'failure_reason': failureReason,
       'remittance_status': remittanceStatus,
+      'financial_settlement_status': financialSettlementStatus,
       'remittance_reference': remittanceReference,
       'remitted_at': remittedAt?.toIso8601String(),
       'assigned_at': assignedAt?.toIso8601String(),

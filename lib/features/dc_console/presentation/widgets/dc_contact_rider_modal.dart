@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/helpers/formatters.dart';
+import '../../../../core/widgets/user_avatar_widget.dart';
 import '../../../notifications/presentation/providers/notifications_provider.dart';
 import '../../../orders/domain/entities/order.dart';
 
@@ -16,6 +17,7 @@ class DCContactRiderModal extends ConsumerStatefulWidget {
   final String riderCode;
   final String riderPhone;
   final String? riderId;
+  final String? riderAvatarUrl;
   final double amountAwaitingRemittance;
 
   const DCContactRiderModal({
@@ -25,6 +27,7 @@ class DCContactRiderModal extends ConsumerStatefulWidget {
     required this.riderCode,
     required this.riderPhone,
     this.riderId,
+    this.riderAvatarUrl,
     required this.amountAwaitingRemittance,
   });
 
@@ -35,6 +38,7 @@ class DCContactRiderModal extends ConsumerStatefulWidget {
     required String riderCode,
     required String riderPhone,
     String? riderId,
+    String? riderAvatarUrl,
     required double amountAwaitingRemittance,
   }) {
     return showDialog(
@@ -46,6 +50,7 @@ class DCContactRiderModal extends ConsumerStatefulWidget {
         riderCode: riderCode,
         riderPhone: riderPhone,
         riderId: riderId,
+        riderAvatarUrl: riderAvatarUrl,
         amountAwaitingRemittance: amountAwaitingRemittance,
       ),
     );
@@ -237,13 +242,10 @@ ${customNote.isNotEmpty ? "Note: $customNote\n" : ""}Kindly remit the cash custo
                 ),
                 child: Row(
                   children: [
-                    CircleAvatar(
+                    UserAvatarWidget(
+                      avatarUrl: widget.riderAvatarUrl,
+                      fullName: widget.riderName,
                       radius: 24,
-                      backgroundColor: const Color(0xFF00A2D3),
-                      child: Text(
-                        widget.riderName.isNotEmpty ? widget.riderName.substring(0, 1).toUpperCase() : 'R',
-                        style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-                      ),
                     ),
                     const SizedBox(width: 14),
                     Expanded(

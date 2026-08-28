@@ -11,6 +11,7 @@ import '../../../orders/domain/entities/order.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
 import '../../domain/entities/stock_item.dart';
 import '../providers/stock_provider.dart';
+import '../widgets/return_stock_modal.dart';
 
 class StockDetailsGrazerPage extends ConsumerWidget {
   final String productName;
@@ -381,25 +382,27 @@ class StockDetailsGrazerPage extends ConsumerWidget {
 
                   const SizedBox(height: 24),
 
-                  // 4. ACTION BUTTONS (Reconcile Stock & Deliveries)
+                  // 4. ACTION BUTTONS (Return to DC & Reconcile Stock)
                   Row(
                     children: [
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: () {
-                            context.push('/stock/audit');
+                            if (item != null) {
+                              ReturnStockModal.show(context, preselectedItem: item);
+                            }
                           },
-                          icon: const Icon(Icons.fact_check_outlined, size: 16, color: Color(0xFF2563EB)),
+                          icon: const Icon(Icons.assignment_return_rounded, size: 16, color: Color(0xFFEA580C)),
                           label: Text(
-                            'Reconcile Stock',
+                            'Return to DC',
                             style: GoogleFonts.inter(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
-                              color: const Color(0xFF2563EB),
+                              color: const Color(0xFFEA580C),
                             ),
                           ),
                           style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Color(0xFF2563EB), width: 1.2),
+                            side: const BorderSide(color: Color(0xFFEA580C), width: 1.2),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             padding: const EdgeInsets.symmetric(vertical: 12),
                           ),
@@ -409,11 +412,11 @@ class StockDetailsGrazerPage extends ConsumerWidget {
                       Expanded(
                         child: ElevatedButton.icon(
                           onPressed: () {
-                            context.push('/orders');
+                            context.push('/stock/audit');
                           },
-                          icon: const Icon(Icons.local_shipping_rounded, size: 16, color: Colors.white),
+                          icon: const Icon(Icons.fact_check_outlined, size: 16, color: Colors.white),
                           label: Text(
-                            'My Deliveries',
+                            'Reconcile Stock',
                             style: GoogleFonts.inter(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
@@ -421,7 +424,7 @@ class StockDetailsGrazerPage extends ConsumerWidget {
                             ),
                           ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
+                            backgroundColor: const Color(0xFF2563EB),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             padding: const EdgeInsets.symmetric(vertical: 12),
                           ),

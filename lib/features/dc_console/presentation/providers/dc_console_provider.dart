@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/supabase_constants.dart';
@@ -325,9 +326,15 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
   final LocalStorageService _storageService;
 
   static bool get isTestEnvironment {
+    try {
+      if (WidgetsBinding.instance.runtimeType.toString().toLowerCase().contains('test')) {
+        return true;
+      }
+    } catch (_) {}
     if (kIsWeb) return false;
     try {
-      return Platform.environment.containsKey('FLUTTER_TEST');
+      return Platform.environment.containsKey('FLUTTER_TEST') ||
+             Platform.environment.containsKey('TEST_PLATFORM');
     } catch (_) {
       return false;
     }

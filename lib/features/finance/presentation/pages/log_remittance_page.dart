@@ -86,7 +86,6 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
       ...deliveredOrders.map((o) {
         final cash = o.isCashPod ? o.totalAmount : 0.0;
         final comm = o.agentEntitlement > 0 ? o.agentEntitlement : commissionRate;
-        final posFee = o.isCashPod && o.totalAmount > 0 ? ((o.totalAmount / 5000.0).ceil() * 100.0) : 0.0;
         return RemittanceOrderItem(
           orderId: o.id,
           orderNumber: o.orderNumber,
@@ -97,7 +96,7 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
           riderCommission: comm,
           transportAllowance: transportPerOrder,
           failedStipend: 0.0,
-          posFee: posFee,
+          posFee: 0.0,
           date: o.createdAt,
         );
       }),
@@ -195,15 +194,19 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          'CASH BREAKDOWN & RETENTIONS',
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.8,
-                            color: const Color(0xFF64748B),
+                        Expanded(
+                          child: Text(
+                            'CASH BREAKDOWN & RETENTIONS',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.8,
+                              color: const Color(0xFF64748B),
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
@@ -248,25 +251,31 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Net Due for Remittance:',
-                                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? Colors.white70 : const Color(0xFF475569)),
-                              ),
-                              Text(
-                                'Must be paid to clear custody',
-                                style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8)),
-                              ),
-                            ],
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Net Due for Remittance:',
+                                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? Colors.white70 : const Color(0xFF475569)),
+                                ),
+                                Text(
+                                  'Must be paid to clear custody',
+                                  style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8)),
+                                ),
+                              ],
+                            ),
                           ),
-                          Text(
-                            CurrencyFormatter.formatNaira(expectedAmount),
-                            style: GoogleFonts.inter(
-                              fontSize: 19,
-                              fontWeight: FontWeight.w900,
-                              color: AppColors.orange,
+                          const SizedBox(width: 8),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              CurrencyFormatter.formatNaira(expectedAmount),
+                              style: GoogleFonts.inter(
+                                fontSize: 19,
+                                fontWeight: FontWeight.w900,
+                                color: AppColors.orange,
+                              ),
                             ),
                           ),
                         ],
@@ -330,20 +339,24 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
                         children: [
                           const Icon(Icons.warning_amber_rounded, color: Color(0xFFEA580C), size: 20),
                           const SizedBox(width: 8),
-                          Text(
-                            discrepancyAmount < 0
-                                ? 'Shortage Discrepancy: ${CurrencyFormatter.formatNaira(discrepancyAmount.abs())}'
-                                : 'Overpayment Discrepancy: +${CurrencyFormatter.formatNaira(discrepancyAmount)}',
-                            style: GoogleFonts.inter(
-                              color: const Color(0xFFEA580C),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
+                          Expanded(
+                            child: Text(
+                              discrepancyAmount < 0
+                                  ? 'Shortage Discrepancy: ${CurrencyFormatter.formatNaira(discrepancyAmount.abs())}'
+                                  : 'Overpayment Discrepancy: +${CurrencyFormatter.formatNaira(discrepancyAmount)}',
+                              style: GoogleFonts.inter(
+                                color: const Color(0xFFEA580C),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 8),
                       DropdownButtonFormField<String>(
+                        isExpanded: true,
                         value: selectedDiscrepancyReason,
                         hint: Text('Select Reason for Discrepancy', style: GoogleFonts.inter(fontSize: 12)),
                         items: _discrepancyReasons.map((r) => DropdownMenuItem(value: r, child: Text(r, style: GoogleFonts.inter(fontSize: 12)))).toList(),
@@ -396,12 +409,15 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
                         children: [
                           Row(
                             children: [
-                              Text(
-                                'Paystack Remittance Portal',
-                                style: GoogleFonts.inter(
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                              Expanded(
+                                child: Text(
+                                  'Paystack Remittance Portal',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                               const SizedBox(width: 6),
@@ -724,13 +740,17 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 12.5,
-            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+        Expanded(
+          child: Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 12.5,
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+            ),
+            overflow: TextOverflow.ellipsis,
           ),
         ),
+        const SizedBox(width: 8),
         Text(
           value,
           style: GoogleFonts.inter(

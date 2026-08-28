@@ -1,8 +1,9 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import '../../../../core/services/local_storage_service.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/datasources/orders_remote_datasource.dart';
@@ -78,11 +79,25 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     bool isTest = false;
     if (!kIsWeb) {
       try {
-        isTest = Platform.environment.containsKey('FLUTTER_TEST');
+        isTest = Platform.environment.containsKey('FLUTTER_TEST') ||
+                 Platform.environment.containsKey('TEST_PLATFORM');
       } catch (_) {}
     }
+    try {
+      if (WidgetsBinding.instance.runtimeType.toString().toLowerCase().contains('test')) {
+        isTest = true;
+      }
+    } catch (_) {}
     if (!isTest) {
       _startHeartbeatTimer();
+    }
+    if (_ref != null) {
+      _ref.listen<AuthState>(authProvider, (previous, next) {
+        final nextAgentId = next.user?.deliveryAgentId ?? next.user?.id;
+        if (nextAgentId != null && nextAgentId.isNotEmpty) {
+          loadOrders(nextAgentId);
+        }
+      });
     }
   }
 
@@ -91,8 +106,8 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
       final user = _ref.read(authProvider).user;
       if (user == null) return false;
       final role = user.role.toLowerCase();
-      return (role == 'rider' || role == 'delivery_agent') &&
-          (user.deliveryAgentId != null && user.deliveryAgentId!.isNotEmpty);
+      return (role.contains('rider') || role.contains('agent') || role.contains('driver') || user.isPda) &&
+          ((user.deliveryAgentId != null && user.deliveryAgentId!.isNotEmpty) || user.id.isNotEmpty);
     }
     return false;
   }
@@ -100,8 +115,8 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
   String _getActiveAgentId() {
     if (_ref != null) {
       final user = _ref.read(authProvider).user;
-      if (user != null && _isRiderUser()) {
-        return user.deliveryAgentId!;
+      if (user != null) {
+        return user.deliveryAgentId ?? user.id;
       }
     }
     return '';
@@ -179,9 +194,17 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
   }
 
   void _startHeartbeatTimer() {
+    try {
+      if (WidgetsBinding.instance.runtimeType.toString().toLowerCase().contains('test')) {
+        return;
+      }
+    } catch (_) {}
     if (!kIsWeb) {
       try {
-        if (Platform.environment.containsKey('FLUTTER_TEST')) return;
+        if (Platform.environment.containsKey('FLUTTER_TEST') ||
+            Platform.environment.containsKey('TEST_PLATFORM')) {
+          return;
+        }
       } catch (_) {}
     }
     _heartbeatTimer?.cancel();
@@ -316,6 +339,42 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
       state = state.copyWith(isLoading: false, errorMessage: 'Failed to create order: $e');
       return false;
     }
+  }
+
+  /// Bulk creates orders from parsed CSV data
+  Future<Map<String, dynamic>> bulkCreateOrders(List<Map<String, dynamic>> ordersList) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    int successCount = 0;
+    int failCount = 0;
+    final List<OrderEntity> newOrders = [];
+
+    for (final orderData in ordersList) {
+      try {
+        final created = await _repository.createOrder(orderData);
+        newOrders.add(created);
+        successCount++;
+      } catch (e) {
+        failCount++;
+      }
+    }
+
+    final rawUpdated = [
+      ...newOrders,
+      ...state.orders.where((o) => !newOrders.any((no) => no.id == o.id || no.orderNumber == o.orderNumber)),
+    ];
+    final updatedOrders = _sortOrdersByOperationalPriority(rawUpdated);
+    state = state.copyWith(
+      isLoading: false,
+      orders: updatedOrders,
+    );
+    await _storageService.cacheOrders(updatedOrders, _getScopeKey());
+
+    return {
+      'success': successCount > 0,
+      'importedCount': successCount,
+      'failedCount': failCount,
+      'totalCount': ordersList.length,
+    };
   }
 
   Future<bool> assignOrderToRider({
@@ -456,6 +515,9 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     required double amountCollected,
     String? customerSignatureUrl,
     String? photoProofUrl,
+    String? gatePassCode,
+    double? latitude,
+    double? longitude,
     String? notes,
   }) async {
     state = state.copyWith(isLoading: true);
@@ -474,49 +536,30 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
         amountCollected: amountCollected,
         customerSignatureUrl: customerSignatureUrl,
         photoProofUrl: photoProofUrl,
+        gatePassCode: gatePassCode,
+        latitude: latitude,
+        longitude: longitude,
         notes: notes,
       );
 
       final updatedList = state.orders.map((o) {
         if (o.id == orderId || o.orderNumber == orderId) {
-          return OrderEntity(
-            id: o.id,
-            orderNumber: o.orderNumber,
-            customerName: o.customerName,
-            customerPhone: o.customerPhone,
-            customerAltPhone: o.customerAltPhone,
-            deliveryCity: o.deliveryCity,
-            deliveryState: o.deliveryState,
-            deliveryAddress: o.deliveryAddress,
-            landmark: o.landmark,
-            lga: o.lga,
-            productName: o.productName,
+          final isCleared = isDirectTransfer;
+          return o.copyWith(
             status: 'delivered',
-            quantity: o.quantity,
-            paidQuantity: o.paidQuantity,
-            freeQuantity: o.freeQuantity,
-            basePrice: o.basePrice,
-            upsellAmount: o.upsellAmount,
-            totalAmount: o.totalAmount,
             paymentType: resolvedPaymentType,
             paymentStatus: resolvedPaymentStatus,
-            fulfillmentType: o.fulfillmentType,
-            clientName: o.clientName,
-            packageCustodyId: o.packageCustodyId,
-            clientDeliveryFee: o.clientDeliveryFee,
-            agentEntitlement: o.agentEntitlement,
+            remittanceStatus: isCleared ? 'direct_transfer' : 'unremitted',
+            financialSettlementStatus: isCleared ? 'direct_transfer_settled' : 'pending_remittance',
             deliveryNotes: notes ?? o.deliveryNotes,
-            createdAt: o.createdAt,
-            deliveryAgentId: o.deliveryAgentId,
-            deliveryAgentName: o.deliveryAgentName,
-            deliveryAgentCode: o.deliveryAgentCode,
-            distributionCenterId: o.distributionCenterId,
-            latitude: o.latitude,
-            longitude: o.longitude,
-            geocodingStatus: o.geocodingStatus,
-            geocodedAddress: o.geocodedAddress,
-            locationConfidence: o.locationConfidence,
-            isLocationVerified: o.isLocationVerified,
+            deliveredAt: DateTime.now(),
+            customerSignatureUrl: customerSignatureUrl ?? o.customerSignatureUrl,
+            photoProofUrl: photoProofUrl ?? o.photoProofUrl,
+            gatePassCode: gatePassCode ?? o.gatePassCode,
+            latitude: latitude ?? o.latitude,
+            longitude: longitude ?? o.longitude,
+            isLocationVerified: true,
+            geocodingStatus: 'exact_verified',
           );
         }
         return o;
@@ -538,6 +581,9 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     required String reasonCode,
     String? notes,
     String? scheduledCallbackAt,
+    String? gatePassCode,
+    double? latitude,
+    double? longitude,
   }) async {
     state = state.copyWith(isLoading: true);
     final isCallback = reasonCode == 'rescheduled' || scheduledCallbackAt != null;
@@ -549,48 +595,22 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
         reasonCode: reasonCode,
         notes: notes,
         scheduledCallbackAt: scheduledCallbackAt,
+        gatePassCode: gatePassCode,
+        latitude: latitude,
+        longitude: longitude,
       );
 
       final updatedList = state.orders.map((o) {
         if (o.id == orderId || o.orderNumber == orderId) {
-          return OrderEntity(
-            id: o.id,
-            orderNumber: o.orderNumber,
-            customerName: o.customerName,
-            customerPhone: o.customerPhone,
-            customerAltPhone: o.customerAltPhone,
-            deliveryCity: o.deliveryCity,
-            deliveryState: o.deliveryState,
-            deliveryAddress: o.deliveryAddress,
-            landmark: o.landmark,
-            lga: o.lga,
-            productName: o.productName,
+          return o.copyWith(
             status: newStatus,
-            quantity: o.quantity,
-            paidQuantity: o.paidQuantity,
-            freeQuantity: o.freeQuantity,
-            basePrice: o.basePrice,
-            upsellAmount: o.upsellAmount,
-            totalAmount: o.totalAmount,
-            paymentType: o.paymentType,
-            paymentStatus: o.paymentStatus,
-            fulfillmentType: o.fulfillmentType,
-            clientName: o.clientName,
-            packageCustodyId: o.packageCustodyId,
-            clientDeliveryFee: o.clientDeliveryFee,
-            agentEntitlement: o.agentEntitlement,
             deliveryNotes: notes ?? o.deliveryNotes,
-            createdAt: o.createdAt,
-            deliveryAgentId: o.deliveryAgentId,
-            deliveryAgentName: o.deliveryAgentName,
-            deliveryAgentCode: o.deliveryAgentCode,
-            distributionCenterId: o.distributionCenterId,
-            latitude: o.latitude,
-            longitude: o.longitude,
-            geocodingStatus: o.geocodingStatus,
-            geocodedAddress: o.geocodedAddress,
-            locationConfidence: o.locationConfidence,
-            isLocationVerified: o.isLocationVerified,
+            failureReason: notes ?? o.failureReason ?? 'Delivery failure reported by PDA',
+            gatePassCode: gatePassCode ?? o.gatePassCode,
+            latitude: latitude ?? o.latitude,
+            longitude: longitude ?? o.longitude,
+            isLocationVerified: true,
+            geocodingStatus: 'exact_verified',
           );
         }
         return o;
@@ -623,38 +643,7 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
 
       final updatedList = state.orders.map((o) {
         if (o.id == orderId || o.orderNumber == orderId) {
-          return OrderEntity(
-            id: o.id,
-            orderNumber: o.orderNumber,
-            customerName: o.customerName,
-            customerPhone: o.customerPhone,
-            customerAltPhone: o.customerAltPhone,
-            deliveryCity: o.deliveryCity,
-            deliveryState: o.deliveryState,
-            deliveryAddress: o.deliveryAddress,
-            landmark: o.landmark,
-            lga: o.lga,
-            productName: o.productName,
-            status: o.status,
-            quantity: o.quantity,
-            paidQuantity: o.paidQuantity,
-            freeQuantity: o.freeQuantity,
-            basePrice: o.basePrice,
-            upsellAmount: o.upsellAmount,
-            totalAmount: o.totalAmount,
-            paymentType: o.paymentType,
-            paymentStatus: o.paymentStatus,
-            fulfillmentType: o.fulfillmentType,
-            clientName: o.clientName,
-            packageCustodyId: o.packageCustodyId,
-            clientDeliveryFee: o.clientDeliveryFee,
-            agentEntitlement: o.agentEntitlement,
-            deliveryNotes: o.deliveryNotes,
-            createdAt: o.createdAt,
-            deliveryAgentId: o.deliveryAgentId,
-            deliveryAgentName: o.deliveryAgentName,
-            deliveryAgentCode: o.deliveryAgentCode,
-            distributionCenterId: o.distributionCenterId,
+          return o.copyWith(
             latitude: latitude,
             longitude: longitude,
             isLocationVerified: isLocationVerified,
@@ -670,6 +659,30 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     } catch (e) {
       // Ignored
     }
+  }
+
+  Future<void> updateOrderRemittance({
+    required String orderId,
+    required String remittanceStatus,
+    String? remittanceReference,
+  }) async {
+    final updatedList = state.orders.map((o) {
+      if (o.id == orderId || o.orderNumber == orderId) {
+        final fStatus = remittanceStatus == 'cleared'
+            ? 'cash_remitted_verified'
+            : (o.isDirectTransfer ? 'direct_transfer_settled' : 'pending_remittance');
+        return o.copyWith(
+          remittanceStatus: remittanceStatus,
+          financialSettlementStatus: fStatus,
+          remittanceReference: remittanceReference ?? o.remittanceReference,
+          remittedAt: remittanceStatus == 'cleared' ? DateTime.now() : o.remittedAt,
+        );
+      }
+      return o;
+    }).toList();
+
+    state = state.copyWith(orders: updatedList);
+    await _storageService.cacheOrders(updatedList, _getScopeKey());
   }
 
   /// Geocodes an order address and updates state

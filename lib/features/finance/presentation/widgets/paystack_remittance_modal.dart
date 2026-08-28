@@ -116,9 +116,7 @@ class _PaystackRemittanceModalState extends ConsumerState<PaystackRemittanceModa
   void _openPaystackPopup() {
     final authUrl = ref.read(paystackRemittanceAuthUrlProvider);
     if (kIsWeb) {
-      final int amountKobo = (PaystackConstants.publicKey.startsWith('pk_test_') && widget.amount > 250000)
-          ? 25000000
-          : (widget.amount * 100).toInt();
+      final int amountKobo = (widget.amount * 100).toInt();
 
       launchPaystackInlineJs(
         publicKey: PaystackConstants.publicKey,

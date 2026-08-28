@@ -223,7 +223,7 @@ class _CenterDeliveriesHumpButton extends StatelessWidget {
               color: isSelected ? accentColor : const Color(0xFF94A3B8),
               letterSpacing: 0.3,
             ),
-            child: const Text('Deliveries'),
+            child: const Text('Orders'),
           ),
         ],
       ),

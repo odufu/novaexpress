@@ -92,10 +92,10 @@ void main() {
         user: testRider,
       );
 
-      // Cash in custody comes from Cash POD (18,500 - 1,000 commission - 1,500 transport - 400 transfer fee = 15,600 pending remittance)
+      // Cash in custody comes from Cash POD (18,500 - 1,000 commission - 1,500 transport = 16,000 pending remittance)
       expect(summary.cashCollectedAllTime, equals(18500.0));
-      expect(summary.totalTransferFeesRetained, equals(400.0));
-      expect(summary.pendingRemittanceToDC, equals(15600.0));
+      expect(summary.totalTransferFeesRetained, equals(0.0));
+      expect(summary.pendingRemittanceToDC, equals(16000.0));
 
       // Direct transfer earnings credit to myDirectTransfersBalance
       expect(summary.myDirectTransfersBalance, equals(2500.0));
@@ -142,9 +142,8 @@ void main() {
       // Verify Paystack Payment Breakdown UI appears
       expect(find.text('PAYSTACK PAYMENT BREAKDOWN'), findsOneWidget);
       expect(find.text('RETURNING TO "MY BALANCE"'), findsOneWidget);
-      expect(find.text('Proceed to Pay via Paystack'), findsOneWidget);
-      expect(find.text('Check Status'), findsOneWidget);
       expect(find.text('Settled Directly to Company'), findsOneWidget);
+      expect(find.text('Physical Cash Held by Rider'), findsOneWidget);
       expect(find.text('Enter Physical Cash Collected'), findsNothing);
 
       // Switch back to Cash
@@ -170,6 +169,9 @@ class MockTestOrdersNotifier extends StateNotifier<OrdersState> implements Order
     String? customerSignatureUrl,
     String? photoProofUrl,
     String? notes,
+    String? gatePassCode,
+    double? latitude,
+    double? longitude,
   }) async => {'status': 'success'};
 
   @override

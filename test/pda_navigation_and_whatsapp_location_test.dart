@@ -9,6 +9,7 @@ import 'package:novexps/features/auth/domain/usecases/get_current_user.dart';
 import 'package:novexps/features/auth/domain/usecases/login.dart';
 import 'package:novexps/features/auth/domain/usecases/logout.dart';
 import 'package:novexps/features/auth/presentation/providers/auth_provider.dart';
+import 'package:novexps/features/notifications/presentation/providers/notifications_provider.dart';
 import 'package:novexps/features/orders/data/models/order_model.dart';
 import 'package:novexps/features/orders/domain/entities/order.dart';
 import 'package:novexps/features/orders/domain/repositories/orders_repository.dart';
@@ -135,7 +136,7 @@ void main() {
       expect(model.latitude, 6.59220);
       expect(model.longitude, 3.35560);
       expect(model.isLocationVerified, isTrue);
-      expect(model.confidenceDisplay, 'Verified Gate PIN');
+      expect(model.confidenceDisplay, contains('Verified Gate PIN'));
       expect(model.formattedWhatsAppPhone, '2347031112233');
 
       final serialized = model.toJson();
@@ -211,6 +212,7 @@ void main() {
         ProviderScope(
           overrides: [
             ordersProvider.overrideWith((ref) => mockNotifier),
+            notificationsProvider.overrideWith((ref) => MockNotificationsNotifier()),
             authProvider.overrideWith((ref) {
               final notifier = AuthNotifier(
                 loginUseCase: LoginUseCase(AuthRepositoryImpl(MockAuthRemoteDataSource())),
@@ -239,7 +241,7 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      expect(find.text('DELIVERIES'), findsOneWidget);
+      expect(find.text('ORDERS'), findsOneWidget);
       expect(find.text('Amina Yusuf'), findsOneWidget);
       expect(find.text('Emeka Eze'), findsOneWidget);
       expect(find.text('GPS PIN 📍'), findsOneWidget);
@@ -249,16 +251,27 @@ void main() {
   });
 }
 
-class MockOrdersNotifier extends OrdersNotifier {
+class MockNotificationsNotifier extends StateNotifier<NotificationsState> implements NotificationsNotifier {
+  MockNotificationsNotifier() : super(const NotificationsState(notifications: [], isLoading: false));
+
+  @override
+  Future<void> fetchNotifications([String? agentId]) async {}
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class MockOrdersNotifier extends StateNotifier<OrdersState> implements OrdersNotifier {
   final List<OrderEntity> _initial;
-  MockOrdersNotifier(this._initial) : super(MockOrdersRepository(_initial)) {
-    state = OrdersState(isLoading: false, orders: _initial);
-  }
+  MockOrdersNotifier(this._initial) : super(OrdersState(isLoading: false, orders: _initial));
 
   @override
   Future<void> loadOrders([String? agentId]) async {
     state = state.copyWith(isLoading: false, orders: _initial);
   }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class MockOrdersRepository implements OrdersRepository {
@@ -288,7 +301,19 @@ class MockOrdersRepository implements OrdersRepository {
   }
 
   @override
-  Future<void> updateOrderStatus(String orderId, String status, {String? paymentStatus, String? paymentType, String? notes}) async {}
+  Future<void> updateOrderStatus(
+    String orderId,
+    String status, {
+    String? paymentStatus,
+    String? paymentType,
+    String? notes,
+    String? customerSignatureUrl,
+    String? photoProofUrl,
+    String? gatePassCode,
+    double? latitude,
+    double? longitude,
+    bool? isLocationVerified,
+  }) async {}
 
   @override
   Future<Map<String, dynamic>> confirmDeliveryPod({
@@ -300,6 +325,9 @@ class MockOrdersRepository implements OrdersRepository {
     String? customerSignatureUrl,
     String? photoProofUrl,
     String? notes,
+    String? gatePassCode,
+    double? latitude,
+    double? longitude,
   }) async => {'status': 'success'};
 
   @override
@@ -309,6 +337,9 @@ class MockOrdersRepository implements OrdersRepository {
     required String reasonCode,
     String? notes,
     String? scheduledCallbackAt,
+    String? gatePassCode,
+    double? latitude,
+    double? longitude,
   }) async => {'status': 'success'};
 
   @override

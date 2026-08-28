@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/helpers/formatters.dart';
+import '../../../../core/widgets/user_avatar_widget.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
 import '../../../stock/domain/entities/stock_item.dart';
@@ -20,12 +21,12 @@ class DCOrderDetailModal extends ConsumerStatefulWidget {
 }
 
 class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
-  late OrderEntity _currentOrder;
-
-  @override
-  void initState() {
-    super.initState();
-    _currentOrder = widget.order;
+  OrderEntity get _currentOrder {
+    final ordersState = ref.watch(ordersProvider);
+    return ordersState.orders.firstWhere(
+      (o) => o.id == widget.order.id || o.orderNumber == widget.order.orderNumber,
+      orElse: () => widget.order,
+    );
   }
 
   Future<void> _launchUri(Uri uri) async {
@@ -520,10 +521,10 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
       child: hasRider
           ? Row(
               children: [
-                CircleAvatar(
+                UserAvatarWidget(
+                  avatarUrl: assignedDriver.avatarUrl,
+                  fullName: assignedDriver.name,
                   radius: 22,
-                  backgroundColor: const Color(0xFF2563EB).withValues(alpha: 0.15),
-                  child: Text(assignedDriver.name.substring(0, 1), style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -812,6 +813,7 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
   void _showReassignDialog(BuildContext context, bool isDark, List<DCFleetDriver> drivers) {
     final messenger = ScaffoldMessenger.of(context);
     final stockState = ref.read(stockProvider);
+    final order = _currentOrder;
 
     showDialog(
       context: context,
@@ -828,16 +830,17 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
                 final driverAllocations = stockState.getAllocationsForRider(d.id, d.driverCode);
                 int riderUnits = 0;
                 for (final a in driverAllocations) {
-                  if (a.productName.toLowerCase().contains(_currentOrder.productName.toLowerCase()) ||
-                      _currentOrder.productName.toLowerCase().contains(a.productName.toLowerCase())) {
+                  if (a.productName.toLowerCase().contains(order.productName.toLowerCase()) ||
+                      order.productName.toLowerCase().contains(a.productName.toLowerCase())) {
                     riderUnits += a.inCustodyUnits;
                   }
                 }
 
                 return ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: const Color(0xFF2563EB).withValues(alpha: 0.15),
-                    child: Text(d.name.substring(0, 1), style: const TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.bold)),
+                  leading: UserAvatarWidget(
+                    avatarUrl: d.avatarUrl,
+                    fullName: d.name,
+                    radius: 20,
                   ),
                   title: Text(d.name, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13)),
                   subtitle: Text('${d.driverCode} • Zone: ${d.assignedZone} • In Vehicle: $riderUnits units', style: GoogleFonts.inter(fontSize: 11)),
@@ -845,25 +848,14 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
                   onTap: () async {
                     Navigator.of(ctx).pop();
                     final success = await ref.read(ordersProvider.notifier).assignOrderToRider(
-                          orderId: _currentOrder.id,
+                          orderId: order.id,
                           riderId: d.id,
                           riderName: d.name,
                           riderCode: d.driverCode,
                         );
-                    if (mounted) {
-                      setState(() {
-                        _currentOrder = _currentOrder.copyWith(
-                          deliveryAgentId: d.id,
-                          deliveryAgentName: d.name,
-                          deliveryAgentCode: d.driverCode,
-                          status: 'accepted',
-                          assignedAt: DateTime.now(),
-                        );
-                      });
-                    }
                     messenger.showSnackBar(
                       SnackBar(
-                        content: Text(success ? '✅ Order ${_currentOrder.orderNumber} assigned to ${d.name}!' : '⚠️ Could not assign order.'),
+                        content: Text(success ? '✅ Order ${order.orderNumber} assigned to ${d.name}!' : '⚠️ Could not assign order.'),
                         backgroundColor: success ? const Color(0xFF10B981) : const Color(0xFFEF4444),
                       ),
                     );
@@ -877,19 +869,20 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
     );
   }
 
-  void _markOrderAsRemitted(BuildContext context) {
+  void _markOrderAsRemitted(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
-    setState(() {
-      _currentOrder = _currentOrder.copyWith(
-        remittanceStatus: 'cleared',
-        remittanceReference: 'RMT-REC-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
-        remittedAt: DateTime.now(),
-      );
-    });
+    final order = _currentOrder;
+    final refCode = 'RMT-REC-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+
+    await ref.read(ordersProvider.notifier).updateOrderRemittance(
+      orderId: order.id,
+      remittanceStatus: 'cleared',
+      remittanceReference: refCode,
+    );
 
     messenger.showSnackBar(
       SnackBar(
-        content: Text('✅ Order ${_currentOrder.orderNumber} remittance marked as CLEARED & RECONCILED! (Ref: ${_currentOrder.remittanceReference})'),
+        content: Text('✅ Order ${order.orderNumber} remittance marked as CLEARED & RECONCILED! (Ref: $refCode)'),
         backgroundColor: const Color(0xFF10B981),
       ),
     );

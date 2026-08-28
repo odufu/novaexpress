@@ -268,7 +268,7 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
       name: fullName,
       phone: phone,
       email: email,
-      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+      avatarUrl: '',
       vehicleModel: _vehicleModelController.text.trim(),
       vehiclePlate: _vehiclePlateController.text.trim(),
       vehicleType: draftState.vehicleType,

@@ -20,7 +20,13 @@ class OrderEntity {
   final String paymentType; // 'pay_on_delivery' | 'prepaid'
   final String paymentStatus;
   final String fulfillmentType; // 'distributed_inventory' | 'client_package'
-  final String clientName; // e.g. 'NovaCare'
+  final String? clientId; // e.g. 'cli-novacale-001'
+  final String clientName; // e.g. 'Dr. Chuka Okafor'
+  final String clientCompany; // e.g. 'Novacale Limited'
+  final String? clientPhone;
+  final String? clientEmail;
+  final String? packageDealId; // e.g. 'pkg-alpha-02'
+  final String? packageDealName; // e.g. 'Triple Treatment Pack (2 + 1 Free)'
   final String? packageCustodyId;
   final double clientDeliveryFee; // e.g. 5000.0
   final double agentEntitlement; // e.g. 2500.0
@@ -36,9 +42,11 @@ class OrderEntity {
   final String? locationConfidence; // 'high', 'medium', 'low', 'unresolved'
   final String? customerSignatureUrl;
   final String? photoProofUrl;
+  final String? gatePassCode;
   final bool isLocationVerified;
   final String? failureReason;
   final String remittanceStatus; // 'cleared', 'unremitted', 'pending_verification', 'direct_transfer', 'prepaid'
+  final String financialSettlementStatus; // 'pending_remittance', 'direct_transfer_settled', 'cash_remitted_verified'
   final String? remittanceReference;
   final DateTime? remittedAt;
   final DateTime? assignedAt;
@@ -72,7 +80,13 @@ class OrderEntity {
     required this.paymentType,
     required this.paymentStatus,
     this.fulfillmentType = 'distributed_inventory',
-    this.clientName = 'Novacare Limited',
+    this.clientId,
+    this.clientName = 'Novacale Limited',
+    this.clientCompany = 'Novacale Limited',
+    this.clientPhone,
+    this.clientEmail,
+    this.packageDealId,
+    this.packageDealName,
     this.packageCustodyId,
     this.clientDeliveryFee = 5000.0,
     this.agentEntitlement = 2500.0,
@@ -89,9 +103,11 @@ class OrderEntity {
     this.locationConfidence,
     this.customerSignatureUrl,
     this.photoProofUrl,
+    this.gatePassCode,
     this.isLocationVerified = false,
     this.failureReason,
     this.remittanceStatus = 'unremitted',
+    this.financialSettlementStatus = 'pending_remittance',
     this.remittanceReference,
     this.remittedAt,
     this.assignedAt,
@@ -186,13 +202,30 @@ class OrderEntity {
 
   int get totalPhysicalQuantity => paidQuantity + freeQuantity > 0 ? paidQuantity + freeQuantity : quantity;
   bool get hasCoordinates => latitude != null && longitude != null && latitude != 0.0 && longitude != 0.0;
+  bool get hasSignature => customerSignatureUrl != null && customerSignatureUrl!.isNotEmpty;
+
+  /// Returns the explicit or deterministic audit Gate PIN for this order
+  String get effectiveGatePin {
+    if (gatePassCode != null && gatePassCode!.trim().isNotEmpty) {
+      return gatePassCode!.trim().toUpperCase();
+    }
+    if (deliveryNotes != null) {
+      final pinMatch = RegExp(r'\[(?:Audit\s+)?Gate\s+PIN:\s*([A-Z0-9-]+)\]', caseSensitive: false).firstMatch(deliveryNotes!);
+      if (pinMatch != null && pinMatch.group(1) != null) {
+        return pinMatch.group(1)!.trim().toUpperCase();
+      }
+    }
+    final cleanNo = orderNumber.replaceAll(RegExp(r'[^0-9A-Za-z]'), '');
+    final suffix = cleanNo.length >= 4 ? cleanNo.substring(cleanNo.length - 4) : '7182';
+    return 'GT-$suffix';
+  }
 
   String get coordinatesFormatted => hasCoordinates
       ? '${latitude!.toStringAsFixed(5)}, ${longitude!.toStringAsFixed(5)}'
       : 'Not Geocoded';
 
   String get confidenceDisplay {
-    if (isLocationVerified) return 'Verified Gate PIN';
+    if (isLocationVerified) return 'Verified Gate PIN ($effectiveGatePin)';
     switch (locationConfidence?.toLowerCase()) {
       case 'high':
         return 'High Accuracy PIN';
@@ -285,6 +318,18 @@ Kindly tap the "📎" attach button below and share your *Current Location / Liv
     }
   }
 
+  bool get isFullySettledToCompany {
+    if (isDirectTransfer) return true;
+    if (isDelivered && (remittanceStatus.toLowerCase() == 'cleared' || financialSettlementStatus == 'cash_remitted_verified')) {
+      return true;
+    }
+    return false;
+  }
+
+  bool get isPendingRemittance {
+    return isDelivered && !isFullySettledToCompany;
+  }
+
   OrderEntity copyWith({
     String? id,
     String? orderNumber,
@@ -307,7 +352,13 @@ Kindly tap the "📎" attach button below and share your *Current Location / Liv
     String? paymentType,
     String? paymentStatus,
     String? fulfillmentType,
+    String? clientId,
     String? clientName,
+    String? clientCompany,
+    String? clientPhone,
+    String? clientEmail,
+    String? packageDealId,
+    String? packageDealName,
     String? packageCustodyId,
     double? clientDeliveryFee,
     double? agentEntitlement,
@@ -322,9 +373,13 @@ Kindly tap the "📎" attach button below and share your *Current Location / Liv
     String? geocodingStatus,
     String? geocodedAddress,
     String? locationConfidence,
+    String? customerSignatureUrl,
+    String? photoProofUrl,
+    String? gatePassCode,
     bool? isLocationVerified,
     String? failureReason,
     String? remittanceStatus,
+    String? financialSettlementStatus,
     String? remittanceReference,
     DateTime? remittedAt,
     DateTime? assignedAt,
@@ -357,7 +412,13 @@ Kindly tap the "📎" attach button below and share your *Current Location / Liv
       paymentType: paymentType ?? this.paymentType,
       paymentStatus: paymentStatus ?? this.paymentStatus,
       fulfillmentType: fulfillmentType ?? this.fulfillmentType,
+      clientId: clientId ?? this.clientId,
       clientName: clientName ?? this.clientName,
+      clientCompany: clientCompany ?? this.clientCompany,
+      clientPhone: clientPhone ?? this.clientPhone,
+      clientEmail: clientEmail ?? this.clientEmail,
+      packageDealId: packageDealId ?? this.packageDealId,
+      packageDealName: packageDealName ?? this.packageDealName,
       packageCustodyId: packageCustodyId ?? this.packageCustodyId,
       clientDeliveryFee: clientDeliveryFee ?? this.clientDeliveryFee,
       agentEntitlement: agentEntitlement ?? this.agentEntitlement,
@@ -372,9 +433,13 @@ Kindly tap the "📎" attach button below and share your *Current Location / Liv
       geocodingStatus: geocodingStatus ?? this.geocodingStatus,
       geocodedAddress: geocodedAddress ?? this.geocodedAddress,
       locationConfidence: locationConfidence ?? this.locationConfidence,
+      customerSignatureUrl: customerSignatureUrl ?? this.customerSignatureUrl,
+      photoProofUrl: photoProofUrl ?? this.photoProofUrl,
+      gatePassCode: gatePassCode ?? this.gatePassCode,
       isLocationVerified: isLocationVerified ?? this.isLocationVerified,
       failureReason: failureReason ?? this.failureReason,
       remittanceStatus: remittanceStatus ?? this.remittanceStatus,
+      financialSettlementStatus: financialSettlementStatus ?? this.financialSettlementStatus,
       remittanceReference: remittanceReference ?? this.remittanceReference,
       remittedAt: remittedAt ?? this.remittedAt,
       assignedAt: assignedAt ?? this.assignedAt,

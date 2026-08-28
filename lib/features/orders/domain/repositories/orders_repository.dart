@@ -11,7 +11,19 @@ abstract class OrdersRepository {
     required String riderCode,
   });
   Future<OrderEntity> getOrderById(String orderId);
-  Future<void> updateOrderStatus(String orderId, String status, {String? paymentStatus, String? paymentType, String? notes});
+  Future<void> updateOrderStatus(
+    String orderId,
+    String status, {
+    String? paymentStatus,
+    String? paymentType,
+    String? notes,
+    String? customerSignatureUrl,
+    String? photoProofUrl,
+    String? gatePassCode,
+    double? latitude,
+    double? longitude,
+    bool? isLocationVerified,
+  });
   Future<Map<String, dynamic>> confirmDeliveryPod({
     required String orderId,
     required String agentId,
@@ -21,6 +33,9 @@ abstract class OrdersRepository {
     String? customerSignatureUrl,
     String? photoProofUrl,
     String? notes,
+    String? gatePassCode,
+    double? latitude,
+    double? longitude,
   });
   Future<Map<String, dynamic>> logDeliveryFailure({
     required String orderId,
@@ -28,6 +43,9 @@ abstract class OrdersRepository {
     required String reasonCode,
     String? notes,
     String? scheduledCallbackAt,
+    String? gatePassCode,
+    double? latitude,
+    double? longitude,
   });
   Future<void> updateOrderCoordinates({
     required String orderId,
