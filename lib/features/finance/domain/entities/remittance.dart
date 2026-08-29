@@ -27,6 +27,10 @@ class RemittanceOrderItem {
 
   bool get isDelivered => status.toLowerCase() == 'delivered';
   bool get isFailed => status.toLowerCase() == 'failed' || status.toLowerCase() == 'failed_attempt';
+  bool get isDirectTransfer =>
+      paymentType.toLowerCase().contains('transfer') ||
+      paymentType.toLowerCase().contains('prepaid') ||
+      paymentType.toLowerCase().contains('paystack');
 
   double get netContribution {
     if (isFailed) {
@@ -34,6 +38,8 @@ class RemittanceOrderItem {
     }
     return cashCollected - riderCommission - transportAllowance;
   }
+
+  double get netToDC => netContribution;
 
   factory RemittanceOrderItem.fromJson(Map<String, dynamic> json) {
     return RemittanceOrderItem(

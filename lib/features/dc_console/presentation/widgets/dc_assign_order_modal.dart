@@ -129,7 +129,27 @@ class _DCAssignOrderModalState extends ConsumerState<DCAssignOrderModal> {
       nearestDistanceKm = 0.8;
     }
 
-    final displayTracking = widget.order.orderNumber;
+    // Pre-calculate active reserved units per driver for this product
+    final ordersState = ref.watch(ordersProvider);
+    final Map<String, int> activeReservedUnitsByDriverId = {};
+    final orderProdLower = widget.order.productName.toLowerCase();
+
+    for (final o in ordersState.orders) {
+      final isActive = o.status == 'in_transit' || o.status == 'accepted' || o.status == 'out_for_delivery' || o.status == 'assigned' || o.status == 'contacting';
+      if (isActive && o.id != widget.order.id) {
+        final oProdLower = o.productName.toLowerCase();
+        final isSameProduct = (orderProdLower.isNotEmpty && (oProdLower.contains(orderProdLower) || orderProdLower.contains(oProdLower))) ||
+            (widget.order.productSku != null && widget.order.productSku!.isNotEmpty && o.productSku == widget.order.productSku);
+        if (isSameProduct) {
+          if (o.deliveryAgentId != null && o.deliveryAgentId!.isNotEmpty) {
+            activeReservedUnitsByDriverId[o.deliveryAgentId!] = (activeReservedUnitsByDriverId[o.deliveryAgentId!] ?? 0) + o.quantity;
+          }
+          if (o.deliveryAgentCode != null && o.deliveryAgentCode!.isNotEmpty) {
+            activeReservedUnitsByDriverId[o.deliveryAgentCode!] = (activeReservedUnitsByDriverId[o.deliveryAgentCode!] ?? 0) + o.quantity;
+          }
+        }
+      }
+    }
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -183,26 +203,22 @@ class _DCAssignOrderModalState extends ConsumerState<DCAssignOrderModal> {
                           crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             Text(
-                              'Dispatch Order ${displayTracking.replaceAll('#', '')}',
+                              'Dispatch Order ${widget.order.orderNumber.replaceAll('#', '')}',
                               style: GoogleFonts.inter(
-                                fontSize: 16.5,
+                                fontSize: 16,
                                 fontWeight: FontWeight.bold,
                                 color: isDark ? Colors.white : const Color(0xFF0F172A),
                               ),
                             ),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF2563EB).withValues(alpha: 0.15),
+                                color: const Color(0xFFF37021).withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
-                                widget.order.paymentType == 'prepaid' ? 'PREPAID' : 'POD',
-                                style: GoogleFonts.jetBrainsMono(
-                                  fontSize: 9.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: const Color(0xFF2563EB),
-                                ),
+                                widget.order.deliveryState,
+                                style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.bold, color: const Color(0xFFF37021)),
                               ),
                             ),
                           ],
@@ -224,19 +240,17 @@ class _DCAssignOrderModalState extends ConsumerState<DCAssignOrderModal> {
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
                     icon: const Icon(Icons.close_rounded, size: 20),
-                    style: IconButton.styleFrom(
-                      backgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                    ),
+                    tooltip: 'Close',
                   ),
                 ],
               ),
             ),
 
-            // GIS Nearest Rider Match Card (if geocoded order)
+            // GIS Proximity Suggestion Banner (If applicable)
             if (nearestRider != null)
               Container(
-                margin: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                margin: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: const Color(0xFF10B981).withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
@@ -304,80 +318,50 @@ class _DCAssignOrderModalState extends ConsumerState<DCAssignOrderModal> {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
               ),
-              child: Column(
+              child: Row(
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('CUSTOMER & DESTINATION', style: GoogleFonts.jetBrainsMono(fontSize: 9.5, fontWeight: FontWeight.bold, color: const Color(0xFF64748B))),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${widget.order.customerName} • ${widget.order.customerPhone}',
-                              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            Text(
-                              widget.order.deliveryAddress,
-                              style: GoogleFonts.inter(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('CUSTOMER & DESTINATION', style: GoogleFonts.jetBrainsMono(fontSize: 9.5, fontWeight: FontWeight.bold, color: const Color(0xFF64748B))),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${widget.order.customerName} • ${widget.order.customerPhone}',
+                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                      Container(height: 36, width: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('PRODUCT / QUANTITY', style: GoogleFonts.jetBrainsMono(fontSize: 9.5, fontWeight: FontWeight.bold, color: const Color(0xFF64748B))),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${widget.order.productName} (x${widget.order.quantity})',
-                              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
+                        Text(
+                          '${widget.order.deliveryAddress}, ${widget.order.deliveryCity}',
+                          style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Row(
-                          children: [
-                            Text('AMOUNT: ', style: GoogleFonts.jetBrainsMono(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF64748B))),
-                            Text(
-                              CurrencyFormatter.formatNaira(widget.order.totalAmount),
-                              style: GoogleFonts.jetBrainsMono(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF16A34A)),
-                            ),
-                          ],
+                  Container(width: 1, height: 38, color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1), margin: const EdgeInsets.symmetric(horizontal: 10)),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('PACKAGE & VALUE', style: GoogleFonts.jetBrainsMono(fontSize: 9.5, fontWeight: FontWeight.bold, color: const Color(0xFF64748B))),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${widget.order.quantity}x ${widget.order.productName}',
+                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                      Expanded(
-                        child: Row(
-                          children: [
-                            Text('CLIENT: ', style: GoogleFonts.jetBrainsMono(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF64748B))),
-                            Expanded(
-                              child: Text(
-                                widget.order.clientName.isNotEmpty ? widget.order.clientName : 'Novacare Limited',
-                                style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w600),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
+                        Text(
+                          '${CurrencyFormatter.formatNaira(widget.order.totalAmount)} • ${widget.order.isDirectTransfer ? 'Direct Pay' : 'Pay on Delivery'}',
+                          style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -432,15 +416,8 @@ class _DCAssignOrderModalState extends ConsumerState<DCAssignOrderModal> {
 
                   final totalCustodyUnits = matchingAllocations.fold(0, (sum, a) => sum + a.inCustodyUnits);
 
-                  // Active reserved units across other orders
-                  final ordersState = ref.watch(ordersProvider);
-                  final activeReservedUnits = ordersState.orders.where((o) {
-                    final isThisDriver = (o.deliveryAgentId == driver.id || o.deliveryAgentCode == driver.driverCode);
-                    final isActive = o.status == 'in_transit' || o.status == 'accepted' || o.status == 'out_for_delivery' || o.status == 'assigned' || o.status == 'contacting';
-                    final isNotThisOrder = o.id != widget.order.id;
-                    final isSameProduct = o.productName.toLowerCase().contains(widget.order.productName.toLowerCase()) || widget.order.productName.toLowerCase().contains(o.productName.toLowerCase());
-                    return isThisDriver && isActive && isNotThisOrder && isSameProduct;
-                  }).fold(0, (sum, o) => sum + o.quantity);
+                  // Fast O(1) active reserved units lookup
+                  final activeReservedUnits = activeReservedUnitsByDriverId[driver.id] ?? activeReservedUnitsByDriverId[driver.driverCode] ?? 0;
 
                   final availableCustodyUnits = (totalCustodyUnits - activeReservedUnits).clamp(0, 999999);
                   final hasStockInVehicle = totalCustodyUnits > 0;

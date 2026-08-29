@@ -751,151 +751,153 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 1. Summary KPI Metric Cards (6 Cards) - Compact & Horizontally Scrollable on Mobile
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isDesktop = constraints.maxWidth >= 1150;
-              if (isDesktop) {
-                final cardWidth = (constraints.maxWidth - 40) / 6;
-                return Row(
-                  children: [
-                    _buildDeliveredKpiCard(
-                      isDark,
-                      title: 'Total Filtered Orders',
-                      value: '${filtered.length} Orders',
-                      subtitle: 'Gross: ${CurrencyFormatter.formatNaira(totalValuation)}',
-                      icon: Icons.inventory_2_rounded,
-                      iconColor: const Color(0xFF2563EB),
-                      width: cardWidth,
-                    ),
-                    const SizedBox(width: 8),
-                    _buildDeliveredKpiCard(
-                      isDark,
-                      title: '📦 Unassigned Pool',
-                      value: '$unassignedCount Pending',
-                      subtitle: 'Awaiting rider dispatch',
-                      icon: Icons.outbox_rounded,
-                      iconColor: const Color(0xFFF37021),
-                      width: cardWidth,
-                    ),
-                    const SizedBox(width: 8),
-                    _buildDeliveredKpiCard(
-                      isDark,
-                      title: '🚴 In-Transit Live',
-                      value: '$inTransitCount Active',
-                      subtitle: 'Out on delivery routes',
-                      icon: Icons.local_shipping_rounded,
-                      iconColor: const Color(0xFF0284C7),
-                      width: cardWidth,
-                    ),
-                    const SizedBox(width: 8),
-                    _buildDeliveredKpiCard(
-                      isDark,
-                      title: '🟢 Fulfilled / POD',
-                      value: '$deliveredCount Delivered',
-                      subtitle: 'Rev: ${CurrencyFormatter.formatNaira(deliveredRevenue)}',
-                      icon: Icons.check_circle_rounded,
-                      iconColor: const Color(0xFF16A34A),
-                      width: cardWidth,
-                    ),
-                    const SizedBox(width: 8),
-                    _buildDeliveredKpiCard(
-                      isDark,
-                      title: '🟡 Cash in Custody',
-                      value: CurrencyFormatter.formatNaira(unremittedCash),
-                      subtitle: '$unremittedCount awaiting remittance',
-                      icon: Icons.payments_rounded,
-                      iconColor: const Color(0xFFD97706),
-                      width: cardWidth,
-                      onTap: () {
-                        ref.read(dcMasterStatusFilterProvider.notifier).state = 'awaiting_remittance';
-                      },
-                    ),
-                    const SizedBox(width: 8),
-                    _buildDeliveredKpiCard(
-                      isDark,
-                      title: '⚠️ Failed / Returns',
-                      value: '$failedCount Issues',
-                      subtitle: 'Call backs & returns',
-                      icon: Icons.warning_amber_rounded,
-                      iconColor: const Color(0xFFDC2626),
-                      width: cardWidth,
-                    ),
-                  ],
-                );
-              }
+          RepaintBoundary(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isDesktop = constraints.maxWidth >= 1150;
+                if (isDesktop) {
+                  final cardWidth = (constraints.maxWidth - 40) / 6;
+                  return Row(
+                    children: [
+                      _buildDeliveredKpiCard(
+                        isDark,
+                        title: 'Total Filtered Orders',
+                        value: '${filtered.length} Orders',
+                        subtitle: 'Gross: ${CurrencyFormatter.formatNaira(totalValuation)}',
+                        icon: Icons.inventory_2_rounded,
+                        iconColor: const Color(0xFF2563EB),
+                        width: cardWidth,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildDeliveredKpiCard(
+                        isDark,
+                        title: '📦 Unassigned Pool',
+                        value: '$unassignedCount Pending',
+                        subtitle: 'Awaiting rider dispatch',
+                        icon: Icons.outbox_rounded,
+                        iconColor: const Color(0xFFF37021),
+                        width: cardWidth,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildDeliveredKpiCard(
+                        isDark,
+                        title: '🚴 In-Transit Live',
+                        value: '$inTransitCount Active',
+                        subtitle: 'Out on delivery routes',
+                        icon: Icons.local_shipping_rounded,
+                        iconColor: const Color(0xFF0284C7),
+                        width: cardWidth,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildDeliveredKpiCard(
+                        isDark,
+                        title: '🟢 Fulfilled / POD',
+                        value: '$deliveredCount Delivered',
+                        subtitle: 'Rev: ${CurrencyFormatter.formatNaira(deliveredRevenue)}',
+                        icon: Icons.check_circle_rounded,
+                        iconColor: const Color(0xFF16A34A),
+                        width: cardWidth,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildDeliveredKpiCard(
+                        isDark,
+                        title: '🟡 Cash in Custody',
+                        value: CurrencyFormatter.formatNaira(unremittedCash),
+                        subtitle: '$unremittedCount awaiting remittance',
+                        icon: Icons.payments_rounded,
+                        iconColor: const Color(0xFFD97706),
+                        width: cardWidth,
+                        onTap: () {
+                          ref.read(dcMasterStatusFilterProvider.notifier).state = 'awaiting_remittance';
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      _buildDeliveredKpiCard(
+                        isDark,
+                        title: '⚠️ Failed / Returns',
+                        value: '$failedCount Issues',
+                        subtitle: 'Call backs & returns',
+                        icon: Icons.warning_amber_rounded,
+                        iconColor: const Color(0xFFDC2626),
+                        width: cardWidth,
+                      ),
+                    ],
+                  );
+                }
 
-              // On Mobile & Tablet: 1-line horizontal scrollable strip
-              return SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                child: Row(
-                  children: [
-                    _buildDeliveredKpiCard(
-                      isDark,
-                      title: 'Total Filtered Orders',
-                      value: '${filtered.length} Orders',
-                      subtitle: 'Gross: ${CurrencyFormatter.formatNaira(totalValuation)}',
-                      icon: Icons.inventory_2_rounded,
-                      iconColor: const Color(0xFF2563EB),
-                      width: 175,
-                    ),
-                    const SizedBox(width: 8),
-                    _buildDeliveredKpiCard(
-                      isDark,
-                      title: '📦 Unassigned Pool',
-                      value: '$unassignedCount Pending',
-                      subtitle: 'Awaiting rider dispatch',
-                      icon: Icons.outbox_rounded,
-                      iconColor: const Color(0xFFF37021),
-                      width: 175,
-                    ),
-                    const SizedBox(width: 8),
-                    _buildDeliveredKpiCard(
-                      isDark,
-                      title: '🚴 In-Transit Live',
-                      value: '$inTransitCount Active',
-                      subtitle: 'Out on delivery routes',
-                      icon: Icons.local_shipping_rounded,
-                      iconColor: const Color(0xFF0284C7),
-                      width: 175,
-                    ),
-                    const SizedBox(width: 8),
-                    _buildDeliveredKpiCard(
-                      isDark,
-                      title: '🟢 Fulfilled / POD',
-                      value: '$deliveredCount Delivered',
-                      subtitle: 'Rev: ${CurrencyFormatter.formatNaira(deliveredRevenue)}',
-                      icon: Icons.check_circle_rounded,
-                      iconColor: const Color(0xFF16A34A),
-                      width: 175,
-                    ),
-                    const SizedBox(width: 8),
-                    _buildDeliveredKpiCard(
-                      isDark,
-                      title: '🟡 Cash in Custody',
-                      value: CurrencyFormatter.formatNaira(unremittedCash),
-                      subtitle: '$unremittedCount awaiting remittance',
-                      icon: Icons.payments_rounded,
-                      iconColor: const Color(0xFFD97706),
-                      width: 175,
-                      onTap: () {
-                        ref.read(dcMasterStatusFilterProvider.notifier).state = 'awaiting_remittance';
-                      },
-                    ),
-                    const SizedBox(width: 8),
-                    _buildDeliveredKpiCard(
-                      isDark,
-                      title: '⚠️ Failed / Returns',
-                      value: '$failedCount Issues',
-                      subtitle: 'Call backs & returns',
-                      icon: Icons.warning_amber_rounded,
-                      iconColor: const Color(0xFFDC2626),
-                      width: 175,
-                    ),
-                  ],
-                ),
-              );
-            },
+                // On Mobile & Tablet: 1-line horizontal scrollable strip
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  child: Row(
+                    children: [
+                      _buildDeliveredKpiCard(
+                        isDark,
+                        title: 'Total Filtered Orders',
+                        value: '${filtered.length} Orders',
+                        subtitle: 'Gross: ${CurrencyFormatter.formatNaira(totalValuation)}',
+                        icon: Icons.inventory_2_rounded,
+                        iconColor: const Color(0xFF2563EB),
+                        width: 175,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildDeliveredKpiCard(
+                        isDark,
+                        title: '📦 Unassigned Pool',
+                        value: '$unassignedCount Pending',
+                        subtitle: 'Awaiting rider dispatch',
+                        icon: Icons.outbox_rounded,
+                        iconColor: const Color(0xFFF37021),
+                        width: 175,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildDeliveredKpiCard(
+                        isDark,
+                        title: '🚴 In-Transit Live',
+                        value: '$inTransitCount Active',
+                        subtitle: 'Out on delivery routes',
+                        icon: Icons.local_shipping_rounded,
+                        iconColor: const Color(0xFF0284C7),
+                        width: 175,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildDeliveredKpiCard(
+                        isDark,
+                        title: '🟢 Fulfilled / POD',
+                        value: '$deliveredCount Delivered',
+                        subtitle: 'Rev: ${CurrencyFormatter.formatNaira(deliveredRevenue)}',
+                        icon: Icons.check_circle_rounded,
+                        iconColor: const Color(0xFF16A34A),
+                        width: 175,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildDeliveredKpiCard(
+                        isDark,
+                        title: '🟡 Cash in Custody',
+                        value: CurrencyFormatter.formatNaira(unremittedCash),
+                        subtitle: '$unremittedCount awaiting remittance',
+                        icon: Icons.payments_rounded,
+                        iconColor: const Color(0xFFD97706),
+                        width: 175,
+                        onTap: () {
+                          ref.read(dcMasterStatusFilterProvider.notifier).state = 'awaiting_remittance';
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      _buildDeliveredKpiCard(
+                        isDark,
+                        title: '⚠️ Failed / Returns',
+                        value: '$failedCount Issues',
+                        subtitle: 'Call backs & returns',
+                        icon: Icons.warning_amber_rounded,
+                        iconColor: const Color(0xFFDC2626),
+                        width: 175,
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
           ),
           const SizedBox(height: 14),
 
@@ -955,23 +957,24 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
           const SizedBox(height: 14),
 
           // 3. Multi-Attribute Filter Toolbar Card
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E293B) : Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+          RepaintBoundary(
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                 // Top Row: Search & View Mode Switcher
                 Row(
                   children: [
@@ -1240,24 +1243,26 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
               ],
             ),
           ),
+          ),
           const SizedBox(height: 16),
 
           // 4. Orders Directory View (Table or Grid)
-          if (ordersState.isLoading)
-            Column(
-              children: List.generate(4, (index) => const OrderCardSkeleton()),
-            )
-          else if (filtered.isEmpty)
-            _buildEmptyState(
-              isDark,
-              icon: Icons.search_off_rounded,
-              title: 'No Orders Match Your Filters',
-              subtitle: 'Try adjusting your search query, status, rider, product, or date filters to find matching shipments.',
-            )
-          else if (viewMode == 'table')
-            _buildMasterOrdersTable(context, isDark, filtered, dcState, ordersState)
-          else
-            _buildMasterOrdersGrid(context, isDark, filtered, dcState, ordersState),
+          RepaintBoundary(
+            child: ordersState.isLoading
+                ? Column(
+                    children: List.generate(4, (index) => const OrderCardSkeleton()),
+                  )
+                : filtered.isEmpty
+                    ? _buildEmptyState(
+                        isDark,
+                        icon: Icons.search_off_rounded,
+                        title: 'No Orders Match Your Filters',
+                        subtitle: 'Try adjusting your search query, status, rider, product, or date filters to find matching shipments.',
+                      )
+                    : viewMode == 'table'
+                        ? _buildMasterOrdersTable(context, isDark, filtered, dcState, ordersState)
+                        : _buildMasterOrdersGrid(context, isDark, filtered, dcState, ordersState),
+          ),
         ],
       ),
     );

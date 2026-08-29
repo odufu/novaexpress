@@ -25,7 +25,9 @@ class SupabaseConstants {
   static const String paystackWebhookUrl = 'https://vacyxnehxpqvwtaimkgc.supabase.co/functions/v1/paystack-webhook';
 
   // Storage Buckets
-  static const String podSignaturesBucket = 'pod_signatures';
-  static const String proofOfDeliveryBucket = 'pod_proofs';
-  static const String remittanceReceiptsBucket = 'remittance_receipts';
+  static const String avatarsBucket = 'avatars';
+  static const String podSignaturesBucket = 'pod-proofs';
+  static const String proofOfDeliveryBucket = 'pod-proofs';
+  static const String remittanceReceiptsBucket = 'remittance-proofs';
+  static const String receiptsBucket = 'receipts';
 }

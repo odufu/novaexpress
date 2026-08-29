@@ -9,7 +9,6 @@ import '../../../dc_console/presentation/providers/dc_console_provider.dart';
 import '../../../notifications/presentation/providers/notifications_provider.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
 import '../../../../core/services/paystack_gateway_launcher.dart';
-import '../../domain/entities/financial_summary.dart';
 import '../../domain/entities/remittance.dart';
 import '../providers/finance_provider.dart';
 
@@ -63,41 +62,40 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
     final failedStipendRate = user?.failedDeliveryAllowance ?? (user?.isPda == true ? 500.0 : 300.0);
 
     final deliveredOrders = ordersState.orders.where((o) => o.isDelivered).toList();
-    final deliveredCashOrders = deliveredOrders.where((o) => o.isCashPod).toList();
-    final failedOrders = ordersState.orders.where((o) => o.status == 'failed' || o.status == 'failed_attempt').toList();
-    final double failedStipendsDeduction = failedOrders.length * failedStipendRate;
-
-    final double grossCash = deliveredCashOrders.fold(0.0, (acc, o) => acc + o.totalAmount);
-    final double posFeeDeduction = (grossCash > 0 && dcFinanceSettings.isPosFeeReimbursable)
-        ? dcFinanceSettings.computePosFee(grossCash)
-        : 0.0;
-
-    final summary = FinancialSummary.calculate(
-      orders: ordersState.orders,
-      remittances: financeState.remittances,
-      user: user,
-      manualEarnedBalance: financeState.totalEarnedBalance,
-      transactions: financeState.transactions,
-      posFee: posFeeDeduction,
-    );
-
-    final double grossCollections = summary.cashCollectedAllTime;
-    final double commissionDeduction = summary.totalCommissionRetained;
-    final double transportDeduction = summary.totalTransportRetained;
-    final double transferFeeDeduction = posFeeDeduction;
-    final double expectedAmount = summary.pendingRemittanceToDC;
-    final int deliveredCount = deliveredOrders.length;
-    final int failedCount = failedOrders.length;
-
     final unremittedDeliveredOrders = deliveredOrders
         .where((o) => !o.isRemitted && o.paymentStatus.toLowerCase() != 'remitted')
         .toList();
+    final unremittedCashOrders = unremittedDeliveredOrders.where((o) => o.isCashPod).toList();
+    final failedOrders = ordersState.orders.where((o) => o.status == 'failed' || o.status == 'failed_attempt').toList();
+
+    final double batchGrossCash = unremittedCashOrders.fold(0.0, (acc, o) => acc + o.totalAmount);
+    final double batchCommission = unremittedCashOrders.fold(
+      0.0,
+      (acc, o) => acc + (o.agentEntitlement > 0 ? o.agentEntitlement : commissionRate),
+    );
+    final double batchTransport = unremittedCashOrders.fold(
+      0.0,
+      (acc, o) => acc + (o.transportFee > 0 ? o.transportFee : transportPerOrder),
+    );
+    final double failedStipendsDeduction = failedOrders.length * failedStipendRate;
+    final double posFeeDeduction = (batchGrossCash > 0 && dcFinanceSettings.isPosFeeReimbursable)
+        ? dcFinanceSettings.computePosFee(batchGrossCash)
+        : 0.0;
+
+    final double grossCollections = batchGrossCash;
+    final double commissionDeduction = batchCommission;
+    final double transportDeduction = batchTransport;
+    final double transferFeeDeduction = posFeeDeduction;
+    final double expectedAmount = (grossCollections - commissionDeduction - transportDeduction - failedStipendsDeduction - transferFeeDeduction).clamp(0.0, double.infinity);
+    final int deliveredCount = unremittedDeliveredOrders.length;
+    final int failedCount = failedOrders.length;
 
     // Snapshot of orders contributing to this remittance with itemized breakdown (collections - commission - transport)
     final List<RemittanceOrderItem> associatedOrderItems = [
       ...unremittedDeliveredOrders.map((o) {
         final cash = o.isCashPod ? o.totalAmount : 0.0;
         final comm = o.agentEntitlement > 0 ? o.agentEntitlement : commissionRate;
+        final trans = o.transportFee > 0 ? o.transportFee : transportPerOrder;
         return RemittanceOrderItem(
           orderId: o.id,
           orderNumber: o.orderNumber,
@@ -106,7 +104,7 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
           paymentType: o.paymentType,
           cashCollected: cash,
           riderCommission: comm,
-          transportAllowance: transportPerOrder,
+          transportAllowance: trans,
           failedStipend: 0.0,
           posFee: 0.0,
           date: o.createdAt,

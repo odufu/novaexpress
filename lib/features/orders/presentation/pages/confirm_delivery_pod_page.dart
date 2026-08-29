@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -11,6 +10,7 @@ import '../../../../core/helpers/formatters.dart';
 import '../../../../core/providers/navigation_provider.dart';
 import '../../../../core/services/paystack_web_interop.dart';
 import '../../../../core/services/rider_location_service.dart';
+import '../../../../core/services/signature_storage_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_logo_widget.dart';
 import '../../../../core/widgets/signature_pad_modal.dart';
@@ -328,9 +328,17 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
         final bytes = await file.readAsBytes();
         if (bytes.isNotEmpty) {
           final ext = file.extension?.toLowerCase() ?? 'jpg';
-          final base64String = base64Encode(bytes);
-          final dataUrl = 'data:image/$ext;base64,$base64String';
-          ref.read(confirmDeliveryPodProvider.notifier).setPhoto(bytes, dataUrl);
+          final contentType = ext == 'png' ? 'image/png' : (ext == 'webp' ? 'image/webp' : 'image/jpeg');
+          
+          final publicUrl = await SignatureStorageService.uploadDeliveryProofPhoto(
+            imageBytes: bytes,
+            orderId: widget.orderId,
+            ext: ext,
+            contentType: contentType,
+          );
+          
+          ref.read(confirmDeliveryPodProvider.notifier).setPhoto(bytes, publicUrl);
+          debugPrint('[POD] ✅ POD Photo proof stored with URL: $publicUrl');
         }
       }
     } catch (e) {

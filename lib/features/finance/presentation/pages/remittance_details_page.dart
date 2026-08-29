@@ -1,11 +1,13 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:novexps/core/helpers/formatters.dart';
-import 'package:novexps/core/theme/app_theme.dart';
+import 'package:novexps/core/services/file_downloader.dart';
 import 'package:novexps/features/auth/presentation/providers/auth_provider.dart';
 import 'package:novexps/features/finance/domain/entities/remittance.dart';
 import 'package:novexps/features/finance/presentation/providers/finance_provider.dart';
@@ -22,16 +24,24 @@ final paystackTxnDetailsProvider = FutureProvider.autoDispose.family<Map<String,
   }
 });
 
-/// Transaction Receipt & Remittance Details Page
-/// Displays a comprehensive payment receipt for remittances handled via Paystack or direct transfer.
-/// Strictly presents the exact orders and financial figures reconciled in that specific remittance.
-class RemittanceDetailsPage extends ConsumerWidget {
+/// Official Remittance Receipt & Breakdown Page
+/// Strictly presents the exact orders and financial figures reconciled in that specific remittance instance.
+/// Includes downloadable receipt as high-resolution PNG image.
+class RemittanceDetailsPage extends ConsumerStatefulWidget {
   final String remittanceId;
 
   const RemittanceDetailsPage({
     super.key,
     required this.remittanceId,
   });
+
+  @override
+  ConsumerState<RemittanceDetailsPage> createState() => _RemittanceDetailsPageState();
+}
+
+class _RemittanceDetailsPageState extends ConsumerState<RemittanceDetailsPage> {
+  final GlobalKey _receiptCardKey = GlobalKey();
+  bool _isDownloadingImage = false;
 
   RemittanceEntity _resolveRemittance(
     String id,
@@ -148,90 +158,28 @@ class RemittanceDetailsPage extends ConsumerWidget {
             riderCommission: 0.0,
             transportAllowance: 0.0,
             failedStipend: 500.0,
-            date: DateTime.now().subtract(const Duration(days: 1, hours: 2)),
-          ),
-        ],
-      );
-    } else if (cleanId.contains('RMT-0003') || cleanId.contains('0003')) {
-      return RemittanceEntity(
-        id: 'RMT-0003',
-        referenceNumber: 'RMT-0003',
-        amount: 5000.0,
-        grossCollections: 15000.0,
-        commissionDeducted: 5000.0,
-        transportAllowanceDeducted: 5000.0,
-        failedStipendsDeducted: 0.0,
-        paymentMethod: 'paystack',
-        status: 'verified',
-        paystackChannel: 'USSD Gateway (*737#)',
-        paystackBank: 'GTBank',
-        gatewayResponse: 'Approved / Successful',
-        verifiedByName: 'Paystack Settlement Engine',
-        notes: 'USSD-2283742 • Reconciled',
-        createdAt: DateTime(2025, 5, 2, 14, 20),
-        verifiedAt: DateTime(2025, 5, 2, 14, 35),
-        associatedOrders: [
-          RemittanceOrderItem(
-            orderId: 'ord-301',
-            orderNumber: 'ORD-7201',
-            customerName: 'Fatima Garba',
-            status: 'delivered',
-            paymentType: 'pay_on_delivery',
-            cashCollected: 15000.0,
-            riderCommission: 5000.0,
-            transportAllowance: 5000.0,
-            failedStipend: 0.0,
-            date: DateTime(2025, 5, 2, 11, 0),
-          ),
-        ],
-      );
-    } else if (cleanId.contains('RMT-0002') || cleanId.contains('0002')) {
-      return RemittanceEntity(
-        id: 'RMT-0002',
-        referenceNumber: 'RMT-0002',
-        amount: 10000.0,
-        grossCollections: 25000.0,
-        commissionDeducted: 7500.0,
-        transportAllowanceDeducted: 7500.0,
-        failedStipendsDeducted: 0.0,
-        paymentMethod: 'paystack',
-        status: 'verified',
-        paystackChannel: 'Mastercard Debit Card (**** 4242)',
-        paystackBank: 'Zenith Bank Card Gateway',
-        paystackAuthCode: 'AUTH_CARD_77281920',
-        gatewayResponse: 'Approved / Successful',
-        verifiedByName: 'Paystack Settlement Engine',
-        notes: 'TXN-77281920 • Card verified',
-        createdAt: DateTime(2025, 5, 1, 11, 10),
-        verifiedAt: DateTime(2025, 5, 1, 11, 25),
-        associatedOrders: [
-          RemittanceOrderItem(
-            orderId: 'ord-201',
-            orderNumber: 'ORD-6190',
-            customerName: 'Kelechi Nwosu',
-            status: 'delivered',
-            paymentType: 'pay_on_delivery',
-            cashCollected: 25000.0,
-            riderCommission: 7500.0,
-            transportAllowance: 7500.0,
-            failedStipend: 0.0,
-            date: DateTime(2025, 5, 1, 9, 30),
+            date: DateTime.now().subtract(const Duration(days: 1, hours: 3)),
           ),
         ],
       );
     }
 
-    // 3. Fallback dynamically generated remittance
+    // 3. Fallback dynamically generated remittance scoped to realistic single batch
     final deliveredOrders = (riderOrders ?? []).where((o) => o.isDelivered && o.isPod).toList();
-    final gross = deliveredOrders.isNotEmpty
-        ? deliveredOrders.fold<double>(0.0, (acc, o) => acc + o.totalAmount)
-        : 1462000.0;
-    final comm = deliveredOrders.isNotEmpty
-        ? deliveredOrders.fold<double>(0.0, (acc, o) => acc + o.agentEntitlement)
-        : 41000.0;
-    final trans = deliveredOrders.isNotEmpty
-        ? deliveredOrders.fold<double>(0.0, (acc, o) => acc + o.transportFee)
-        : 61500.0;
+    final matchingRefOrders = (riderOrders ?? []).where((o) => o.deliveryNotes?.contains(id) == true).toList();
+    final effectiveOrders = matchingRefOrders.isNotEmpty
+        ? matchingRefOrders
+        : (deliveredOrders.length > 3 ? deliveredOrders.take(3).toList() : deliveredOrders);
+
+    final gross = effectiveOrders.isNotEmpty
+        ? effectiveOrders.fold<double>(0.0, (acc, o) => acc + o.totalAmount)
+        : 145000.0;
+    final comm = effectiveOrders.isNotEmpty
+        ? effectiveOrders.fold<double>(0.0, (acc, o) => acc + (o.agentEntitlement > 0 ? o.agentEntitlement : 1000.0))
+        : 3000.0;
+    final trans = effectiveOrders.isNotEmpty
+        ? effectiveOrders.fold<double>(0.0, (acc, o) => acc + (o.transportFee > 0 ? o.transportFee : 1500.0))
+        : 4500.0;
     final netDue = (gross - comm - trans).clamp(0.0, double.infinity);
 
     final riderName = currentUser != null && currentUser.fullName.toString().isNotEmpty
@@ -239,7 +187,7 @@ class RemittanceDetailsPage extends ConsumerWidget {
         : 'Joel Odufu';
     final riderEmail = currentUser?.email ?? 'joel.odufu@novaexpress.ng';
 
-    final associated = deliveredOrders.map((o) {
+    final associated = effectiveOrders.map((o) {
       return RemittanceOrderItem(
         orderId: o.id,
         orderNumber: o.orderNumber,
@@ -247,8 +195,8 @@ class RemittanceDetailsPage extends ConsumerWidget {
         status: o.status,
         paymentType: o.paymentType,
         cashCollected: o.totalAmount,
-        riderCommission: o.agentEntitlement,
-        transportAllowance: o.transportFee,
+        riderCommission: o.agentEntitlement > 0 ? o.agentEntitlement : 1000.0,
+        transportAllowance: o.transportFee > 0 ? o.transportFee : 1500.0,
         failedStipend: 0.0,
         date: o.deliveredAt ?? o.createdAt,
       );
@@ -257,7 +205,7 @@ class RemittanceDetailsPage extends ConsumerWidget {
     return RemittanceEntity(
       id: id,
       referenceNumber: id.startsWith('RMT-') || id.startsWith('REM-') || id.startsWith('PSTK-') ? id : 'PSTK-RMT-$id',
-      amount: netDue > 0 ? netDue : 1359000.0,
+      amount: netDue > 0 ? netDue : 137500.0,
       grossCollections: gross,
       commissionDeducted: comm,
       transportAllowanceDeducted: trans,
@@ -274,54 +222,62 @@ class RemittanceDetailsPage extends ConsumerWidget {
       notes: '$id • Auto-verified via Paystack Instant Settlement',
       createdAt: DateTime.now(),
       verifiedAt: DateTime.now(),
-      associatedOrders: associated.isNotEmpty
-          ? associated
-          : [
-              RemittanceOrderItem(
-                orderId: 'ord-101',
-                orderNumber: 'ORD-5501',
-                customerName: 'Adeola Adeleke',
-                status: 'delivered',
-                paymentType: 'pay_on_delivery',
-                cashCollected: 35000.0,
-                riderCommission: 7500.0,
-                transportAllowance: 8750.0,
-                failedStipend: 0.0,
-                date: DateTime.now().subtract(const Duration(hours: 5)),
-              ),
-              RemittanceOrderItem(
-                orderId: 'ord-102',
-                orderNumber: 'ORD-5502',
-                customerName: 'Ngozi Okafor',
-                status: 'delivered',
-                paymentType: 'pay_on_delivery',
-                cashCollected: 30000.0,
-                riderCommission: 7500.0,
-                transportAllowance: 8750.0,
-                failedStipend: 0.0,
-                date: DateTime.now().subtract(const Duration(hours: 3)),
-              ),
-            ],
+      associatedOrders: associated,
     );
   }
 
-  List<RemittanceOrderItem> _resolveOrdersList(RemittanceEntity remit) {
+  List<RemittanceOrderItem> _resolveOrdersList(RemittanceEntity remit, List<OrderEntity> riderOrders) {
     if (remit.associatedOrders.isNotEmpty) {
       return remit.associatedOrders;
     }
-    // If empty, generate realistic breakdown items matching the exact remittance figures
+
+    // 1. Search for orders linked by remittance reference in delivery notes or notes string
+    final linkedOrders = riderOrders.where((o) {
+      return o.deliveryNotes?.contains(remit.referenceNumber) == true ||
+          remit.notes?.contains(o.orderNumber) == true ||
+          remit.referenceNumber.contains(o.orderNumber);
+    }).toList();
+
+    if (linkedOrders.isNotEmpty) {
+      return linkedOrders.map((o) {
+        final cash = o.isCashPod ? o.totalAmount : 0.0;
+        final comm = o.agentEntitlement > 0
+            ? o.agentEntitlement
+            : (remit.commissionDeducted > 0 ? (remit.commissionDeducted / linkedOrders.length) : 1000.0);
+        final trans = o.transportFee > 0
+            ? o.transportFee
+            : (remit.transportAllowanceDeducted > 0 ? (remit.transportAllowanceDeducted / linkedOrders.length) : 1500.0);
+        return RemittanceOrderItem(
+          orderId: o.id,
+          orderNumber: o.orderNumber,
+          customerName: o.customerName,
+          status: o.status,
+          paymentType: o.paymentType,
+          cashCollected: cash,
+          riderCommission: comm,
+          transportAllowance: trans,
+          failedStipend: 0.0,
+          posFee: 0.0,
+          date: o.deliveredAt ?? o.createdAt,
+        );
+      }).toList();
+    }
+
+    // 2. Generate itemized order breakdown matching the exact remittance instance figures
     final gross = remit.grossCollections > 0 ? remit.grossCollections : remit.amount;
     final comm = remit.commissionDeducted;
     final trans = remit.transportAllowanceDeducted;
     final failedStipend = remit.failedStipendsDeducted;
 
     final items = <RemittanceOrderItem>[];
+    final cleanRef = remit.referenceNumber.replaceAll(RegExp(r'[^0-9]'), '').padLeft(4, '0');
+
     if (gross > 0) {
       items.add(
         RemittanceOrderItem(
-          orderId: 'ord-${remit.referenceNumber}-1',
-          orderNumber: 'ORD-${remit.referenceNumber.replaceAll(RegExp(r'[^0-9]'), '').padLeft(4, '0')}-A',
-          customerName: 'Reconciled Delivery Order',
+          orderId: 'ord-${remit.id.substring(0, 4.clamp(0, remit.id.length))}-1',
+          orderNumber: 'ORD-$cleanRef-A',
+          customerName: 'Customer Delivery Package',
           status: 'delivered',
           paymentType: 'pay_on_delivery',
           cashCollected: gross,
@@ -336,8 +292,8 @@ class RemittanceDetailsPage extends ConsumerWidget {
     if (failedStipend > 0) {
       items.add(
         RemittanceOrderItem(
-          orderId: 'ord-${remit.referenceNumber}-failed',
-          orderNumber: 'ORD-${remit.referenceNumber.replaceAll(RegExp(r'[^0-9]'), '').padLeft(4, '0')}-F',
+          orderId: 'ord-${remit.id.substring(0, 4.clamp(0, remit.id.length))}-failed',
+          orderNumber: 'ORD-$cleanRef-F',
           customerName: 'Attempted / Returned Package',
           status: 'failed',
           paymentType: 'pay_on_delivery',
@@ -350,6 +306,69 @@ class RemittanceDetailsPage extends ConsumerWidget {
       );
     }
     return items;
+  }
+
+  Future<void> _downloadReceiptAsImage(RemittanceEntity remit) async {
+    if (_isDownloadingImage) return;
+    setState(() => _isDownloadingImage = true);
+
+    try {
+      // Give the widget a tick to ensure repaint boundary is complete
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      final boundary = _receiptCardKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) {
+        throw Exception('Could not locate receipt render object');
+      }
+
+      final ui.Image image = await boundary.toImage(pixelRatio: 3.0);
+      final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+
+      if (byteData == null) {
+        throw Exception('Failed to generate PNG image bytes');
+      }
+
+      final Uint8List pngBytes = byteData.buffer.asUint8List();
+      final cleanRef = remit.referenceNumber.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+      final fileName = 'Official_Receipt_$cleanRef.png';
+
+      downloadBytes(
+        bytes: pngBytes,
+        fileName: fileName,
+        mimeType: 'image/png',
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFF10B981),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+                const SizedBox(width: 10),
+                Expanded(child: Text('Official receipt ($fileName) downloaded successfully!')),
+              ],
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFFEF4444),
+            behavior: SnackBarBehavior.floating,
+            content: Text('Failed to download receipt image: $e'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isDownloadingImage = false);
+      }
+    }
   }
 
   void _shareReceipt(BuildContext context, RemittanceEntity remit, String timestamp, String payerName, List<RemittanceOrderItem> orders) {
@@ -407,7 +426,7 @@ Thank you for your timely settlement!
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
@@ -429,14 +448,14 @@ Thank you for your timely settlement!
     try {
       final financeState = ref.watch(financeProvider);
       remit = _resolveRemittance(
-        remittanceId,
+        widget.remittanceId,
         financeState.remittances,
         riderOrders: riderOrders,
         currentUser: user,
       );
     } catch (_) {
       remit = _resolveRemittance(
-        remittanceId,
+        widget.remittanceId,
         [],
         riderOrders: riderOrders,
         currentUser: user,
@@ -447,20 +466,35 @@ Thank you for your timely settlement!
     final paystackTxn = paystackTxnAsync.asData?.value;
     final isLoadingTxn = paystackTxnAsync.isLoading;
 
-    final orders = _resolveOrdersList(remit);
+    final orders = _resolveOrdersList(remit, riderOrders);
     final deliveredCount = orders.where((o) => o.isDelivered).length;
     final failedCount = orders.where((o) => o.isFailed).length;
 
-    final gross = remit.grossCollections > 0 ? remit.grossCollections : orders.fold<double>(0.0, (acc, o) => acc + o.cashCollected);
-    final comm = remit.commissionDeducted > 0 ? remit.commissionDeducted : orders.fold<double>(0.0, (acc, o) => acc + o.riderCommission);
-    final transport = remit.transportAllowanceDeducted > 0 ? remit.transportAllowanceDeducted : orders.fold<double>(0.0, (acc, o) => acc + o.transportAllowance);
-    final failedStipends = remit.failedStipendsDeducted > 0 ? remit.failedStipendsDeducted : orders.fold<double>(0.0, (acc, o) => acc + o.failedStipend);
-    final posFees = remit.posFee > 0 ? remit.posFee : orders.fold<double>(0.0, (acc, o) => acc + o.posFee);
+    // Instance-only financial figures
+    final gross = orders.isNotEmpty
+        ? orders.fold<double>(0.0, (acc, o) => acc + o.cashCollected)
+        : (remit.grossCollections > 0 ? remit.grossCollections : remit.amount);
 
-    final double expectedHandover = remit.expectedAmount ?? (gross - comm - transport - failedStipends - posFees).clamp(0.0, double.infinity);
+    final comm = orders.isNotEmpty
+        ? orders.fold<double>(0.0, (acc, o) => acc + o.riderCommission)
+        : remit.commissionDeducted;
+
+    final transport = orders.isNotEmpty
+        ? orders.fold<double>(0.0, (acc, o) => acc + o.transportAllowance)
+        : remit.transportAllowanceDeducted;
+
+    final failedStipends = orders.isNotEmpty
+        ? orders.fold<double>(0.0, (acc, o) => acc + o.failedStipend)
+        : remit.failedStipendsDeducted;
+
+    final posFees = orders.isNotEmpty
+        ? orders.fold<double>(0.0, (acc, o) => acc + o.posFee)
+        : remit.posFee;
+
+    final double expectedHandover = (gross - comm - transport - failedStipends - posFees).clamp(0.0, double.infinity);
 
     final isPartial = remit.isPartialRemittance;
-    final double remainingShortage = remit.remainingShortage;
+    final double remainingShortage = (expectedHandover - remit.amount).clamp(0.0, double.infinity);
 
     // Extract enriched Paystack details from DB query if available
     final paystackChannel = paystackTxn?['channel']?.toString() ??
@@ -517,6 +551,17 @@ Thank you for your timely settlement!
         ),
         actions: [
           IconButton(
+            icon: _isDownloadingImage
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Icon(Icons.download_rounded, color: const Color(0xFF10B981), size: 22),
+            tooltip: 'Download Receipt as Image (PNG)',
+            onPressed: () => _downloadReceiptAsImage(remit),
+          ),
+          IconButton(
             icon: Icon(Icons.share_outlined, color: theme.colorScheme.onSurface, size: 20),
             tooltip: 'Share Receipt',
             onPressed: () => _shareReceipt(context, remit, formattedTimestamp, payerName, orders),
@@ -529,353 +574,365 @@ Thank you for your timely settlement!
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 1. HERO RECEIPT AMOUNT CARD
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(22),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  // Status Badge Pill
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: isPartial ? const Color(0xFFFFF7ED) : const Color(0xFFDCFCE7),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: isPartial ? const Color(0xFFFDBA74) : const Color(0xFF86EFAC),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          isPartial ? Icons.published_with_changes_rounded : Icons.check_circle_rounded,
-                          size: 15,
-                          color: isPartial ? const Color(0xFFEA580C) : const Color(0xFF16A34A),
+            // REPAINT BOUNDARY WRAPS THE FULL OFFICIAL RECEIPT CARD
+            RepaintBoundary(
+              key: _receiptCardKey,
+              child: Container(
+                color: isDark ? const Color(0xFF0B132B) : const Color(0xFFF8FAFC),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 1. HERO RECEIPT AMOUNT CARD
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(22),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
                         ),
-                        const SizedBox(width: 6),
-                        Text(
-                          isPartial ? 'PARTIAL SETTLEMENT' : 'SUCCESSFUL / SETTLED ⚡',
-                          style: GoogleFonts.jetBrainsMono(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: isPartial ? const Color(0xFFEA580C) : const Color(0xFF15803D),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          // Status Badge Pill
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: isPartial ? const Color(0xFFFFF7ED) : const Color(0xFFDCFCE7),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: isPartial ? const Color(0xFFFDBA74) : const Color(0xFF86EFAC),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  isPartial ? Icons.published_with_changes_rounded : Icons.check_circle_rounded,
+                                  size: 15,
+                                  color: isPartial ? const Color(0xFFEA580C) : const Color(0xFF16A34A),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  isPartial ? 'PARTIAL SETTLEMENT' : 'SUCCESSFUL / SETTLED ⚡',
+                                  style: GoogleFonts.jetBrainsMono(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: isPartial ? const Color(0xFFEA580C) : const Color(0xFF15803D),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 14),
 
-                  Text(
-                    'TOTAL REMITTANCE PAID',
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.8,
-                      color: const Color(0xFF64748B),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
+                          Text(
+                            'TOTAL REMITTANCE PAID',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.8,
+                              color: const Color(0xFF64748B),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
 
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      CurrencyFormatter.formatNaira(remit.amount),
-                      style: GoogleFonts.inter(
-                        fontSize: 34,
-                        fontWeight: FontWeight.w900,
-                        color: theme.colorScheme.onSurface,
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              CurrencyFormatter.formatNaira(remit.amount),
+                              style: GoogleFonts.inter(
+                                fontSize: 34,
+                                fontWeight: FontWeight.w900,
+                                color: theme.colorScheme.onSurface,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+
+                          Text(
+                            'Auto-reconciled via Paystack • Credited to NovaExpress Treasury',
+                            style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 6),
+                    const SizedBox(height: 16),
 
-                  Text(
-                    'Auto-reconciled via Paystack • Credited to NovaExpress Treasury',
-                    style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // 2. RECEIPT CONFIRMATION BANNER
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: isPartial
-                    ? (isDark ? const Color(0xFF7C2D12).withValues(alpha: 0.3) : const Color(0xFFFFF7ED))
-                    : (isDark ? const Color(0xFF064E3B).withValues(alpha: 0.3) : const Color(0xFFF0FDF4)),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: isPartial ? const Color(0xFFF97316) : const Color(0xFF10B981),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    isPartial ? Icons.published_with_changes_rounded : Icons.verified_rounded,
-                    color: isPartial ? const Color(0xFFEA580C) : const Color(0xFF16A34A),
-                    size: 24,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          isPartial ? 'Partial Settlement Reconciled' : 'Payment Verified & Settled',
-                          style: GoogleFonts.inter(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.bold,
+                    // 2. RECEIPT CONFIRMATION BANNER
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: isPartial
+                            ? (isDark ? const Color(0xFF7C2D12).withValues(alpha: 0.3) : const Color(0xFFFFF7ED))
+                            : (isDark ? const Color(0xFF064E3B).withValues(alpha: 0.3) : const Color(0xFFF0FDF4)),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: isPartial ? const Color(0xFFF97316) : const Color(0xFF10B981),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isPartial ? Icons.published_with_changes_rounded : Icons.verified_rounded,
                             color: isPartial ? const Color(0xFFEA580C) : const Color(0xFF16A34A),
+                            size: 24,
                           ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          isPartial
-                              ? 'Paid ${CurrencyFormatter.formatNaira(remit.amount)} of expected ${CurrencyFormatter.formatNaira(expectedHandover)}. Remaining shortage of ${CurrencyFormatter.formatNaira(remainingShortage)} recorded in audit log.'
-                              : 'This remittance was successfully completed via Paystack and automatically posted to the company ledger.',
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  isPartial ? 'Partial Settlement Reconciled' : 'Payment Verified & Settled',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: isPartial ? const Color(0xFFEA580C) : const Color(0xFF16A34A),
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  isPartial
+                                      ? 'Paid ${CurrencyFormatter.formatNaira(remit.amount)} of expected ${CurrencyFormatter.formatNaira(expectedHandover)}. Remaining shortage of ${CurrencyFormatter.formatNaira(remainingShortage)} recorded in audit log.'
+                                      : 'This remittance was successfully completed via Paystack and automatically posted to the company ledger.',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11,
+                                    color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
+                    const SizedBox(height: 16),
 
-            // 3. SETTLEMENT RECONCILIATION BREAKDOWN MATRIX
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'SETTLEMENT RECONCILIATION',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.8,
-                          color: const Color(0xFF475569),
-                        ),
+                    // 3. SETTLEMENT RECONCILIATION BREAKDOWN MATRIX
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2563EB).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          '${orders.length} Orders Settled',
-                          style: GoogleFonts.jetBrainsMono(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF2563EB),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'SETTLEMENT RECONCILIATION',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.8,
+                                  color: const Color(0xFF475569),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF2563EB).withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  '${orders.length} Orders Settled',
+                                  style: GoogleFonts.jetBrainsMono(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: const Color(0xFF2563EB),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  _buildDetailRow('Customer Collections (POD Cash)', CurrencyFormatter.formatNaira(gross), isDark),
-                  const Divider(height: 14),
-                  _buildDetailRow('Less: Delivery Commission Retained', '-${CurrencyFormatter.formatNaira(comm)}', isDark, valColor: const Color(0xFF16A34A)),
-                  const Divider(height: 14),
-                  _buildDetailRow('Less: Transport Allowance Retained', '-${CurrencyFormatter.formatNaira(transport)}', isDark, valColor: const Color(0xFF2563EB)),
-                  if (failedStipends > 0) ...[
-                    const Divider(height: 14),
-                    _buildDetailRow('Less: Failed Delivery Stipends ($failedCount Drops)', '-${CurrencyFormatter.formatNaira(failedStipends)}', isDark, valColor: const Color(0xFFD97706)),
-                  ],
-                  if (posFees > 0) ...[
-                    const Divider(height: 14),
-                    _buildDetailRow('Less: POS / Transfer Fees Retained', '-${CurrencyFormatter.formatNaira(posFees)}', isDark, valColor: const Color(0xFF0284C7)),
-                  ],
-                  const Divider(height: 14),
-                  _buildDetailRow(
-                    'Expected Handover Due',
-                    CurrencyFormatter.formatNaira(expectedHandover),
-                    isDark,
-                    isBold: true,
-                    valColor: const Color(0xFFEA580C),
-                  ),
-                  const Divider(height: 14),
-                  _buildDetailRow(
-                    'Actual Remitted Amount',
-                    CurrencyFormatter.formatNaira(remit.amount),
-                    isDark,
-                    isBold: true,
-                    valColor: const Color(0xFF16A34A),
-                  ),
-                  if (isPartial) ...[
-                    const Divider(height: 14),
-                    _buildDetailRow('Remaining Shortage Liability', '-${CurrencyFormatter.formatNaira(remainingShortage)}', isDark, valColor: const Color(0xFFEA580C), isBold: true),
-                    if (remit.discrepancyReason != null && remit.discrepancyReason!.isNotEmpty) ...[
-                      const Divider(height: 14),
-                      _buildDetailRow('Variance Reason', remit.discrepancyReason!, isDark, valColor: const Color(0xFFF97316)),
-                    ],
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // 4. ITEMIZED ORDERS BREAKDOWN (EXCLUSIVE TO THIS REMITTANCE)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'RECONCILED ORDERS BREAKDOWN',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.8,
-                          color: const Color(0xFF475569),
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF10B981).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          '$deliveredCount Delivered • $failedCount Failed',
-                          style: GoogleFonts.jetBrainsMono(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF10B981),
+                          const SizedBox(height: 12),
+                          _buildDetailRow('Customer Collections (POD Cash)', CurrencyFormatter.formatNaira(gross), isDark),
+                          const Divider(height: 14),
+                          _buildDetailRow('Less: Delivery Commission Retained', '-${CurrencyFormatter.formatNaira(comm)}', isDark, valColor: const Color(0xFF16A34A)),
+                          const Divider(height: 14),
+                          _buildDetailRow('Less: Transport Allowance Retained', '-${CurrencyFormatter.formatNaira(transport)}', isDark, valColor: const Color(0xFF2563EB)),
+                          if (failedStipends > 0) ...[
+                            const Divider(height: 14),
+                            _buildDetailRow('Less: Failed Delivery Stipends ($failedCount Drops)', '-${CurrencyFormatter.formatNaira(failedStipends)}', isDark, valColor: const Color(0xFFD97706)),
+                          ],
+                          if (posFees > 0) ...[
+                            const Divider(height: 14),
+                            _buildDetailRow('Less: POS / Transfer Fees Retained', '-${CurrencyFormatter.formatNaira(posFees)}', isDark, valColor: const Color(0xFF0284C7)),
+                          ],
+                          const Divider(height: 14),
+                          _buildDetailRow(
+                            'Expected Handover Due',
+                            CurrencyFormatter.formatNaira(expectedHandover),
+                            isDark,
+                            isBold: true,
+                            valColor: const Color(0xFFEA580C),
                           ),
-                        ),
+                          const Divider(height: 14),
+                          _buildDetailRow(
+                            'Actual Remitted Amount',
+                            CurrencyFormatter.formatNaira(remit.amount),
+                            isDark,
+                            isBold: true,
+                            valColor: const Color(0xFF16A34A),
+                          ),
+                          if (isPartial) ...[
+                            const Divider(height: 14),
+                            _buildDetailRow('Remaining Shortage Liability', '-${CurrencyFormatter.formatNaira(remainingShortage)}', isDark, valColor: const Color(0xFFEA580C), isBold: true),
+                            if (remit.discrepancyReason != null && remit.discrepancyReason!.isNotEmpty) ...[
+                              const Divider(height: 14),
+                              _buildDetailRow('Variance Reason', remit.discrepancyReason!, isDark, valColor: const Color(0xFFF97316)),
+                            ],
+                          ],
+                        ],
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Order-by-order financial breakdown of customer collections, commission, and failed stipends.',
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                     ),
-                  ),
-                  const SizedBox(height: 14),
+                    const SizedBox(height: 16),
 
-                  if (orders.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Text(
-                        'No specific orders snapshot available for this historical remittance.',
-                        style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)),
+                    // 4. ITEMIZED ORDERS BREAKDOWN (EXCLUSIVE TO THIS REMITTANCE)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                       ),
-                    )
-                  else
-                    ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: orders.length,
-                      separatorBuilder: (context, index) => const SizedBox(height: 10),
-                      itemBuilder: (context, index) {
-                        final order = orders[index];
-                        return _buildOrderItemCard(order, isDark, theme);
-                      },
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'RECONCILED ORDERS BREAKDOWN',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.8,
+                                  color: const Color(0xFF475569),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  '$deliveredCount Delivered • $failedCount Failed',
+                                  style: GoogleFonts.jetBrainsMono(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: const Color(0xFF10B981),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Order-by-order financial breakdown of customer collections, commission, and transport allowance.',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+
+                          if (orders.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Text(
+                                'No specific orders snapshot available for this historical remittance.',
+                                style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)),
+                              ),
+                            )
+                          else
+                            ListView.separated(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: orders.length,
+                              separatorBuilder: (context, index) => const SizedBox(height: 10),
+                              itemBuilder: (context, index) {
+                                final order = orders[index];
+                                return _buildOrderItemCard(order, isDark, theme);
+                              },
+                            ),
+                        ],
+                      ),
                     ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
+                    const SizedBox(height: 16),
 
-            // 5. AUDIT & TRANSACTION DETAILS (PAYSTACK METADATA)
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'AUDIT & TRANSACTION DETAILS',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.8,
-                          color: const Color(0xFF475569),
-                        ),
+                    // 5. AUDIT & TRANSACTION DETAILS (PAYSTACK METADATA)
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                       ),
-                      if (isLoadingTxn)
-                        const SizedBox(
-                          width: 12,
-                          height: 12,
-                          child: CircularProgressIndicator(strokeWidth: 1.5),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  _buildDetailRow('Remitted To', '${remit.destinationAccountName} (${remit.destinationBankName})', isDark),
-                  const Divider(height: 14),
-                  _buildDetailRow('Payment Method', remit.paymentMethodDisplay, isDark),
-                  const Divider(height: 14),
-                  _buildCopyableRow(context, 'Transaction Reference', remit.referenceNumber, isDark),
-                  const Divider(height: 14),
-                  _buildDetailRow('Paystack Channel', paystackChannel, isDark),
-                  const Divider(height: 14),
-                  _buildDetailRow('Bank / Processor', paystackBank, isDark),
-                  const Divider(height: 14),
-                  _buildDetailRow('Auth / Trace Code', paystackAuthCode, isDark),
-                  const Divider(height: 14),
-                  _buildDetailRow('Gateway Status', gatewayStatus, isDark, valColor: const Color(0xFF16A34A)),
-                  const Divider(height: 14),
-                  _buildDetailRow('Payer / Rider', '$payerName ($payerEmail)', isDark),
-                  const Divider(height: 14),
-                  _buildDetailRow('Timestamp', formattedTimestamp, isDark),
-                  const Divider(height: 14),
-                  _buildDetailRow('Reconciled By', remit.verifiedByName ?? 'Paystack Instant Settlement Engine', isDark),
-                ],
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'AUDIT & TRANSACTION DETAILS',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.8,
+                                  color: const Color(0xFF475569),
+                                ),
+                              ),
+                              if (isLoadingTxn)
+                                const SizedBox(
+                                  width: 12,
+                                  height: 12,
+                                  child: CircularProgressIndicator(strokeWidth: 1.5),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          _buildDetailRow('Remitted To', '${remit.destinationAccountName} (${remit.destinationBankName})', isDark),
+                          const Divider(height: 14),
+                          _buildDetailRow('Payment Method', remit.paymentMethodDisplay, isDark),
+                          const Divider(height: 14),
+                          _buildCopyableRow(context, 'Transaction Reference', remit.referenceNumber, isDark),
+                          const Divider(height: 14),
+                          _buildDetailRow('Paystack Channel', paystackChannel, isDark),
+                          const Divider(height: 14),
+                          _buildDetailRow('Bank / Processor', paystackBank, isDark),
+                          const Divider(height: 14),
+                          _buildDetailRow('Auth / Trace Code', paystackAuthCode, isDark),
+                          const Divider(height: 14),
+                          _buildDetailRow('Gateway Status', gatewayStatus, isDark, valColor: const Color(0xFF16A34A)),
+                          const Divider(height: 14),
+                          _buildDetailRow('Payer / Rider', '$payerName ($payerEmail)', isDark),
+                          const Divider(height: 14),
+                          _buildDetailRow('Timestamp', formattedTimestamp, isDark),
+                          const Divider(height: 14),
+                          _buildDetailRow('Reconciled By', remit.verifiedByName ?? 'Paystack Instant Settlement Engine', isDark),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 20),
@@ -885,16 +942,22 @@ Thank you for your timely settlement!
               width: double.infinity,
               height: 48,
               child: ElevatedButton.icon(
-                onPressed: () => _shareReceipt(context, remit, formattedTimestamp, payerName, orders),
+                onPressed: _isDownloadingImage ? null : () => _downloadReceiptAsImage(remit),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF10B981),
                   foregroundColor: Colors.white,
                   elevation: 1,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                icon: const Icon(Icons.share_rounded, size: 18),
+                icon: _isDownloadingImage
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                      )
+                    : const Icon(Icons.download_rounded, size: 18),
                 label: Text(
-                  'Share Receipt',
+                  _isDownloadingImage ? 'Generating Image...' : 'Download Receipt as Image (PNG)',
                   style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold),
                 ),
               ),
@@ -904,23 +967,16 @@ Thank you for your timely settlement!
               width: double.infinity,
               height: 46,
               child: ElevatedButton.icon(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      backgroundColor: const Color(0xFF2563EB),
-                      content: Text('Downloading statement receipt for ${remit.referenceNumber}...'),
-                    ),
-                  );
-                },
+                onPressed: () => _shareReceipt(context, remit, formattedTimestamp, payerName, orders),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF2563EB),
                   foregroundColor: Colors.white,
                   elevation: 1,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                icon: const Icon(Icons.download_rounded, size: 18),
+                icon: const Icon(Icons.share_rounded, size: 18),
                 label: Text(
-                  'Download Statement (PDF)',
+                  'Copy & Share Receipt Summary',
                   style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold),
                 ),
               ),
@@ -947,8 +1003,9 @@ Thank you for your timely settlement!
   }
 
   Widget _buildOrderItemCard(RemittanceOrderItem order, bool isDark, ThemeData theme) {
-    final isDelivered = order.isDelivered;
     final isFailed = order.isFailed;
+
+    final itemDate = '${order.date.day} ${_monthName(order.date.month)} • ${order.date.hour.toString().padLeft(2, '0')}:${order.date.minute.toString().padLeft(2, '0')}';
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -956,114 +1013,106 @@ Thank you for your timely settlement!
         color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isFailed
-              ? const Color(0xFFF59E0B).withValues(alpha: 0.3)
-              : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Order Header Row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
                 children: [
-                  Icon(
-                    isDelivered ? Icons.check_circle_rounded : Icons.cancel_rounded,
-                    size: 16,
-                    color: isDelivered ? const Color(0xFF16A34A) : const Color(0xFFEA580C),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: isFailed
+                          ? const Color(0xFFEF4444).withValues(alpha: 0.12)
+                          : const Color(0xFF10B981).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      order.orderNumber,
+                      style: GoogleFonts.jetBrainsMono(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: isFailed ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 6),
-                  Text(
-                    order.orderNumber,
-                    style: GoogleFonts.jetBrainsMono(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.onSurface,
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                    decoration: BoxDecoration(
+                      color: isFailed
+                          ? const Color(0xFFEF4444).withValues(alpha: 0.1)
+                          : const Color(0xFF2563EB).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      isFailed ? 'FAILED ATTEMPT' : (order.isDirectTransfer ? 'DIRECT TRANSFER' : 'CASH POD'),
+                      style: GoogleFonts.inter(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        color: isFailed ? const Color(0xFFEF4444) : const Color(0xFF2563EB),
+                      ),
                     ),
                   ),
                 ],
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                decoration: BoxDecoration(
-                  color: isDelivered
-                      ? const Color(0xFF16A34A).withValues(alpha: 0.12)
-                      : const Color(0xFFEA580C).withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  isDelivered
-                      ? (order.paymentType == 'pay_on_delivery' ? 'DELIVERED (POD)' : 'DELIVERED (PREPAID)')
-                      : 'FAILED ATTEMPT (STIPEND APPLIED)',
-                  style: GoogleFonts.jetBrainsMono(
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.bold,
-                    color: isDelivered ? const Color(0xFF16A34A) : const Color(0xFFEA580C),
-                  ),
-                ),
+              Text(
+                itemDate,
+                style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8)),
               ),
             ],
           ),
-          const SizedBox(height: 4),
-
-          // Customer Name & Status Subtext
+          const SizedBox(height: 6),
           Text(
             order.customerName,
             style: GoogleFonts.inter(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              color: theme.colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 8),
 
-          // Mini Financial Summary Table
+          // Financial Grid for this order
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E293B) : Colors.white,
+              color: isDark ? const Color(0xFF1E293B).withValues(alpha: 0.5) : Colors.white,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+              border: Border.all(color: isDark ? const Color(0xFF334155).withValues(alpha: 0.5) : const Color(0xFFE2E8F0)),
             ),
-            child: Column(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                if (isDelivered) ...[
-                  _buildSubRow('POD Cash Collected:', CurrencyFormatter.formatNaira(order.cashCollected), isDark),
-                  const SizedBox(height: 4),
-                  _buildSubRow('Rider Delivery Commission:', '-${CurrencyFormatter.formatNaira(order.riderCommission)}', isDark, valColor: const Color(0xFF16A34A)),
-                  const SizedBox(height: 4),
-                  _buildSubRow('Transport Allowance:', '-${CurrencyFormatter.formatNaira(order.transportAllowance)}', isDark, valColor: const Color(0xFF2563EB)),
-                  if (order.posFee > 0) ...[
-                    const SizedBox(height: 4),
-                    _buildSubRow('POS / Transfer Fee:', '-${CurrencyFormatter.formatNaira(order.posFee)}', isDark, valColor: const Color(0xFF0284C7)),
-                  ],
-                ] else ...[
-                  _buildSubRow('POD Cash Collected:', '₦0.00', isDark),
-                  const SizedBox(height: 4),
-                  _buildSubRow('Delivery Commission:', '₦0.00 (Attempted)', isDark),
-                  const SizedBox(height: 4),
-                  _buildSubRow('Failed Attempt Stipend Credit:', '-${CurrencyFormatter.formatNaira(order.failedStipend)}', isDark, valColor: const Color(0xFFD97706)),
-                ],
-                const Divider(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Net Order Contribution:',
-                      style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: isDark ? Colors.white70 : const Color(0xFF475569)),
-                    ),
-                    Text(
-                      CurrencyFormatter.formatNaira(order.netContribution),
-                      style: GoogleFonts.jetBrainsMono(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: order.netContribution >= 0 ? const Color(0xFF16A34A) : const Color(0xFFEA580C),
-                      ),
-                    ),
-                  ],
+                _buildOrderMiniMetric(
+                  'Collection',
+                  CurrencyFormatter.formatNaira(order.cashCollected),
+                  isDark,
+                  valColor: order.cashCollected > 0 ? theme.colorScheme.onSurface : const Color(0xFF94A3B8),
+                ),
+                _buildOrderMiniMetric(
+                  'Commission',
+                  '-${CurrencyFormatter.formatNaira(order.riderCommission)}',
+                  isDark,
+                  valColor: const Color(0xFF16A34A),
+                ),
+                _buildOrderMiniMetric(
+                  'Transport',
+                  '-${CurrencyFormatter.formatNaira(order.transportAllowance)}',
+                  isDark,
+                  valColor: const Color(0xFF2563EB),
+                ),
+                _buildOrderMiniMetric(
+                  'Net Handover',
+                  CurrencyFormatter.formatNaira(order.netToDC),
+                  isDark,
+                  valColor: const Color(0xFF10B981),
+                  isBold: true,
                 ),
               ],
             ),
@@ -1073,19 +1122,20 @@ Thank you for your timely settlement!
     );
   }
 
-  Widget _buildSubRow(String label, String value, bool isDark, {Color? valColor}) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  Widget _buildOrderMiniMetric(String label, String value, bool isDark, {Color? valColor, bool isBold = false}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+          style: GoogleFonts.inter(fontSize: 9.5, color: const Color(0xFF94A3B8), fontWeight: FontWeight.w500),
         ),
+        const SizedBox(height: 1),
         Text(
           value,
           style: GoogleFonts.jetBrainsMono(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
+            fontSize: 10.5,
+            fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
             color: valColor ?? (isDark ? Colors.white : const Color(0xFF1E293B)),
           ),
         ),
@@ -1093,79 +1143,76 @@ Thank you for your timely settlement!
     );
   }
 
-  Widget _buildDetailRow(String label, String val, bool isDark, {bool isBold = false, Color? valColor}) {
+  Widget _buildDetailRow(String label, String value, bool isDark, {Color? valColor, bool isBold = false}) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B), fontWeight: FontWeight.w500),
-        ),
-        const SizedBox(width: 8),
         Expanded(
           child: Text(
-            val,
-            textAlign: TextAlign.right,
+            label,
             style: GoogleFonts.inter(
-              fontSize: 12.5,
-              fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
-              color: valColor ?? (isBold ? AppColors.orange : (isDark ? Colors.white : const Color(0xFF1E293B))),
+              fontSize: 12,
+              color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+              fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
             ),
           ),
         ),
-      ],
-    );
-  }
-
-  Widget _buildCopyableRow(BuildContext context, String label, String val, bool isDark) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
         Text(
-          label,
-          style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B), fontWeight: FontWeight.w500),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: InkWell(
-            onTap: () {
-              Clipboard.setData(ClipboardData(text: val));
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  backgroundColor: const Color(0xFF00A2D3),
-                  content: Text('Copied reference "$val" to clipboard'),
-                  duration: const Duration(seconds: 2),
-                ),
-              );
-            },
-            borderRadius: BorderRadius.circular(4),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Flexible(
-                  child: Text(
-                    val,
-                    textAlign: TextAlign.right,
-                    style: GoogleFonts.jetBrainsMono(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF00A2D3),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                const Icon(Icons.copy_rounded, size: 13, color: Color(0xFF00A2D3)),
-              ],
-            ),
+          value,
+          style: GoogleFonts.jetBrainsMono(
+            fontSize: 12.5,
+            fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+            color: valColor ?? (isDark ? Colors.white : const Color(0xFF0F172A)),
           ),
         ),
       ],
     );
   }
 
-  static String _monthName(int month) {
+  Widget _buildCopyableRow(BuildContext context, String label, String value, bool isDark) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+            ),
+          ),
+        ),
+        InkWell(
+          onTap: () {
+            Clipboard.setData(ClipboardData(text: value));
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('$label copied to clipboard'),
+                duration: const Duration(seconds: 1),
+              ),
+            );
+          },
+          child: Row(
+            children: [
+              Text(
+                value,
+                style: GoogleFonts.jetBrainsMono(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF2563EB),
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Icon(Icons.copy_rounded, size: 12, color: Color(0xFF2563EB)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _monthName(int month) {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    if (month >= 1 && month <= 12) return months[month - 1];
-    return 'Aug';
+    return months[month - 1];
   }
 }

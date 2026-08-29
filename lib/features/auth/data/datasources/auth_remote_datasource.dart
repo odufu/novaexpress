@@ -660,7 +660,11 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
         if (agentRes != null) {
           deliveryAgentId = agentRes['id'];
+          final userAvatar = userRes?['avatar_url'] ?? merged['avatar_url'];
           merged.addAll(agentRes);
+          if (userAvatar != null && userAvatar.toString().isNotEmpty) {
+            merged['avatar_url'] = userAvatar;
+          }
 
           final dcId = agentRes['distribution_center_id'];
           if (dcId != null) {

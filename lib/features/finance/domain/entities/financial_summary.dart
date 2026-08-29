@@ -103,23 +103,19 @@ class FinancialSummary {
     double pendingRemittanceToDC = 0.0;
     if (unremittedDeliveredCashOrders.isNotEmpty) {
       final double unremittedCash = unremittedDeliveredCashOrders.fold(0.0, (acc, o) => acc + o.totalAmount);
-      final double unremittedCommission = unremittedDeliveredCashOrders.length * commissionPerOrder;
-      final double unremittedTransport = unremittedDeliveredCashOrders.length * transportPerOrder;
+      final double unremittedCommission = unremittedDeliveredCashOrders.fold(
+        0.0,
+        (acc, o) => acc + (o.agentEntitlement > 0 ? o.agentEntitlement : commissionPerOrder),
+      );
+      final double unremittedTransport = unremittedDeliveredCashOrders.fold(
+        0.0,
+        (acc, o) => acc + (o.transportFee > 0 ? o.transportFee : transportPerOrder),
+      );
       final double unremittedTotalEarnings = unremittedCommission + unremittedTransport;
 
-      final double netUnremittedExpected = isSalaried
+      pendingRemittanceToDC = isSalaried
           ? unremittedCash
           : (unremittedCash - unremittedTotalEarnings).clamp(0.0, double.infinity);
-
-      final double totalRemittedSoFar = totalVerifiedRemitted + totalPendingApprovalRemitted;
-      final double totalHistoricalExpected = isSalaried
-          ? cashCollectedAllTime
-          : (cashCollectedAllTime - totalEarningRetained).clamp(0.0, double.infinity);
-      final double remainingGlobalDiff = (totalHistoricalExpected - totalRemittedSoFar).clamp(0.0, double.infinity);
-
-      pendingRemittanceToDC = remainingGlobalDiff < netUnremittedExpected
-          ? remainingGlobalDiff
-          : netUnremittedExpected;
     } else {
       pendingRemittanceToDC = 0.0;
     }

@@ -1,11 +1,10 @@
-import 'dart:convert';
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../core/services/signature_storage_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/user_avatar_widget.dart';
 import '../../../auth/domain/entities/user.dart';
@@ -207,25 +206,13 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> with Single
       }
 
       final contentType = cleanExt == 'png' ? 'image/png' : (cleanExt == 'webp' ? 'image/webp' : (cleanExt == 'gif' ? 'image/gif' : 'image/jpeg'));
-      final fileName = 'avatar_${widget.user.id}_${DateTime.now().millisecondsSinceEpoch}.$cleanExt';
-
-      String? uploadedUrl;
-
-      // 3. Attempt upload to Supabase Storage 'avatars' bucket
-      try {
-        final client = Supabase.instance.client;
-        await client.storage.from('avatars').uploadBinary(
-          fileName,
-          bytes,
-          fileOptions: FileOptions(contentType: contentType, upsert: true),
-        );
-        uploadedUrl = client.storage.from('avatars').getPublicUrl(fileName);
-        debugPrint('[EDIT_PROFILE] ✅ Uploaded avatar to Supabase Storage: $uploadedUrl');
-      } catch (storageErr) {
-        debugPrint('[EDIT_PROFILE] ℹ️ Storage bucket upload notice ($storageErr). Storing as encoded data URI.');
-        // 4. Resilient data URI fallback so DP works on any device and connection
-        uploadedUrl = 'data:$contentType;base64,${base64Encode(bytes)}';
-      }
+      final uploadedUrl = await SignatureStorageService.uploadAvatarImage(
+        imageBytes: bytes,
+        userId: widget.user.id,
+        ext: cleanExt,
+        contentType: contentType,
+      );
+      debugPrint('[EDIT_PROFILE] ✅ Resolved avatar URL: $uploadedUrl');
 
       if (mounted) {
         ref.read(editProfileAvatarUrlProvider.notifier).state = uploadedUrl;

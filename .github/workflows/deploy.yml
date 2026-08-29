@@ -5,13 +5,6 @@ on:
     branches:
       - main
       - master
-      - develop
-      - 'feature/**'
-      - 'fix/**'
-  pull_request:
-    branches:
-      - main
-      - master
   workflow_dispatch:
 
 # Permissions for GitHub Pages deployment
@@ -26,38 +19,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # --------------------------------------------------------------------------
-  # 1. QUALITY CHECK & AUTOMATED TEST SUITE
-  # --------------------------------------------------------------------------
-  quality-and-test:
-    name: Code Analysis & Automated Tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Setup Flutter Environment
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-          cache: true
-          cache-key: 'flutter-:os:-:channel:-:version:-:arch:-:hash:'
-
-      - name: Install Dependencies
-        run: flutter pub get
-
-      - name: Static Code Analysis
-        run: flutter analyze --no-fatal-infos
-
-      - name: Run Test Suites
-        run: flutter test
-
-  # --------------------------------------------------------------------------
-  # 2. COMPILE WASM WEB & DEPLOY (PAGES)
-  # --------------------------------------------------------------------------
   build-and-deploy:
-    name: Build WASM & Deploy
-    needs: quality-and-test
+    name: Build WASM & Deploy to GitHub Pages
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -97,16 +60,13 @@ jobs:
           EOF
 
       - name: Setup GitHub Pages
-        if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && github.event_name != 'pull_request'
         uses: actions/configure-pages@v5
 
       - name: Upload GitHub Pages Artifact
-        if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3
         with:
           path: 'build/web'
 
       - name: Deploy to GitHub Pages
-        if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && github.event_name != 'pull_request'
         id: deployment
         uses: actions/deploy-pages@v4

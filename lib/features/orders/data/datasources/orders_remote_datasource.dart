@@ -533,15 +533,17 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
       updateData['financial_settlement_status'] = 'cash_remitted_verified';
       updateData['remitted_at'] = DateTime.now().toIso8601String();
     }
-    if (notes != null) {
-      updateData['delivery_notes'] = notes;
-    }
+    String combinedNotes = notes ?? '';
     if (customerSignatureUrl != null) {
-      updateData['customer_signature_url'] = customerSignatureUrl;
       updateData['proof_of_delivery_url'] = customerSignatureUrl;
+      combinedNotes = '$combinedNotes [Signature: $customerSignatureUrl]'.trim();
     }
     if (photoProofUrl != null) {
-      updateData['proof_photo_url'] = photoProofUrl;
+      updateData['proof_of_delivery_url'] ??= photoProofUrl;
+      combinedNotes = '$combinedNotes [POD Photo: $photoProofUrl]'.trim();
+    }
+    if (combinedNotes.isNotEmpty) {
+      updateData['delivery_notes'] = combinedNotes;
     }
     if (gatePassCode != null) {
       updateData['gate_pass_code'] = gatePassCode;

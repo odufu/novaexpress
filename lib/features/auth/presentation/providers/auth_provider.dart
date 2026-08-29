@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../core/constants/supabase_constants.dart';
 import '../../data/datasources/auth_remote_datasource.dart';
 import '../../data/repositories/auth_repository_impl.dart';
 import '../../data/models/user_model.dart';
@@ -135,46 +136,97 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       if (currentUser != null) {
         // 1. Update users table in Supabase
+        final userUpdateData = <String, dynamic>{
+          'first_name': firstName,
+          'last_name': lastName,
+          'phone': phone,
+          'phone_number': phone,
+          'updated_at': DateTime.now().toIso8601String(),
+        };
+        if (avatarUrl != null && avatarUrl.isNotEmpty) {
+          userUpdateData['avatar_url'] = avatarUrl;
+        }
+
         try {
-          await client.from('users').update({
-            'first_name': firstName,
-            'last_name': lastName,
-            'phone_number': phone,
-            if (avatarUrl != null) 'avatar_url': avatarUrl,
-            'updated_at': DateTime.now().toIso8601String(),
-          }).eq('id', currentUser.id);
+          await client
+              .from(SupabaseConstants.usersTable)
+              .update(userUpdateData)
+              .eq('id', currentUser.id);
+          debugPrint('[AUTH_PROVIDER] ✅ Users table updated for: ${currentUser.id}');
         } catch (uErr) {
-          debugPrint('[AUTH_PROVIDER] ℹ️ Users table update notice ($uErr)');
+          debugPrint('[AUTH_PROVIDER] ℹ️ Users table update notice ($uErr). Retrying with service client...');
+          SupabaseClient? serviceDb;
+          try {
+            serviceDb = SupabaseClient(
+              SupabaseConstants.supabaseUrl,
+              SupabaseConstants.supabaseServiceRoleKey,
+              authOptions: const AuthClientOptions(autoRefreshToken: false),
+            );
+            await serviceDb
+                .from(SupabaseConstants.usersTable)
+                .update(userUpdateData)
+                .eq('id', currentUser.id);
+            debugPrint('[AUTH_PROVIDER] ✅ Users table updated via service client for: ${currentUser.id}');
+          } catch (sErr) {
+            debugPrint('[AUTH_PROVIDER] ⚠️ Users table service update notice ($sErr)');
+          } finally {
+            serviceDb?.dispose();
+          }
         }
 
         // 2. Update delivery_agents table in Supabase
         final agentId = currentUser.deliveryAgentId ?? currentUser.id;
+        final agentUpdateData = <String, dynamic>{
+          'operating_state': operatingState,
+          'operating_city': operatingCity,
+          'vehicle_type': vehicleType,
+          'vehicle_plate_number': vehiclePlateNumber,
+          'bank_name': bankName,
+          'bank_account_number': bankAccountNumber,
+          'bank_account_name': bankAccountName,
+          'last_sync_at': DateTime.now().toIso8601String(),
+        };
+
         try {
-          final res = await client.from('delivery_agents').update({
-            'operating_state': operatingState,
-            'operating_city': operatingCity,
-            'vehicle_type': vehicleType,
-            'vehicle_plate_number': vehiclePlateNumber,
-            'bank_name': bankName,
-            'bank_account_number': bankAccountNumber,
-            'bank_account_name': bankAccountName,
-            'updated_at': DateTime.now().toIso8601String(),
-          }).eq('id', agentId).select();
+          final res = await client
+              .from(SupabaseConstants.deliveryAgentsTable)
+              .update(agentUpdateData)
+              .eq('id', agentId)
+              .select();
 
           if ((res as List).isEmpty) {
-            await client.from('delivery_agents').update({
-              'operating_state': operatingState,
-              'operating_city': operatingCity,
-              'vehicle_type': vehicleType,
-              'vehicle_plate_number': vehiclePlateNumber,
-              'bank_name': bankName,
-              'bank_account_number': bankAccountNumber,
-              'bank_account_name': bankAccountName,
-              'updated_at': DateTime.now().toIso8601String(),
-            }).eq('user_id', currentUser.id);
+            await client
+                .from(SupabaseConstants.deliveryAgentsTable)
+                .update(agentUpdateData)
+                .eq('user_id', currentUser.id);
           }
+          debugPrint('[AUTH_PROVIDER] ✅ Delivery agents table updated for agent: $agentId');
         } catch (dErr) {
-          debugPrint('[AUTH_PROVIDER] ℹ️ Delivery agents update notice ($dErr)');
+          debugPrint('[AUTH_PROVIDER] ℹ️ Delivery agents update notice ($dErr). Retrying with service client...');
+          SupabaseClient? serviceDb;
+          try {
+            serviceDb = SupabaseClient(
+              SupabaseConstants.supabaseUrl,
+              SupabaseConstants.supabaseServiceRoleKey,
+              authOptions: const AuthClientOptions(autoRefreshToken: false),
+            );
+            final res = await serviceDb
+                .from(SupabaseConstants.deliveryAgentsTable)
+                .update(agentUpdateData)
+                .eq('id', agentId)
+                .select();
+            if ((res as List).isEmpty) {
+              await serviceDb
+                  .from(SupabaseConstants.deliveryAgentsTable)
+                  .update(agentUpdateData)
+                  .eq('user_id', currentUser.id);
+            }
+            debugPrint('[AUTH_PROVIDER] ✅ Delivery agents table updated via service client for agent: $agentId');
+          } catch (sdErr) {
+            debugPrint('[AUTH_PROVIDER] ⚠️ Delivery agents service update notice ($sdErr)');
+          } finally {
+            serviceDb?.dispose();
+          }
         }
 
         // 3. Update local state
@@ -206,8 +258,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
           bankAccountNumber: bankAccountNumber,
           bankAccountName: bankAccountName,
           agentStatus: currentUser.agentStatus,
-          avatarUrl: avatarUrl ?? currentUser.avatarUrl,
+          avatarUrl: (avatarUrl != null && avatarUrl.isNotEmpty) ? avatarUrl : currentUser.avatarUrl,
         );
+
+        // Update in-memory datasource cache
+        if (currentUser.email.isNotEmpty) {
+          AuthRemoteDataSourceImpl.registerUserInMemory(updatedUser);
+        }
 
         state = state.copyWith(isLoading: false, user: updatedUser);
         return true;

@@ -28,10 +28,10 @@ class DCOrderPaymentMatchingPage extends ConsumerStatefulWidget {
   const DCOrderPaymentMatchingPage({super.key});
 
   @override
-  ConsumerState<DCOrderPaymentMatchingPage> createState() => _DCOrderPaymentMatchingPageState();
+  DCOrderPaymentMatchingPageState createState() => DCOrderPaymentMatchingPageState();
 }
 
-class _DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchingPage> {
+class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchingPage> {
   final TextEditingController _searchController = TextEditingController();
   Timer? _searchDebounceTimer;
 
@@ -106,6 +106,14 @@ class _DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatch
 
     return null;
   }
+
+  @visibleForTesting
+  List<DCRemittanceLifecycleItem> buildRemittanceLifecycleItemsForTest(
+    List<OrderEntity> allOrders,
+    List<RemittanceEntity> allRemittances,
+    DCConsoleState dcState,
+  ) =>
+      _buildRemittanceLifecycleItems(allOrders, allRemittances, dcState);
 
   /// High-Performance Unified Remittance Lifecycle Generator with Pre-Indexed Hash Lookups
   List<DCRemittanceLifecycleItem> _buildRemittanceLifecycleItems(
@@ -273,7 +281,7 @@ class _DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatch
     // 3. Add Remitted & Cleared Cash Batches from financeState.remittances (O(1) Order Linking)
     final Set<String> processedOrderIds = <String>{};
     for (final rem in allRemittances) {
-      if (rem.paymentMethod != 'paystack' && rem.paymentMethod != 'direct_transfer') {
+      if (rem.paymentMethod != 'direct_transfer') {
         final List<OrderEntity> matchingOrders = [];
 
         for (final ao in rem.associatedOrders) {
@@ -284,9 +292,12 @@ class _DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatch
           }
         }
 
-        if (matchingOrders.isEmpty) {
-          for (final o in allOrders) {
-            if (rem.referenceNumber.contains(o.orderNumber)) {
+        // Also check if any order's delivery_notes references this remittance reference
+        for (final o in allOrders) {
+          if (!matchingOrders.any((mo) => mo.id == o.id)) {
+            if (o.deliveryNotes?.contains(rem.referenceNumber) == true ||
+                rem.referenceNumber.contains(o.orderNumber) ||
+                rem.notes?.contains(o.orderNumber) == true) {
               matchingOrders.add(o);
             }
           }
@@ -336,7 +347,7 @@ class _DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatch
             riderAvatarUrl: riderAvatarUrl,
             riderPhone: riderPhone,
             type: 'cash_pod',
-            status: 'verified',
+            status: rem.isVerified ? 'verified' : (rem.isPending ? 'pending_audit' : rem.status),
             openingDate: rem.createdAt,
             closingDate: rem.verifiedAt ?? rem.createdAt,
             grossAmount: gross,
@@ -345,7 +356,7 @@ class _DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatch
             posFee: pos,
             netAmount: net,
             orders: matchingOrders,
-            paymentMethod: 'cash_to_dc',
+            paymentMethod: rem.paymentMethod.isNotEmpty ? rem.paymentMethod : 'paystack',
           ),
         );
       }

@@ -59,7 +59,7 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
     final ordersState = ref.watch(ordersProvider);
     final allOrders = ordersState.orders;
 
-    // Filter drivers by search query and model filter
+    // 1. Filter drivers by search query and model filter
     final filteredDrivers = widget.drivers.where((d) {
       if (personnelFilter != 'all') {
         if (personnelFilter == 'pda' && !d.isPda) return false;
@@ -77,23 +77,54 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
       return true;
     }).toList();
 
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF151D36) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0),
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.03),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
+    // 2. Pre-Group all orders by driver into fast O(1) Lookup Maps
+    final Map<String, List<OrderEntity>> ordersByDriverId = {};
+    final Map<String, List<OrderEntity>> ordersByDriverCode = {};
+    final Map<String, List<OrderEntity>> ordersByDriverName = {};
+
+    for (final o in allOrders) {
+      if (o.deliveryAgentId != null && o.deliveryAgentId!.isNotEmpty) {
+        ordersByDriverId.putIfAbsent(o.deliveryAgentId!, () => []).add(o);
+      }
+      if (o.deliveryAgentCode != null && o.deliveryAgentCode!.isNotEmpty) {
+        ordersByDriverCode.putIfAbsent(o.deliveryAgentCode!.toLowerCase(), () => []).add(o);
+      }
+      if (o.deliveryAgentName != null && o.deliveryAgentName!.isNotEmpty) {
+        ordersByDriverName.putIfAbsent(o.deliveryAgentName!.toLowerCase(), () => []).add(o);
+      }
+    }
+
+    List<OrderEntity> getDriverOrders(DCFleetDriver driver) {
+      if (driver.id.isNotEmpty && ordersByDriverId.containsKey(driver.id)) {
+        return ordersByDriverId[driver.id]!;
+      }
+      if (driver.driverCode.isNotEmpty && ordersByDriverCode.containsKey(driver.driverCode.toLowerCase())) {
+        return ordersByDriverCode[driver.driverCode.toLowerCase()]!;
+      }
+      if (driver.name.isNotEmpty && ordersByDriverName.containsKey(driver.name.toLowerCase())) {
+        return ordersByDriverName[driver.name.toLowerCase()]!;
+      }
+      return const [];
+    }
+
+    return RepaintBoundary(
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF151D36) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0),
+            width: 1,
           ),
-        ],
-      ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.03),
+              blurRadius: 14,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -298,7 +329,7 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
               }
 
               if (isNarrow) {
-                return _buildMobileCardList(filteredDrivers, allOrders, isDark);
+                return _buildMobileCardList(filteredDrivers, allOrders, isDark, getDriverOrders);
               }
 
               return SingleChildScrollView(
@@ -339,11 +370,7 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
                     ],
                     rows: filteredDrivers.map((driver) {
                       // Live performance calculations based on matched orders
-                      final driverOrders = allOrders.where((o) {
-                        return (o.deliveryAgentId != null && o.deliveryAgentId == driver.id) ||
-                            (o.deliveryAgentCode != null && o.deliveryAgentCode == driver.driverCode) ||
-                            (o.deliveryAgentName != null && o.deliveryAgentName!.toLowerCase() == driver.name.toLowerCase());
-                      }).toList();
+                      final driverOrders = getDriverOrders(driver);
 
                       final totalOrders = driverOrders.isNotEmpty ? driverOrders.length : driver.totalAssignedOrders;
                       final completedOrders = driverOrders.isNotEmpty
@@ -594,6 +621,7 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
           ),
         ],
       ),
+    ),
     );
   }
 
@@ -628,7 +656,12 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
     );
   }
 
-  Widget _buildMobileCardList(List<DCFleetDriver> drivers, List<OrderEntity> allOrders, bool isDark) {
+  Widget _buildMobileCardList(
+    List<DCFleetDriver> drivers,
+    List<OrderEntity> allOrders,
+    bool isDark,
+    List<OrderEntity> Function(DCFleetDriver) getDriverOrders,
+  ) {
     return ListView.separated(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -638,12 +671,8 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
       itemBuilder: (ctx, i) {
         final driver = drivers[i];
 
-        // Dynamic order performance calculation
-        final driverOrders = allOrders.where((o) {
-          return (o.deliveryAgentId != null && o.deliveryAgentId == driver.id) ||
-              (o.deliveryAgentCode != null && o.deliveryAgentCode == driver.driverCode) ||
-              (o.deliveryAgentName != null && o.deliveryAgentName!.toLowerCase() == driver.name.toLowerCase());
-        }).toList();
+        // Dynamic order performance calculation using fast lookup
+        final driverOrders = getDriverOrders(driver);
 
         final totalOrders = driverOrders.isNotEmpty ? driverOrders.length : driver.totalAssignedOrders;
         final completedOrders = driverOrders.isNotEmpty
