@@ -370,7 +370,7 @@ ORD-9002,Hon. Maryam Ali,08097654321,,5 Ahmadu Bello Way,Abuja,FCT,Grazer Herbal
       expect(find.text('Hon. Maryam Ali'), findsOneWidget);
     });
 
-    testWidgets('2. DCOrdersPage renders Master Orders Directory with all orders and tabs', (tester) async {
+    testWidgets('2. DCOrdersPage renders Master Orders Directory with all orders and action buttons', (tester) async {
       tester.view.physicalSize = const Size(1280, 900);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
@@ -386,13 +386,13 @@ ORD-9002,Hon. Maryam Ali,08097654321,,5 Ahmadu Bello Way,Abuja,FCT,Grazer Herbal
 
       await tester.pumpAndSettle();
 
-      expect(find.text('Master Orders Directory'), findsOneWidget);
-      expect(find.textContaining('All Orders (3)'), findsOneWidget);
-      expect(find.textContaining('Unassigned Pool (1)'), findsOneWidget);
-      expect(find.textContaining('In-Transit Routes (1)'), findsOneWidget);
-      expect(find.textContaining('Delivered / POD (1)'), findsOneWidget);
+      expect(find.text('Total Filtered Orders'), findsOneWidget);
+      expect(find.text('📦 Unassigned Pool'), findsOneWidget);
+      expect(find.text('🚴 In-Transit Live'), findsOneWidget);
+      expect(find.text('🟢 Fulfilled / POD'), findsOneWidget);
 
       expect(find.text('Import CSV'), findsOneWidget);
+      expect(find.text('Create New Order'), findsOneWidget);
 
       expect(find.text('Aisha Bello'), findsOneWidget);
       expect(find.text('Chidi Okafor'), findsOneWidget);

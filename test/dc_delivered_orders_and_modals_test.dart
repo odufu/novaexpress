@@ -110,7 +110,7 @@ void main() {
       ),
     ];
 
-    testWidgets('1. DCOrdersPage renders Delivered/POD tab, metric KPIs, and order cards', (tester) async {
+    testWidgets('1. DCOrdersPage renders Delivered & POD KPI and orders in table', (tester) async {
       await tester.binding.setSurfaceSize(const Size(1200, 900));
 
       await tester.pumpWidget(
@@ -127,32 +127,19 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // Tap the Delivered / POD tab (tab index 2)
-      final deliveredTab = find.text('Delivered / POD (2)');
-      expect(deliveredTab, findsOneWidget);
-      await tester.tap(deliveredTab);
-      await tester.pumpAndSettle();
+      // Verify Summary KPI Cards
+      expect(find.text('🟢 Fulfilled / POD'), findsOneWidget);
+      expect(find.text('Total Filtered Orders'), findsOneWidget);
 
-      // Verify Header and Summary KPI Cards
-      expect(find.text('Delivered Orders & Fulfillment Audit'), findsOneWidget);
-      expect(find.text('Total Delivered Revenue'), findsOneWidget);
-      expect(find.text('🟢 Remitted & Cleared'), findsOneWidget);
-      expect(find.text('🟡 In Rider Custody'), findsOneWidget);
-      expect(find.text('⚡ Direct to Bank'), findsOneWidget);
-
-      // Verify Delivered Order Cards
+      // Verify Delivered Order Row items
       expect(find.text('#ORD-9284-NIG'), findsOneWidget);
       expect(find.text('#ORD-9285-NIG'), findsOneWidget);
       expect(find.textContaining('Chief Aliyu Mohammed'), findsOneWidget);
       expect(find.textContaining('Fatima Garba'), findsOneWidget);
-
-      // Verify the 3 action buttons exist on delivered orders
-      expect(find.text('💰 Finance & Collections'), findsWidgets);
-      expect(find.textContaining('📦 Stock & Inventory'), findsWidgets);
-      expect(find.text('📍 Order & POD Signature'), findsWidgets);
+      expect(find.text('DELIVERED'), findsWidgets);
     });
 
-    testWidgets('2. Clicking Finance button opens DCOrderDetailModal with financial accounting', (tester) async {
+    testWidgets('2. Tapping delivered order row opens DCOrderDetailModal with financial accounting', (tester) async {
       await tester.binding.setSurfaceSize(const Size(1200, 900));
 
       await tester.pumpWidget(
@@ -169,13 +156,8 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // Switch to Delivered tab
-      await tester.tap(find.text('Delivered / POD (2)'));
-      await tester.pumpAndSettle();
-
-      // Tap first Finance button
-      final financeBtn = find.text('💰 Finance & Collections').first;
-      await tester.tap(financeBtn);
+      // Tap first delivered order row
+      await tester.tap(find.text('#ORD-9284-NIG'));
       await tester.pumpAndSettle();
 
       // Verify Order Detail Modal
@@ -191,7 +173,7 @@ void main() {
       await tester.pumpAndSettle();
     });
 
-    testWidgets('3. Clicking Stock button opens DCOrderDetailModal with warehouse stock custody', (tester) async {
+    testWidgets('3. DCOrderDetailModal displays warehouse stock custody linkage', (tester) async {
       await tester.binding.setSurfaceSize(const Size(1200, 900));
 
       await tester.pumpWidget(
@@ -208,19 +190,14 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // Switch to Delivered tab
-      await tester.tap(find.text('Delivered / POD (2)'));
-      await tester.pumpAndSettle();
-
-      // Tap first Stock button
-      final stockBtn = find.textContaining('📦 Stock & Inventory').first;
-      await tester.tap(stockBtn);
+      // Tap first order row
+      await tester.tap(find.text('#ORD-9284-NIG'));
       await tester.pumpAndSettle();
 
       // Verify Stock info in modal
       expect(find.text('Order ORD-9284-NIG'), findsOneWidget);
       expect(find.text('📦 Product & Warehouse Inventory Linkage'), findsOneWidget);
-      expect(find.text('Respira Detox Tea'), findsOneWidget);
+      expect(find.text('Respira Detox Tea'), findsWidgets);
       expect(find.text('BIN-A1-01'), findsOneWidget);
       expect(find.text('LOT-2026-08'), findsOneWidget);
 
@@ -229,7 +206,7 @@ void main() {
       await tester.pumpAndSettle();
     });
 
-    testWidgets('4. Clicking Order & POD details button opens DCOrderDetailModal with receiver and POD details', (tester) async {
+    testWidgets('4. DCOrderDetailModal displays customer and POD proof details', (tester) async {
       await tester.binding.setSurfaceSize(const Size(1200, 900));
 
       await tester.pumpWidget(
@@ -246,13 +223,8 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // Switch to Delivered tab
-      await tester.tap(find.text('Delivered / POD (2)'));
-      await tester.pumpAndSettle();
-
-      // Tap first Order & POD details button
-      final podBtn = find.text('📍 Order & POD Signature').first;
-      await tester.tap(podBtn);
+      // Tap first order row
+      await tester.tap(find.text('#ORD-9284-NIG'));
       await tester.pumpAndSettle();
 
       // Verify Order & POD Details in modal
@@ -260,7 +232,7 @@ void main() {
       expect(find.text('👤 Customer & Destination Information'), findsOneWidget);
       expect(find.text('Chief Aliyu Mohammed'), findsWidgets);
       expect(find.text('Phone: 08031234567'), findsOneWidget);
-      expect(find.text('Plot 42, Admiralty Way, Lekki Phase 1'), findsOneWidget);
+      expect(find.text('Plot 42, Admiralty Way, Lekki Phase 1'), findsWidgets);
       expect(find.textContaining('Digital Proof of Delivery (POD)'), findsOneWidget);
       expect(find.textContaining('Recipient: Chief Aliyu Mohammed'), findsOneWidget);
     });

@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:novexps/features/dc_console/domain/entities/dc_fleet_driver.dart';
-import 'package:novexps/features/dc_console/presentation/pages/dc_orders_page.dart';
+import 'package:novexps/features/dc_console/presentation/widgets/dc_assign_order_modal.dart';
 import 'package:novexps/features/dc_console/presentation/providers/dc_console_provider.dart';
 import 'package:novexps/features/orders/data/datasources/orders_remote_datasource.dart';
 import 'package:novexps/features/orders/data/models/order_model.dart';
@@ -142,27 +142,14 @@ void main() {
               return notifier;
             }),
           ],
-          child: const MaterialApp(
+          child: MaterialApp(
             home: Scaffold(
-              body: DCOrdersPage(),
+              body: DCAssignOrderModal(order: initialOrders.first),
             ),
           ),
         ),
       );
 
-      await tester.pumpAndSettle();
-
-      // Switch to Unassigned Pool tab
-      await tester.tap(find.textContaining('Unassigned Pool').first);
-      await tester.pumpAndSettle();
-
-      expect(find.text('TRK-8930 • Senator Kashim Shettima (08091112233)'), findsOneWidget);
-      expect(find.text('TRK-8931 • Barrister Chidinma Okafor (08032223344)'), findsOneWidget);
-
-      // Tap "Assign Rider" on the first unassigned order (TRK-8930)
-      final assignButtons = find.widgetWithText(ElevatedButton, 'Assign Rider');
-      expect(assignButtons, findsWidgets);
-      await tester.tap(assignButtons.first);
       await tester.pumpAndSettle();
 
       // Verify Dispatch Modal opens

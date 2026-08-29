@@ -317,18 +317,18 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(DCOrdersPage), findsOneWidget);
-      expect(find.textContaining('All Orders'), findsWidgets);
-      expect(find.textContaining('Unassigned Pool'), findsWidgets);
-      expect(find.textContaining('In-Transit Routes'), findsWidgets);
-      expect(find.textContaining('Delivered / POD'), findsWidgets);
-      expect(find.textContaining('Failed / Rescheduled'), findsWidgets);
-      expect(find.text('Master Orders Directory'), findsOneWidget);
+      expect(find.text('Total Filtered Orders'), findsOneWidget);
+      expect(find.text('📦 Unassigned Pool'), findsOneWidget);
+      expect(find.text('🚴 In-Transit Live'), findsOneWidget);
+      expect(find.text('🟢 Fulfilled / POD'), findsOneWidget);
+      expect(find.text('⚠️ Failed / Returns'), findsOneWidget);
 
-      // Navigate to Unassigned Pool tab
-      await tester.tap(find.textContaining('Unassigned Pool').first);
-      await tester.pumpAndSettle();
-      expect(find.text('Unassigned Orders Pool'), findsOneWidget);
-      expect(find.text('TRK-8930 • Senator Kashim Shettima (08091112233)'), findsOneWidget);
+      expect(find.text('Create New Order'), findsOneWidget);
+      expect(find.text('Import CSV'), findsOneWidget);
+
+      // Verify orders are rendered in responsive master table
+      expect(find.text('#TRK-8930'), findsOneWidget);
+      expect(find.text('Senator Kashim Shettima'), findsOneWidget);
     });
 
     testWidgets('4. DCStockPage renders all 4 warehouse inventory sub-tabs', (tester) async {

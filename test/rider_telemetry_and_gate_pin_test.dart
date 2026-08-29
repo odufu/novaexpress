@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:novexps/core/services/rider_location_service.dart';
 import 'package:novexps/features/dc_console/domain/entities/dc_fleet_driver.dart';
-import 'package:novexps/features/dc_console/presentation/pages/dc_orders_page.dart';
+import 'package:novexps/features/dc_console/presentation/widgets/dc_assign_order_modal.dart';
 import 'package:novexps/features/dc_console/presentation/providers/dc_console_provider.dart';
 import 'package:novexps/features/orders/data/datasources/orders_remote_datasource.dart';
 import 'package:novexps/features/orders/data/models/order_model.dart';
@@ -104,7 +104,7 @@ void main() {
         totalAmount: 22000.0,
         paymentType: 'pay_on_delivery',
         paymentStatus: 'pending',
-        fulfillmentType: 'distributed_inventory',
+        fulfillmentType: 'client_package',
         clientName: 'NovaCare',
         createdAt: DateTime(2026, 8, 22, 10, 0),
         latitude: 9.0765,
@@ -144,24 +144,14 @@ void main() {
               ]);
             }),
           ],
-          child: const MaterialApp(
+          child: MaterialApp(
             home: Scaffold(
-              body: DCOrdersPage(),
+              body: DCAssignOrderModal(order: unassignedOrder),
             ),
           ),
         ),
       );
 
-      await tester.pumpAndSettle();
-
-      // Navigate to Unassigned Pool tab
-      await tester.tap(find.textContaining('Unassigned Pool').first);
-      await tester.pumpAndSettle();
-
-      // Open dispatch modal
-      final assignButton = find.text('Assign Rider');
-      expect(assignButton, findsOneWidget);
-      await tester.tap(assignButton);
       await tester.pumpAndSettle();
 
       // Verify GIS Nearest Rider Match card
