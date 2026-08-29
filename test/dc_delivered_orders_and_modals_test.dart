@@ -136,7 +136,7 @@ void main() {
       expect(find.text('#ORD-9285-NIG'), findsOneWidget);
       expect(find.textContaining('Chief Aliyu Mohammed'), findsOneWidget);
       expect(find.textContaining('Fatima Garba'), findsOneWidget);
-      expect(find.text('DELIVERED'), findsWidgets);
+      expect(find.textContaining('DELIVERED'), findsWidgets);
     });
 
     testWidgets('2. Tapping delivered order row opens DCOrderDetailModal with financial accounting', (tester) async {

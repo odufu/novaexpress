@@ -183,9 +183,8 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      expect(find.text('📝 Digital Proof of Delivery (POD) & Customer Signature'), findsOneWidget);
-      expect(find.text('✓ Customer Signature Verified & Stored'), findsOneWidget);
-      expect(find.text('POD SIGNATURE RECORD'), findsOneWidget);
+      expect(find.textContaining('Digital Proof of Delivery (POD)'), findsOneWidget);
+      expect(find.textContaining('CUSTOMER SIGNATURE RECORD'), findsOneWidget);
       expect(find.text('Recipient: Tunde Bakare'), findsOneWidget);
       expect(find.text('Update / Re-sign'), findsOneWidget);
     });

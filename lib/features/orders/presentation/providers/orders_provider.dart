@@ -224,10 +224,10 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
       } catch (_) {}
     }
     _heartbeatTimer?.cancel();
-    _heartbeatTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 4), (_) {
       if (!mounted) return;
       final agentId = _getActiveAgentId();
-      if (agentId.isNotEmpty) {
+      if (agentId.isNotEmpty && _isRiderUser()) {
         _silentSyncOrders(agentId);
       } else {
         _silentSyncOrders();
@@ -251,13 +251,25 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
 
       if (!mounted) return;
 
-      // Check if list changed
+      // Check if list or any order attribute changed
       bool hasChanges = freshList.length != state.orders.length;
       if (!hasChanges) {
         for (int i = 0; i < freshList.length; i++) {
-          if (freshList[i].id != state.orders[i].id || 
-              freshList[i].status != state.orders[i].status ||
-              freshList[i].deliveryAgentId != state.orders[i].deliveryAgentId) {
+          final f = freshList[i];
+          final s = state.orders[i];
+          if (f.id != s.id ||
+              f.status != s.status ||
+              f.paymentStatus != s.paymentStatus ||
+              f.paymentType != s.paymentType ||
+              f.remittanceStatus != s.remittanceStatus ||
+              f.financialSettlementStatus != s.financialSettlementStatus ||
+              f.deliveryAgentId != s.deliveryAgentId ||
+              f.customerSignatureUrl != s.customerSignatureUrl ||
+              f.photoProofUrl != s.photoProofUrl ||
+              f.gatePassCode != s.gatePassCode ||
+              f.latitude != s.latitude ||
+              f.longitude != s.longitude ||
+              f.deliveryNotes != s.deliveryNotes) {
             hasChanges = true;
             break;
           }

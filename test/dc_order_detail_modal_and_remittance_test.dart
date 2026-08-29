@@ -310,7 +310,7 @@ void main() {
 
       // 1. Header & ID
       expect(find.text('Order TRK-8924'), findsOneWidget);
-      expect(find.text('DELIVERED'), findsOneWidget);
+      expect(find.text('DELIVERED ✓'), findsOneWidget);
 
       // 2. Customer details & Quick Actions
       expect(find.text('Fatima Abdullahi'), findsOneWidget);
@@ -454,6 +454,95 @@ void main() {
       expect(find.text('Dispatch Order TRK-9900'), findsOneWidget);
       expect(find.text('Emeka Okafor'), findsWidgets);
       expect(find.text('Select a rider above to dispatch'), findsOneWidget);
+    });
+
+    testWidgets('Delivered cash order in DCOrderDetailModal displays cash collected awaiting remittance, signature, photo waybill, and GPS data', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1280, 1000));
+
+      final deliveredCashOrder = OrderEntity(
+        id: 'ord-del-8620',
+        orderNumber: 'TRK-8620',
+        customerName: 'Samul Shiu',
+        customerPhone: '08085040146',
+        deliveryState: 'Gombe',
+        deliveryCity: 'Billiri',
+        deliveryAddress: 'back of elicity',
+        landmark: 'Church',
+        productName: 'Grazer Herbal Detox Tea',
+        quantity: 5,
+        paidQuantity: 4,
+        freeQuantity: 1,
+        basePrice: 55000,
+        upsellAmount: 0,
+        totalAmount: 55000,
+        paymentType: 'pay_on_delivery',
+        paymentStatus: 'collected',
+        fulfillmentType: 'distributed_inventory',
+        clientName: 'Novacale Limited',
+        status: 'delivered',
+        deliveryAgentId: 'drv-1',
+        deliveryAgentName: 'Joel Odufu',
+        deliveryAgentCode: 'PDA-7182',
+        customerSignatureUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+        photoProofUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+        gatePassCode: 'GT-8620',
+        latitude: 9.07850,
+        longitude: 7.48320,
+        isLocationVerified: true,
+        remittanceStatus: 'unremitted',
+        financialSettlementStatus: 'pending_remittance',
+        deliveryNotes: '[POD Collected via Cash • Gate PIN: GT-8620 • GPS Proof: 9.07850°, 7.48320° (14.5m)] Cash in custody.',
+        deliveredAt: DateTime(2026, 8, 29, 13, 48),
+        createdAt: DateTime(2026, 8, 29, 9, 30),
+      );
+
+      final container = ProviderContainer(
+        overrides: [
+          ordersProvider.overrideWith((ref) => _MockOrdersNotifier([deliveredCashOrder])),
+          stockProvider.overrideWith((ref) => _MockStockNotifier([])),
+          dcConsoleProvider.overrideWith((ref) => _MockDCConsoleNotifier()),
+        ],
+      );
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            home: Scaffold(
+              body: DCOrderDetailModal(order: deliveredCashOrder),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 1. Header & Status Pill
+      expect(find.text('Order TRK-8620'), findsOneWidget);
+      expect(find.text('DELIVERED ✓'), findsOneWidget);
+      expect(find.text('CASH COLLECTED • AWAITING REMITTANCE'), findsOneWidget);
+
+      // 2. Top KPI Cards
+      expect(find.text('Total Order Value'), findsOneWidget);
+      expect(find.text('🟡 Cash in Custody'), findsOneWidget);
+      expect(find.text('Awaiting Remittance (₦55,000.00)'), findsOneWidget);
+
+      // 3. Digital Proof of Delivery Section
+      expect(find.text('📝 Digital Proof of Delivery (POD) & Verification Audit'), findsOneWidget);
+      expect(find.text('💵 Cash Collected • Awaiting DC Remittance'), findsOneWidget);
+      expect(find.text('CUSTOMER SIGNATURE RECORD (VERIFIED)'), findsOneWidget);
+      expect(find.text('Recipient: Samul Shiu'), findsOneWidget);
+      expect(find.text('DELIVERY PHOTO / WAYBILL SNAPSHOT (ATTACHED)'), findsOneWidget);
+      expect(find.text('PHYSICAL PRESENCE GPS PROOF'), findsOneWidget);
+      expect(find.text('9.07850°, 7.48320°'), findsOneWidget);
+      expect(find.text('GT-8620'), findsOneWidget);
+      expect(find.text('View on Map'), findsOneWidget);
+
+      // 4. Financial Accounting Breakdown
+      expect(find.text('💰 Total Order Amount Collected:'), findsOneWidget);
+      expect(find.text('₦55,000.00'), findsWidgets);
+      expect(find.text('🏢 Net Merchant Settlement Payable:'), findsOneWidget);
+      expect(find.text('₦51,000.00'), findsOneWidget);
+      expect(find.text('Mark Remitted / Cleared'), findsOneWidget);
     });
   });
 }

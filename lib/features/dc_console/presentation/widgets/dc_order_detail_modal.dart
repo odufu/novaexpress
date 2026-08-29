@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -129,6 +130,15 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
                     LayoutBuilder(
                       builder: (context, constraints) {
                         final isDesktop = constraints.maxWidth >= 680;
+                        final hasPodData = _currentOrder.isDelivered ||
+                            _currentOrder.customerSignatureUrl != null ||
+                            _currentOrder.photoProofUrl != null ||
+                            _currentOrder.hasCoordinates ||
+                            (_currentOrder.deliveryNotes != null &&
+                                (_currentOrder.deliveryNotes!.contains('POD') ||
+                                    _currentOrder.deliveryNotes!.contains('Gate PIN') ||
+                                    _currentOrder.deliveryNotes!.contains('GPS Proof')));
+
                         if (isDesktop) {
                           return Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -142,7 +152,7 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
                                     _buildCustomerSection(isDark),
                                     const SizedBox(height: 16),
                                     _buildHolderAndRiderSection(isDark, assignedDriver, dcState.drivers),
-                                    if (_currentOrder.isDelivered) ...[
+                                    if (hasPodData) ...[
                                       const SizedBox(height: 16),
                                       _buildProofOfDeliverySection(isDark),
                                     ],
@@ -177,7 +187,7 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
                             _buildHolderAndRiderSection(isDark, assignedDriver, dcState.drivers),
                             const SizedBox(height: 16),
                             _buildFinancialAndRemittanceSection(isDark),
-                            if (_currentOrder.isDelivered) ...[
+                            if (hasPodData) ...[
                               const SizedBox(height: 16),
                               _buildProofOfDeliverySection(isDark),
                             ],
@@ -251,13 +261,46 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
 
   Widget _buildStatusPill(OrderEntity order) {
     if (order.isDelivered) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(
-          color: const Color(0xFF10B981).withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Text('DELIVERED', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w800, color: const Color(0xFF059669))),
+      final isCashAwaitingRemittance = order.isUnremitted && !order.isDirectTransfer;
+      return Wrap(
+        spacing: 6,
+        runSpacing: 4,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: const Color(0xFF10B981).withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.check_circle_rounded, size: 11, color: Color(0xFF059669)),
+                const SizedBox(width: 4),
+                Text('DELIVERED ✓', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w800, color: const Color(0xFF059669))),
+              ],
+            ),
+          ),
+          if (isCashAwaitingRemittance)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF59E0B).withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.4)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.payments_outlined, size: 11, color: Color(0xFFD97706)),
+                  const SizedBox(width: 4),
+                  Text('CASH COLLECTED • AWAITING REMITTANCE', style: GoogleFonts.jetBrainsMono(fontSize: 9.5, fontWeight: FontWeight.w800, color: const Color(0xFFD97706))),
+                ],
+              ),
+            ),
+        ],
       );
     } else if (order.isFailed) {
       return Container(
@@ -347,11 +390,13 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
           _currentOrder.isDelivered
               ? (_currentOrder.isDirectTransfer
                   ? '⚡ Direct Transfer'
-                  : (_currentOrder.isRemitted ? '🟢 Remitted & Cleared' : '🟡 In Rider Custody'))
+                  : (_currentOrder.isRemitted ? '🟢 Remitted & Cleared' : '🟡 Cash in Custody'))
               : (_currentOrder.isFailed ? '⚠️ Failed Attempt' : '🕒 In Progress'),
           _currentOrder.isRemitted && _currentOrder.remittanceReference != null
               ? 'Ref: ${_currentOrder.remittanceReference}'
-              : (_currentOrder.isUnremitted ? 'Cash in custody' : 'Settlement pending'),
+              : (_currentOrder.isUnremitted
+                  ? 'Awaiting Remittance (${CurrencyFormatter.formatNaira(_currentOrder.totalAmount)})'
+                  : 'Settlement pending'),
           _currentOrder.isRemitted ? const Color(0xFF10B981) : (_currentOrder.isUnremitted ? const Color(0xFFD97706) : const Color(0xFF64748B)),
           isDark,
         );
@@ -829,6 +874,50 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
     }
   }
 
+  Future<void> _captureOrUploadPhotoProof() async {
+    try {
+      final result = await FilePickerPlatform.instance.pickFiles(
+        type: FileType.image,
+      );
+
+      if (result.isNotEmpty) {
+        final file = result.first;
+        final bytes = await file.readAsBytes();
+        if (bytes.isNotEmpty) {
+          final ext = file.extension?.toLowerCase() ?? 'jpg';
+          final base64String = base64Encode(bytes);
+          final dataUrl = 'data:image/$ext;base64,$base64String';
+
+          final updatedOrder = _currentOrder.copyWith(
+            photoProofUrl: dataUrl,
+          );
+          ref.read(ordersProvider.notifier).updateOrderInList(updatedOrder);
+
+          try {
+            final client = Supabase.instance.client;
+            await client.from(SupabaseConstants.ordersTable).update({
+              'proof_photo_url': dataUrl,
+              'updated_at': DateTime.now().toIso8601String(),
+            }).eq('id', _currentOrder.id);
+          } catch (e) {
+            debugPrint('[DC_ORDER_DETAIL] ℹ️ Supabase photo update notice: $e');
+          }
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                backgroundColor: Color(0xFF16A34A),
+                content: Text('✓ Delivery photo proof attached successfully!'),
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[DC_ORDER_DETAIL] ⚠️ Photo upload error: $e');
+    }
+  }
+
   Widget _buildProofOfDeliverySection(bool isDark) {
     String? sigUrl = _currentOrder.customerSignatureUrl;
     if ((sigUrl == null || sigUrl.isEmpty) && _currentOrder.deliveryNotes != null) {
@@ -837,114 +926,169 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
       if (match != null) sigUrl = match.group(1)?.trim();
     }
 
+    String? photoUrl = _currentOrder.photoProofUrl;
+    if ((photoUrl == null || photoUrl.isEmpty) && _currentOrder.deliveryNotes != null) {
+      final match = RegExp(r'\[(?:Audit\s+)?(?:PHOTO|IMAGE|WAYBILL):\s*([^\]]+)\]', caseSensitive: false)
+          .firstMatch(_currentOrder.deliveryNotes!);
+      if (match != null) photoUrl = match.group(1)?.trim();
+    }
+
     final hasSignature = sigUrl != null && sigUrl.isNotEmpty;
-    Uint8List? memoryBytes;
+    final hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
+
+    Uint8List? sigBytes;
     if (hasSignature && sigUrl.startsWith('data:image')) {
       try {
         final commaIdx = sigUrl.indexOf(',');
         if (commaIdx != -1) {
-          memoryBytes = base64Decode(sigUrl.substring(commaIdx + 1));
+          sigBytes = base64Decode(sigUrl.substring(commaIdx + 1));
         }
       } catch (_) {}
     }
 
+    Uint8List? photoBytes;
+    if (hasPhoto && photoUrl.startsWith('data:image')) {
+      try {
+        final commaIdx = photoUrl.indexOf(',');
+        if (commaIdx != -1) {
+          photoBytes = base64Decode(photoUrl.substring(commaIdx + 1));
+        }
+      } catch (_) {}
+    }
+
+    final isCashAwaitingRemittance = _currentOrder.isDelivered && _currentOrder.isUnremitted && !_currentOrder.isDirectTransfer;
+
     return _buildSectionContainer(
       isDark: isDark,
-      title: '📝 Digital Proof of Delivery (POD) & Customer Signature',
+      title: '📝 Digital Proof of Delivery (POD) & Verification Audit',
       icon: Icons.verified_rounded,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(
-                hasSignature ? Icons.check_circle_rounded : Icons.pending_actions_rounded,
-                color: hasSignature ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
-                size: 18,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  hasSignature
-                      ? '✓ Customer Signature Verified & Stored'
-                      : (_currentOrder.isDelivered
-                          ? 'Delivered (Signature Pending Upload)'
-                          : 'Pending Delivery Fulfillment'),
-                  style: GoogleFonts.inter(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.bold,
-                    color: hasSignature ? const Color(0xFF10B981) : (isDark ? Colors.white70 : const Color(0xFF475569)),
-                  ),
-                ),
-              ),
-              ElevatedButton.icon(
-                onPressed: () => _captureOrUploadSignature(),
-                icon: Icon(hasSignature ? Icons.edit_rounded : Icons.add_photo_alternate_rounded, size: 14),
-                label: Text(hasSignature ? 'Update / Re-sign' : 'Upload / Capture POD', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: hasSignature ? const Color(0xFF0284C7) : const Color(0xFF2563EB),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          if (hasSignature) ...[
+          // 1. Prominent Cash Collection & Custody Status Banner
+          if (isCashAwaitingRemittance) ...[
             Container(
+              margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4), width: 1.5),
+                color: const Color(0xFFF59E0B).withValues(alpha: isDark ? 0.18 : 0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.4)),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF10B981).withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                'POD SIGNATURE RECORD',
-                                style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.bold, color: const Color(0xFF10B981)),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'Recipient: ${_currentOrder.customerName}',
-                                style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B)),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.fullscreen_rounded, size: 18),
-                        tooltip: 'View Full Signature',
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        onPressed: () => _showFullSignaturePreview(context, sigUrl!, isDark),
-                      ),
-                    ],
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFF59E0B),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.payments_rounded, color: Colors.white, size: 18),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '💵 Cash Collected • Awaiting DC Remittance',
+                          style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFFD97706)),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Amount of ${CurrencyFormatter.formatNaira(_currentOrder.totalAmount)} is held in rider vehicle custody (${_currentOrder.deliveryAgentName ?? "Assigned Rider"} - ${_currentOrder.deliveryAgentCode ?? "PDA"}).',
+                          style: GoogleFonts.inter(fontSize: 11, color: isDark ? Colors.white70 : const Color(0xFF475569)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          // 2. Customer Signature Record Card
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: hasSignature
+                    ? const Color(0xFF10B981).withValues(alpha: 0.4)
+                    : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                width: hasSignature ? 1.5 : 1,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Icon(
+                            hasSignature ? Icons.check_circle_rounded : Icons.pending_actions_rounded,
+                            size: 16,
+                            color: hasSignature ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              hasSignature ? 'CUSTOMER SIGNATURE RECORD (VERIFIED)' : 'CUSTOMER SIGNATURE RECORD (PENDING)',
+                              style: GoogleFonts.jetBrainsMono(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: hasSignature ? const Color(0xFF10B981) : const Color(0xFFD97706),
+                                letterSpacing: 0.5,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (hasSignature)
+                          IconButton(
+                            icon: const Icon(Icons.fullscreen_rounded, size: 18),
+                            tooltip: 'View Full Signature',
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            onPressed: () => _showFullSignaturePreview(context, sigUrl!, isDark),
+                          ),
+                        const SizedBox(width: 6),
+                        ElevatedButton.icon(
+                          onPressed: () => _captureOrUploadSignature(),
+                          icon: Icon(hasSignature ? Icons.edit_rounded : Icons.draw_rounded, size: 13),
+                          label: Text(hasSignature ? 'Update / Re-sign' : 'Capture Signature', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: hasSignature ? const Color(0xFF0284C7) : const Color(0xFF2563EB),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                if (hasSignature) ...[
+                  Text(
+                    'Recipient: ${_currentOrder.customerName}',
+                    style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B)),
+                  ),
+                  const SizedBox(height: 6),
                   GestureDetector(
                     onTap: () => _showFullSignaturePreview(context, sigUrl!, isDark),
                     child: Container(
-                      height: 140,
+                      height: 120,
                       width: double.infinity,
                       decoration: BoxDecoration(
                         color: Colors.white,
@@ -953,9 +1097,9 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(7),
-                        child: memoryBytes != null
+                        child: sigBytes != null
                             ? Image.memory(
-                                memoryBytes,
+                                sigBytes,
                                 fit: BoxFit.contain,
                                 errorBuilder: (_, __, ___) => _buildSignatureFallback(),
                               )
@@ -972,40 +1116,167 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
                       ),
                     ),
                   ),
+                ] else ...[
+                  InkWell(
+                    onTap: () => _captureOrUploadSignature(),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+                      alignment: Alignment.center,
+                      child: Column(
+                        children: [
+                          Icon(Icons.draw_rounded, size: 26, color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
+                          const SizedBox(height: 4),
+                          Text(
+                            'No digital signature on file for this order',
+                            style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w600, color: isDark ? Colors.white70 : const Color(0xFF334155)),
+                          ),
+                          Text(
+                            'Click to capture recipient signature on pad',
+                            style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // 3. Delivery Photo Proof / Waybill Snapshot Card
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: hasPhoto
+                    ? const Color(0xFF10B981).withValues(alpha: 0.4)
+                    : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                width: hasPhoto ? 1.5 : 1,
               ),
             ),
-          ] else ...[
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
-              ),
-              child: InkWell(
-                onTap: () => _captureOrUploadSignature(),
-                child: Column(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Icon(Icons.draw_rounded, size: 32, color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
-                    const SizedBox(height: 8),
-                    Text(
-                      'No digital signature on file for this order',
-                      style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: isDark ? Colors.white70 : const Color(0xFF334155)),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Icon(
+                            hasPhoto ? Icons.photo_camera_rounded : Icons.add_photo_alternate_outlined,
+                            size: 16,
+                            color: hasPhoto ? const Color(0xFF10B981) : const Color(0xFF0284C7),
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              hasPhoto ? 'DELIVERY PHOTO / WAYBILL SNAPSHOT (ATTACHED)' : 'DELIVERY PHOTO / WAYBILL SNAPSHOT (OPTIONAL)',
+                              style: GoogleFonts.jetBrainsMono(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: hasPhoto ? const Color(0xFF10B981) : const Color(0xFF0284C7),
+                                letterSpacing: 0.5,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Click to upload physical waybill photo or sign digitally on pad',
-                      style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (hasPhoto)
+                          IconButton(
+                            icon: const Icon(Icons.fullscreen_rounded, size: 18),
+                            tooltip: 'View Full Photo',
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            onPressed: () => _showFullPhotoPreview(context, photoUrl!, isDark),
+                          ),
+                        const SizedBox(width: 6),
+                        ElevatedButton.icon(
+                          onPressed: () => _captureOrUploadPhotoProof(),
+                          icon: Icon(hasPhoto ? Icons.photo_camera_rounded : Icons.upload_file_rounded, size: 13),
+                          label: Text(hasPhoto ? 'Replace Photo' : 'Attach Photo', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: hasPhoto ? const Color(0xFF0284C7) : const Color(0xFF10B981),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ),
+                const SizedBox(height: 8),
+                if (hasPhoto) ...[
+                  GestureDetector(
+                    onTap: () => _showFullPhotoPreview(context, photoUrl!, isDark),
+                    child: Container(
+                      height: 140,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(7),
+                        child: photoBytes != null
+                            ? Image.memory(
+                                photoBytes,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => _buildPhotoFallback(),
+                              )
+                            : (photoUrl.startsWith('http://') || photoUrl.startsWith('https://')
+                                ? Image.network(
+                                    photoUrl,
+                                    fit: BoxFit.cover,
+                                    loadingBuilder: (ctx, child, progress) => progress == null
+                                        ? child
+                                        : const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                                    errorBuilder: (_, __, ___) => _buildPhotoFallback(),
+                                  )
+                                : _buildPhotoFallback()),
+                      ),
+                    ),
+                  ),
+                ] else ...[
+                  InkWell(
+                    onTap: () => _captureOrUploadPhotoProof(),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+                      alignment: Alignment.center,
+                      child: Column(
+                        children: [
+                          Icon(Icons.add_a_photo_outlined, size: 26, color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
+                          const SizedBox(height: 4),
+                          Text(
+                            'No parcel or waybill photo attached yet',
+                            style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w600, color: isDark ? Colors.white70 : const Color(0xFF334155)),
+                          ),
+                          Text(
+                            'Click to upload doorstep delivery snapshot or physical waybill',
+                            style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
-          ],
+          ),
           const SizedBox(height: 12),
-          // Physical GPS Telemetry & Presence Verification Record
+
+          // 4. Physical GPS Telemetry & Doorstep Arrival Presence Record
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -1121,6 +1392,19 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
     );
   }
 
+  Widget _buildPhotoFallback() {
+    return Center(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.photo_library_rounded, color: Color(0xFF10B981), size: 16),
+          const SizedBox(width: 6),
+          Text('Delivery Photo Attached', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSignatureFallback() {
     return Center(
       child: Row(
@@ -1130,6 +1414,68 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
           const SizedBox(width: 6),
           Text('Digital Signature Attached', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
         ],
+      ),
+    );
+  }
+
+  void _showFullPhotoPreview(BuildContext context, String photoUrl, bool isDark) {
+    Uint8List? bytes;
+    if (photoUrl.startsWith('data:image')) {
+      try {
+        final commaIdx = photoUrl.indexOf(',');
+        if (commaIdx != -1) bytes = base64Decode(photoUrl.substring(commaIdx + 1));
+      } catch (_) {}
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 700, maxHeight: 600),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Proof of Delivery (POD) Photo / Waybill', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
+                        Text('Order #${_currentOrder.orderNumber} • ${_currentOrder.customerName}', style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B))),
+                      ],
+                    ),
+                    IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close_rounded)),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFCBD5E1)),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(11),
+                      child: bytes != null
+                          ? Image.memory(bytes, fit: BoxFit.contain)
+                          : (photoUrl.startsWith('http://') || photoUrl.startsWith('https://')
+                              ? Image.network(photoUrl, fit: BoxFit.contain)
+                              : _buildPhotoFallback()),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

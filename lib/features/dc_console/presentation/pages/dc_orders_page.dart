@@ -1642,10 +1642,32 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
     final isUnassigned = order.deliveryAgentId == null || order.deliveryAgentId!.isEmpty;
 
     if (status == 'delivered') {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-        decoration: BoxDecoration(color: const Color(0xFFDCFCE7), borderRadius: BorderRadius.circular(6)),
-        child: Text('DELIVERED', style: GoogleFonts.jetBrainsMono(fontSize: 9.5, fontWeight: FontWeight.bold, color: const Color(0xFF16A34A))),
+      final isCashAwaitingRemittance = order.isUnremitted && !order.isDirectTransfer;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+            decoration: BoxDecoration(color: const Color(0xFFDCFCE7), borderRadius: BorderRadius.circular(6)),
+            child: Text('DELIVERED ✓', style: GoogleFonts.jetBrainsMono(fontSize: 9.5, fontWeight: FontWeight.bold, color: const Color(0xFF16A34A))),
+          ),
+          if (isCashAwaitingRemittance) ...[
+            const SizedBox(height: 3),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF3C7),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: const Color(0xFFFDE68A)),
+              ),
+              child: Text(
+                'AWAITING REMITTANCE',
+                style: GoogleFonts.jetBrainsMono(fontSize: 8, fontWeight: FontWeight.bold, color: const Color(0xFFB45309)),
+              ),
+            ),
+          ],
+        ],
       );
     }
     if (status == 'returned') {

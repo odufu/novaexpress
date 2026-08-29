@@ -351,41 +351,27 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
         }
       }
 
-      // Map assigned riders from in-memory cache
+      // Map assigned riders from in-memory cache without overwriting terminal states or stripping fields
       final syncedList = list.map((model) {
         if (_assignedRidersByOrderId.containsKey(model.id)) {
-          return OrderModel(
-            id: model.id,
-            orderNumber: model.orderNumber,
-            customerName: model.customerName,
-            customerPhone: model.customerPhone,
-            customerAltPhone: model.customerAltPhone,
-            deliveryState: model.deliveryState,
-            deliveryCity: model.deliveryCity,
-            deliveryAddress: model.deliveryAddress,
-            landmark: model.landmark,
-            lga: model.lga,
-            productName: model.productName,
-            status: 'assigned',
-            quantity: model.quantity,
-            paidQuantity: model.paidQuantity,
-            freeQuantity: model.freeQuantity,
-            basePrice: model.basePrice,
-            upsellAmount: model.upsellAmount,
-            totalAmount: model.totalAmount,
-            paymentType: model.paymentType,
-            paymentStatus: model.paymentStatus,
-            fulfillmentType: model.fulfillmentType,
-            clientName: model.clientName,
-            packageCustodyId: model.packageCustodyId,
-            clientDeliveryFee: model.clientDeliveryFee,
-            agentEntitlement: model.agentEntitlement,
-            deliveryNotes: model.deliveryNotes,
-            createdAt: model.createdAt,
-            deliveryAgentId: _assignedRidersByOrderId[model.id],
-            deliveryAgentName: _assignedRiderNamesByOrderId[model.id],
-            deliveryAgentCode: _assignedRiderCodesByOrderId[model.id],
-            distributionCenterId: distributionCenterId,
+          final isFinished = model.status == 'delivered' ||
+              model.status == 'completed' ||
+              model.status == 'failed' ||
+              model.status == 'cancelled' ||
+              model.status == 'returned';
+
+          return OrderModel.fromEntity(
+            model.copyWith(
+              deliveryAgentId: model.deliveryAgentId ?? _assignedRidersByOrderId[model.id],
+              deliveryAgentName: model.deliveryAgentName ?? _assignedRiderNamesByOrderId[model.id],
+              deliveryAgentCode: model.deliveryAgentCode ?? _assignedRiderCodesByOrderId[model.id],
+              distributionCenterId: distributionCenterId,
+              status: isFinished
+                  ? model.status
+                  : (model.status == 'pending' || model.status == 'new' || model.status == 'unassigned'
+                      ? 'in_transit'
+                      : model.status),
+            ),
           );
         }
         return model;

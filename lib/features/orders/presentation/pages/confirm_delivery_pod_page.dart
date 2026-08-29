@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -29,6 +31,8 @@ class ConfirmDeliveryPodState {
   final bool isSuccess;
   final Uint8List? signatureBytes;
   final String? signatureUrl;
+  final Uint8List? photoBytes;
+  final String? photoUrl;
   final String? errorMessage;
   final double enteredAmount;
 
@@ -40,6 +44,8 @@ class ConfirmDeliveryPodState {
     this.isSuccess = false,
     this.signatureBytes,
     this.signatureUrl,
+    this.photoBytes,
+    this.photoUrl,
     this.errorMessage,
     this.enteredAmount = 0.0,
   });
@@ -52,6 +58,8 @@ class ConfirmDeliveryPodState {
     bool? isSuccess,
     Uint8List? signatureBytes,
     String? signatureUrl,
+    Uint8List? photoBytes,
+    String? photoUrl,
     String? errorMessage,
     double? enteredAmount,
   }) {
@@ -63,6 +71,8 @@ class ConfirmDeliveryPodState {
       isSuccess: isSuccess ?? this.isSuccess,
       signatureBytes: signatureBytes ?? this.signatureBytes,
       signatureUrl: signatureUrl ?? this.signatureUrl,
+      photoBytes: photoBytes ?? this.photoBytes,
+      photoUrl: photoUrl ?? this.photoUrl,
       errorMessage: errorMessage,
       enteredAmount: enteredAmount ?? this.enteredAmount,
     );
@@ -98,6 +108,10 @@ class ConfirmDeliveryPodNotifier extends StateNotifier<ConfirmDeliveryPodState> 
 
   void setSignature(Uint8List? bytes, String? url) {
     state = state.copyWith(signatureBytes: bytes, signatureUrl: url);
+  }
+
+  void setPhoto(Uint8List? bytes, String? url) {
+    state = state.copyWith(photoBytes: bytes, photoUrl: url);
   }
 
   void setEnteredAmount(double amt) {
@@ -260,6 +274,7 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
             paymentMethod: paymentMethod,
             amountCollected: isDirectTransfer ? 0.0 : amount,
             customerSignatureUrl: podState.signatureUrl,
+            photoProofUrl: podState.photoUrl,
             gatePassCode: gatePin,
             latitude: riderLoc.latitude,
             longitude: riderLoc.longitude,
@@ -299,6 +314,27 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
       if (mounted) {
         ref.read(confirmDeliveryPodProvider.notifier).setError(e.toString());
       }
+    }
+  }
+
+  Future<void> _pickOrCapturePhotoProof() async {
+    try {
+      final result = await FilePickerPlatform.instance.pickFiles(
+        type: FileType.image,
+      );
+
+      if (result.isNotEmpty) {
+        final file = result.first;
+        final bytes = await file.readAsBytes();
+        if (bytes.isNotEmpty) {
+          final ext = file.extension?.toLowerCase() ?? 'jpg';
+          final base64String = base64Encode(bytes);
+          final dataUrl = 'data:image/$ext;base64,$base64String';
+          ref.read(confirmDeliveryPodProvider.notifier).setPhoto(bytes, dataUrl);
+        }
+      }
+    } catch (e) {
+      debugPrint('[POD] ⚠️ Photo picking error: $e');
     }
   }
 
@@ -1405,6 +1441,130 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                             style: GoogleFonts.inter(
                               fontSize: 11,
                               color: const Color(0xFF64748B),
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // Optional Photo Proof / Waybill Snapshot Card
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    'DELIVERY PHOTO PROOF / WAYBILL',
+                    style: GoogleFonts.jetBrainsMono(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF64748B),
+                      letterSpacing: 0.5,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (podState.photoBytes != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDCFCE7),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFF86EFAC)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.check_circle_rounded, size: 12, color: Color(0xFF16A34A)),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Photo Attached ✓',
+                          style: GoogleFonts.jetBrainsMono(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF15803D),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            GestureDetector(
+              onTap: _pickOrCapturePhotoProof,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: podState.photoBytes != null
+                        ? const Color(0xFF10B981)
+                        : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                    width: podState.photoBytes != null ? 1.5 : 1,
+                  ),
+                ),
+                child: podState.photoBytes != null
+                    ? Column(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.memory(
+                              podState.photoBytes!,
+                              height: 120,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.photo_camera_rounded, size: 14, color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF00A2D3)),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Tap to Retake / Replace Photo',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF00A2D3),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0284C7).withValues(alpha: 0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.add_a_photo_outlined, color: Color(0xFF0284C7), size: 22),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Attach Parcel / Waybill Photo',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: theme.colorScheme.onSurface,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Snapshot of delivered package at doorstep or physical waybill',
+                                  style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                                ),
+                              ],
                             ),
                           ),
                         ],
