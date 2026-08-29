@@ -111,8 +111,18 @@ class DCCreateOrderDraftNotifier extends StateNotifier<DCCreateOrderDraftState> 
 
   void setLocation(String stateVal, String cityVal) => state = state.copyWith(selectedState: stateVal, selectedCity: cityVal);
   void setCity(String cityVal) => state = state.copyWith(selectedCity: cityVal);
-  void setUnitPrice(double price) => state = state.copyWith(unitPrice: price);
-  void setQuantity(int q) => state = state.copyWith(quantity: q);
+  void setUnitPrice(double price) => state = state.copyWith(
+    unitPrice: price,
+    selectedPackage: state.selectedPackage != null
+        ? () => state.selectedPackage!.copyWith(packagePrice: price)
+        : null,
+  );
+  void setQuantity(int q) => state = state.copyWith(
+    quantity: q,
+    selectedPackage: state.selectedPackage != null
+        ? () => state.selectedPackage!.copyWith(quantity: q, paidQuantity: q)
+        : null,
+  );
   void setPaymentType(String type) => state = state.copyWith(paymentType: type);
   void setClientCompany(String company) => state = state.copyWith(clientCompany: company, clientName: company);
   void setAssignImmediately(bool val) => state = state.copyWith(assignImmediately: val);
@@ -130,7 +140,7 @@ class DCCreateOrderDraftNotifier extends StateNotifier<DCCreateOrderDraftState> 
       selectedProductName: product.name,
       clientName: product.clientName,
       selectedPackage: () => defaultPkg,
-      quantity: defaultPkg != null ? defaultPkg.quantity : 1,
+      quantity: defaultPkg != null ? defaultPkg.totalPhysicalQuantity : 1,
       unitPrice: defaultPkg != null ? defaultPkg.packagePrice : product.defaultUnitPrice,
     );
   }
@@ -138,7 +148,7 @@ class DCCreateOrderDraftNotifier extends StateNotifier<DCCreateOrderDraftState> 
     state = state.copyWith(
       selectedPackage: () => pkg,
       selectedProductId: () => pkg.productId,
-      quantity: pkg.quantity,
+      quantity: pkg.totalPhysicalQuantity,
       unitPrice: pkg.packagePrice,
     );
   }
@@ -175,8 +185,8 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
     super.initState();
     _priceController.addListener(_onPriceChanged);
     _quantityController.addListener(_onQuantityChanged);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(productCatalogProvider.notifier).reloadCatalog();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await ref.read(productCatalogProvider.notifier).reloadCatalog();
       final stockItems = ref.read(stockProvider).stockItems;
       if (stockItems.isNotEmpty) {
         ref.read(productCatalogProvider.notifier).syncFromStockItems(stockItems);
@@ -207,7 +217,7 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
     final defaultPkg = packages.isNotEmpty ? packages.first : null;
     _productNameController.text = product.name;
     if (defaultPkg != null) {
-      _quantityController.text = '${defaultPkg.quantity}';
+      _quantityController.text = '${defaultPkg.totalPhysicalQuantity}';
       _priceController.text = defaultPkg.packagePrice.toStringAsFixed(0);
     } else {
       _quantityController.text = '1';
@@ -217,7 +227,7 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
   }
 
   void _selectPackage(ProductPackage pkg) {
-    _quantityController.text = '${pkg.quantity}';
+    _quantityController.text = '${pkg.totalPhysicalQuantity}';
     _priceController.text = pkg.packagePrice.toStringAsFixed(0);
     ref.read(dcCreateOrderDraftProvider.notifier).selectPackage(pkg);
   }
@@ -877,7 +887,9 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                                           ),
                                           const SizedBox(height: 1),
                                           Text(
-                                            '${CurrencyFormatter.formatNaira(pkg.packagePrice)} (${pkg.quantity} unit${pkg.quantity > 1 ? 's' : ''})',
+                                            pkg.freeQuantity > 0
+                                                ? '${CurrencyFormatter.formatNaira(pkg.packagePrice)} (${pkg.totalPhysicalQuantity} Pcs: ${pkg.paidQuantity} Paid + ${pkg.freeQuantity} Free)'
+                                                : '${CurrencyFormatter.formatNaira(pkg.packagePrice)} (${pkg.totalPhysicalQuantity} unit${pkg.totalPhysicalQuantity > 1 ? 's' : ''})',
                                             style: GoogleFonts.inter(
                                               fontSize: 10.5,
                                               color: isSelected ? Colors.white70 : const Color(0xFF64748B),
@@ -1197,6 +1209,15 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                                     style: GoogleFonts.inter(fontSize: isMobile ? 18 : 20, fontWeight: FontWeight.w900, color: const Color(0xFF2563EB)),
                                     overflow: TextOverflow.ellipsis,
                                   ),
+                                  if (draft.selectedPackage != null) ...[
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      draft.selectedPackage!.freeQuantity > 0
+                                          ? '📦 ${draft.selectedPackage!.totalPhysicalQuantity} Physical Stock Units (${draft.selectedPackage!.paidQuantity} Paid + ${draft.selectedPackage!.freeQuantity} Free) • Amount to Collect: ${CurrencyFormatter.formatNaira(draft.totalAmount)}'
+                                          : '📦 ${draft.selectedPackage!.totalPhysicalQuantity} Physical Units • Amount to Collect: ${CurrencyFormatter.formatNaira(draft.totalAmount)}',
+                                      style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w600, color: const Color(0xFF10B981)),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),

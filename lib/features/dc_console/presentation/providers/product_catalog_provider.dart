@@ -53,23 +53,25 @@ class ProductCatalogState {
   List<ProductPackage> getPackagesForProduct(String productName) {
     final prod = findProductByName(productName);
     if (prod != null && prod.packages.isNotEmpty) {
+      if (prod.packages.length == 1 && prod.packages.first.packageName == '1 Unit (Single)') {
+        return ProductCatalogNotifier.buildDefaultPackagesForProduct(
+          productId: prod.id,
+          productName: prod.name,
+          productSku: prod.sku,
+          baseUnitPrice: prod.defaultUnitPrice,
+          clientName: prod.clientName,
+        );
+      }
       return prod.packages;
     }
-    // Default fallback single package
-    return [
-      ProductPackage(
-        id: 'pkg-default-${productName.hashCode.abs()}',
-        productId: prod?.id ?? 'prod-custom',
-        productName: productName,
-        packageName: '1 Unit (Single)',
-        quantity: 1,
-        paidQuantity: 1,
-        freeQuantity: 0,
-        packagePrice: prod?.defaultUnitPrice ?? 25000.0,
-        clientName: prod?.clientName ?? 'Novacare Limited',
-        createdAt: DateTime.now(),
-      ),
-    ];
+    // Return rich default commercial packages for this product
+    return ProductCatalogNotifier.buildDefaultPackagesForProduct(
+      productId: prod?.id ?? 'prod-${productName.hashCode.abs()}',
+      productName: prod?.name ?? productName,
+      productSku: prod?.sku,
+      baseUnitPrice: prod?.defaultUnitPrice ?? 25000.0,
+      clientName: prod?.clientName ?? 'Novacare Limited',
+    );
   }
 }
 
@@ -80,6 +82,84 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
       : _storageService = storageService ?? LocalStorageServiceImpl(),
         super(const ProductCatalogState(products: [])) {
     _initCatalog();
+  }
+
+  /// Builds the standard suite of commercial package bundles for any product
+  static List<ProductPackage> buildDefaultPackagesForProduct({
+    required String productId,
+    required String productName,
+    String? productSku,
+    required double baseUnitPrice,
+    String clientName = 'Novacare Limited',
+  }) {
+    final sku = productSku ?? 'SKU-${productName.hashCode.abs()}';
+    final isGrazer = productName.toLowerCase().contains('grazer');
+    final p1Price = baseUnitPrice > 0 ? baseUnitPrice : 25000.0;
+    final p2Price = isGrazer ? 35000.0 : (p1Price >= 25000 ? 35000.0 : (p1Price * 2 * 0.85).roundToDouble());
+    final p3Price = isGrazer ? 50000.0 : (p1Price >= 25000 ? 50000.0 : (p1Price * 3 * 0.80).roundToDouble());
+    const p5Price = 55000.0;
+
+    return [
+      // 1 Unit (Single)
+      ProductPackage(
+        id: 'pkg-${sku.toLowerCase()}-1',
+        productId: productId,
+        productName: productName,
+        productSku: sku,
+        packageName: '1 Unit (Single)',
+        quantity: 1,
+        paidQuantity: 1,
+        freeQuantity: 0,
+        packagePrice: p1Price,
+        clientName: clientName,
+        createdAt: DateTime.now(),
+      ),
+      // 2-Pack Special Deal
+      ProductPackage(
+        id: 'pkg-${sku.toLowerCase()}-2',
+        productId: productId,
+        productName: productName,
+        productSku: sku,
+        packageName: '$productName 2-Pack Special Deal',
+        quantity: 2,
+        paidQuantity: 2,
+        freeQuantity: 0,
+        packagePrice: p2Price,
+        clientName: clientName,
+        description: '2 Units Pack Deal',
+        createdAt: DateTime.now(),
+      ),
+      // 3-Pack Value Deal
+      ProductPackage(
+        id: 'pkg-${sku.toLowerCase()}-3',
+        productId: productId,
+        productName: productName,
+        productSku: sku,
+        packageName: '$productName 3-Pack Value Deal',
+        quantity: 3,
+        paidQuantity: 3,
+        freeQuantity: 0,
+        packagePrice: p3Price,
+        clientName: clientName,
+        description: '3 Units Value Bundle',
+        createdAt: DateTime.now(),
+      ),
+      // 5-Pack Mega Deal (4 + 1 Free @ ₦55,000)
+      ProductPackage(
+        id: 'pkg-${sku.toLowerCase()}-5',
+        productId: productId,
+        productName: productName,
+        productSku: sku,
+        packageName: '$productName 5-Pack Mega Deal (4 + 1 Free)',
+        quantity: 5,
+        paidQuantity: 4,
+        freeQuantity: 1,
+        packagePrice: p5Price,
+        clientName: clientName,
+        description: 'Buy 4 Units, Get 1 Free Bonus (5 Total Physical Units)',
+        createdAt: DateTime.now(),
+      ),
+    ];
   }
 
   Future<void> _initCatalog() async {
@@ -139,31 +219,30 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
           }
         }
 
-        // If no packages embedded, check if we had cached packages for this product
-        if (parsedPackages.isEmpty) {
-          final cachedProd = state.findProductByName(name) ?? state.findProductBySku(sku);
-          if (cachedProd != null && cachedProd.packages.isNotEmpty) {
-            parsedPackages = cachedProd.packages;
+        // Merge with existing packages in memory / local cache
+        final cachedProd = state.findProductByName(name) ?? state.findProductBySku(sku);
+        if (cachedProd != null && cachedProd.packages.isNotEmpty) {
+          for (final cachedPkg in cachedProd.packages) {
+            if (!parsedPackages.any((p) => p.id == cachedPkg.id || p.packageName.toLowerCase() == cachedPkg.packageName.toLowerCase())) {
+              parsedPackages.add(cachedPkg);
+            }
           }
         }
 
-        // If still empty, add default 1-unit single package
-        if (parsedPackages.isEmpty) {
-          parsedPackages = [
-            ProductPackage(
-              id: 'pkg-${sku.toLowerCase()}-1',
-              productId: id,
-              productName: name,
-              productSku: sku,
-              packageName: '1 Unit (Single)',
-              quantity: 1,
-              paidQuantity: 1,
-              freeQuantity: 0,
-              packagePrice: basePrice,
-              clientName: clientName,
-              createdAt: DateTime.now(),
-            ),
-          ];
+        // If packages list only contains single 1-unit or is empty, enrich with default full packages
+        if (parsedPackages.length <= 1) {
+          final defaults = buildDefaultPackagesForProduct(
+            productId: id,
+            productName: name,
+            productSku: sku,
+            baseUnitPrice: basePrice,
+            clientName: clientName,
+          );
+          for (final defPkg in defaults) {
+            if (!parsedPackages.any((p) => p.packageName.toLowerCase() == defPkg.packageName.toLowerCase())) {
+              parsedPackages.add(defPkg);
+            }
+          }
         }
 
         fetchedProducts.add(
@@ -234,7 +313,7 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
     }
   }
 
-  /// Syncs newly created stock items from the stock inventory into the product catalog
+  /// Syncs newly created stock items from the stock inventory into the product catalog without overwriting existing packages
   void syncFromStockItems(List<StockItemEntity> stockItems) {
     var updated = false;
     final currentList = List<CatalogProduct>.from(state.products);
@@ -242,7 +321,7 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
     for (final item in stockItems) {
       final existing = state.findProductByName(item.name) ?? state.findProductBySku(item.sku);
       if (existing == null) {
-        // Register new catalog product with a standard single package
+        // Register new catalog product with the full suite of commercial packages
         final newProd = CatalogProduct(
           id: item.id,
           name: item.name,
@@ -250,24 +329,41 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
           clientName: item.ownerName,
           defaultUnitPrice: item.price,
           category: item.category,
-          packages: [
-            ProductPackage(
-              id: 'pkg-${item.sku.toLowerCase()}-1',
-              productId: item.id,
-              productName: item.name,
-              productSku: item.sku,
-              packageName: '1 Unit (Single)',
-              quantity: 1,
-              paidQuantity: 1,
-              freeQuantity: 0,
-              packagePrice: item.price,
-              clientName: item.ownerName,
-              createdAt: DateTime.now(),
-            ),
-          ],
+          packages: buildDefaultPackagesForProduct(
+            productId: item.id,
+            productName: item.name,
+            productSku: item.sku,
+            baseUnitPrice: item.price,
+            clientName: item.ownerName,
+          ),
         );
         currentList.add(newProd);
         updated = true;
+      } else {
+        // Product exists. Merge any missing default packages while NEVER removing custom ones!
+        final mergedPackages = List<ProductPackage>.from(existing.packages);
+        final defaultPkgs = buildDefaultPackagesForProduct(
+          productId: existing.id,
+          productName: existing.name,
+          productSku: existing.sku,
+          baseUnitPrice: existing.defaultUnitPrice > 0 ? existing.defaultUnitPrice : item.price,
+          clientName: existing.clientName,
+        );
+        var added = false;
+        for (final defPkg in defaultPkgs) {
+          if (!mergedPackages.any((p) => p.packageName.toLowerCase() == defPkg.packageName.toLowerCase() || p.quantity == defPkg.quantity)) {
+            mergedPackages.add(defPkg);
+            added = true;
+          }
+        }
+        if (added) {
+          final updatedProd = existing.copyWith(packages: mergedPackages);
+          final idx = currentList.indexWhere((p) => p.id == existing.id);
+          if (idx != -1) {
+            currentList[idx] = updatedProd;
+            updated = true;
+          }
+        }
       }
     }
 
@@ -351,20 +447,14 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
 
     final updatedPackages = existingProduct.packages.where((p) => p.id != packageId).toList();
     if (updatedPackages.isEmpty) {
-      // Keep at least one default single pack
-      updatedPackages.add(
-        ProductPackage(
-          id: 'pkg-${existingProduct.sku.toLowerCase()}-1',
+      // Keep at least standard commercial defaults
+      updatedPackages.addAll(
+        buildDefaultPackagesForProduct(
           productId: existingProduct.id,
           productName: existingProduct.name,
           productSku: existingProduct.sku,
-          packageName: '1 Unit (Single)',
-          quantity: 1,
-          paidQuantity: 1,
-          freeQuantity: 0,
-          packagePrice: existingProduct.defaultUnitPrice,
+          baseUnitPrice: existingProduct.defaultUnitPrice,
           clientName: existingProduct.clientName,
-          createdAt: DateTime.now(),
         ),
       );
     }
