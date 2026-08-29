@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/constants/nigeria_locations.dart';
 import '../../../../core/helpers/formatters.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
+import '../../../stock/presentation/providers/stock_provider.dart';
 import '../../domain/entities/product_package.dart';
 import '../providers/dc_console_provider.dart';
 import '../providers/product_catalog_provider.dart';
@@ -174,6 +175,13 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
     super.initState();
     _priceController.addListener(_onPriceChanged);
     _quantityController.addListener(_onQuantityChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(productCatalogProvider.notifier).reloadCatalog();
+      final stockItems = ref.read(stockProvider).stockItems;
+      if (stockItems.isNotEmpty) {
+        ref.read(productCatalogProvider.notifier).syncFromStockItems(stockItems);
+      }
+    });
   }
 
   void _onPriceChanged() {
@@ -331,6 +339,7 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
     final isDark = theme.brightness == Brightness.dark;
     final dcState = ref.watch(dcConsoleProvider);
     final ordersState = ref.watch(ordersProvider);
+    final stockState = ref.watch(stockProvider);
     final catalogState = ref.watch(productCatalogProvider);
     final draft = ref.watch(dcCreateOrderDraftProvider);
     final availablePackages = catalogState.getPackagesForProduct(draft.selectedProductName);
@@ -1253,13 +1262,38 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                               return isMatching && o.status != 'delivered' && o.status != 'failed' && o.status != 'cancelled';
                             }).length;
 
-                            final loadText = activeCount == 0 ? 'Available' : '$activeCount Active';
+                            final driverAllocations = stockState.getAllocationsForRider(d.id, d.driverCode);
+                            final matchingAllocations = driverAllocations.where((a) {
+                              final prodA = a.productName.toLowerCase();
+                              final orderP = draft.selectedProductName.toLowerCase();
+                              return (orderP.isNotEmpty && (prodA.contains(orderP) || orderP.contains(prodA))) ||
+                                  (a.sku.isNotEmpty && orderP.contains(a.sku.toLowerCase()));
+                            }).toList();
+
+                            final totalCustodyUnits = matchingAllocations.fold(0, (sum, a) => sum + a.inCustodyUnits);
+
+                            final activeReservedUnits = ordersState.orders.where((o) {
+                              final isThisDriver = (o.deliveryAgentId == d.id || o.deliveryAgentCode == d.driverCode);
+                              final isActive = o.status == 'in_transit' || o.status == 'accepted' || o.status == 'out_for_delivery' || o.status == 'assigned' || o.status == 'contacting';
+                              final isSameProduct = o.productName.toLowerCase().contains(draft.selectedProductName.toLowerCase()) || draft.selectedProductName.toLowerCase().contains(o.productName.toLowerCase());
+                              return isThisDriver && isActive && isSameProduct;
+                            }).fold(0, (sum, o) => sum + o.quantity);
+
+                            final availableCustodyUnits = (totalCustodyUnits - activeReservedUnits).clamp(0, 999999);
+                            final hasStock = availableCustodyUnits >= draft.quantity;
+                            final stockLabel = hasStock
+                                ? '✓ Stock: $availableCustodyUnits'
+                                : (totalCustodyUnits > 0 ? '⚠️ Stock: $availableCustodyUnits (Low)' : '⚠️ 0 in Vehicle');
 
                             return DropdownMenuItem<String>(
                               value: d.id,
                               child: Text(
-                                '${d.name} (${d.driverCode}) • $loadText',
+                                '${d.name} (${d.driverCode}) • $stockLabel • $activeCount Active',
                                 overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: !hasStock && !isDark ? const Color(0xFFDC2626) : null,
+                                  fontWeight: hasStock ? FontWeight.w500 : FontWeight.normal,
+                                ),
                               ),
                             );
                           }).toList(),
@@ -1270,8 +1304,29 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                             }
                           },
                           validator: (v) {
-                            if (draft.assignImmediately && (v == null || v.isEmpty)) {
-                              return 'Please select a rider or toggle off immediate assignment';
+                            if (draft.assignImmediately) {
+                              if (v == null || v.isEmpty) {
+                                return 'Please select a rider or toggle off immediate assignment';
+                              }
+                              final targetDriver = dcState.drivers.firstWhere((d) => d.id == v);
+                              final driverAlloc = stockState.getAllocationsForRider(targetDriver.id, targetDriver.driverCode);
+                              final matching = driverAlloc.where((a) {
+                                final pA = a.productName.toLowerCase();
+                                final oP = draft.selectedProductName.toLowerCase();
+                                return (oP.isNotEmpty && (pA.contains(oP) || oP.contains(pA))) ||
+                                    (a.sku.isNotEmpty && oP.contains(a.sku.toLowerCase()));
+                              }).toList();
+                              final total = matching.fold(0, (sum, a) => sum + a.inCustodyUnits);
+                              final reserved = ordersState.orders.where((o) {
+                                final isThis = (o.deliveryAgentId == targetDriver.id || o.deliveryAgentCode == targetDriver.driverCode);
+                                final isActive = o.status == 'in_transit' || o.status == 'accepted' || o.status == 'out_for_delivery' || o.status == 'assigned' || o.status == 'contacting';
+                                final isSame = o.productName.toLowerCase().contains(draft.selectedProductName.toLowerCase()) || draft.selectedProductName.toLowerCase().contains(o.productName.toLowerCase());
+                                return isThis && isActive && isSame;
+                              }).fold(0, (sum, o) => sum + o.quantity);
+                              final avail = (total - reserved).clamp(0, 999999);
+                              if (total == 0 || avail < draft.quantity) {
+                                return 'Rider ${targetDriver.name} has insufficient vehicle stock ($avail avail vs ${draft.quantity} needed)';
+                              }
                             }
                             return null;
                           },
@@ -1551,7 +1606,38 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
         return StatefulBuilder(
           builder: (context, setModalState) {
             final catalog = ref.read(productCatalogProvider);
-            final filtered = catalog.products.where((p) {
+            final stock = ref.read(stockProvider);
+
+            final allProducts = List<CatalogProduct>.from(catalog.products);
+            for (final item in stock.stockItems) {
+              if (!allProducts.any((p) => p.name.toLowerCase() == item.name.toLowerCase() || p.sku.toLowerCase() == item.sku.toLowerCase())) {
+                allProducts.add(CatalogProduct(
+                  id: item.id,
+                  name: item.name,
+                  sku: item.sku,
+                  clientName: item.ownerName,
+                  defaultUnitPrice: item.price,
+                  category: item.category,
+                  packages: [
+                    ProductPackage(
+                      id: 'pkg-${item.sku.toLowerCase()}-1',
+                      productId: item.id,
+                      productName: item.name,
+                      productSku: item.sku,
+                      packageName: '1 Unit (Single)',
+                      quantity: 1,
+                      paidQuantity: 1,
+                      freeQuantity: 0,
+                      packagePrice: item.price,
+                      clientName: item.ownerName,
+                      createdAt: DateTime.now(),
+                    ),
+                  ],
+                ));
+              }
+            }
+
+            final filtered = allProducts.where((p) {
               final name = p.name.toLowerCase();
               final sku = p.sku.toLowerCase();
               final client = p.clientName.toLowerCase();

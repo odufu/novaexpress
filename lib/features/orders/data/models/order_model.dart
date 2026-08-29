@@ -62,6 +62,25 @@ class OrderModel extends OrderEntity {
     required super.createdAt,
   });
 
+  factory OrderModel.empty() => OrderModel(
+        id: '',
+        orderNumber: '',
+        customerName: '',
+        customerPhone: '',
+        deliveryState: '',
+        deliveryCity: '',
+        deliveryAddress: '',
+        productName: '',
+        status: 'pending',
+        quantity: 0,
+        basePrice: 0,
+        upsellAmount: 0,
+        totalAmount: 0,
+        paymentType: 'cod',
+        paymentStatus: 'pending',
+        createdAt: DateTime.now(),
+      );
+
   factory OrderModel.fromJson(Map<String, dynamic> json) {
     final rawProduct = json['products'];
     String name = 'Respira Detox Tea';
@@ -96,11 +115,11 @@ class OrderModel extends OrderEntity {
     // Determine smart remittance status
     String rStatus = json['remittance_status']?.toString() ?? '';
     if (rStatus.isEmpty) {
-      if (orderStatus == 'delivered' || orderStatus == 'completed') {
+      if (notes.contains('[REMITTED') || pStatus == 'remitted' || pStatus == 'cleared' || pStatus == 'verified') {
+        rStatus = 'remitted';
+      } else if (orderStatus == 'delivered' || orderStatus == 'completed') {
         if (pType == 'paystack' || pType == 'direct_transfer' || pType == 'prepaid' || pStatus == 'transfer_verified') {
           rStatus = 'direct_transfer';
-        } else if (pStatus == 'verified' || pStatus == 'cleared' || pStatus == 'remitted') {
-          rStatus = 'cleared';
         } else {
           rStatus = 'unremitted';
         }
@@ -137,7 +156,7 @@ class OrderModel extends OrderEntity {
     DateTime? remittedDate;
     if (json['remitted_at'] != null) {
       remittedDate = DateTime.tryParse(json['remitted_at'].toString());
-    } else if (rStatus == 'cleared') {
+    } else if (rStatus == 'cleared' || rStatus == 'remitted') {
       remittedDate = deliveredDate ?? DateTime.now();
     }
 
@@ -146,7 +165,7 @@ class OrderModel extends OrderEntity {
     if (fStatus.isEmpty) {
       if (rStatus == 'direct_transfer' || pType == 'paystack' || pType == 'direct_transfer') {
         fStatus = 'direct_transfer_settled';
-      } else if (rStatus == 'cleared') {
+      } else if (rStatus == 'cleared' || rStatus == 'remitted' || notes.contains('[REMITTED')) {
         fStatus = 'cash_remitted_verified';
       } else {
         fStatus = 'pending_remittance';

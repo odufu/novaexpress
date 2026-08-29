@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/providers/navigation_provider.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_skeleton_loader.dart';
+import '../../../../core/widgets/product_image_widget.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../notifications/presentation/providers/notifications_provider.dart';
 import '../widgets/return_stock_modal.dart';
@@ -934,26 +935,11 @@ class _ProductInventoryCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Product Image Thumbnail
-                Container(
+                ProductImageWidget(
+                  imageUrl: item.imageAsset,
                   width: 78,
                   height: 96,
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                    ),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(9),
-                    child: item.imageAsset != null
-                        ? Image.asset(
-                            item.imageAsset!,
-                            fit: BoxFit.contain,
-                            errorBuilder: (_, __, ___) => _buildFallbackProductIcon(),
-                          )
-                        : _buildFallbackProductIcon(),
-                  ),
+                  borderRadius: 10,
                 ),
                 const SizedBox(width: 12),
 
@@ -1145,15 +1131,6 @@ class _ProductInventoryCard extends StatelessWidget {
     );
   }
 
-  Widget _buildFallbackProductIcon() {
-    return const Center(
-      child: Icon(
-        Icons.inventory_2_rounded,
-        size: 32,
-        color: AppColors.primary,
-      ),
-    );
-  }
 
   Widget _buildBulletRow(Color dotColor, String label, String value, bool isDark) {
     return Row(

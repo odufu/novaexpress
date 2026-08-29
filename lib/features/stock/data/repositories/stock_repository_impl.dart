@@ -1,3 +1,4 @@
+import '../../domain/entities/rider_stock_allocation.dart';
 import '../../domain/entities/stock_item.dart';
 import '../../domain/repositories/stock_repository.dart';
 import '../datasources/stock_remote_datasource.dart';
@@ -24,6 +25,7 @@ class StockRepositoryImpl implements StockRepository {
     int lowStockThreshold = 3,
     String? binLocation,
     String? companyId,
+    String? imageAsset,
   }) async {
     return await remoteDataSource.createProduct(
       name: name,
@@ -36,6 +38,7 @@ class StockRepositoryImpl implements StockRepository {
       lowStockThreshold: lowStockThreshold,
       binLocation: binLocation,
       companyId: companyId,
+      imageAsset: imageAsset,
     );
   }
 
@@ -121,6 +124,28 @@ class StockRepositoryImpl implements StockRepository {
       quantity: quantity,
       reason: reason,
       notes: notes,
+    );
+  }
+
+  @override
+  Future<List<RiderStockAllocation>> getRiderStockAllocations([String? riderId]) async {
+    return await remoteDataSource.getRiderStockAllocations(riderId);
+  }
+
+  @override
+  Future<void> updateRiderStockCustody({
+    required String riderId,
+    required String productId,
+    int deliveredDelta = 0,
+    int returnedDelta = 0,
+    int inCustodyDelta = 0,
+  }) async {
+    return await remoteDataSource.updateRiderStockCustody(
+      riderId: riderId,
+      productId: productId,
+      deliveredDelta: deliveredDelta,
+      returnedDelta: returnedDelta,
+      inCustodyDelta: inCustodyDelta,
     );
   }
 

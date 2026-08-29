@@ -24,6 +24,21 @@ class StockItemModel extends StockItemEntity {
     super.lastAuditDate,
   });
 
+  factory StockItemModel.empty() {
+    return const StockItemModel(
+      id: '',
+      sku: '',
+      name: '',
+      description: '',
+      price: 0,
+      assignedCount: 0,
+      deliveredCount: 0,
+      availableCount: 0,
+      returnedCount: 0,
+      category: '',
+    );
+  }
+
   factory StockItemModel.fromJson(Map<String, dynamic> json) {
     final rawPrice = json['price'] ?? json['base_price'] ?? 0.0;
     final double price = rawPrice is num ? rawPrice.toDouble() : 0.0;

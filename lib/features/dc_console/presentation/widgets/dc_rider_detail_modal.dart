@@ -1839,10 +1839,14 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
 
   void _showTopUpRiderStockDialog(BuildContext context, bool isDark, DCFleetDriver driver, _DriverCustodyStockItem item) {
     final stockState = ref.read(stockProvider);
-    final targetProd = stockState.stockItems.firstWhere(
-      (p) => p.sku.toLowerCase() == item.sku.toLowerCase() || p.name.toLowerCase() == item.productName.toLowerCase(),
-      orElse: () => stockState.stockItems.isNotEmpty ? stockState.stockItems.first : const StockItemEntity(id: '', sku: '', name: '', description: '', price: 0, assignedCount: 0, deliveredCount: 0, availableCount: 0, returnedCount: 0, category: ''),
-    );
+    StockItemEntity? matched;
+    for (final p in stockState.stockItems) {
+      if (p.sku.toLowerCase() == item.sku.toLowerCase() || p.name.toLowerCase() == item.productName.toLowerCase()) {
+        matched = p;
+        break;
+      }
+    }
+    final targetProd = matched ?? (stockState.stockItems.isNotEmpty ? stockState.stockItems.first : StockItemEntity.empty);
 
     final qtyCtrl = TextEditingController(text: '5');
     final messenger = ScaffoldMessenger.of(context);

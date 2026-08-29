@@ -158,8 +158,23 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
       
       // 1. Resolve authoritative product_id
       final rawProductId = insertPayload['product_id']?.toString() ?? '';
+      final rawProductName = insertPayload['product_name']?.toString() ?? '';
+      final cleanBaseName = rawProductName.split('(').first.trim();
       final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
       String validProductId = uuidRegex.hasMatch(rawProductId) ? rawProductId : '';
+
+      if (validProductId.isEmpty && cleanBaseName.isNotEmpty) {
+        try {
+          final prodRes = await dbClient
+              .from('products')
+              .select('id, name, sku')
+              .or('name.ilike.%$cleanBaseName%,sku.ilike.%$cleanBaseName%')
+              .limit(1);
+          if ((prodRes as List).isNotEmpty && prodRes.first['id'] != null) {
+            validProductId = prodRes.first['id'].toString();
+          }
+        } catch (_) {}
+      }
 
       if (validProductId.isEmpty) {
         try {
@@ -202,8 +217,9 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
       final paymentType = (rawPaymentType.contains('prepaid') || rawPaymentType.contains('transfer'))
           ? 'prepaid'
           : 'pay_on_delivery';
-      final paymentStatus = (insertPayload['payment_status']?.toString().toLowerCase() == 'paid' || paymentType == 'prepaid')
-          ? 'paid'
+      final rawPaymentStatus = insertPayload['payment_status']?.toString().toLowerCase() ?? 'pending';
+      final paymentStatus = (rawPaymentStatus == 'paid' || rawPaymentStatus == 'collected' || paymentType == 'prepaid')
+          ? 'collected'
           : 'pending';
 
       final qty = (insertPayload['quantity'] as num?)?.toInt() ?? 1;
@@ -740,3 +756,101 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
     }
   }
 }
+
+class MockOrdersRemoteDataSource implements OrdersRemoteDataSource {
+  @override
+  Future<List<OrderModel>> getAssignedOrders(String deliveryAgentId) async => [];
+
+  @override
+  Future<List<OrderModel>> getDistributionCenterOrders(String distributionCenterId) async => [];
+
+  @override
+  Future<OrderModel> createOrder(Map<String, dynamic> orderData) async {
+    return OrderModel.fromJson(orderData);
+  }
+
+  @override
+  Future<void> assignOrderToRider({
+    required String orderId,
+    required String riderId,
+    required String riderName,
+    required String riderCode,
+  }) async {}
+
+  @override
+  Future<OrderModel> getOrderById(String orderId) async {
+    return OrderModel(
+      id: orderId,
+      orderNumber: 'ORD-$orderId',
+      customerName: 'Mock Customer',
+      customerPhone: '08000000000',
+      deliveryState: 'Lagos',
+      deliveryCity: 'Lagos',
+      deliveryAddress: 'Lagos Address',
+      productName: 'Mock Product',
+      quantity: 1,
+      basePrice: 10000.0,
+      upsellAmount: 0.0,
+      totalAmount: 10000.0,
+      paymentType: 'pay_on_delivery',
+      paymentStatus: 'pending',
+      status: 'pending',
+      createdAt: DateTime.now(),
+    );
+  }
+
+  @override
+  Future<void> updateOrderStatus(
+    String orderId,
+    String status, {
+    String? paymentStatus,
+    String? paymentType,
+    String? notes,
+    String? customerSignatureUrl,
+    String? photoProofUrl,
+    String? gatePassCode,
+    double? latitude,
+    double? longitude,
+    bool? isLocationVerified,
+  }) async {}
+
+  @override
+  Future<Map<String, dynamic>> confirmDeliveryPod({
+    required String orderId,
+    required String agentId,
+    required String paymentType,
+    required String paymentMethod,
+    required double amountCollected,
+    String? customerSignatureUrl,
+    String? photoProofUrl,
+    String? notes,
+    String? gatePassCode,
+    double? latitude,
+    double? longitude,
+    bool? isLocationVerified,
+  }) async => {'status': 'success'};
+
+  @override
+  Future<Map<String, dynamic>> logDeliveryFailure({
+    required String orderId,
+    required String agentId,
+    required String reasonCode,
+    String? notes,
+    String? scheduledCallbackAt,
+    String? gatePassCode,
+    double? latitude,
+    double? longitude,
+  }) async => {'status': 'success'};
+
+  @override
+  Future<void> updateOrderCoordinates({
+    required String orderId,
+    required double latitude,
+    required double longitude,
+    bool isLocationVerified = true,
+    String? geocodedAddress,
+  }) async {}
+}
+
+
+

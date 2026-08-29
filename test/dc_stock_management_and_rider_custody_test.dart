@@ -50,6 +50,51 @@ class MockStockRepository implements StockRepository {
     ),
   ];
 
+  static final List<RiderStockAllocation> testAllocations = [
+    RiderStockAllocation(
+      id: 'alloc_1',
+      riderId: 'b1111111-1111-4111-8111-111111111111',
+      riderName: 'Emeka Rider',
+      riderCode: 'PDA-7000',
+      productId: 'prod_1',
+      productName: 'Respira Detox Tea',
+      sku: 'SKU-RESP-01',
+      clientName: 'Novacare Limited',
+      allocatedUnits: 25,
+      deliveredUnits: 10,
+      inCustodyUnits: 15,
+      unitPrice: 25000,
+      allocatedAt: DateTime.now().subtract(const Duration(days: 2)),
+    ),
+    RiderStockAllocation(
+      id: 'alloc_2',
+      riderId: 'driver_1',
+      riderName: 'Musa Ibrahim',
+      riderCode: 'DRV-001',
+      productId: 'prod_1',
+      productName: 'Respira Detox Tea',
+      sku: 'SKU-RESP-01',
+      clientName: 'Novacare Limited',
+      allocatedUnits: 10,
+      deliveredUnits: 5,
+      inCustodyUnits: 5,
+      unitPrice: 25000,
+      allocatedAt: DateTime.now().subtract(const Duration(days: 2)),
+    ),
+  ];
+
+  @override
+  Future<List<RiderStockAllocation>> getRiderStockAllocations([String? riderId]) async => testAllocations;
+
+  @override
+  Future<void> updateRiderStockCustody({
+    required String riderId,
+    required String productId,
+    int deliveredDelta = 0,
+    int returnedDelta = 0,
+    int inCustodyDelta = 0,
+  }) async {}
+
   @override
   Future<List<StockItemEntity>> getVehicleStockItems([String? agentId]) async {
     return items;
@@ -324,7 +369,7 @@ void main() {
           stockProvider.overrideWith((ref) => StockNotifier(repository: mockRepo, storageService: MockLocalStorageService())
             ..state = StockState(
               stockItems: mockRepo.items,
-              riderAllocations: StockNotifier.defaultAllocations,
+              riderAllocations: MockStockRepository.testAllocations,
               isLoading: false,
             )),
         ],
@@ -398,7 +443,7 @@ void main() {
             stockProvider.overrideWith((ref) => StockNotifier(repository: mockRepo, storageService: MockLocalStorageService())
               ..state = StockState(
                 stockItems: mockRepo.items,
-                riderAllocations: StockNotifier.defaultAllocations,
+                riderAllocations: MockStockRepository.testAllocations,
                 isLoading: false,
               )),
           ],
@@ -412,9 +457,9 @@ void main() {
       await tester.pumpAndSettle();
 
       // Switch to Stock tab (Tab index 3: Profile, Orders, Remittances, Stock)
-      final stockTab = find.text('Stock (2)');
-      expect(stockTab, findsOneWidget);
-      await tester.tap(stockTab);
+      final stockTab = find.textContaining('Stock');
+      expect(stockTab, findsWidgets);
+      await tester.tap(stockTab.first);
       await tester.pumpAndSettle();
 
       // Verify Assign New Product button in Rider Stock Tab

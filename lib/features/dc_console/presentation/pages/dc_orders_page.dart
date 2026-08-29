@@ -7,16 +7,16 @@ import '../../../../core/widgets/app_skeleton_loader.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
 import '../../../stock/presentation/providers/stock_provider.dart';
+import '../../domain/entities/dc_fleet_driver.dart';
 import '../providers/dc_console_provider.dart';
 import '../widgets/dc_create_order_modal.dart';
 import '../widgets/dc_order_detail_modal.dart';
 import '../widgets/dc_csv_order_import_modal.dart';
 import '../widgets/dc_assign_order_modal.dart';
 
-final dcDeliveredSearchProvider = StateProvider.autoDispose<String>((ref) => '');
-final dcDeliveredFilterProvider = StateProvider.autoDispose<String>((ref) => 'all');
 final dcOrdersDateFilterProvider = StateProvider.autoDispose<String>((ref) => 'all_time');
 final dcOrdersCustomDateRangeProvider = StateProvider.autoDispose<DateTimeRange?>((ref) => null);
+final dcOrdersSingleDateProvider = StateProvider.autoDispose<DateTime?>((ref) => null);
 
 // Master Orders Directory Multi-Attribute Filters
 final dcMasterSearchProvider = StateProvider.autoDispose<String>((ref) => '');
@@ -33,9 +33,7 @@ class DCOrdersPage extends ConsumerStatefulWidget {
   ConsumerState<DCOrdersPage> createState() => _DCOrdersPageState();
 }
 
-class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-  final TextEditingController _deliveredSearchController = TextEditingController();
+class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
   final TextEditingController _masterSearchController = TextEditingController();
   Timer? _searchDebounceTimer;
   int _masterCurrentPage = 0;
@@ -53,7 +51,6 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(ordersProvider.notifier).loadDcOrders('22222222-2222-4222-8222-222222222222');
     });
@@ -62,13 +59,16 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
   @override
   void dispose() {
     _searchDebounceTimer?.cancel();
-    _tabController.dispose();
-    _deliveredSearchController.dispose();
     _masterSearchController.dispose();
     super.dispose();
   }
 
-  List<OrderEntity> _filterOrdersByDate(List<OrderEntity> orders, String dateFilter, DateTimeRange? customRange) {
+  List<OrderEntity> _filterOrdersByDate(
+    List<OrderEntity> orders,
+    String dateFilter,
+    DateTimeRange? customRange,
+    DateTime? singleDate,
+  ) {
     if (dateFilter == 'all_time') return orders;
     final now = DateTime.now();
     final todayStart = DateTime(now.year, now.month, now.day);
@@ -89,6 +89,11 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
         case 'this_month':
           final monthStart = DateTime(now.year, now.month, 1);
           return date.isAfter(monthStart);
+        case 'single_date':
+          if (singleDate == null) return true;
+          return date.year == singleDate.year &&
+                 date.month == singleDate.month &&
+                 date.day == singleDate.day;
         case 'custom':
           if (customRange == null) return true;
           final start = DateTime(customRange.start.year, customRange.start.month, customRange.start.day);
@@ -109,8 +114,9 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
     final dcState = ref.watch(dcConsoleProvider);
     final activeDateFilter = ref.watch(dcOrdersDateFilterProvider);
     final customRange = ref.watch(dcOrdersCustomDateRangeProvider);
+    final singleDate = ref.watch(dcOrdersSingleDateProvider);
 
-    final dateFilteredOrders = _filterOrdersByDate(ordersState.orders, activeDateFilter, customRange);
+    final dateFilteredOrders = _filterOrdersByDate(ordersState.orders, activeDateFilter, customRange, singleDate);
 
     final unassignedOrders = dateFilteredOrders.where((o) {
       final isUnassigned = o.deliveryAgentId == null || o.deliveryAgentId!.isEmpty;
@@ -123,171 +129,469 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
     }).toList();
 
     final deliveredOrders = dateFilteredOrders.where((o) => o.status == 'delivered').toList();
-    final failedOrders = dateFilteredOrders.where((o) => o.status == 'cancelled' || o.status == 'failed' || o.status == 'call_back').toList();
+    final failedOrders = dateFilteredOrders.where((o) => o.status == 'cancelled' || o.status == 'failed' || o.status == 'call_back' || o.status == 'returned').toList();
 
-    return Material(
-      color: Colors.transparent,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-        // Sub-Tab Navigation Bar (5 Business Tabs)
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1E293B) : Colors.white,
-            border: Border(bottom: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
-          ),
-          child: TabBar(
-            controller: _tabController,
-            isScrollable: true,
-            labelColor: const Color(0xFFF37021),
-            unselectedLabelColor: const Color(0xFF64748B),
-            indicatorColor: const Color(0xFFF37021),
-            indicatorWeight: 3,
-            labelStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
-            unselectedLabelStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500),
-            tabs: [
-              Tab(icon: const Icon(Icons.list_alt_rounded, size: 18), text: 'All Orders (${dateFilteredOrders.length})'),
-              Tab(icon: const Icon(Icons.outbox_rounded, size: 18), text: 'Unassigned Pool (${unassignedOrders.length})'),
-              Tab(icon: const Icon(Icons.local_shipping_rounded, size: 18), text: 'In-Transit Routes (${inTransitOrders.length})'),
-              Tab(icon: const Icon(Icons.check_circle_outline_rounded, size: 18), text: 'Delivered / POD (${deliveredOrders.length})'),
-              Tab(icon: const Icon(Icons.warning_amber_rounded, size: 18), text: 'Failed / Rescheduled (${failedOrders.length})'),
-            ],
-          ),
+    return SafeArea(
+      child: Material(
+        color: Colors.transparent,
+        child: _buildAllOrdersView(
+          isDark,
+          dateFilteredOrders,
+          dcState,
+          ordersState,
+          unassignedOrders.length,
+          inTransitOrders.length,
+          deliveredOrders.length,
+          failedOrders.length,
         ),
+      ),
+    );
+  }
 
-        // Date Range Filter Toolbar
-        _buildDateFilterBar(context, isDark, activeDateFilter, customRange),
+  Widget _buildDateFilterPopupButton({
+    required BuildContext context,
+    required bool isDark,
+    required String activeDateFilter,
+    required DateTimeRange? customRange,
+    required DateTime? singleDate,
+    bool iconOnly = false,
+  }) {
+    String label = 'All Time';
+    bool isCustomActive = activeDateFilter != 'all_time';
 
-        // Tab Content
-        Expanded(
-          child: TabBarView(
-            controller: _tabController,
-            children: [
-              // 0. Master All Orders Directory (with Multi-attribute Filters & Fulfillment Tracker)
-              _buildAllOrdersView(isDark, dateFilteredOrders, dcState, ordersState, unassignedOrders.length, inTransitOrders.length, deliveredOrders.length, failedOrders.length),
+    if (activeDateFilter == 'today') {
+      label = 'Today';
+    } else if (activeDateFilter == 'yesterday') {
+      label = 'Yesterday';
+    } else if (activeDateFilter == 'this_week') {
+      label = 'This Week';
+    } else if (activeDateFilter == 'this_month') {
+      label = 'This Month';
+    } else if (activeDateFilter == 'single_date' && singleDate != null) {
+      label = DateTimeFormatter.formatShortDate(singleDate);
+    } else if (activeDateFilter == 'custom' && customRange != null) {
+      label = '${customRange.start.day}/${customRange.start.month} - ${customRange.end.day}/${customRange.end.month}';
+    }
 
-              // 1. Unassigned Orders Pool
-              _buildUnassignedPoolView(isDark, unassignedOrders, dcState, ordersState),
+    return PopupMenuButton<String>(
+      tooltip: 'Filter Orders by Date',
+      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      onSelected: (choice) async {
+        if (choice == 'custom') {
+          final picked = await showDateRangePicker(
+            context: context,
+            firstDate: DateTime(2025, 1, 1),
+            lastDate: DateTime(2030, 12, 31),
+            initialDateRange: customRange ??
+                DateTimeRange(
+                  start: DateTime.now().subtract(const Duration(days: 7)),
+                  end: DateTime.now(),
+                ),
+            helpText: 'SELECT ORDER DATE RANGE',
+            cancelText: 'CANCEL',
+            confirmText: 'APPLY FILTER',
+            saveText: 'APPLY',
+            builder: (context, child) {
+              return Theme(
+                data: Theme.of(context).copyWith(
+                  colorScheme: isDark
+                      ? const ColorScheme.dark(
+                          primary: Color(0xFFF37021),
+                          onPrimary: Colors.white,
+                          surface: Color(0xFF1E293B),
+                          onSurface: Colors.white,
+                          secondary: Color(0xFF2563EB),
+                        )
+                      : const ColorScheme.light(
+                          primary: Color(0xFFF37021),
+                          onPrimary: Colors.white,
+                          surface: Colors.white,
+                          onSurface: Color(0xFF0F172A),
+                          secondary: Color(0xFF2563EB),
+                        ),
+                  dialogBackgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                ),
+                child: child!,
+              );
+            },
+          );
+          if (picked != null) {
+            ref.read(dcOrdersCustomDateRangeProvider.notifier).state = picked;
+            ref.read(dcOrdersSingleDateProvider.notifier).state = null;
+            ref.read(dcOrdersDateFilterProvider.notifier).state = 'custom';
+          }
+        } else if (choice == 'single_date') {
+          final picked = await showDatePicker(
+            context: context,
+            firstDate: DateTime(2025, 1, 1),
+            lastDate: DateTime(2030, 12, 31),
+            initialDate: singleDate ?? DateTime.now(),
+            helpText: 'SELECT ORDER DATE',
+            cancelText: 'CANCEL',
+            confirmText: 'APPLY FILTER',
+            builder: (context, child) {
+              return Theme(
+                data: Theme.of(context).copyWith(
+                  colorScheme: isDark
+                      ? const ColorScheme.dark(
+                          primary: Color(0xFFF37021),
+                          onPrimary: Colors.white,
+                          surface: Color(0xFF1E293B),
+                          onSurface: Colors.white,
+                        )
+                      : const ColorScheme.light(
+                          primary: Color(0xFFF37021),
+                          onPrimary: Colors.white,
+                          surface: Colors.white,
+                          onSurface: Color(0xFF0F172A),
+                        ),
+                  dialogBackgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                ),
+                child: child!,
+              );
+            },
+          );
+          if (picked != null) {
+            ref.read(dcOrdersSingleDateProvider.notifier).state = picked;
+            ref.read(dcOrdersCustomDateRangeProvider.notifier).state = null;
+            ref.read(dcOrdersDateFilterProvider.notifier).state = 'single_date';
+          }
+        } else {
+          ref.read(dcOrdersDateFilterProvider.notifier).state = choice;
+          ref.read(dcOrdersCustomDateRangeProvider.notifier).state = null;
+          ref.read(dcOrdersSingleDateProvider.notifier).state = null;
+        }
+      },
+      constraints: const BoxConstraints(minWidth: 260, maxWidth: 330),
+      itemBuilder: (ctx) => [
+        _buildDateMenuItem('all_time', 'All Time', activeDateFilter == 'all_time', Icons.all_inclusive_rounded, isDark),
+        _buildDateMenuItem('today', 'Today', activeDateFilter == 'today', Icons.today_rounded, isDark),
+        _buildDateMenuItem('yesterday', 'Yesterday', activeDateFilter == 'yesterday', Icons.history_rounded, isDark),
+        _buildDateMenuItem('this_week', 'This Week', activeDateFilter == 'this_week', Icons.date_range_rounded, isDark),
+        _buildDateMenuItem('this_month', 'This Month', activeDateFilter == 'this_month', Icons.calendar_view_month_rounded, isDark),
+        const PopupMenuDivider(),
+        _buildDateMenuItem('single_date', 'Single Date (Calendar Pop-up)...', activeDateFilter == 'single_date', Icons.event_available_rounded, isDark),
+        _buildDateMenuItem('custom', 'Custom Range (From - To Calendar)...', activeDateFilter == 'custom', Icons.date_range_outlined, isDark),
+      ],
+      child: iconOnly
+          ? Container(
+              height: 38,
+              width: 42,
+              decoration: BoxDecoration(
+                color: isCustomActive
+                    ? const Color(0xFFF37021).withValues(alpha: 0.14)
+                    : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: isCustomActive
+                      ? const Color(0xFFF37021)
+                      : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                  width: isCustomActive ? 1.5 : 1.0,
+                ),
+              ),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Icon(
+                    Icons.calendar_month_rounded,
+                    size: 18,
+                    color: isCustomActive
+                        ? const Color(0xFFF37021)
+                        : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                  ),
+                  if (isCustomActive)
+                    Positioned(
+                      top: 5,
+                      right: 5,
+                      child: Container(
+                        width: 6,
+                        height: 6,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFF37021),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            )
+          : Container(
+              height: 38,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: isCustomActive
+                    ? const Color(0xFFF37021).withValues(alpha: 0.12)
+                    : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: isCustomActive
+                      ? const Color(0xFFF37021)
+                      : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.calendar_month_rounded,
+                    size: 14,
+                    color: isCustomActive ? const Color(0xFFF37021) : const Color(0xFF64748B),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Date: $label',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: isCustomActive ? FontWeight.bold : FontWeight.w500,
+                      color: isCustomActive
+                          ? const Color(0xFFF37021)
+                          : (isDark ? Colors.white : const Color(0xFF0F172A)),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.arrow_drop_down_rounded,
+                    size: 18,
+                    color: isCustomActive ? const Color(0xFFF37021) : const Color(0xFF64748B),
+                  ),
+                ],
+              ),
+            ),
+    );
+  }
 
-              // 2. In-Transit Routes Monitor
-              _buildInTransitView(isDark, inTransitOrders, dcState),
-
-              // 3. Delivered & POD Verified
-              _buildDeliveredView(isDark, deliveredOrders),
-
-                // 4. Failed / Rescheduled Deliveries
-                _buildFailedView(isDark, failedOrders),
-              ],
+  PopupMenuItem<String> _buildDateMenuItem(String value, String title, bool isSelected, IconData icon, bool isDark) {
+    return PopupMenuItem<String>(
+      value: value,
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            size: 16,
+            color: isSelected ? const Color(0xFFF37021) : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              title,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.inter(
+                fontSize: 12.5,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected ? const Color(0xFFF37021) : (isDark ? Colors.white : const Color(0xFF0F172A)),
+              ),
             ),
           ),
+          if (isSelected) ...[
+            const SizedBox(width: 6),
+            const Icon(Icons.check_rounded, size: 16, color: Color(0xFFF37021)),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildDateFilterBar(BuildContext context, bool isDark, String activeDateFilter, DateTimeRange? customRange) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 7),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-        border: Border(bottom: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
+  Widget _buildMobileIconPopupFilter({
+    required BuildContext context,
+    required bool isDark,
+    required IconData icon,
+    required String tooltip,
+    required String currentValue,
+    required ValueChanged<String> onSelected,
+    required List<PopupMenuEntry<String>> items,
+  }) {
+    final isFiltered = currentValue != 'all';
+    return PopupMenuButton<String>(
+      tooltip: tooltip,
+      onSelected: onSelected,
+      constraints: const BoxConstraints(minWidth: 220, maxWidth: 300),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+      itemBuilder: (ctx) => items,
+      child: Container(
+        height: 38,
+        width: 42,
+        decoration: BoxDecoration(
+          color: isFiltered
+              ? const Color(0xFFF37021).withValues(alpha: 0.14)
+              : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isFiltered
+                ? const Color(0xFFF37021)
+                : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+            width: isFiltered ? 1.5 : 1.0,
+          ),
+        ),
+        child: Stack(
+          alignment: Alignment.center,
           children: [
-            Text(
-              '📅 Filter by Date:',
-              style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color(0xFF64748B)),
+            Icon(
+              icon,
+              size: 18,
+              color: isFiltered
+                  ? const Color(0xFFF37021)
+                  : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
             ),
-            const SizedBox(width: 8),
-            _buildDateFilterChip('All Time', 'all_time', activeDateFilter, isDark),
-            const SizedBox(width: 6),
-            _buildDateFilterChip('Today', 'today', activeDateFilter, isDark),
-            const SizedBox(width: 6),
-            _buildDateFilterChip('Yesterday', 'yesterday', activeDateFilter, isDark),
-            const SizedBox(width: 6),
-            _buildDateFilterChip('This Week', 'this_week', activeDateFilter, isDark),
-            const SizedBox(width: 6),
-            _buildDateFilterChip('This Month', 'this_month', activeDateFilter, isDark),
-            const SizedBox(width: 6),
-            InkWell(
-              onTap: () async {
-                final picked = await showDateRangePicker(
-                  context: context,
-                  firstDate: DateTime(2025, 1, 1),
-                  lastDate: DateTime(2030, 12, 31),
-                  initialDateRange: customRange ?? DateTimeRange(start: DateTime.now().subtract(const Duration(days: 7)), end: DateTime.now()),
-                );
-                if (picked != null) {
-                  ref.read(dcOrdersCustomDateRangeProvider.notifier).state = picked;
-                  ref.read(dcOrdersDateFilterProvider.notifier).state = 'custom';
-                }
-              },
-              borderRadius: BorderRadius.circular(8),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: activeDateFilter == 'custom' ? const Color(0xFF2563EB).withValues(alpha: 0.15) : Colors.transparent,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: activeDateFilter == 'custom' ? const Color(0xFF2563EB) : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+            if (isFiltered)
+              Positioned(
+                top: 5,
+                right: 5,
+                child: Container(
+                  width: 6,
+                  height: 6,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF37021),
+                    shape: BoxShape.circle,
                   ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.date_range_rounded, size: 13, color: Color(0xFF2563EB)),
-                    const SizedBox(width: 4),
-                    Text(
-                      customRange != null
-                          ? '${customRange.start.day}/${customRange.start.month} - ${customRange.end.day}/${customRange.end.month}'
-                          : 'Custom Range 📅',
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        fontWeight: activeDateFilter == 'custom' ? FontWeight.bold : FontWeight.w500,
-                        color: activeDateFilter == 'custom' ? const Color(0xFF2563EB) : const Color(0xFF64748B),
-                      ),
-                    ),
-                  ],
-                ),
               ),
-            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildDateFilterChip(String label, String key, String activeKey, bool isDark) {
-    final isSelected = activeKey == key;
-    return InkWell(
-      onTap: () {
-        ref.read(dcOrdersDateFilterProvider.notifier).state = key;
-        if (key != 'custom') {
-          ref.read(dcOrdersCustomDateRangeProvider.notifier).state = null;
-        }
-      },
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF2563EB).withValues(alpha: 0.15) : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isSelected ? const Color(0xFF2563EB) : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+  Widget _buildMobileIconFilterBar({
+    required BuildContext context,
+    required bool isDark,
+    required String activeDateFilter,
+    required DateTimeRange? customRange,
+    required DateTime? singleDate,
+    required String masterStatus,
+    required String masterRider,
+    required String masterProduct,
+    required String masterClient,
+    required List<DCFleetDriver> fleetDrivers,
+    required List<String> uniqueProducts,
+    required List<String> uniqueClients,
+    required bool hasActiveFilters,
+  }) {
+    final dateBtn = _buildDateFilterPopupButton(
+      context: context,
+      isDark: isDark,
+      activeDateFilter: activeDateFilter,
+      customRange: customRange,
+      singleDate: singleDate,
+      iconOnly: true,
+    );
+
+    final statusBtn = _buildMobileIconPopupFilter(
+      context: context,
+      isDark: isDark,
+      icon: Icons.filter_list_rounded,
+      tooltip: 'Status Filter ($masterStatus)',
+      currentValue: masterStatus,
+      onSelected: (val) => ref.read(dcMasterStatusFilterProvider.notifier).state = val,
+      items: const [
+        PopupMenuItem(value: 'all', child: Text('All Statuses')),
+        PopupMenuItem(value: 'unassigned', child: Text('📦 Unassigned (Pending)')),
+        PopupMenuItem(value: 'in_transit', child: Text('🚴 In Transit (Assigned)')),
+        PopupMenuItem(value: 'delivered', child: Text('🟢 Delivered (Fulfilled)')),
+        PopupMenuItem(value: 'failed', child: Text('⚠️ Failed / Call Back')),
+        PopupMenuItem(value: 'returned', child: Text('↩️ Returned to DC')),
+      ],
+    );
+
+    final riderBtn = _buildMobileIconPopupFilter(
+      context: context,
+      isDark: isDark,
+      icon: Icons.two_wheeler_rounded,
+      tooltip: 'Rider Filter ($masterRider)',
+      currentValue: masterRider,
+      onSelected: (val) => ref.read(dcMasterRiderFilterProvider.notifier).state = val,
+      items: [
+        const PopupMenuItem(value: 'all', child: Text('All Riders')),
+        const PopupMenuItem(value: 'unassigned', child: Text('📦 Unassigned Only')),
+        ...fleetDrivers.map((d) {
+          return PopupMenuItem(
+            value: d.id,
+            child: Text('🚴 ${d.name} (${d.driverCode})'),
+          );
+        }),
+      ],
+    );
+
+    final productBtn = _buildMobileIconPopupFilter(
+      context: context,
+      isDark: isDark,
+      icon: Icons.inventory_2_outlined,
+      tooltip: 'Product Filter ($masterProduct)',
+      currentValue: masterProduct,
+      onSelected: (val) => ref.read(dcMasterProductFilterProvider.notifier).state = val,
+      items: [
+        const PopupMenuItem(value: 'all', child: Text('All Products')),
+        ...uniqueProducts.map((p) {
+          return PopupMenuItem(
+            value: p,
+            child: Text(p),
+          );
+        }),
+      ],
+    );
+
+    final clientBtn = _buildMobileIconPopupFilter(
+      context: context,
+      isDark: isDark,
+      icon: Icons.business_rounded,
+      tooltip: 'Client Filter ($masterClient)',
+      currentValue: masterClient,
+      onSelected: (val) => ref.read(dcMasterClientFilterProvider.notifier).state = val,
+      items: [
+        const PopupMenuItem(value: 'all', child: Text('All Clients')),
+        ...uniqueClients.map((c) {
+          return PopupMenuItem(
+            value: c,
+            child: Text(c),
+          );
+        }),
+      ],
+    );
+
+    Widget? resetBtn;
+    if (hasActiveFilters) {
+      resetBtn = Tooltip(
+        message: 'Reset All Filters',
+        child: InkWell(
+          onTap: () {
+            _masterSearchController.clear();
+            ref.read(dcMasterSearchProvider.notifier).state = '';
+            ref.read(dcMasterStatusFilterProvider.notifier).state = 'all';
+            ref.read(dcMasterRiderFilterProvider.notifier).state = 'all';
+            ref.read(dcMasterProductFilterProvider.notifier).state = 'all';
+            ref.read(dcMasterClientFilterProvider.notifier).state = 'all';
+            ref.read(dcOrdersDateFilterProvider.notifier).state = 'all_time';
+            ref.read(dcOrdersCustomDateRangeProvider.notifier).state = null;
+            ref.read(dcOrdersSingleDateProvider.notifier).state = null;
+          },
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            height: 38,
+            width: 42,
+            decoration: BoxDecoration(
+              color: const Color(0xFFEF4444).withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.4)),
+            ),
+            child: const Center(
+              child: Icon(Icons.restart_alt_rounded, size: 18, color: Color(0xFFEF4444)),
+            ),
           ),
         ),
-        child: Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 11,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-            color: isSelected ? const Color(0xFF2563EB) : const Color(0xFF64748B),
-          ),
-        ),
-      ),
+      );
+    }
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        dateBtn,
+        statusBtn,
+        riderBtn,
+        productBtn,
+        clientBtn,
+        if (resetBtn != null) resetBtn,
+      ],
     );
   }
 
@@ -310,6 +614,9 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
     final masterRider = ref.watch(dcMasterRiderFilterProvider);
     final masterProduct = ref.watch(dcMasterProductFilterProvider);
     final masterClient = ref.watch(dcMasterClientFilterProvider);
+    final activeDateFilter = ref.watch(dcOrdersDateFilterProvider);
+    final customRange = ref.watch(dcOrdersCustomDateRangeProvider);
+    final singleDate = ref.watch(dcOrdersSingleDateProvider);
     final viewMode = ref.watch(dcMasterViewModeProvider);
 
     // Apply multi-attribute filters
@@ -345,34 +652,27 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
 
       // 3. Product Filter
       if (masterProduct != 'all') {
-        if (!o.productName.toLowerCase().contains(masterProduct.toLowerCase()) &&
-            !masterProduct.toLowerCase().contains(o.productName.toLowerCase())) {
-          return false;
-        }
+        if (!o.productName.toLowerCase().contains(masterProduct.toLowerCase())) return false;
       }
 
       // 4. Client Filter
       if (masterClient != 'all') {
-        if (!o.clientName.toLowerCase().contains(masterClient.toLowerCase()) &&
-            !masterClient.toLowerCase().contains(o.clientName.toLowerCase())) {
-          return false;
-        }
+        final client = o.clientName.isNotEmpty ? o.clientName : 'Novacare';
+        if (!client.toLowerCase().contains(masterClient.toLowerCase())) return false;
       }
 
       // 5. Search Query Filter
       if (masterSearch.isNotEmpty) {
-        final matchOrderNo = o.orderNumber.toLowerCase().contains(masterSearch);
-        final matchCust = o.customerName.toLowerCase().contains(masterSearch);
-        final matchPhone = o.customerPhone.toLowerCase().contains(masterSearch);
-        final matchAddress = o.deliveryAddress.toLowerCase().contains(masterSearch);
-        final matchCity = o.deliveryCity.toLowerCase().contains(masterSearch);
-        final matchState = o.deliveryState.toLowerCase().contains(masterSearch);
-        final matchProd = o.productName.toLowerCase().contains(masterSearch);
-        final matchClient = o.clientName.toLowerCase().contains(masterSearch);
-        final matchRiderName = o.deliveryAgentName != null && o.deliveryAgentName!.toLowerCase().contains(masterSearch);
-        final matchRiderCode = o.deliveryAgentCode != null && o.deliveryAgentCode!.toLowerCase().contains(masterSearch);
+        final matchesOrderNum = o.orderNumber.toLowerCase().contains(masterSearch);
+        final matchesCust = o.customerName.toLowerCase().contains(masterSearch);
+        final matchesPhone = o.customerPhone.toLowerCase().contains(masterSearch);
+        final matchesAddress = o.deliveryAddress.toLowerCase().contains(masterSearch) || o.deliveryCity.toLowerCase().contains(masterSearch);
+        final matchesProduct = o.productName.toLowerCase().contains(masterSearch);
+        final matchesClient = o.clientName.toLowerCase().contains(masterSearch);
+        final matchesRider = (o.deliveryAgentName != null && o.deliveryAgentName!.toLowerCase().contains(masterSearch)) ||
+            (o.deliveryAgentCode != null && o.deliveryAgentCode!.toLowerCase().contains(masterSearch));
 
-        if (!matchOrderNo && !matchCust && !matchPhone && !matchAddress && !matchCity && !matchState && !matchProd && !matchClient && !matchRiderName && !matchRiderCode) {
+        if (!matchesOrderNum && !matchesCust && !matchesPhone && !matchesAddress && !matchesProduct && !matchesClient && !matchesRider) {
           return false;
         }
       }
@@ -392,193 +692,195 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
         masterStatus != 'all' ||
         masterRider != 'all' ||
         masterProduct != 'all' ||
-        masterClient != 'all';
+        masterClient != 'all' ||
+        activeDateFilter != 'all_time';
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. Header Toolbar with Action Buttons
+          // 1. Summary KPI Metric Cards (5 Cards) - Compact & Horizontally Scrollable on Mobile
           LayoutBuilder(
             builder: (context, constraints) {
-              final isMobile = constraints.maxWidth < 750;
-              final headerCol = Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Wrap(
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 10,
-                    runSpacing: 4,
-                    children: [
-                      Text(
-                        'Master Orders Directory',
-                        style: GoogleFonts.inter(fontSize: isMobile ? 18 : 22, fontWeight: FontWeight.bold),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2563EB).withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          '${filtered.length} of ${allOrders.length} Orders',
-                          style: GoogleFonts.jetBrainsMono(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF2563EB),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Complete overview of all DC shipments including unassigned pool, in-transit routes, and completed deliveries',
-                    style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
-                  ),
-                ],
-              );
-
-              final actionsWrap = Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      showDialog(
-                        context: context,
-                        barrierDismissible: false,
-                        builder: (ctx) => const DCCreateOrderModal(),
-                      );
-                    },
-                    icon: const Icon(Icons.add_rounded, size: 16, color: Colors.white),
-                    label: const Text('Create New Order', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFF37021),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                  ),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      showDialog(
-                        context: context,
-                        barrierDismissible: false,
-                        builder: (ctx) => const DCCsvOrderImportModal(),
-                      );
-                    },
-                    icon: const Icon(Icons.upload_file_rounded, size: 16, color: Colors.white),
-                    label: const Text('Import CSV', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF16A34A),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                  ),
-                  if (unassignedCount > 0)
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        final unassignedList = allOrders.where((o) => (o.deliveryAgentId == null || o.deliveryAgentId!.isEmpty) && o.status != 'delivered').toList();
-                        _autoAssignPool(unassignedList, dcState, ordersState);
-                      },
-                      icon: const Icon(Icons.auto_awesome, size: 16, color: Colors.white),
-                      label: const Text('Auto-Assign Pool', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2563EB),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                    ),
-                ],
-              );
-
-              if (isMobile) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              final isDesktop = constraints.maxWidth >= 1000;
+              if (isDesktop) {
+                final cardWidth = (constraints.maxWidth - 32) / 5;
+                return Row(
                   children: [
-                    headerCol,
-                    const SizedBox(height: 12),
-                    actionsWrap,
+                    _buildDeliveredKpiCard(
+                      isDark,
+                      title: 'Total Filtered Orders',
+                      value: '${filtered.length} Orders',
+                      subtitle: 'Gross: ${CurrencyFormatter.formatNaira(totalValuation)}',
+                      icon: Icons.inventory_2_rounded,
+                      iconColor: const Color(0xFF2563EB),
+                      width: cardWidth,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildDeliveredKpiCard(
+                      isDark,
+                      title: '📦 Unassigned Pool',
+                      value: '$unassignedCount Pending',
+                      subtitle: 'Awaiting rider dispatch',
+                      icon: Icons.outbox_rounded,
+                      iconColor: const Color(0xFFF37021),
+                      width: cardWidth,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildDeliveredKpiCard(
+                      isDark,
+                      title: '🚴 In-Transit Live',
+                      value: '$inTransitCount Active',
+                      subtitle: 'Out on delivery routes',
+                      icon: Icons.local_shipping_rounded,
+                      iconColor: const Color(0xFF0284C7),
+                      width: cardWidth,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildDeliveredKpiCard(
+                      isDark,
+                      title: '🟢 Fulfilled / POD',
+                      value: '$deliveredCount Delivered',
+                      subtitle: 'Rev: ${CurrencyFormatter.formatNaira(deliveredRevenue)}',
+                      icon: Icons.check_circle_rounded,
+                      iconColor: const Color(0xFF16A34A),
+                      width: cardWidth,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildDeliveredKpiCard(
+                      isDark,
+                      title: '⚠️ Failed / Returns',
+                      value: '$failedCount Issues',
+                      subtitle: 'Call backs & returns',
+                      icon: Icons.warning_amber_rounded,
+                      iconColor: const Color(0xFFDC2626),
+                      width: cardWidth,
+                    ),
                   ],
                 );
               }
 
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(child: headerCol),
-                  const SizedBox(width: 14),
-                  actionsWrap,
-                ],
+              // On Mobile & Tablet: 1-line horizontal scrollable strip
+              return SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                child: Row(
+                  children: [
+                    _buildDeliveredKpiCard(
+                      isDark,
+                      title: 'Total Filtered Orders',
+                      value: '${filtered.length} Orders',
+                      subtitle: 'Gross: ${CurrencyFormatter.formatNaira(totalValuation)}',
+                      icon: Icons.inventory_2_rounded,
+                      iconColor: const Color(0xFF2563EB),
+                      width: 175,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildDeliveredKpiCard(
+                      isDark,
+                      title: '📦 Unassigned Pool',
+                      value: '$unassignedCount Pending',
+                      subtitle: 'Awaiting rider dispatch',
+                      icon: Icons.outbox_rounded,
+                      iconColor: const Color(0xFFF37021),
+                      width: 175,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildDeliveredKpiCard(
+                      isDark,
+                      title: '🚴 In-Transit Live',
+                      value: '$inTransitCount Active',
+                      subtitle: 'Out on delivery routes',
+                      icon: Icons.local_shipping_rounded,
+                      iconColor: const Color(0xFF0284C7),
+                      width: 175,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildDeliveredKpiCard(
+                      isDark,
+                      title: '🟢 Fulfilled / POD',
+                      value: '$deliveredCount Delivered',
+                      subtitle: 'Rev: ${CurrencyFormatter.formatNaira(deliveredRevenue)}',
+                      icon: Icons.check_circle_rounded,
+                      iconColor: const Color(0xFF16A34A),
+                      width: 175,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildDeliveredKpiCard(
+                      isDark,
+                      title: '⚠️ Failed / Returns',
+                      value: '$failedCount Issues',
+                      subtitle: 'Call backs & returns',
+                      icon: Icons.warning_amber_rounded,
+                      iconColor: const Color(0xFFDC2626),
+                      width: 175,
+                    ),
+                  ],
+                ),
               );
             },
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
-          // 2. Summary KPI Metric Cards (5 Cards)
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isNarrow = constraints.maxWidth < 950;
-              final cardWidth = isNarrow ? (constraints.maxWidth - 12) / 2 : (constraints.maxWidth - 48) / 5;
-              return Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  _buildDeliveredKpiCard(
-                    isDark,
-                    title: 'Total Filtered Orders',
-                    value: '${filtered.length} Orders',
-                    subtitle: 'Gross: ${CurrencyFormatter.formatNaira(totalValuation)}',
-                    icon: Icons.inventory_2_rounded,
-                    iconColor: const Color(0xFF2563EB),
-                    width: cardWidth,
+          // 2. Action Buttons (Placed Directly Under the KPI Cards)
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              ElevatedButton.icon(
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (ctx) => const DCCreateOrderModal(),
+                  );
+                },
+                icon: const Icon(Icons.add_rounded, size: 16, color: Colors.white),
+                label: const Text('Create New Order', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12.5)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFF37021),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              ElevatedButton.icon(
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (ctx) => const DCCsvOrderImportModal(),
+                  );
+                },
+                icon: const Icon(Icons.upload_file_rounded, size: 16, color: Colors.white),
+                label: const Text('Import CSV', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12.5)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF16A34A),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              if (unassignedCount > 0)
+                ElevatedButton.icon(
+                  onPressed: () {
+                    final unassignedList = allOrders.where((o) => (o.deliveryAgentId == null || o.deliveryAgentId!.isEmpty) && o.status != 'delivered').toList();
+                    _autoAssignPool(unassignedList, dcState, ordersState);
+                  },
+                  icon: const Icon(Icons.auto_awesome, size: 16, color: Colors.white),
+                  label: const Text('Auto-Assign Pool', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12.5)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
-                  _buildDeliveredKpiCard(
-                    isDark,
-                    title: '📦 Unassigned Pool',
-                    value: '$unassignedCount Pending',
-                    subtitle: 'Awaiting rider dispatch',
-                    icon: Icons.outbox_rounded,
-                    iconColor: const Color(0xFFF37021),
-                    width: cardWidth,
-                  ),
-                  _buildDeliveredKpiCard(
-                    isDark,
-                    title: '🚴 In-Transit Live',
-                    value: '$inTransitCount Active',
-                    subtitle: 'Out on delivery routes',
-                    icon: Icons.local_shipping_rounded,
-                    iconColor: const Color(0xFF0284C7),
-                    width: cardWidth,
-                  ),
-                  _buildDeliveredKpiCard(
-                    isDark,
-                    title: '🟢 Fulfilled / POD',
-                    value: '$deliveredCount Delivered',
-                    subtitle: 'Rev: ${CurrencyFormatter.formatNaira(deliveredRevenue)}',
-                    icon: Icons.check_circle_rounded,
-                    iconColor: const Color(0xFF16A34A),
-                    width: cardWidth,
-                  ),
-                  _buildDeliveredKpiCard(
-                    isDark,
-                    title: '⚠️ Failed / Returns',
-                    value: '$failedCount Issues',
-                    subtitle: 'Call backs & returns',
-                    icon: Icons.warning_amber_rounded,
-                    iconColor: const Color(0xFFDC2626),
-                    width: cardWidth,
-                  ),
-                ],
-              );
-            },
+                ),
+            ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
           // 3. Multi-Attribute Filter Toolbar Card
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF1E293B) : Colors.white,
               borderRadius: BorderRadius.circular(16),
@@ -629,7 +931,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 10),
 
                     // View Mode Switcher Toggle
                     Container(
@@ -665,107 +967,172 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
                 ),
                 const SizedBox(height: 12),
 
-                // Bottom Row: Dropdown Filters (Status, Rider, Product, Client, Reset)
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    // 1. Status Filter Dropdown
-                    _buildFilterDropdown(
-                      label: 'Status',
-                      icon: Icons.filter_alt_outlined,
-                      value: masterStatus,
-                      isDark: isDark,
-                      items: const [
-                        DropdownMenuItem(value: 'all', child: Text('All Statuses')),
-                        DropdownMenuItem(value: 'unassigned', child: Text('📦 Unassigned (Pending)')),
-                        DropdownMenuItem(value: 'in_transit', child: Text('🚴 In Transit (Assigned)')),
-                        DropdownMenuItem(value: 'delivered', child: Text('🟢 Delivered (Fulfilled)')),
-                        DropdownMenuItem(value: 'failed', child: Text('⚠️ Failed / Call Back')),
-                        DropdownMenuItem(value: 'returned', child: Text('↩️ Returned to DC')),
-                      ],
-                      onChanged: (val) {
-                        if (val != null) ref.read(dcMasterStatusFilterProvider.notifier).state = val;
-                      },
-                    ),
+                // Bottom Row: Adaptive Filters (Icons only on mobile for 0-horizontal scroll, full row on desktop)
+                LayoutBuilder(
+                  builder: (context, filterConstraints) {
+                    final isCompact = filterConstraints.maxWidth < 700;
+                    if (isCompact) {
+                      return _buildMobileIconFilterBar(
+                        context: context,
+                        isDark: isDark,
+                        activeDateFilter: activeDateFilter,
+                        customRange: customRange,
+                        singleDate: singleDate,
+                        masterStatus: masterStatus,
+                        masterRider: masterRider,
+                        masterProduct: masterProduct,
+                        masterClient: masterClient,
+                        fleetDrivers: fleetDrivers,
+                        uniqueProducts: uniqueProducts,
+                        uniqueClients: uniqueClients,
+                        hasActiveFilters: hasActiveFilters,
+                      );
+                    }
 
-                    // 2. Rider Filter Dropdown
-                    _buildFilterDropdown(
-                      label: 'Rider',
-                      icon: Icons.two_wheeler_rounded,
-                      value: masterRider,
-                      isDark: isDark,
-                      items: [
-                        const DropdownMenuItem(value: 'all', child: Text('All Riders')),
-                        const DropdownMenuItem(value: 'unassigned', child: Text('📦 Unassigned Only')),
-                        ...fleetDrivers.map((d) {
-                          return DropdownMenuItem(
-                            value: d.id,
-                            child: Text('🚴 ${d.name} (${d.driverCode})'),
-                          );
-                        }),
-                      ],
-                      onChanged: (val) {
-                        if (val != null) ref.read(dcMasterRiderFilterProvider.notifier).state = val;
-                      },
-                    ),
+                    return SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      child: Row(
+                        children: [
+                          // 1. Pop-up Date Filter
+                          _buildDateFilterPopupButton(
+                            context: context,
+                            isDark: isDark,
+                            activeDateFilter: activeDateFilter,
+                            customRange: customRange,
+                            singleDate: singleDate,
+                          ),
+                          const SizedBox(width: 8),
 
-                    // 3. Product Filter Dropdown
-                    _buildFilterDropdown(
-                      label: 'Product',
-                      icon: Icons.inventory_2_outlined,
-                      value: masterProduct,
-                      isDark: isDark,
-                      items: [
-                        const DropdownMenuItem(value: 'all', child: Text('All Products')),
-                        ...uniqueProducts.map((p) {
-                          return DropdownMenuItem(
-                            value: p,
-                            child: Text(p),
-                          );
-                        }),
-                      ],
-                      onChanged: (val) {
-                        if (val != null) ref.read(dcMasterProductFilterProvider.notifier).state = val;
-                      },
-                    ),
+                          // 2. Status Filter Dropdown
+                          _buildFilterDropdown(
+                            label: 'Status',
+                            icon: Icons.filter_alt_outlined,
+                            value: masterStatus,
+                            isDark: isDark,
+                            items: const [
+                              DropdownMenuItem(value: 'all', child: Text('All Statuses')),
+                              DropdownMenuItem(value: 'unassigned', child: Text('📦 Unassigned (Pending)')),
+                              DropdownMenuItem(value: 'in_transit', child: Text('🚴 In Transit (Assigned)')),
+                              DropdownMenuItem(value: 'delivered', child: Text('🟢 Delivered (Fulfilled)')),
+                              DropdownMenuItem(value: 'failed', child: Text('⚠️ Failed / Call Back')),
+                              DropdownMenuItem(value: 'returned', child: Text('↩️ Returned to DC')),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) ref.read(dcMasterStatusFilterProvider.notifier).state = val;
+                            },
+                          ),
+                          const SizedBox(width: 8),
 
-                    // 4. Client Filter Dropdown
-                    _buildFilterDropdown(
-                      label: 'Client',
-                      icon: Icons.business_rounded,
-                      value: masterClient,
-                      isDark: isDark,
-                      items: [
-                        const DropdownMenuItem(value: 'all', child: Text('All Clients')),
-                        ...uniqueClients.map((c) {
-                          return DropdownMenuItem(
-                            value: c,
-                            child: Text(c),
-                          );
-                        }),
-                      ],
-                      onChanged: (val) {
-                        if (val != null) ref.read(dcMasterClientFilterProvider.notifier).state = val;
-                      },
-                    ),
+                          // 3. Rider Filter Dropdown
+                          _buildFilterDropdown(
+                            label: 'Rider',
+                            icon: Icons.two_wheeler_rounded,
+                            value: masterRider,
+                            isDark: isDark,
+                            items: [
+                              const DropdownMenuItem(value: 'all', child: Text('All Riders')),
+                              const DropdownMenuItem(value: 'unassigned', child: Text('📦 Unassigned Only')),
+                              ...fleetDrivers.map((d) {
+                                return DropdownMenuItem(
+                                  value: d.id,
+                                  child: Text('🚴 ${d.name} (${d.driverCode})'),
+                                );
+                              }),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) ref.read(dcMasterRiderFilterProvider.notifier).state = val;
+                            },
+                          ),
+                          const SizedBox(width: 8),
 
-                    // Reset Filters Button
-                    if (hasActiveFilters)
-                      TextButton.icon(
-                        onPressed: () {
-                          _masterSearchController.clear();
-                          ref.read(dcMasterSearchProvider.notifier).state = '';
-                          ref.read(dcMasterStatusFilterProvider.notifier).state = 'all';
-                          ref.read(dcMasterRiderFilterProvider.notifier).state = 'all';
-                          ref.read(dcMasterProductFilterProvider.notifier).state = 'all';
-                          ref.read(dcMasterClientFilterProvider.notifier).state = 'all';
-                        },
-                        icon: const Icon(Icons.restart_alt_rounded, size: 16, color: Color(0xFFEF4444)),
-                        label: const Text('Reset Filters', style: TextStyle(fontSize: 12, color: Color(0xFFEF4444), fontWeight: FontWeight.bold)),
+                          // 4. Product Filter Dropdown
+                          _buildFilterDropdown(
+                            label: 'Product',
+                            icon: Icons.inventory_2_outlined,
+                            value: masterProduct,
+                            isDark: isDark,
+                            items: [
+                              const DropdownMenuItem(value: 'all', child: Text('All Products')),
+                              ...uniqueProducts.map((p) {
+                                return DropdownMenuItem(
+                                  value: p,
+                                  child: Text(p),
+                                );
+                              }),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) ref.read(dcMasterProductFilterProvider.notifier).state = val;
+                            },
+                          ),
+                          const SizedBox(width: 8),
+
+                          // 5. Client Filter Dropdown
+                          _buildFilterDropdown(
+                            label: 'Client',
+                            icon: Icons.business_rounded,
+                            value: masterClient,
+                            isDark: isDark,
+                            items: [
+                              const DropdownMenuItem(value: 'all', child: Text('All Clients')),
+                              ...uniqueClients.map((c) {
+                                return DropdownMenuItem(
+                                  value: c,
+                                  child: Text(c),
+                                );
+                              }),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) ref.read(dcMasterClientFilterProvider.notifier).state = val;
+                            },
+                          ),
+
+                          // 6. Reset Filters Button
+                          if (hasActiveFilters) ...[
+                            const SizedBox(width: 8),
+                            InkWell(
+                              onTap: () {
+                                _masterSearchController.clear();
+                                ref.read(dcMasterSearchProvider.notifier).state = '';
+                                ref.read(dcMasterStatusFilterProvider.notifier).state = 'all';
+                                ref.read(dcMasterRiderFilterProvider.notifier).state = 'all';
+                                ref.read(dcMasterProductFilterProvider.notifier).state = 'all';
+                                ref.read(dcMasterClientFilterProvider.notifier).state = 'all';
+                                ref.read(dcOrdersDateFilterProvider.notifier).state = 'all_time';
+                                ref.read(dcOrdersCustomDateRangeProvider.notifier).state = null;
+                                ref.read(dcOrdersSingleDateProvider.notifier).state = null;
+                              },
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                height: 40,
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEF4444).withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.3)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.restart_alt_rounded, size: 15, color: Color(0xFFEF4444)),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Reset',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: const Color(0xFFEF4444),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
-                  ],
+                    );
+                  },
                 ),
               ],
             ),
@@ -872,6 +1239,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: DataTable(
+                showCheckboxColumn: false,
                 headingRowColor: WidgetStateProperty.all(isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
                 headingRowHeight: 46,
                 dataRowMaxHeight: 64,
@@ -895,125 +1263,164 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
                   final isPrepaid = order.paymentType == 'prepaid' || order.isDirectTransfer;
 
                   return DataRow(
+                    onSelectChanged: (_) {
+                      showDialog(
+                        context: context,
+                        builder: (ctx) => DCOrderDetailModal(order: order),
+                      );
+                    },
+                    mouseCursor: WidgetStateProperty.all(SystemMouseCursors.click),
+                    color: WidgetStateProperty.resolveWith<Color?>((states) {
+                      if (states.contains(WidgetState.hovered)) {
+                        return isDark ? const Color(0xFF334155).withValues(alpha: 0.5) : const Color(0xFFF1F5F9);
+                      }
+                      return null;
+                    }),
                     cells: [
                       // 1. Order # & Date
                       DataCell(
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              '#${order.orderNumber}',
-                              style: GoogleFonts.jetBrainsMono(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
-                            ),
-                            Text(
-                              DateTimeFormatter.formatRelativeTime(order.createdAt),
-                              style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF94A3B8)),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // 2. Customer & Phone
-                      DataCell(
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              order.customerName,
-                              style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            Text(
-                              order.customerPhone,
-                              style: GoogleFonts.jetBrainsMono(fontSize: 11, color: const Color(0xFF64748B)),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // 3. Destination
-                      DataCell(
-                        Container(
-                          constraints: const BoxConstraints(maxWidth: 180),
+                        InkWell(
+                          onTap: () => showDialog(context: context, builder: (ctx) => DCOrderDetailModal(order: order)),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                order.deliveryAddress,
-                                style: GoogleFonts.inter(fontSize: 11.5),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                                '#${order.orderNumber}',
+                                style: GoogleFonts.jetBrainsMono(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
                               ),
                               Text(
-                                '${order.deliveryCity}, ${order.deliveryState}',
-                                style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                                DateTimeFormatter.formatRelativeTime(order.createdAt),
+                                style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF94A3B8)),
                               ),
                             ],
                           ),
                         ),
                       ),
 
+                      // 2. Customer & Phone
+                      DataCell(
+                        InkWell(
+                          onTap: () => showDialog(context: context, builder: (ctx) => DCOrderDetailModal(order: order)),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                order.customerName,
+                                style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Text(
+                                order.customerPhone,
+                                style: GoogleFonts.jetBrainsMono(fontSize: 11, color: const Color(0xFF64748B)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      // 3. Destination
+                      DataCell(
+                        InkWell(
+                          onTap: () => showDialog(context: context, builder: (ctx) => DCOrderDetailModal(order: order)),
+                          child: Container(
+                            constraints: const BoxConstraints(maxWidth: 180),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  order.deliveryAddress,
+                                  style: GoogleFonts.inter(fontSize: 11.5),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  '${order.deliveryCity}, ${order.deliveryState}',
+                                  style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+
                       // 4. Product & Qty
                       DataCell(
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF8B5CF6).withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(4),
+                        InkWell(
+                          onTap: () => showDialog(context: context, builder: (ctx) => DCOrderDetailModal(order: order)),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  '${order.quantity}x',
+                                  style: GoogleFonts.jetBrainsMono(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF8B5CF6)),
+                                ),
                               ),
-                              child: Text(
-                                '${order.quantity}x',
-                                style: GoogleFonts.jetBrainsMono(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF8B5CF6)),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(order.productName, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500)),
-                          ],
+                              const SizedBox(width: 6),
+                              Text(order.productName, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500)),
+                            ],
+                          ),
                         ),
                       ),
 
                       // 5. Amount & Payment
                       DataCell(
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              CurrencyFormatter.formatNaira(order.totalAmount),
-                              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF16A34A)),
-                            ),
-                            Text(
-                              isPrepaid ? '⚡ Prepaid' : '💵 Pay on Del',
-                              style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B)),
-                            ),
-                          ],
+                        InkWell(
+                          onTap: () => showDialog(context: context, builder: (ctx) => DCOrderDetailModal(order: order)),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                CurrencyFormatter.formatNaira(order.totalAmount),
+                                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF16A34A)),
+                              ),
+                              Text(
+                                isPrepaid ? '⚡ Prepaid' : '💵 Pay on Del',
+                                style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B)),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
 
                       // 6. Client
                       DataCell(
-                        Text(order.clientName.isNotEmpty ? order.clientName : 'Novacare', style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B))),
+                        InkWell(
+                          onTap: () => showDialog(context: context, builder: (ctx) => DCOrderDetailModal(order: order)),
+                          child: Text(order.clientName.isNotEmpty ? order.clientName : 'Novacare', style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B))),
+                        ),
                       ),
 
                       // 7. Assigned Rider
                       DataCell(
-                        Text(
-                          isUnassigned ? 'Unassigned' : (order.deliveryAgentName ?? order.deliveryAgentCode ?? 'Assigned'),
-                          style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w500, color: isUnassigned ? const Color(0xFFEA580C) : const Color(0xFF2563EB)),
+                        InkWell(
+                          onTap: () => showDialog(context: context, builder: (ctx) => DCOrderDetailModal(order: order)),
+                          child: Text(
+                            isUnassigned ? 'Unassigned' : (order.deliveryAgentName ?? order.deliveryAgentCode ?? 'Assigned'),
+                            style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w500, color: isUnassigned ? const Color(0xFFEA580C) : const Color(0xFF2563EB)),
+                          ),
                         ),
                       ),
 
                       // 8. Status
-                      DataCell(_buildOrderStatusBadge(order)),
+                      DataCell(
+                        InkWell(
+                          onTap: () => showDialog(context: context, builder: (ctx) => DCOrderDetailModal(order: order)),
+                          child: _buildOrderStatusBadge(order),
+                        ),
+                      ),
 
                       // 9. Actions
                       DataCell(
@@ -1054,15 +1461,18 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
               ),
             ),
 
-            // Pagination Controls Toolbar
+            // Pagination Controls Toolbar (Fully Responsive without overflow)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                 border: Border(top: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                runSpacing: 8,
                 children: [
                   Text(
                     totalCount == 0
@@ -1070,46 +1480,50 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
                         : 'Showing ${startIndex + 1} to $endIndex of $totalCount orders',
                     style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B), fontWeight: FontWeight.w500),
                   ),
-                  Row(
-                    children: [
-                      Text('Per page:', style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B))),
-                      const SizedBox(width: 6),
-                      DropdownButton<int>(
-                        value: _masterPageSize,
-                        isDense: true,
-                        underline: const SizedBox(),
-                        items: const [
-                          DropdownMenuItem(value: 25, child: Text('25')),
-                          DropdownMenuItem(value: 50, child: Text('50')),
-                          DropdownMenuItem(value: 100, child: Text('100')),
-                        ],
-                        onChanged: (val) {
-                          if (val != null) {
-                            setState(() {
-                              _masterPageSize = val;
-                              _masterCurrentPage = 0;
-                            });
-                          }
-                        },
-                      ),
-                      const SizedBox(width: 14),
-                      IconButton(
-                        icon: const Icon(Icons.chevron_left_rounded, size: 20),
-                        onPressed: currentPage > 0
-                            ? () => setState(() => _masterCurrentPage = currentPage - 1)
-                            : null,
-                      ),
-                      Text(
-                        'Page ${currentPage + 1} of $totalPages',
-                        style: GoogleFonts.jetBrainsMono(fontSize: 12, fontWeight: FontWeight.bold),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.chevron_right_rounded, size: 20),
-                        onPressed: currentPage < totalPages - 1
-                            ? () => setState(() => _masterCurrentPage = currentPage + 1)
-                            : null,
-                      ),
-                    ],
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('Per page:', style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B))),
+                        const SizedBox(width: 6),
+                        DropdownButton<int>(
+                          value: _masterPageSize,
+                          isDense: true,
+                          underline: const SizedBox(),
+                          items: const [
+                            DropdownMenuItem(value: 25, child: Text('25')),
+                            DropdownMenuItem(value: 50, child: Text('50')),
+                            DropdownMenuItem(value: 100, child: Text('100')),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) {
+                              setState(() {
+                                _masterPageSize = val;
+                                _masterCurrentPage = 0;
+                              });
+                            }
+                          },
+                        ),
+                        const SizedBox(width: 14),
+                        IconButton(
+                          icon: const Icon(Icons.chevron_left_rounded, size: 20),
+                          onPressed: currentPage > 0
+                              ? () => setState(() => _masterCurrentPage = currentPage - 1)
+                              : null,
+                        ),
+                        Text(
+                          'Page ${currentPage + 1} of $totalPages',
+                          style: GoogleFonts.jetBrainsMono(fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.chevron_right_rounded, size: 20),
+                          onPressed: currentPage < totalPages - 1
+                              ? () => setState(() => _masterCurrentPage = currentPage + 1)
+                              : null,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -1146,66 +1560,75 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
             final isDelivered = order.status == 'delivered';
             final isFailed = order.status == 'cancelled' || order.status == 'failed' || order.status == 'call_back';
 
-            return Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('#${order.orderNumber}', style: GoogleFonts.jetBrainsMono(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB))),
-                      _buildOrderStatusBadge(order),
-                    ],
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(order.customerName, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold)),
-                      Text('${order.customerPhone} • ${order.deliveryAddress}, ${order.deliveryCity}', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)), maxLines: 1, overflow: TextOverflow.ellipsis),
-                      const SizedBox(height: 4),
-                      Text('${order.quantity}x ${order.productName} • ${CurrencyFormatter.formatNaira(order.totalAmount)}', style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w600, color: const Color(0xFF16A34A))),
-                    ],
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        isUnassigned ? 'Unassigned' : '🚴 ${order.deliveryAgentName ?? "Rider"}',
-                        style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: isUnassigned ? const Color(0xFFF37021) : const Color(0xFF2563EB)),
-                      ),
-                      Row(
-                        children: [
-                          if (isUnassigned && !isDelivered && !isFailed)
-                            ElevatedButton(
-                              onPressed: () => _showAssignRiderModal(context, isDark, order, dcState, ordersState),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFF37021),
+            return InkWell(
+              onTap: () {
+                showDialog(
+                  context: context,
+                  builder: (ctx) => DCOrderDetailModal(order: order),
+                );
+              },
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('#${order.orderNumber}', style: GoogleFonts.jetBrainsMono(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB))),
+                        _buildOrderStatusBadge(order),
+                      ],
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(order.customerName, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold)),
+                        Text('${order.customerPhone} • ${order.deliveryAddress}, ${order.deliveryCity}', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        const SizedBox(height: 4),
+                        Text('${order.quantity}x ${order.productName} • ${CurrencyFormatter.formatNaira(order.totalAmount)}', style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w600, color: const Color(0xFF16A34A))),
+                      ],
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          isUnassigned ? 'Unassigned' : '🚴 ${order.deliveryAgentName ?? "Rider"}',
+                          style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: isUnassigned ? const Color(0xFFF37021) : const Color(0xFF2563EB)),
+                        ),
+                        Row(
+                          children: [
+                            if (isUnassigned && !isDelivered && !isFailed)
+                              ElevatedButton(
+                                onPressed: () => _showAssignRiderModal(context, isDark, order, dcState, ordersState),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFF37021),
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                ),
+                                child: const Text('Assign', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                              ),
+                            const SizedBox(width: 6),
+                            OutlinedButton(
+                              onPressed: () => showDialog(context: context, builder: (ctx) => DCOrderDetailModal(order: order)),
+                              style: OutlinedButton.styleFrom(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                               ),
-                              child: const Text('Assign', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                              child: const Text('Details', style: TextStyle(fontSize: 11)),
                             ),
-                          const SizedBox(width: 6),
-                          OutlinedButton(
-                            onPressed: () => showDialog(context: context, builder: (ctx) => DCOrderDetailModal(order: order)),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                            ),
-                            child: const Text('Details', style: TextStyle(fontSize: 11)),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ],
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             );
           },
@@ -1253,527 +1676,6 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
     );
   }
 
-  Widget _buildUnassignedPoolView(
-    bool isDark,
-    List<OrderEntity> orders,
-    DCConsoleState dcState,
-    OrdersState ordersState,
-  ) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isMobile = constraints.maxWidth < 650;
-              final headerInfo = Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Unassigned Orders Pool', style: GoogleFonts.inter(fontSize: isMobile ? 18 : 20, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 4),
-                  Text('Assign incoming merchant shipments to riders based on delivery zones & workload', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-                ],
-              );
-
-              final actionButtons = Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      showDialog(
-                        context: context,
-                        barrierDismissible: false,
-                        builder: (ctx) => const DCCreateOrderModal(),
-                      );
-                    },
-                    icon: const Icon(Icons.add_rounded, size: 16, color: Colors.white),
-                    label: const Text('Create New Order', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFF37021),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                  ),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      showDialog(
-                        context: context,
-                        barrierDismissible: false,
-                        builder: (ctx) => const DCCsvOrderImportModal(),
-                      );
-                    },
-                    icon: const Icon(Icons.upload_file_rounded, size: 16, color: Colors.white),
-                    label: const Text('Import CSV', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF16A34A),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                  ),
-                  if (orders.isNotEmpty)
-                    ElevatedButton.icon(
-                      onPressed: () => _autoAssignPool(orders, dcState, ordersState),
-                      icon: const Icon(Icons.auto_awesome, size: 16, color: Colors.white),
-                      label: const Text('Auto-Assign', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2563EB),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                    ),
-                ],
-              );
-
-              if (isMobile) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    headerInfo,
-                    const SizedBox(height: 12),
-                    actionButtons,
-                  ],
-                );
-              }
-
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(child: headerInfo),
-                  const SizedBox(width: 12),
-                  actionButtons,
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: 16),
-          if (ordersState.isLoading)
-            Column(
-              children: List.generate(3, (index) => const OrderCardSkeleton()),
-            )
-          else if (orders.isEmpty)
-            _buildEmptyState(
-              isDark,
-              icon: Icons.check_circle_outline_rounded,
-              title: 'All Orders Dispatched',
-              subtitle: 'There are currently no unassigned orders in the Wuse DC manifest. All orders are active on rider routes.',
-            )
-          else
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-              ),
-              child: ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: orders.length,
-                separatorBuilder: (_, __) => Divider(height: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                itemBuilder: (ctx, i) => _buildOrderRow(
-                  context: context,
-                  isDark: isDark,
-                  order: orders[i],
-                  isUnassigned: true,
-                  onAssign: () => _showAssignRiderModal(context, isDark, orders[i], dcState, ordersState),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInTransitView(bool isDark, List<OrderEntity> orders, DCConsoleState dcState) {
-    final ordersState = ref.watch(ordersProvider);
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isMobile = constraints.maxWidth < 650;
-              final titleCol = Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Live In-Transit Deliveries', style: GoogleFonts.inter(fontSize: isMobile ? 18 : 20, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 4),
-                  Text('Active delivery routes currently in custody of distribution center riders', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-                ],
-              );
-              final badge = Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2563EB).withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  '${orders.length} Active Routes',
-                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
-                ),
-              );
-
-              if (isMobile) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    titleCol,
-                    const SizedBox(height: 10),
-                    badge,
-                  ],
-                );
-              }
-
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(child: titleCol),
-                  const SizedBox(width: 12),
-                  badge,
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: 16),
-          if (ordersState.isLoading)
-            Column(
-              children: List.generate(3, (index) => const OrderCardSkeleton()),
-            )
-          else if (orders.isEmpty)
-            _buildEmptyState(
-              isDark,
-              icon: Icons.local_shipping_outlined,
-              title: 'No In-Transit Orders',
-              subtitle: 'Assign orders from the Unassigned Pool to dispatch riders out on their routes.',
-            )
-          else
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-              ),
-              child: ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: orders.length,
-                separatorBuilder: (_, __) => Divider(height: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                itemBuilder: (ctx, i) => _buildOrderRow(
-                  context: context,
-                  isDark: isDark,
-                  order: orders[i],
-                  statusPill: 'IN-TRANSIT',
-                  isUnassigned: false,
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDeliveredView(bool isDark, List<OrderEntity> orders) {
-    final ordersState = ref.watch(ordersProvider);
-    final stockState = ref.watch(stockProvider);
-
-    // Calculate Summary Metrics
-    final totalRevenue = orders.fold<double>(0.0, (acc, o) => acc + o.totalAmount);
-    final paystackOrders = orders.where((o) => o.isDirectTransfer).toList();
-    final clearedOrders = orders.where((o) => o.isRemitted).toList();
-    final unremittedOrders = orders.where((o) => o.isUnremitted).toList();
-
-    final clearedRevenue = clearedOrders.fold<double>(0.0, (acc, o) => acc + o.totalAmount);
-    final unremittedRevenue = unremittedOrders.fold<double>(0.0, (acc, o) => acc + o.totalAmount);
-    final paystackRevenue = paystackOrders.fold<double>(0.0, (acc, o) => acc + o.totalAmount);
-
-    final deliveredFilter = ref.watch(dcDeliveredFilterProvider);
-    final deliveredSearchQuery = ref.watch(dcDeliveredSearchProvider);
-
-    // Filter by query and payment/remittance channel
-    final filteredOrders = orders.where((o) {
-      final matchesFilter = deliveredFilter == 'all' ||
-          (deliveredFilter == 'paystack' && o.isDirectTransfer) ||
-          (deliveredFilter == 'cleared' && o.isRemitted) ||
-          (deliveredFilter == 'unremitted' && o.isUnremitted) ||
-          (deliveredFilter == 'cash' && !o.isDirectTransfer);
-      if (!matchesFilter) return false;
-
-      if (deliveredSearchQuery.trim().isEmpty) return true;
-      final q = deliveredSearchQuery.toLowerCase().trim();
-      return o.orderNumber.toLowerCase().contains(q) ||
-          o.customerName.toLowerCase().contains(q) ||
-          o.customerPhone.toLowerCase().contains(q) ||
-          (o.deliveryAgentName != null && o.deliveryAgentName!.toLowerCase().contains(q)) ||
-          (o.deliveryAgentCode != null && o.deliveryAgentCode!.toLowerCase().contains(q)) ||
-          (o.remittanceReference != null && o.remittanceReference!.toLowerCase().contains(q)) ||
-          o.deliveryAddress.toLowerCase().contains(q) ||
-          o.productName.toLowerCase().contains(q);
-    }).toList();
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Delivered Orders & Fulfillment Audit', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 4),
-                    Text('Review confirmed proof of delivery, settlement finances, and warehouse stock deductions', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.check_circle_rounded, size: 14, color: Color(0xFF10B981)),
-                    const SizedBox(width: 5),
-                    Text('${orders.length} Fulfilled', style: GoogleFonts.jetBrainsMono(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF10B981))),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // 4-Metric Summary Cards
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isNarrow = constraints.maxWidth < 900;
-              final cardWidth = isNarrow ? (constraints.maxWidth - 12) / 2 : (constraints.maxWidth - 36) / 4;
-              return Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  _buildDeliveredKpiCard(
-                    isDark,
-                    title: 'Total Delivered Revenue',
-                    value: CurrencyFormatter.formatNaira(totalRevenue),
-                    subtitle: '${orders.length} shipments fulfilled',
-                    icon: Icons.payments_rounded,
-                    iconColor: const Color(0xFF2563EB),
-                    width: cardWidth,
-                  ),
-                  _buildDeliveredKpiCard(
-                    isDark,
-                    title: '🟢 Remitted & Cleared',
-                    value: CurrencyFormatter.formatNaira(clearedRevenue),
-                    subtitle: '${clearedOrders.length} reconciled orders',
-                    icon: Icons.check_circle_rounded,
-                    iconColor: const Color(0xFF10B981),
-                    width: cardWidth,
-                  ),
-                  _buildDeliveredKpiCard(
-                    isDark,
-                    title: '🟡 In Rider Custody',
-                    value: CurrencyFormatter.formatNaira(unremittedRevenue),
-                    subtitle: '${unremittedOrders.length} unremitted cash runs',
-                    icon: Icons.account_balance_wallet_rounded,
-                    iconColor: const Color(0xFFF37021),
-                    width: cardWidth,
-                  ),
-                  _buildDeliveredKpiCard(
-                    isDark,
-                    title: '⚡ Direct to Bank',
-                    value: CurrencyFormatter.formatNaira(paystackRevenue),
-                    subtitle: '${paystackOrders.length} direct settled',
-                    icon: Icons.bolt_rounded,
-                    iconColor: const Color(0xFF00A2D3),
-                    width: cardWidth,
-                  ),
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: 16),
-
-          // Search and Channel Filters
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E293B) : Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-            ),
-            child: Column(
-              children: [
-                TextField(
-                  controller: _deliveredSearchController,
-                  onChanged: (val) => _onDebouncedSearch(() => ref.read(dcDeliveredSearchProvider.notifier).state = val),
-                  style: GoogleFonts.inter(fontSize: 13),
-                  decoration: InputDecoration(
-                    hintText: 'Search by Order #, Customer, Phone, Rider, Ref #, or Address...',
-                    hintStyle: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)),
-                    prefixIcon: const Icon(Icons.search_rounded, size: 20, color: Color(0xFF64748B)),
-                    suffixIcon: deliveredSearchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear_rounded, size: 16),
-                            onPressed: () {
-                              _deliveredSearchController.clear();
-                              ref.read(dcDeliveredSearchProvider.notifier).state = '';
-                            },
-                          )
-                        : null,
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _buildDeliveredFilterChip(
-                        label: 'All Delivered (${orders.length})',
-                        isSelected: deliveredFilter == 'all',
-                        onTap: () => ref.read(dcDeliveredFilterProvider.notifier).state = 'all',
-                        isDark: isDark,
-                      ),
-                      const SizedBox(width: 8),
-                      _buildDeliveredFilterChip(
-                        label: '🟢 Remitted & Cleared (${clearedOrders.length})',
-                        isSelected: deliveredFilter == 'cleared',
-                        onTap: () => ref.read(dcDeliveredFilterProvider.notifier).state = 'cleared',
-                        isDark: isDark,
-                        activeColor: const Color(0xFF10B981),
-                      ),
-                      const SizedBox(width: 8),
-                      _buildDeliveredFilterChip(
-                        label: '🟡 In Rider Custody / Unremitted (${unremittedOrders.length})',
-                        isSelected: deliveredFilter == 'unremitted',
-                        onTap: () => ref.read(dcDeliveredFilterProvider.notifier).state = 'unremitted',
-                        isDark: isDark,
-                        activeColor: const Color(0xFFD97706),
-                      ),
-                      const SizedBox(width: 8),
-                      _buildDeliveredFilterChip(
-                        label: '⚡ Direct Transfer (${paystackOrders.length})',
-                        isSelected: deliveredFilter == 'paystack',
-                        onTap: () => ref.read(dcDeliveredFilterProvider.notifier).state = 'paystack',
-                        isDark: isDark,
-                        activeColor: const Color(0xFF00A2D3),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Orders Feed
-          if (ordersState.isLoading)
-            Column(children: List.generate(3, (_) => const OrderCardSkeleton()))
-          else if (filteredOrders.isEmpty)
-            _buildEmptyState(
-              isDark,
-              icon: Icons.search_off_rounded,
-              title: deliveredSearchQuery.isNotEmpty ? 'No Matching Delivered Orders' : 'No Delivered Orders in this Category',
-              subtitle: deliveredSearchQuery.isNotEmpty
-                  ? 'No delivered orders matched "$deliveredSearchQuery". Try adjusting your search query or filter.'
-                  : 'Delivered orders will appear here once fulfilled by riders.',
-            )
-          else
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: filteredOrders.length,
-              itemBuilder: (ctx, i) => _buildDeliveredOrderCard(context, isDark, filteredOrders[i], stockState),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFailedView(bool isDark, List<OrderEntity> orders) {
-    final ordersState = ref.watch(ordersProvider);
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Failed & Rescheduled Delivery Tickets', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 4),
-                  Text('Shipments with delivery exceptions, callbacks, or customer rescheduling', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEF4444).withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text('${orders.length} Incidents', style: GoogleFonts.jetBrainsMono(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFFDC2626))),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          if (ordersState.isLoading)
-            Column(
-              children: List.generate(3, (index) => const OrderCardSkeleton()),
-            )
-          else if (orders.isEmpty)
-            _buildEmptyState(
-              isDark,
-              icon: Icons.done_all_rounded,
-              title: 'Zero Failed Deliveries',
-              subtitle: 'All delivery runs have succeeded or are currently in progress without issues.',
-            )
-          else
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-              ),
-              child: ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: orders.length,
-                separatorBuilder: (_, __) => Divider(height: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                itemBuilder: (ctx, i) => _buildOrderRow(
-                  context: context,
-                  isDark: isDark,
-                  order: orders[i],
-                  statusPill: 'FAILED (RETURN PENDING)',
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildEmptyState(
     bool isDark, {
     required IconData icon,
@@ -1782,7 +1684,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
   }) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+      padding: const EdgeInsets.all(40),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -1791,263 +1693,30 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 48, color: const Color(0xFF64748B)),
-          const SizedBox(height: 12),
-          Text(title, style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF2563EB).withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 36, color: const Color(0xFF2563EB)),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            title,
+            style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 6),
           Text(
             subtitle,
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+            style: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF64748B)),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildOrderRow({
-    required BuildContext context,
-    required bool isDark,
-    required OrderEntity order,
-    bool isUnassigned = false,
-    VoidCallback? onAssign,
-    String? statusPill,
-  }) {
-    final orderCode = order.orderNumber;
-    final customer = order.customerName;
-    final phone = order.customerPhone;
-    final address = order.deliveryAddress;
-    final product = order.productName;
-    final amount = order.totalAmount;
-    final paymentType = order.paymentType == 'pay_on_delivery' ? 'POD Cash' : 'Prepaid Direct';
-    final riderName = order.deliveryAgentName != null
-        ? '${order.deliveryAgentName} (${order.deliveryAgentCode ?? "PDA"})'
-        : (order.deliveryAgentCode != null ? 'Agent: ${order.deliveryAgentCode}' : null);
-
-    return InkWell(
-      onTap: () {
-        showDialog(
-          context: context,
-          builder: (ctx) => DCOrderDetailModal(order: order),
-        );
-      },
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isCompact = constraints.maxWidth < 650;
-
-            if (isCompact) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2563EB).withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(Icons.receipt_long_rounded, color: Color(0xFF2563EB), size: 18),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Text('$orderCode • $customer', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold)),
-                                const SizedBox(width: 6),
-                                _buildOrderRemittanceBadge(order),
-                              ],
-                            ),
-                            const SizedBox(height: 2),
-                            Text('$phone • $address', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)), overflow: TextOverflow.ellipsis),
-                            const SizedBox(height: 2),
-                            Text('📦 ${order.quantity}x $product • $paymentType', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8))),
-                            if (riderName != null)
-                              Text('🛵 Custody: $riderName', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB))),
-                            if (order.isFailed && order.failureReason != null)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 2),
-                                child: Text('⚠️ Reason: ${order.failureReason}', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFFDC2626))),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(CurrencyFormatter.formatNaira(amount), style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold)),
-                          Text('Net: ${CurrencyFormatter.formatNaira(order.netMerchantSettlement)}', style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF10B981), fontWeight: FontWeight.w600)),
-                        ],
-                      ),
-                      if (isUnassigned)
-                        ElevatedButton.icon(
-                          onPressed: onAssign,
-                          icon: const Icon(Icons.send_rounded, size: 13, color: Colors.white),
-                          label: const Text('Assign Rider', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF2563EB),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          ),
-                        )
-                      else
-                        OutlinedButton.icon(
-                          onPressed: () {
-                            showDialog(
-                              context: context,
-                              builder: (ctx) => DCOrderDetailModal(order: order),
-                            );
-                          },
-                          icon: const Icon(Icons.open_in_new_rounded, size: 13),
-                          label: const Text('Details', style: TextStyle(fontSize: 11)),
-                          style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6)),
-                        ),
-                    ],
-                  ),
-                ],
-              );
-            }
-
-            return Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2563EB).withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(Icons.receipt_long_rounded, color: Color(0xFF2563EB), size: 20),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Text('$orderCode • $customer ($phone)', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
-                                const SizedBox(width: 8),
-                                _buildOrderRemittanceBadge(order),
-                              ],
-                            ),
-                            const SizedBox(height: 2),
-                            Text(address, style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)), overflow: TextOverflow.ellipsis),
-                            const SizedBox(height: 2),
-                            Text('📦 ${order.quantity}x $product • $paymentType', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)), overflow: TextOverflow.ellipsis),
-                            if (riderName != null)
-                              Text('🛵 Custody: $riderName', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)), overflow: TextOverflow.ellipsis),
-                            if (order.isFailed && order.failureReason != null)
-                              Text('⚠️ Reason: ${order.failureReason}', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFFDC2626)), overflow: TextOverflow.ellipsis),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Row(
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(CurrencyFormatter.formatNaira(amount), style: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.bold)),
-                        Text('Net: ${CurrencyFormatter.formatNaira(order.netMerchantSettlement)}', style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF10B981), fontWeight: FontWeight.w600)),
-                      ],
-                    ),
-                    const SizedBox(width: 12),
-                    if (isUnassigned)
-                      ElevatedButton.icon(
-                        onPressed: onAssign,
-                        icon: const Icon(Icons.send_rounded, size: 13, color: Colors.white),
-                        label: const Text('Assign Rider', style: TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.bold)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2563EB),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        ),
-                      )
-                    else
-                      ElevatedButton.icon(
-                        onPressed: () {
-                          showDialog(
-                            context: context,
-                            builder: (ctx) => DCOrderDetailModal(order: order),
-                          );
-                        },
-                        icon: const Icon(Icons.receipt_long_rounded, size: 13, color: Colors.white),
-                        label: const Text('View Ticket', style: TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.bold)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2563EB),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        ),
-                      ),
-                  ],
-                ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _buildOrderRemittanceBadge(OrderEntity order) {
-    if (order.isDelivered) {
-      if (order.isDirectTransfer) {
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(
-            color: const Color(0xFF0284C7).withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Text('⚡ DIRECT TRANSFER', style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.bold, color: const Color(0xFF0284C7))),
-        );
-      } else if (order.isRemitted) {
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(
-            color: const Color(0xFF10B981).withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Text('🟢 REMITTED & CLEARED', style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.bold, color: const Color(0xFF059669))),
-        );
-      } else {
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(
-            color: const Color(0xFFD97706).withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Text('🟡 IN RIDER CUSTODY', style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.bold, color: const Color(0xFFD97706))),
-        );
-      }
-    } else if (order.isFailed) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-        decoration: BoxDecoration(
-          color: const Color(0xFFEF4444).withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Text('🔴 FAILED ATTEMPT', style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.bold, color: const Color(0xFFDC2626))),
-      );
-    }
-    return const SizedBox.shrink();
-  }
 
   void _showAssignRiderModal(
     BuildContext context,
@@ -2077,29 +1746,60 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
         continue;
       }
 
-      // 2. Fallback: Pick driver with lowest current workload
-      final sortedDrivers = [...dcState.drivers];
-      sortedDrivers.sort((a, b) {
+      // 2. Fallback: Pick driver with available vehicle stock and lowest current workload
+      final stockNotifier = ref.read(stockProvider.notifier);
+      final stockState = ref.read(stockProvider);
+
+      final eligibleDrivers = dcState.drivers.where((d) {
+        final avail = stockNotifier.getRiderAvailableStock(
+          riderId: d.id,
+          riderCode: d.driverCode,
+          productName: order.productName,
+          activeOrders: ordersState.orders,
+        );
+        final totalCustody = stockState.getAllocationsForRider(d.id, d.driverCode).where((a) {
+          final pA = a.productName.toLowerCase();
+          final oP = order.productName.toLowerCase();
+          return (oP.isNotEmpty && (pA.contains(oP) || oP.contains(pA))) ||
+              (a.sku.isNotEmpty && oP.contains(a.sku.toLowerCase()));
+        }).fold(0, (sum, a) => sum + a.inCustodyUnits);
+
+        return order.isClientPackage || (totalCustody > 0 && avail >= order.quantity);
+      }).toList();
+
+      if (eligibleDrivers.isEmpty) {
+        // No driver has sufficient stock for this order
+        continue;
+      }
+
+      eligibleDrivers.sort((a, b) {
         final aCount = ordersState.orders.where((o) => o.deliveryAgentId == a.id || o.deliveryAgentCode == a.driverCode).length;
         final bCount = ordersState.orders.where((o) => o.deliveryAgentId == b.id || o.deliveryAgentCode == b.driverCode).length;
         return aCount.compareTo(bCount);
       });
 
-      final targetDriver = sortedDrivers.first;
-      await ref.read(ordersProvider.notifier).assignOrderToRider(
+      final targetDriver = eligibleDrivers.first;
+      final assigned = await ref.read(ordersProvider.notifier).assignOrderToRider(
         orderId: order.id,
         riderId: targetDriver.id,
         riderName: targetDriver.name,
         riderCode: targetDriver.driverCode,
       );
-      assignedCount++;
+      if (assigned) {
+        assignedCount++;
+      }
     }
 
     if (mounted) {
+      final unassignedRemaining = unassigned.length - assignedCount;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('⚡ Auto-dispatched $assignedCount orders using proximity GIS and workload balancing.'),
-          backgroundColor: const Color(0xFF10B981),
+          content: Text(
+            unassignedRemaining > 0
+                ? '⚡ Auto-dispatched $assignedCount orders. $unassignedRemaining order(s) skipped due to insufficient vehicle stock.'
+                : '⚡ Auto-dispatched all $assignedCount orders using proximity GIS and stock availability.',
+          ),
+          backgroundColor: assignedCount > 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444),
         ),
       );
     }
@@ -2120,14 +1820,15 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
   }) {
     return Container(
       width: width,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2136,7 +1837,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
                 child: Text(
                   title,
                   style: GoogleFonts.inter(
-                    fontSize: 11,
+                    fontSize: 10.5,
                     fontWeight: FontWeight.w600,
                     color: const Color(0xFF64748B),
                   ),
@@ -2144,348 +1845,41 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> with SingleTickerPr
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 4),
               Container(
-                padding: const EdgeInsets.all(6),
+                padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
                   color: iconColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(6),
                 ),
-                child: Icon(icon, size: 16, color: iconColor),
+                child: Icon(icon, size: 14, color: iconColor),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           Text(
             value,
             style: GoogleFonts.jetBrainsMono(
-              fontSize: 16,
+              fontSize: 13.5,
               fontWeight: FontWeight.bold,
               color: isDark ? Colors.white : const Color(0xFF0F172A),
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 1),
           Text(
             subtitle,
             style: GoogleFonts.inter(
-              fontSize: 10.5,
+              fontSize: 9.5,
               color: const Color(0xFF94A3B8),
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildDeliveredFilterChip({
-    required String label,
-    required bool isSelected,
-    required VoidCallback onTap,
-    required bool isDark,
-    Color activeColor = const Color(0xFFF37021),
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? activeColor.withValues(alpha: 0.15) : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isSelected ? activeColor : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
-            width: isSelected ? 1.5 : 1,
-          ),
-        ),
-        child: Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 11.5,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-            color: isSelected ? activeColor : const Color(0xFF64748B),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDeliveredOrderCard(
-    BuildContext context,
-    bool isDark,
-    OrderEntity order,
-    StockState stockState,
-  ) {
-    final isDirect = order.isDirectTransfer;
-    final riderName = order.deliveryAgentName ?? 'Assigned Rider';
-    final riderCode = order.deliveryAgentCode ?? 'PDA-RIDER';
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Row 1: Order ID, Channel Badge, & POD Chip
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: isDirect
-                          ? const Color(0xFF00A2D3).withValues(alpha: 0.12)
-                          : const Color(0xFF10B981).withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(
-                      isDirect ? Icons.bolt_rounded : Icons.payments_rounded,
-                      size: 18,
-                      color: isDirect ? const Color(0xFF00A2D3) : const Color(0xFF10B981),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '#${order.orderNumber}',
-                        style: GoogleFonts.jetBrainsMono(fontSize: 14, fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        isDirect ? 'Direct Bank Transfer (Paystack)' : 'Cash on Delivery (POD)',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: isDirect ? const Color(0xFF00A2D3) : const Color(0xFF059669),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFDCFCE7),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFF86EFAC)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.check_circle_rounded, size: 12, color: Color(0xFF16A34A)),
-                    const SizedBox(width: 4),
-                    Text(
-                      'DELIVERED (POD)',
-                      style: GoogleFonts.jetBrainsMono(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                        color: const Color(0xFF15803D),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          const Divider(height: 1),
-          const SizedBox(height: 12),
-
-          // Row 2: Customer, Address & Rider Details
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isNarrow = constraints.maxWidth < 650;
-              final infoColumn1 = Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.person_outline_rounded, size: 14, color: Color(0xFF64748B)),
-                      const SizedBox(width: 6),
-                      Text(
-                        '${order.customerName} • ${order.customerPhone}',
-                        style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Icon(Icons.location_on_outlined, size: 14, color: Color(0xFF64748B)),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          '${order.deliveryAddress}, ${order.deliveryCity}',
-                          style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              );
-
-              final infoColumn2 = Column(
-                crossAxisAlignment: isNarrow ? CrossAxisAlignment.start : CrossAxisAlignment.end,
-                children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.two_wheeler_rounded, size: 14, color: Color(0xFF2563EB)),
-                      const SizedBox(width: 6),
-                      Text(
-                        '$riderName ($riderCode)',
-                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '${order.quantity}x ${order.productName} • ',
-                        style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
-                      ),
-                      Text(
-                        CurrencyFormatter.formatNaira(order.totalAmount),
-                        style: GoogleFonts.jetBrainsMono(fontSize: 13, fontWeight: FontWeight.w900, color: const Color(0xFF10B981)),
-                      ),
-                    ],
-                  ),
-                ],
-              );
-
-              if (isNarrow) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    infoColumn1,
-                    const SizedBox(height: 8),
-                    infoColumn2,
-                  ],
-                );
-              }
-
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(child: infoColumn1),
-                  const SizedBox(width: 14),
-                  infoColumn2,
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: 14),
-
-          // Row 3: 3 Prominent Interactive Action Buttons (Finance, Stock, Order & POD Details)
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              // 1. Finance Modal Button
-              OutlinedButton.icon(
-                onPressed: () => _openOrderFinanceModal(context, isDark, order),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  side: BorderSide(
-                    color: isDirect ? const Color(0xFF00A2D3) : const Color(0xFF10B981),
-                  ),
-                ),
-                icon: Icon(
-                  Icons.account_balance_wallet_outlined,
-                  size: 15,
-                  color: isDirect ? const Color(0xFF00A2D3) : const Color(0xFF10B981),
-                ),
-                label: Text(
-                  '💰 Finance & Collections',
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: isDirect ? const Color(0xFF00A2D3) : const Color(0xFF10B981),
-                  ),
-                ),
-              ),
-
-              // 2. Stock / Inventory Modal Button
-              OutlinedButton.icon(
-                onPressed: () => _openOrderStockModal(context, isDark, order, stockState),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  side: const BorderSide(color: Color(0xFF8B5CF6)),
-                ),
-                icon: const Icon(Icons.inventory_2_outlined, size: 15, color: Color(0xFF8B5CF6)),
-                label: Text(
-                  '📦 Stock & Inventory (${order.quantity} units)',
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: const Color(0xFF8B5CF6),
-                  ),
-                ),
-              ),
-
-              // 3. Order & POD Details Modal Button
-              ElevatedButton.icon(
-                onPressed: () => _openOrderDetailsModal(context, isDark, order),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2563EB),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  elevation: 0,
-                ),
-                icon: const Icon(Icons.receipt_long_rounded, size: 15),
-                label: Text(
-                  '📍 Order & POD Signature',
-                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-
-  void _openOrderFinanceModal(BuildContext context, bool isDark, OrderEntity order) {
-    showDialog(
-      context: context,
-      builder: (ctx) => DCOrderDetailModal(order: order),
-    );
-  }
-
-  void _openOrderStockModal(BuildContext context, bool isDark, OrderEntity order, StockState stockState) {
-    showDialog(
-      context: context,
-      builder: (ctx) => DCOrderDetailModal(order: order),
-    );
-  }
-
-  void _openOrderDetailsModal(BuildContext context, bool isDark, OrderEntity order) {
-    showDialog(
-      context: context,
-      builder: (ctx) => DCOrderDetailModal(order: order),
     );
   }
 }
+

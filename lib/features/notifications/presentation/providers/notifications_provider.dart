@@ -90,13 +90,29 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
         _ref = ref,
         _storageService = storageService ?? LocalStorageServiceImpl(),
         super(const NotificationsState()) {
+    bool isTest = false;
+    try {
+      if (!kIsWeb && (Platform.environment.containsKey('FLUTTER_TEST') ||
+          Platform.environment.containsKey('TEST_PLATFORM'))) {
+        isTest = true;
+      }
+    } catch (_) {}
+    try {
+      final binding = WidgetsBinding.instance.runtimeType.toString().toLowerCase();
+      if (binding.contains('test') || binding.contains('automated')) {
+        isTest = true;
+      }
+    } catch (_) {}
+
     final agentId = _getAgentId();
     if (agentId.isNotEmpty) {
       _initCache(agentId);
       fetchNotifications(agentId);
     }
-    _setupRealtimeSubscription();
-    _startHeartbeatTimer();
+    if (!isTest) {
+      _setupRealtimeSubscription();
+      _startHeartbeatTimer();
+    }
   }
 
   void _setupRealtimeSubscription() {
@@ -124,18 +140,17 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
 
   void _startHeartbeatTimer() {
     try {
-      if (WidgetsBinding.instance.runtimeType.toString().toLowerCase().contains('test')) {
+      final binding = WidgetsBinding.instance.runtimeType.toString().toLowerCase();
+      if (binding.contains('test') || binding.contains('automated')) {
         return;
       }
     } catch (_) {}
-    if (!kIsWeb) {
-      try {
-        if (Platform.environment.containsKey('FLUTTER_TEST') ||
-            Platform.environment.containsKey('TEST_PLATFORM')) {
-          return;
-        }
-      } catch (_) {}
-    }
+    try {
+      if (!kIsWeb && (Platform.environment.containsKey('FLUTTER_TEST') ||
+          Platform.environment.containsKey('TEST_PLATFORM'))) {
+        return;
+      }
+    } catch (_) {}
     _heartbeatTimer?.cancel();
     _heartbeatTimer = Timer.periodic(const Duration(seconds: 20), (_) {
       if (!mounted) return;

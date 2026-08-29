@@ -31,6 +31,54 @@ abstract class AuthRemoteDataSource {
   });
 }
 
+class MockAuthRemoteDataSource implements AuthRemoteDataSource {
+  UserModel? _currentUser = const UserModel(
+    id: 'b1111111-1111-4111-8111-111111111111',
+    email: 'rider.emeka@novaexpress.com',
+    firstName: 'Emeka',
+    lastName: 'Rider',
+    phone: '08012345678',
+    role: 'delivery_agent',
+    deliveryAgentId: 'b1111111-1111-4111-8111-111111111111',
+    deliveryAgentCode: 'PDA-7000',
+  );
+
+  @override
+  Future<UserModel> login(String email, String password) async => _currentUser!;
+
+  @override
+  Future<void> logout() async {
+    _currentUser = null;
+  }
+
+  @override
+  Future<UserModel?> getCurrentUser() async => _currentUser;
+
+  @override
+  Future<UserModel> registerDeliveryAgent({
+    required String email,
+    required String password,
+    required String firstName,
+    required String lastName,
+    required String phone,
+    required String personnelType,
+    required String compensationType,
+    required double commissionRate,
+    required double transportAllowance,
+    required double fuelAllowance,
+    required double baseSalary,
+    required String vehicleType,
+    required String vehiclePlateNumber,
+    required String bankName,
+    required String bankAccountNumber,
+    required String bankAccountName,
+    required String distributionCenterId,
+    required String assignedZone,
+  }) async {
+    return _currentUser!;
+  }
+}
+
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   final SupabaseClient supabaseClient;
   static final Map<String, UserModel> _registeredUsers = {};

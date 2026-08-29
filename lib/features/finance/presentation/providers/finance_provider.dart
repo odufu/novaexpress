@@ -8,9 +8,19 @@ import '../../data/repositories/finance_repository_impl.dart';
 import '../../domain/entities/remittance.dart';
 import '../../domain/entities/transaction_item.dart';
 import '../../domain/repositories/finance_repository.dart';
+import '../../../orders/presentation/providers/orders_provider.dart';
 
 final financeRemoteDataSourceProvider = Provider<FinanceRemoteDataSource>((ref) {
-  return FinanceRemoteDataSourceImpl(Supabase.instance.client);
+  try {
+    return FinanceRemoteDataSourceImpl(Supabase.instance.client);
+  } catch (_) {
+    return FinanceRemoteDataSourceImpl(
+      SupabaseClient(
+        SupabaseConstants.supabaseUrl,
+        SupabaseConstants.supabaseAnonKey,
+      ),
+    );
+  }
 });
 
 final financeRepositoryProvider = Provider<FinanceRepository>((ref) {
@@ -215,6 +225,17 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
         associatedOrders: associatedOrders,
       );
 
+      if (_ref != null && associatedOrders.isNotEmpty) {
+        final orderIds = associatedOrders.map((o) => o.orderId).where((id) => id.isNotEmpty).toList();
+        if (orderIds.isNotEmpty) {
+          _ref.read(ordersProvider.notifier).markOrdersAsRemitted(
+            orderIds: orderIds,
+            remittanceId: newRemittance.id,
+            status: newRemittance.isVerified ? 'remitted' : 'remittance_pending',
+          );
+        }
+      }
+
       final otherRemittances = state.remittances.where((r) =>
         r.referenceNumber != newRemittance.referenceNumber &&
         (r.id.isEmpty || r.id != newRemittance.id)
@@ -229,6 +250,9 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
       );
 
       await _storageService.cacheRemittances(updated);
+      if (_ref != null) {
+        _ref.read(ordersProvider.notifier).loadOrders(targetAgentId);
+      }
       return true;
     } catch (e) {
       state = state.copyWith(
@@ -237,6 +261,36 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
       );
       return false;
     }
+  }
+
+  Future<void> recordDirectTransferEarning({
+    required String agentId,
+    required String orderNumber,
+    required double amount,
+    double commission = 0.0,
+    double transport = 0.0,
+  }) async {
+    try {
+      final newTxn = TransactionItem(
+        id: 'TXN-EARN-${DateTime.now().millisecondsSinceEpoch}',
+        title: 'Direct Transfer POD Earning',
+        category: 'earning',
+        amount: amount,
+        isCredit: true,
+        timestamp: DateTime.now(),
+        reference: 'EARN-$orderNumber-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}',
+        status: 'completed',
+        description: 'Direct Transfer POD commission (₦${commission.toStringAsFixed(0)}) + transport (₦${transport.toStringAsFixed(0)}) credited for Order $orderNumber.',
+      );
+
+      final updatedTxns = [newTxn, ...state.transactions];
+      final newBalance = state.totalEarnedBalance + amount;
+      state = state.copyWith(
+        transactions: updatedTxns,
+        totalEarnedBalance: newBalance,
+      );
+      await _storageService.cacheTransactions(updatedTxns);
+    } catch (_) {}
   }
 
   Future<Map<String, dynamic>> requestPayout({

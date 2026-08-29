@@ -191,11 +191,41 @@ void main() {
       ),
     ];
 
+    final mockCatalogProduct = CatalogProduct(
+      id: 'prod_grazer',
+      name: 'Grazer Tea',
+      sku: 'SKU-GRZ-001',
+      clientName: 'Novacare Limited',
+      defaultUnitPrice: 22000.0,
+      packages: [
+        ProductPackage(
+          id: 'pkg_grz_5',
+          productId: 'prod_grazer',
+          productName: 'Grazer Tea',
+          productSku: 'SKU-GRZ-001',
+          packageName: '5 Packs Mega Deal (5 for ₦55,000)',
+          quantity: 5,
+          paidQuantity: 5,
+          freeQuantity: 0,
+          packagePrice: 55000.0,
+          clientName: 'Novacare Limited',
+          createdAt: DateTime(2026, 8, 27),
+        ),
+      ],
+    );
+
     testWidgets('1. Renders product specs, inventory stats, commercial packages, and rider custody', (tester) async {
       await tester.binding.setSurfaceSize(const Size(1000, 900));
 
       await tester.pumpWidget(
         ProviderScope(
+          overrides: [
+            productCatalogProvider.overrideWith((ref) {
+              final notifier = ProductCatalogNotifier();
+              notifier.state = ProductCatalogState(products: [mockCatalogProduct]);
+              return notifier;
+            }),
+          ],
           child: MaterialApp(
             home: Scaffold(
               body: DCProductDetailModal(

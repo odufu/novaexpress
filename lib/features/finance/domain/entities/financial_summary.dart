@@ -54,6 +54,7 @@ class FinancialSummary {
     UserEntity? user,
     double manualEarnedBalance = 0.0,
     List<TransactionItem>? transactions,
+    double posFee = 0.0,
   }) {
     final bool isSalaried = user?.compensationType == 'salary' || user?.personnelType == 'in_house_rider';
     final isInHouse = user?.isInHouseRider == true || user?.isPda == false;
@@ -82,9 +83,9 @@ class FinancialSummary {
 
     final double totalCommissionRetained = deliveredCashOrders.length * commissionPerOrder;
     final double totalTransportRetained = deliveredCashOrders.length * transportPerOrder;
-    const double totalTransferFeesRetained = 0.0;
+    final double totalTransferFeesRetained = posFee;
     final double totalFailedAllowanceEarned = failedOrders.length * failedPerOrder;
-    final double totalEarningRetained = totalCommissionRetained + totalTransportRetained + totalFailedAllowanceEarned;
+    final double totalEarningRetained = totalCommissionRetained + totalTransportRetained + totalFailedAllowanceEarned + totalTransferFeesRetained;
 
     final double totalVerifiedRemitted = remittances
         .where((r) => r.isVerified)
@@ -94,9 +95,34 @@ class FinancialSummary {
         .where((r) => r.isPending && !r.isVerified)
         .fold(0.0, (acc, r) => acc + r.amount);
 
-    final double pendingRemittanceToDC = isSalaried
-        ? (cashCollectedAllTime - totalVerifiedRemitted - totalPendingApprovalRemitted).clamp(0.0, double.infinity)
-        : (cashCollectedAllTime - totalEarningRetained - totalVerifiedRemitted - totalPendingApprovalRemitted).clamp(0.0, double.infinity);
+    // Unremitted delivered cash orders (orders not yet remitted)
+    final unremittedDeliveredCashOrders = deliveredCashOrders
+        .where((o) => !o.isRemitted && o.paymentStatus.toLowerCase() != 'remitted')
+        .toList();
+
+    double pendingRemittanceToDC = 0.0;
+    if (unremittedDeliveredCashOrders.isNotEmpty) {
+      final double unremittedCash = unremittedDeliveredCashOrders.fold(0.0, (acc, o) => acc + o.totalAmount);
+      final double unremittedCommission = unremittedDeliveredCashOrders.length * commissionPerOrder;
+      final double unremittedTransport = unremittedDeliveredCashOrders.length * transportPerOrder;
+      final double unremittedTotalEarnings = unremittedCommission + unremittedTransport;
+
+      final double netUnremittedExpected = isSalaried
+          ? unremittedCash
+          : (unremittedCash - unremittedTotalEarnings).clamp(0.0, double.infinity);
+
+      final double totalRemittedSoFar = totalVerifiedRemitted + totalPendingApprovalRemitted;
+      final double totalHistoricalExpected = isSalaried
+          ? cashCollectedAllTime
+          : (cashCollectedAllTime - totalEarningRetained).clamp(0.0, double.infinity);
+      final double remainingGlobalDiff = (totalHistoricalExpected - totalRemittedSoFar).clamp(0.0, double.infinity);
+
+      pendingRemittanceToDC = remainingGlobalDiff < netUnremittedExpected
+          ? remainingGlobalDiff
+          : netUnremittedExpected;
+    } else {
+      pendingRemittanceToDC = 0.0;
+    }
 
     final double directTransfersEarnings = deliveredPrepaidOrders.fold<double>(
       0.0,
@@ -141,7 +167,7 @@ class FinancialSummary {
       totalMonthEarnings: totalMonthEarnings,
       totalDeliveredOrdersCount: deliveredOrders.length,
       todayDeliveredOrdersCount: todayDeliveredOrders.length,
-      deliveredCashOrdersCount: deliveredCashOrders.length,
+      deliveredCashOrdersCount: unremittedDeliveredCashOrders.length,
       deliveredPrepaidOrdersCount: deliveredPrepaidOrders.length,
     );
   }

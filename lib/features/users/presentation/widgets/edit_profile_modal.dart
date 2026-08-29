@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:typed_data';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -140,19 +142,39 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> with Single
 
   Future<void> _pickAndUploadImage(ImageSource source) async {
     try {
-      final picker = ImagePicker();
-      final pickedFile = await picker.pickImage(
-        source: source,
-        maxWidth: 1024,
-        maxHeight: 1024,
-        imageQuality: 85,
-      );
+      Uint8List? bytes;
+      String? ext;
 
-      if (pickedFile == null) return;
+      try {
+        final picker = ImagePicker();
+        final pickedFile = await picker.pickImage(
+          source: source,
+          maxWidth: 1024,
+          maxHeight: 1024,
+          imageQuality: 85,
+        );
+        if (pickedFile != null) {
+          bytes = await pickedFile.readAsBytes();
+          ext = pickedFile.name.contains('.') ? pickedFile.name.split('.').last.toLowerCase() : 'jpg';
+        }
+      } catch (pickerErr) {
+        debugPrint('[EDIT_PROFILE] ℹ️ ImagePicker notice ($pickerErr), attempting FilePicker fallback...');
+      }
+
+      if (bytes == null || bytes.isEmpty) {
+        final fileResult = await FilePickerPlatform.instance.pickFiles(
+          type: FileType.image,
+        );
+        if (fileResult.isNotEmpty) {
+          final file = fileResult.first;
+          bytes = await file.readAsBytes();
+          ext = file.extension?.toLowerCase() ?? 'jpg';
+        }
+      }
+
+      if (bytes == null || bytes.isEmpty) return;
 
       ref.read(editProfileUploadingPhotoProvider.notifier).state = true;
-
-      final bytes = await pickedFile.readAsBytes();
 
       // 1. Client-Side Size Restriction: 5 MB Max
       if (bytes.lengthInBytes > 5 * 1024 * 1024) {
@@ -169,9 +191,9 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> with Single
       }
 
       // 2. MIME & Extension Restriction
-      final ext = pickedFile.name.contains('.') ? pickedFile.name.split('.').last.toLowerCase() : 'jpg';
+      final cleanExt = ext ?? 'jpg';
       final allowedExts = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
-      if (!allowedExts.contains(ext)) {
+      if (!allowedExts.contains(cleanExt)) {
         if (mounted) {
           ref.read(editProfileUploadingPhotoProvider.notifier).state = false;
           ScaffoldMessenger.of(context).showSnackBar(
@@ -184,8 +206,8 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> with Single
         return;
       }
 
-      final contentType = ext == 'png' ? 'image/png' : (ext == 'webp' ? 'image/webp' : (ext == 'gif' ? 'image/gif' : 'image/jpeg'));
-      final fileName = 'avatar_${widget.user.id}_${DateTime.now().millisecondsSinceEpoch}.$ext';
+      final contentType = cleanExt == 'png' ? 'image/png' : (cleanExt == 'webp' ? 'image/webp' : (cleanExt == 'gif' ? 'image/gif' : 'image/jpeg'));
+      final fileName = 'avatar_${widget.user.id}_${DateTime.now().millisecondsSinceEpoch}.$cleanExt';
 
       String? uploadedUrl;
 

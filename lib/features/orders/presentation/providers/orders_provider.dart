@@ -12,14 +12,14 @@ import '../../data/repositories/orders_repository_impl.dart';
 import '../../data/services/geocoding_service.dart';
 import '../../domain/entities/order.dart';
 import '../../domain/repositories/orders_repository.dart';
+import '../../../stock/presentation/providers/stock_provider.dart';
+import '../../../finance/presentation/providers/finance_provider.dart';
 
 final ordersRemoteDataSourceProvider = Provider<OrdersRemoteDataSource>((ref) {
   try {
     return OrdersRemoteDataSourceImpl(Supabase.instance.client);
   } catch (_) {
-    return OrdersRemoteDataSourceImpl(
-      SupabaseClient('https://mock.supabase.co', 'mock-anon-key'),
-    );
+    return MockOrdersRemoteDataSource();
   }
 });
 
@@ -74,23 +74,27 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     this._ref,
   ])  : _storageService = storageService ?? LocalStorageServiceImpl(),
         super(OrdersState()) {
-    _initOrders();
-    _setupRealtimeSubscription();
     bool isTest = false;
-    if (!kIsWeb) {
-      try {
-        isTest = Platform.environment.containsKey('FLUTTER_TEST') ||
-                 Platform.environment.containsKey('TEST_PLATFORM');
-      } catch (_) {}
-    }
     try {
-      if (WidgetsBinding.instance.runtimeType.toString().toLowerCase().contains('test')) {
+      if (!kIsWeb && (Platform.environment.containsKey('FLUTTER_TEST') ||
+          Platform.environment.containsKey('TEST_PLATFORM'))) {
         isTest = true;
       }
     } catch (_) {}
+    try {
+      final binding = WidgetsBinding.instance.runtimeType.toString().toLowerCase();
+      if (binding.contains('test') || binding.contains('automated')) {
+        isTest = true;
+      }
+    } catch (_) {}
+
+    _initOrders(isTest);
+
     if (!isTest) {
+      _setupRealtimeSubscription();
       _startHeartbeatTimer();
     }
+
     if (_ref != null) {
       _ref.listen<AuthState>(authProvider, (previous, next) {
         final nextAgentId = next.user?.deliveryAgentId ?? next.user?.id;
@@ -169,6 +173,18 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
   }
 
   void _setupRealtimeSubscription() {
+    try {
+      final binding = WidgetsBinding.instance.runtimeType.toString().toLowerCase();
+      if (binding.contains('test') || binding.contains('automated')) {
+        return;
+      }
+    } catch (_) {}
+    try {
+      if (!kIsWeb && (Platform.environment.containsKey('FLUTTER_TEST') ||
+          Platform.environment.containsKey('TEST_PLATFORM'))) {
+        return;
+      }
+    } catch (_) {}
     try {
       _realtimeChannel = Supabase.instance.client
           .channel('public_orders_realtime_channel')
@@ -256,7 +272,7 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     } catch (_) {}
   }
 
-  Future<void> _initOrders() async {
+  Future<void> _initOrders([bool skipRemoteFetch = false]) async {
     final cached = await _storageService.getCachedOrders(_getScopeKey());
     if (!mounted) return;
     if (cached != null && cached.isNotEmpty) {
@@ -264,6 +280,7 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
       state = state.copyWith(orders: sortedCached);
       debugPrint('[ORDERS_PROVIDER] ⚡ Hydrated ${sortedCached.length} orders from local cache for scope (${_getScopeKey()}).');
     }
+    if (skipRemoteFetch) return;
     final agentId = _getActiveAgentId();
     if (!mounted) return;
     if (agentId.isNotEmpty && _isRiderUser()) {
@@ -384,12 +401,57 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     required String riderCode,
   }) async {
     try {
+      final targetOrder = state.orders.firstWhere(
+        (o) => o.id == orderId || o.orderNumber == orderId,
+        orElse: () => OrderModel.empty(),
+      );
+
+      // Check stock custody if not a client package
+      if (targetOrder.id.isNotEmpty && !targetOrder.isClientPackage && _ref != null) {
+        final stockNotifier = _ref.read(stockProvider.notifier);
+        final stockState = _ref.read(stockProvider);
+
+        final totalCustody = stockState.getAllocationsForRider(riderId, riderCode).where((a) {
+          final pA = a.productName.toLowerCase();
+          final oP = targetOrder.productName.toLowerCase();
+          return (oP.isNotEmpty && (pA.contains(oP) || oP.contains(pA))) ||
+              (a.sku.isNotEmpty && oP.contains(a.sku.toLowerCase()));
+        }).fold(0, (sum, a) => sum + a.inCustodyUnits);
+
+        final available = stockNotifier.getRiderAvailableStock(
+          riderId: riderId,
+          riderCode: riderCode,
+          productName: targetOrder.productName,
+          activeOrders: state.orders.where((o) => o.id != targetOrder.id && o.orderNumber != targetOrder.orderNumber).toList(),
+        );
+
+        // If rider has no custody or available stock is less than required, reject assignment
+        if (totalCustody == 0 || available < targetOrder.quantity) {
+          final errorMsg = totalCustody == 0
+              ? 'Cannot assign order: Rider $riderName does not have "${targetOrder.productName}" in vehicle custody.'
+              : 'Cannot assign order: Rider $riderName has insufficient stock ($available available, ${targetOrder.quantity} required).';
+          debugPrint('[ORDERS_NOTIFIER] ❌ $errorMsg');
+          state = state.copyWith(errorMessage: errorMsg);
+          return false;
+        }
+      }
+
       await _repository.assignOrderToRider(
         orderId: orderId,
         riderId: riderId,
         riderName: riderName,
         riderCode: riderCode,
       );
+
+      // Sync stock custody reservation
+      if (targetOrder.id.isNotEmpty && _ref != null) {
+        _ref.read(stockProvider.notifier).recordOrderAssignment(
+          riderId: riderId,
+          riderCode: riderCode,
+          productName: targetOrder.productName,
+          quantity: targetOrder.quantity,
+        );
+      }
 
       final updatedList = state.orders.map((o) {
         if (o.id == orderId || o.orderNumber == orderId) {
@@ -507,6 +569,18 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     }
   }
 
+  void updateOrderInList(OrderEntity updatedOrder) {
+    final updatedList = state.orders.map((o) {
+      if (o.id == updatedOrder.id || o.orderNumber == updatedOrder.orderNumber) {
+        return updatedOrder;
+      }
+      return o;
+    }).toList();
+    final sortedList = _sortOrdersByOperationalPriority(updatedList);
+    state = state.copyWith(orders: sortedList);
+    _storageService.cacheOrders(sortedList, _getScopeKey());
+  }
+
   Future<Map<String, dynamic>> confirmDeliveryPod({
     required String orderId,
     required String agentId,
@@ -542,6 +616,42 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
         notes: notes,
       );
 
+      if (_ref != null) {
+        final deliveredOrder = state.orders.firstWhere(
+          (o) => o.id == orderId || o.orderNumber == orderId,
+          orElse: () => OrderModel.empty(),
+        );
+        if (deliveredOrder.id.isNotEmpty) {
+          _ref.read(stockProvider.notifier).recordOrderDelivered(
+            riderId: deliveredOrder.deliveryAgentId ?? agentId,
+            riderCode: deliveredOrder.deliveryAgentCode ?? '',
+            productName: deliveredOrder.productName,
+            quantity: deliveredOrder.quantity,
+          );
+
+          if (isDirectTransfer) {
+            final user = _ref.read(authProvider).user;
+            final commission = (user?.commissionRate != null && user!.commissionRate > 0)
+                ? user.commissionRate
+                : ((user?.isInHouseRider == true || user?.isPda == false) ? 700.0 : 1000.0);
+            final transport = (user?.isInHouseRider == true || user?.isPda == false)
+                ? ((user?.fuelAllowance != null && user!.fuelAllowance > 0) ? user.fuelAllowance : 800.0)
+                : ((user?.transportAllowance != null && user!.transportAllowance > 0) ? user.transportAllowance : 1500.0);
+            final totalEarning = deliveredOrder.agentEntitlement > 0
+                ? deliveredOrder.agentEntitlement
+                : (commission + transport);
+
+            _ref.read(financeProvider.notifier).recordDirectTransferEarning(
+              agentId: agentId,
+              orderNumber: deliveredOrder.orderNumber.isNotEmpty ? deliveredOrder.orderNumber : orderId,
+              amount: totalEarning,
+              commission: commission,
+              transport: transport,
+            );
+          }
+        }
+      }
+
       final updatedList = state.orders.map((o) {
         if (o.id == orderId || o.orderNumber == orderId) {
           final isCleared = isDirectTransfer;
@@ -575,6 +685,28 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     }
   }
 
+  Future<void> markOrdersAsRemitted({
+    required List<String> orderIds,
+    required String remittanceId,
+    required String status,
+  }) async {
+    final idSet = orderIds.toSet();
+    final updatedList = state.orders.map((o) {
+      if (idSet.contains(o.id) || idSet.contains(o.orderNumber)) {
+        return o.copyWith(
+          remittanceStatus: status,
+          financialSettlementStatus: status == 'remitted' ? 'cash_remitted_verified' : 'pending_remittance',
+          remittedAt: status == 'remitted' ? DateTime.now() : o.remittedAt,
+          remittanceReference: remittanceId,
+        );
+      }
+      return o;
+    }).toList();
+    final sortedList = _sortOrdersByOperationalPriority(updatedList);
+    state = state.copyWith(orders: sortedList);
+    await _storageService.cacheOrders(sortedList, _getScopeKey());
+  }
+
   Future<Map<String, dynamic>> logDeliveryFailure({
     required String orderId,
     required String agentId,
@@ -599,6 +731,21 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
         latitude: latitude,
         longitude: longitude,
       );
+
+      if (_ref != null) {
+        final failedOrder = state.orders.firstWhere(
+          (o) => o.id == orderId || o.orderNumber == orderId,
+          orElse: () => OrderModel.empty(),
+        );
+        if (failedOrder.id.isNotEmpty) {
+          _ref.read(stockProvider.notifier).recordOrderReturned(
+            riderId: failedOrder.deliveryAgentId ?? agentId,
+            riderCode: failedOrder.deliveryAgentCode ?? '',
+            productName: failedOrder.productName,
+            quantity: failedOrder.quantity,
+          );
+        }
+      }
 
       final updatedList = state.orders.map((o) {
         if (o.id == orderId || o.orderNumber == orderId) {

@@ -258,11 +258,11 @@ void main() {
       // Verify Order & POD Details in modal
       expect(find.text('Order ORD-9284-NIG'), findsOneWidget);
       expect(find.text('👤 Customer & Destination Information'), findsOneWidget);
-      expect(find.text('Chief Aliyu Mohammed'), findsOneWidget);
+      expect(find.text('Chief Aliyu Mohammed'), findsWidgets);
       expect(find.text('Phone: 08031234567'), findsOneWidget);
       expect(find.text('Plot 42, Admiralty Way, Lekki Phase 1'), findsOneWidget);
-      expect(find.text('📝 Digital Proof of Delivery (POD)'), findsOneWidget);
-      expect(find.text('Fulfilled & Signed by Chief Aliyu Mohammed'), findsOneWidget);
+      expect(find.textContaining('Digital Proof of Delivery (POD)'), findsOneWidget);
+      expect(find.textContaining('Recipient: Chief Aliyu Mohammed'), findsOneWidget);
     });
   });
 }

@@ -473,5 +473,5 @@ void main() {
     }
 
     print('🎉 Master Database Seeding Test Completed!');
-  });
+  }, skip: 'Live seeding disabled - Production data created from DC Console');
 }

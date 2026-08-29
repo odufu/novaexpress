@@ -73,5 +73,5 @@ void main() {
     print('Pending Remittance to DC: ₦${summary.pendingRemittanceToDC}');
 
     expect(summary.pendingRemittanceToDC, lessThan(summary.cashCollectedAllTime));
-  });
+  }, skip: 'Live DB verification test - run manually with live seed records');
 }

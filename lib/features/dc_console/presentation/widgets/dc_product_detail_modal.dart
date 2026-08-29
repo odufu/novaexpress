@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/helpers/formatters.dart';
+import '../../../../core/widgets/product_image_widget.dart';
 import '../../../stock/domain/entities/rider_stock_allocation.dart';
 import '../../../stock/domain/entities/stock_item.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
@@ -87,10 +88,11 @@ class _DCProductDetailModalState extends ConsumerState<DCProductDetailModal> {
           // 1. Header
           Row(
             children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: const Color(0xFF2563EB).withValues(alpha: 0.15),
-                child: const Icon(Icons.inventory_2_rounded, color: Color(0xFF2563EB), size: 22),
+              ProductImageWidget(
+                imageUrl: item.imageAsset,
+                width: 44,
+                height: 44,
+                borderRadius: 10,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -519,6 +521,18 @@ class _DCProductDetailModalState extends ConsumerState<DCProductDetailModal> {
                 ),
               ElevatedButton.icon(
                 onPressed: () {
+                  final catProd = ref.read(productCatalogProvider).findProductByName(item.name) ??
+                      CatalogProduct(
+                        id: item.id,
+                        name: item.name,
+                        sku: item.sku,
+                        clientName: item.ownerName,
+                        defaultUnitPrice: item.price,
+                        category: item.category,
+                        packages: [pkg],
+                      );
+                  ref.read(dcCreateOrderDraftProvider.notifier).selectProduct(catProd);
+                  ref.read(dcCreateOrderDraftProvider.notifier).selectPackage(pkg);
                   Navigator.of(context).pop();
                   showDialog(
                     context: context,

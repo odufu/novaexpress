@@ -16,22 +16,9 @@ void main() {
       container.dispose();
     });
 
-    test('Catalog initializes with default seller products and commercial packages', () {
+    test('Catalog initializes with clean production slate ready for DC products', () {
       final state = container.read(productCatalogProvider);
-      expect(state.products.isNotEmpty, true);
-
-      // Check Grazer Tea
-      final grazer = state.findProductByName('Grazer Tea');
-      expect(grazer, isNotNull);
-      expect(grazer!.packages.length, 4);
-      expect(grazer.packages.any((p) => p.packageName.contains('1 Pack') && p.packagePrice == 22000.0), true);
-      expect(grazer.packages.any((p) => p.packageName.contains('5 Packs') && p.packagePrice == 55000.0), true);
-
-      // Check Alpha Man
-      final alpha = state.findProductByName('Alpha Man');
-      expect(alpha, isNotNull);
-      expect(alpha!.packages.any((p) => p.packageName.contains('1 Bottle') && p.packagePrice == 20000.0), true);
-      expect(alpha.packages.any((p) => p.packageName.contains('5 Bottles') && p.packagePrice == 75000.0), true);
+      expect(state.products, isEmpty);
     });
 
     test('Allows dynamic in-order creation of a new package and reuse across future orders', () {
@@ -53,12 +40,12 @@ void main() {
 
       // Verify the package is now in the persistent catalog for Grazer Tea
       final updatedGrazer = container.read(productCatalogProvider).findProductByName('Grazer Tea');
-      expect(updatedGrazer!.packages.length, 5);
+      expect(updatedGrazer!.packages.length, 1);
       expect(updatedGrazer.packages.any((p) => p.id == createdPkg.id), true);
 
       // Check helper method getPackagesForProduct returns the new package for subsequent orders
       final packages = container.read(productCatalogProvider).getPackagesForProduct('Grazer Tea');
-      expect(packages.length, 5);
+      expect(packages.length, 1);
       expect(packages.any((p) => p.packageName == '4 Packs Mega Cleanse Promo'), true);
     });
 

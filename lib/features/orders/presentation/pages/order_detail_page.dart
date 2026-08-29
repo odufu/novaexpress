@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/helpers/formatters.dart';
 import '../../../../core/helpers/map_launcher_helper.dart';
+import '../../../../core/services/rider_location_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_logo_widget.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -772,7 +773,169 @@ class OrderDetailPage extends ConsumerWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 14),
+            // 5b. Physical Presence & GPS Telemetry Proof Card
+            if (order.hasCoordinates || order.loggedGpsProof != null || order.isDelivered || order.isFailed) ...[
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: theme.cardColor,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: order.isDelivered
+                        ? const Color(0xFF10B981).withValues(alpha: 0.3)
+                        : (order.isFailed
+                            ? const Color(0xFFEF4444).withValues(alpha: 0.3)
+                            : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.15)),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.pin_drop_rounded,
+                                color: order.isDelivered
+                                    ? const Color(0xFF10B981)
+                                    : (order.isFailed ? const Color(0xFFDC2626) : const Color(0xFF0284C7)),
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Text(
+                                  'Physical GPS Presence Proof',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: theme.colorScheme.onSurface,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: order.isDelivered
+                                ? const Color(0xFF10B981).withValues(alpha: 0.15)
+                                : (order.isFailed
+                                    ? const Color(0xFFEF4444).withValues(alpha: 0.15)
+                                    : const Color(0xFF0284C7).withValues(alpha: 0.15)),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            order.isDelivered
+                                ? 'DELIVERED PROOF ✓'
+                                : (order.isFailed ? 'ATTEMPT PROOF ⚠️' : 'GPS LOCKED 🎯'),
+                            style: GoogleFonts.jetBrainsMono(
+                              color: order.isDelivered
+                                  ? const Color(0xFF059669)
+                                  : (order.isFailed ? const Color(0xFFDC2626) : const Color(0xFF0284C7)),
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceContainer,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'COORDINATES:',
+                                style: GoogleFonts.jetBrainsMono(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                              Text(
+                                order.hasCoordinates
+                                    ? '${order.latitude!.toStringAsFixed(5)}°, ${order.longitude!.toStringAsFixed(5)}°'
+                                    : (order.loggedGpsProof ?? 'Logged with Attempt'),
+                                style: GoogleFonts.jetBrainsMono(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: theme.colorScheme.onSurface,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'GATE PIN / CODE:',
+                                style: GoogleFonts.jetBrainsMono(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                              Text(
+                                order.effectiveGatePin,
+                                style: GoogleFonts.jetBrainsMono(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: const Color(0xFFEA580C),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            order.isDelivered
+                                ? '✓ Real-time GPS location was automatically captured and committed to database upon payment completion.'
+                                : (order.isFailed
+                                    ? '⚠️ Doorstep presence coordinates were captured and saved to database during failure logging.'
+                                    : 'Destination geocoding active for direct GPS navigation.'),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        onPressed: () => _openMap(context, order),
+                        icon: const Icon(Icons.map_outlined, size: 16),
+                        label: const Text(
+                          'Open GPS Presence Pin on Map',
+                          style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+            ],
 
             // 6. Payment Collection & Financial Entitlements Card
             Container(
@@ -958,18 +1121,23 @@ class OrderDetailPage extends ConsumerWidget {
                           orderId: order.id,
                           customerName: order.customerName,
                           onRescheduleConfirmed: (dateTime, note) async {
+                            final riderLoc = ref.read(riderLocationProvider);
+                            final fullNote = '$note • [Gate PIN: ${order.effectiveGatePin} • GPS Proof: ${riderLoc.latitude.toStringAsFixed(5)}°, ${riderLoc.longitude.toStringAsFixed(5)}° (±${riderLoc.accuracyMeters.toStringAsFixed(1)}m)]';
                             await ref.read(ordersProvider.notifier).logDeliveryFailure(
                               orderId: order.id,
                               agentId: agentId,
                               reasonCode: 'rescheduled',
-                              notes: note,
+                              notes: fullNote,
                               scheduledCallbackAt: dateTime.toIso8601String(),
+                              gatePassCode: order.effectiveGatePin,
+                              latitude: riderLoc.latitude,
+                              longitude: riderLoc.longitude,
                             );
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   backgroundColor: const Color(0xFFEA580C),
-                                  content: Text('Order rescheduled for ${dateTime.day}/${dateTime.month}! 📅'),
+                                  content: Text('Order rescheduled for ${dateTime.day}/${dateTime.month}! 📅 (GPS Proof Recorded)'),
                                 ),
                               );
                             }

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/helpers/formatters.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/user_avatar_widget.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../notifications/presentation/providers/notifications_provider.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
@@ -217,6 +218,22 @@ class _CashPageState extends ConsumerState<CashPage> {
                               icon: const Icon(Icons.more_vert_rounded, color: Colors.white),
                               tooltip: 'More Options',
                               onPressed: () => _showMoreMenu(context),
+                            ),
+                            const SizedBox(width: 4),
+                            InkWell(
+                              onTap: () => context.push('/profile'),
+                              borderRadius: BorderRadius.circular(20),
+                              child: Padding(
+                                padding: const EdgeInsets.all(4.0),
+                                child: UserAvatarWidget(
+                                  avatarUrl: user?.avatarUrl,
+                                  fullName: agentName,
+                                  radius: 16,
+                                  showBorder: true,
+                                  borderColor: const Color(0xFF00A2D3),
+                                  borderWidth: 1.5,
+                                ),
+                              ),
                             ),
                           ],
                         ),

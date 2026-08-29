@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/helpers/formatters.dart';
-import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_skeleton_loader.dart';
+import '../../../../core/widgets/product_image_widget.dart';
 import '../../../dc_console/domain/entities/product_package.dart';
 import '../../../dc_console/presentation/providers/product_catalog_provider.dart';
 import '../../../orders/domain/entities/order.dart';
@@ -113,41 +113,12 @@ class StockDetailsGrazerPage extends ConsumerWidget {
                 children: [
                   // Product Image & Hero Card
                   Center(
-                    child: Container(
+                    child: ProductImageWidget(
+                      imageUrl: imageAsset,
                       width: 140,
                       height: 150,
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(15),
-                        child: imageAsset != null
-                            ? Image.asset(
-                                imageAsset,
-                                fit: BoxFit.contain,
-                                errorBuilder: (_, __, ___) => const Icon(
-                                  Icons.inventory_2_rounded,
-                                  size: 64,
-                                  color: AppColors.primary,
-                                ),
-                              )
-                            : const Icon(
-                                Icons.inventory_2_rounded,
-                                size: 64,
-                                color: AppColors.primary,
-                              ),
-                      ),
+                      borderRadius: 16,
+                      fit: BoxFit.contain,
                     ),
                   ),
                   const SizedBox(height: 14),

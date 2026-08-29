@@ -1,3 +1,4 @@
+import '../entities/rider_stock_allocation.dart';
 import '../entities/stock_item.dart';
 
 abstract class StockRepository {
@@ -13,6 +14,7 @@ abstract class StockRepository {
     int lowStockThreshold = 3,
     String? binLocation,
     String? companyId,
+    String? imageAsset,
   });
   Future<Map<String, dynamic>> assignStockToRider({
     required String productIdOrSku,
@@ -48,6 +50,14 @@ abstract class StockRepository {
     required int quantity,
     required String reason,
     String? notes,
+  });
+  Future<List<RiderStockAllocation>> getRiderStockAllocations([String? riderId]);
+  Future<void> updateRiderStockCustody({
+    required String riderId,
+    required String productId,
+    int deliveredDelta = 0,
+    int returnedDelta = 0,
+    int inCustodyDelta = 0,
   });
   Future<Map<String, dynamic>> submitInventoryAudit({
     required String distributionCenterId,

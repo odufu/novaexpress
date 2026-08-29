@@ -3,8 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/theme_provider.dart';
+import '../../../../core/widgets/user_avatar_widget.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../notifications/presentation/providers/notifications_provider.dart';
+import '../../../stock/presentation/providers/stock_provider.dart';
+import '../../../users/presentation/widgets/edit_profile_modal.dart';
 import '../providers/dc_console_provider.dart';
 import 'dc_dashboard_page.dart';
 import 'dc_finance_page.dart';
@@ -29,6 +32,16 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
   final TextEditingController _searchController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(stockProvider.notifier).fetchStockItems();
+      ref.read(dcConsoleProvider.notifier).loadDriversFromDatabase();
+      ref.read(dcConsoleProvider.notifier).loadTransactionsFromDatabase();
+    });
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
@@ -51,27 +64,29 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
       key: _scaffoldKey,
       backgroundColor: isDark ? const Color(0xFF0B1120) : const Color(0xFFF8FAFC),
       drawer: isDesktop ? null : Drawer(child: _buildSidebar(context, dcState, dcNotifier, isDark, user, isDrawer: true)),
-      body: Row(
-        children: [
-          // Collapsible Desktop Sidebar
-          if (isDesktop)
-            _buildSidebar(context, dcState, dcNotifier, isDark, user, isDrawer: false),
+      body: SafeArea(
+        child: Row(
+          children: [
+            // Collapsible Desktop Sidebar
+            if (isDesktop)
+              _buildSidebar(context, dcState, dcNotifier, isDark, user, isDrawer: false),
 
-          // Main Screen Content Area
-          Expanded(
-            child: Column(
-              children: [
-                // Top Header Bar
-                _buildTopAppBar(context, isDesktop, isDark, dcState, dcNotifier, notifState.unreadCount, user),
+            // Main Screen Content Area
+            Expanded(
+              child: Column(
+                children: [
+                  // Top Header Bar
+                  _buildTopAppBar(context, isDesktop, isDark, dcState, dcNotifier, notifState.unreadCount, user),
 
-                // Active Tab Screen (Lazily Mounted for High Performance)
-                Expanded(
-                  child: _buildActiveTab(dcState.activeTabIndex),
-                ),
-              ],
+                  // Active Tab Screen (Lazily Mounted for High Performance)
+                  Expanded(
+                    child: _buildActiveTab(dcState.activeTabIndex),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -222,51 +237,60 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
                       onPressed: () => _confirmDcLogout(context, ref),
                     ),
                   )
-                : Row(
-                    children: [
-                      Container(
-                        width: 38,
-                        height: 38,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1A2B48),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: const Color(0xFFF37021).withValues(alpha: 0.5)),
+                : InkWell(
+                    onTap: () {
+                      if (user != null) {
+                        showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (ctx) => EditProfileModal(user: user),
+                        );
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(10),
+                    child: Row(
+                      children: [
+                        UserAvatarWidget(
+                          avatarUrl: user?.avatarUrl,
+                          fullName: user != null && user.fullName.isNotEmpty ? user.fullName : 'Adekunle Supervisor',
+                          radius: 18,
+                          showBorder: true,
+                          borderColor: const Color(0xFFF37021),
+                          borderWidth: 1.5,
                         ),
-                        child: const Center(
-                          child: Icon(Icons.admin_panel_settings_rounded, color: Color(0xFFF37021), size: 20),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              user != null && user.fullName.isNotEmpty ? user.fullName : 'Adekunle Supervisor',
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                user != null && user.fullName.isNotEmpty ? user.fullName : 'Adekunle Supervisor',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            Text(
-                              user?.distributionCenterName ?? 'Wuse DC Manager',
-                              style: GoogleFonts.inter(
-                                fontSize: 11,
-                                color: const Color(0xFF8293B5),
+                              Text(
+                                user?.distributionCenterName ?? 'Wuse DC Manager',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  color: const Color(0xFF8293B5),
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.logout_rounded, color: Color(0xFFEF4444), size: 18),
-                        tooltip: 'Logout of DC Console',
-                        onPressed: () => _confirmDcLogout(context, ref),
-                      ),
-                    ],
+                        IconButton(
+                          icon: const Icon(Icons.logout_rounded, color: Color(0xFFEF4444), size: 18),
+                          tooltip: 'Logout of DC Console',
+                          onPressed: () => _confirmDcLogout(context, ref),
+                        ),
+                      ],
+                    ),
                   ),
           ),
         ],
@@ -342,6 +366,33 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
     );
   }
 
+  String _getActiveTabTitle(int index) {
+    switch (index) {
+      case 0:
+        return 'Distribution Dashboard';
+      case 1:
+        return 'Master Orders Directory';
+      case 2:
+        return 'Payment Reconciliation';
+      case 3:
+        return 'Stock Inventory';
+      case 4:
+        return 'Financial Overview';
+      case 5:
+        return 'Transactions Ledger';
+      case 6:
+        return 'Returns & Exchanges';
+      case 7:
+        return 'Driver Payouts';
+      case 8:
+        return 'Fleet & Riders';
+      case 9:
+        return 'DC Settings';
+      default:
+        return 'Distribution Center';
+    }
+  }
+
   Widget _buildTopAppBar(
     BuildContext context,
     bool isDesktop,
@@ -353,6 +404,7 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
   ) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isCompact = screenWidth < 800;
+    final activeTitle = _getActiveTabTitle(dcState.activeTabIndex);
 
     return Container(
       height: 64,
@@ -374,91 +426,66 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
             ),
 
           // Hub Selector Dropdown Badge
-          Flexible(
-            flex: isDesktop ? 0 : 1,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF10B981),
+                    shape: BoxShape.circle,
+                  ),
                 ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF10B981),
-                      shape: BoxShape.circle,
+                const SizedBox(width: 6),
+                Text(
+                  isCompact ? dcState.activeHubCode : dcState.activeHubName,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (!isCompact) ...[
+                  const SizedBox(width: 4),
+                  Text(
+                    '(${dcState.activeHubCode})',
+                    style: GoogleFonts.firaCode(
+                      fontSize: 11,
+                      color: const Color(0xFF64748B),
                     ),
                   ),
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: Text(
-                      isCompact ? dcState.activeHubCode : dcState.activeHubName,
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : const Color(0xFF0F172A),
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  if (!isCompact) ...[
-                    const SizedBox(width: 4),
-                    Text(
-                      '(${dcState.activeHubCode})',
-                      style: GoogleFonts.firaCode(
-                        fontSize: 11,
-                        color: const Color(0xFF64748B),
-                      ),
-                    ),
-                  ],
                 ],
-              ),
+              ],
             ),
           ),
 
-          const SizedBox(width: 10),
-
-          // Search Field (Adaptive on Desktop / Tablet / Mobile)
-          if (screenWidth > 600)
-            Expanded(
-              child: SizedBox(
-                height: 38,
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: (val) => dcNotifier.setSearchQuery(val),
-                  style: GoogleFonts.inter(fontSize: 13),
-                  decoration: InputDecoration(
-                    hintText: isDesktop ? 'Search orders, waybills, packages, or riders...' : 'Search hub...',
-                    hintStyle: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)),
-                    prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Color(0xFF94A3B8)),
-                    contentPadding: EdgeInsets.zero,
-                    filled: true,
-                    fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5),
-                    ),
-                  ),
+          // Screen Title Centered on AppBar
+          Expanded(
+            child: Center(
+              child: Text(
+                activeTitle,
+                style: GoogleFonts.inter(
+                  fontSize: isCompact ? 15 : 18,
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  letterSpacing: -0.2,
                 ),
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
               ),
-            )
-          else
-            const Spacer(),
+            ),
+          ),
 
           const SizedBox(width: 10),
 
@@ -524,16 +551,10 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
               ),
               child: Row(
                 children: [
-                  Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF031632),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Center(
-                      child: Icon(Icons.admin_panel_settings_rounded, color: Color(0xFFF37021), size: 14),
-                    ),
+                  UserAvatarWidget(
+                    avatarUrl: user?.avatarUrl,
+                    fullName: user != null && user.fullName.isNotEmpty ? user.fullName : 'Supervisor',
+                    radius: 12,
                   ),
                   if (isDesktop) ...[
                     const SizedBox(width: 8),
@@ -552,7 +573,16 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
               ),
             ),
             onSelected: (val) {
-              if (val == 'logout') {
+              if (val == 'profile') {
+                if (user != null) {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (ctx) => EditProfileModal(user: user),
+                  );
+                }
+              } else if (val == 'logout') {
                 _confirmDcLogout(context, ref);
               }
             },
@@ -564,7 +594,7 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
                   children: [
                     Text(
                       user != null && user.fullName.isNotEmpty ? user.fullName : 'Adekunle Supervisor',
-                      style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: const Color(0xFF031632)),
+                      style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: isDark ? Colors.white : const Color(0xFF031632)),
                     ),
                     Text(
                       user?.email ?? 'dc.supervisor@novaexpress.ng',
@@ -586,6 +616,19 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
                 ),
               ),
               const PopupMenuDivider(),
+              const PopupMenuItem(
+                value: 'profile',
+                child: Row(
+                  children: [
+                    Icon(Icons.account_circle_outlined, color: Color(0xFF2563EB), size: 18),
+                    SizedBox(width: 10),
+                    Text(
+                      'Edit Profile & Photo',
+                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
               const PopupMenuItem(
                 value: 'logout',
                 child: Row(

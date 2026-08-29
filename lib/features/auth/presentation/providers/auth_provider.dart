@@ -10,7 +10,11 @@ import '../../domain/usecases/login.dart';
 import '../../domain/usecases/logout.dart';
 
 final authRemoteDataSourceProvider = Provider<AuthRemoteDataSource>((ref) {
-  return AuthRemoteDataSourceImpl(Supabase.instance.client);
+  try {
+    return AuthRemoteDataSourceImpl(Supabase.instance.client);
+  } catch (_) {
+    return MockAuthRemoteDataSource();
+  }
 });
 
 final authRepositoryProvider = Provider((ref) {

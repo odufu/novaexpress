@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
+import '../../../../core/constants/supabase_constants.dart';
 import '../../../../core/services/local_storage_service.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/datasources/stock_remote_datasource.dart';
@@ -105,9 +106,15 @@ class StockState {
   List<StockItemEntity> get lowStockItems => stockItems.where((i) => i.status == StockStatus.lowStock || (i.availableCount <= i.lowStockThreshold && i.availableCount > 0)).toList();
 
   List<RiderStockAllocation> getAllocationsForRider(String riderId, [String? riderCode]) {
+    final cleanId = riderId.trim().toLowerCase();
+    final cleanCode = riderCode?.trim().toLowerCase() ?? '';
     return riderAllocations.where((a) {
-      final matchesId = a.riderId.isNotEmpty && a.riderId == riderId;
-      final matchesCode = riderCode != null && riderCode.isNotEmpty && a.riderCode == riderCode;
+      final aId = a.riderId.trim().toLowerCase();
+      final aCode = a.riderCode.trim().toLowerCase();
+      final aName = a.riderName.trim().toLowerCase();
+
+      final matchesId = aId.isNotEmpty && (aId == cleanId || aName == cleanId || (aName.isNotEmpty && cleanId.isNotEmpty && (aName.contains(cleanId) || cleanId.contains(aName))));
+      final matchesCode = cleanCode.isNotEmpty && (aCode == cleanCode || aId == cleanCode);
       return (matchesId || matchesCode) && a.inCustodyUnits > 0;
     }).toList();
   }
@@ -172,138 +179,6 @@ class StockState {
 class StockNotifier extends StateNotifier<StockState> {
   final StockRepository repository;
   final LocalStorageService _storageService;
-
-  static const List<StockItemEntity> defaultStockCatalogue = [
-    StockItemEntity(
-      id: 'prod_respira_01',
-      sku: 'SKU-RESP-01',
-      name: 'Respira Detox Tea',
-      description: 'Herbal respiratory cleanse and detox tea 20 sachets',
-      price: 25000,
-      ownerName: 'Novacare Limited',
-      inventoryType: InventoryType.distributedInventory,
-      totalInCustody: 60,
-      assignedCount: 15,
-      deliveredCount: 120,
-      availableCount: 45,
-      returnedCount: 2,
-      complaintCount: 2,
-      lowStockThreshold: 5,
-      category: 'Health & Wellness',
-      binLocation: 'BIN-A1-01',
-      batchNumber: 'LOT-2026-08',
-      lastAuditDate: '2026-08-25',
-    ),
-    StockItemEntity(
-      id: 'prod_grazer_02',
-      sku: 'SKU-GRAZ-02',
-      name: 'Grazer Herbal Tea',
-      description: 'Weight loss metabolic enhancement organic tea',
-      price: 30000,
-      ownerName: 'Novacare Limited',
-      inventoryType: InventoryType.distributedInventory,
-      totalInCustody: 45,
-      assignedCount: 10,
-      deliveredCount: 85,
-      availableCount: 35,
-      returnedCount: 1,
-      complaintCount: 1,
-      lowStockThreshold: 5,
-      category: 'Health & Wellness',
-      binLocation: 'BIN-A1-02',
-      batchNumber: 'LOT-2026-08',
-      lastAuditDate: '2026-08-25',
-    ),
-    StockItemEntity(
-      id: 'prod_vitc_03',
-      sku: 'SKU-VITC-03',
-      name: 'Novacare Vitamin C Serum',
-      description: 'Radiance facial brightening antioxidant serum 50ml',
-      price: 18000,
-      ownerName: 'Novacare Limited',
-      inventoryType: InventoryType.distributedInventory,
-      totalInCustody: 33,
-      assignedCount: 8,
-      deliveredCount: 60,
-      availableCount: 25,
-      returnedCount: 0,
-      complaintCount: 0,
-      lowStockThreshold: 5,
-      category: 'Cosmetics & Skincare',
-      binLocation: 'BIN-B1-03',
-      batchNumber: 'LOT-2026-07',
-      lastAuditDate: '2026-08-25',
-    ),
-    StockItemEntity(
-      id: 'prod_slim_04',
-      sku: 'SKU-SLIM-04',
-      name: 'Novacare Slimming Cleanse',
-      description: 'Rapid 14-day detox colon cleanse blend',
-      price: 32000,
-      ownerName: 'Novacare Limited',
-      inventoryType: InventoryType.distributedInventory,
-      totalInCustody: 25,
-      assignedCount: 5,
-      deliveredCount: 40,
-      availableCount: 20,
-      returnedCount: 0,
-      complaintCount: 0,
-      lowStockThreshold: 4,
-      category: 'Weight Management',
-      binLocation: 'BIN-B2-01',
-      batchNumber: 'LOT-2026-08',
-      lastAuditDate: '2026-08-25',
-    ),
-  ];
-
-  static List<RiderStockAllocation> defaultAllocations = [
-    RiderStockAllocation(
-      id: 'alloc_1',
-      riderId: 'driver_1',
-      riderName: 'Musa Ibrahim',
-      riderCode: 'DRV-001',
-      productId: 'prod_respira_01',
-      productName: 'Respira Detox Tea',
-      sku: 'SKU-RESP-01',
-      clientName: 'Novacare Limited',
-      allocatedUnits: 10,
-      deliveredUnits: 20,
-      inCustodyUnits: 10,
-      unitPrice: 25000,
-      allocatedAt: DateTime.now().subtract(const Duration(days: 2)),
-    ),
-    RiderStockAllocation(
-      id: 'alloc_2',
-      riderId: 'driver_1',
-      riderName: 'Musa Ibrahim',
-      riderCode: 'DRV-001',
-      productId: 'prod_grazer_02',
-      productName: 'Grazer Herbal Tea',
-      sku: 'SKU-GRAZ-02',
-      clientName: 'Novacare Limited',
-      allocatedUnits: 5,
-      deliveredUnits: 15,
-      inCustodyUnits: 5,
-      unitPrice: 30000,
-      allocatedAt: DateTime.now().subtract(const Duration(days: 2)),
-    ),
-    RiderStockAllocation(
-      id: 'alloc_3',
-      riderId: 'driver_2',
-      riderName: 'Sanni Umar',
-      riderCode: 'PDA-7588',
-      productId: 'prod_respira_01',
-      productName: 'Respira Detox Tea',
-      sku: 'SKU-RESP-01',
-      clientName: 'Novacare Limited',
-      allocatedUnits: 5,
-      deliveredUnits: 10,
-      inCustodyUnits: 5,
-      unitPrice: 25000,
-      allocatedAt: DateTime.now().subtract(const Duration(days: 1)),
-    ),
-  ];
-
   final Ref? _ref;
   String? _lastAgentId;
 
@@ -313,7 +188,7 @@ class StockNotifier extends StateNotifier<StockState> {
     Ref? ref,
   })  : _storageService = storageService ?? LocalStorageServiceImpl(),
         _ref = ref,
-        super(const StockState(stockItems: [])) {
+        super(const StockState(stockItems: [], riderAllocations: [])) {
     _initCache();
     if (_ref != null) {
       _ref.listen<AuthState>(authProvider, (previous, next) {
@@ -358,31 +233,27 @@ class StockNotifier extends StateNotifier<StockState> {
 
       if (targetAgentId != null && targetAgentId.isNotEmpty) {
         final resolvedAgentId = targetAgentId;
-        // Fetch real stock assigned to this specific rider
+        // Fetch real stock and active allocations assigned to this specific rider from Supabase
         final items = await repository.getVehicleStockItems(resolvedAgentId);
-
-        // Merge with local/DC rider allocations if DC console allocated stock
-        final myAllocations = state.riderAllocations.where((a) =>
-            (a.riderId.toLowerCase() == resolvedAgentId.toLowerCase() ||
-                a.riderCode.toLowerCase() == resolvedAgentId.toLowerCase()) &&
-            (a.inCustodyUnits > 0 || a.deliveredUnits > 0 || a.allocatedUnits > 0)).toList();
+        final allocations = await repository.getRiderStockAllocations(resolvedAgentId);
 
         final Map<String, StockItemEntity> itemMap = {
           for (final it in items) it.name.toLowerCase(): it,
         };
 
-        for (final alloc in myAllocations) {
+        // Merge live repository allocations
+        for (final alloc in allocations) {
           final key = alloc.productName.toLowerCase();
           if (itemMap.containsKey(key)) {
             final existing = itemMap[key]!;
-            final mergedAvailable = existing.availableCount > 0 ? existing.availableCount : alloc.inCustodyUnits;
-            final mergedAssigned = existing.assignedCount > 0 ? existing.assignedCount : alloc.allocatedUnits;
+            final mergedAvailable = alloc.inCustodyUnits > 0 ? alloc.inCustodyUnits : existing.availableCount;
+            final mergedAssigned = alloc.allocatedUnits > 0 ? alloc.allocatedUnits : existing.assignedCount;
             itemMap[key] = existing.copyWith(
               availableCount: mergedAvailable,
               assignedCount: mergedAssigned,
               totalInCustody: mergedAvailable,
             );
-          } else {
+          } else if (alloc.inCustodyUnits > 0 || alloc.allocatedUnits > 0) {
             itemMap[key] = StockItemEntity(
               id: alloc.productId,
               sku: alloc.sku,
@@ -411,20 +282,27 @@ class StockNotifier extends StateNotifier<StockState> {
         state = state.copyWith(
           isLoading: false,
           stockItems: riderItems,
+          riderAllocations: allocations.isNotEmpty ? allocations : state.riderAllocations,
           lastAuditedTime: DateTime.now().subtract(const Duration(hours: 4)),
           isAuditRequired: false,
         );
         _storageService.cacheStockItems(riderItems);
+        if (allocations.isNotEmpty) {
+          _storageService.cacheRiderStockAllocations(allocations);
+        }
       } else {
         // DC Master Overview
         final items = await repository.getVehicleStockItems();
-        final finalItems = items.isNotEmpty ? items : defaultStockCatalogue;
+        final allocations = await repository.getRiderStockAllocations();
         state = state.copyWith(
           isLoading: false,
-          stockItems: finalItems,
-          riderAllocations: state.riderAllocations.isNotEmpty ? state.riderAllocations : defaultAllocations,
+          stockItems: items,
+          riderAllocations: allocations.isNotEmpty ? allocations : state.riderAllocations,
         );
-        _storageService.cacheStockItems(finalItems);
+        _storageService.cacheStockItems(items);
+        if (allocations.isNotEmpty) {
+          _storageService.cacheRiderStockAllocations(allocations);
+        }
       }
     } catch (e) {
       state = state.copyWith(
@@ -544,6 +422,7 @@ class StockNotifier extends StateNotifier<StockState> {
     int lowStockThreshold = 3,
     String description = '',
     String? binLocation,
+    String? imageAsset,
   }) async {
     // 1. Create on remote backend via repository
     StockItemEntity newItem;
@@ -558,6 +437,7 @@ class StockNotifier extends StateNotifier<StockState> {
         lowStockThreshold: lowStockThreshold,
         description: description,
         binLocation: binLocation,
+        imageAsset: imageAsset,
       );
     } catch (_) {
       final newId = 'prod_${DateTime.now().millisecondsSinceEpoch}';
@@ -576,6 +456,7 @@ class StockNotifier extends StateNotifier<StockState> {
         returnedCount: 0,
         lowStockThreshold: lowStockThreshold,
         category: category.trim().isNotEmpty ? category.trim() : 'General',
+        imageAsset: imageAsset,
         batchNumber: 'LOT-${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}',
         lastAuditDate: DateTime.now().toIso8601String().split('T').first,
       );
@@ -989,6 +870,113 @@ class StockNotifier extends StateNotifier<StockState> {
     };
   }
 
+  /// Real-time Rider Stock Availability Check
+  int getRiderAvailableStock({
+    required String riderId,
+    required String riderCode,
+    required String productName,
+    List<dynamic>? activeOrders,
+  }) {
+    final driverAllocations = state.getAllocationsForRider(riderId, riderCode);
+    final matchingAlloc = driverAllocations.where((a) {
+      final prodA = a.productName.toLowerCase();
+      final orderP = productName.toLowerCase();
+      return (orderP.isNotEmpty && (prodA.contains(orderP) || orderP.contains(prodA))) ||
+          (a.sku.isNotEmpty && orderP.contains(a.sku.toLowerCase()));
+    }).toList();
+
+    final totalCustody = matchingAlloc.fold(0, (sum, a) => sum + a.inCustodyUnits);
+    if (activeOrders == null || activeOrders.isEmpty) {
+      return totalCustody;
+    }
+
+    int reservedUnits = 0;
+    for (final order in activeOrders) {
+      final agentId = order.deliveryAgentId?.toString() ?? '';
+      final agentCode = order.deliveryAgentCode?.toString() ?? '';
+      final status = order.status?.toString().toLowerCase() ?? '';
+      final pName = order.productName?.toString().toLowerCase() ?? '';
+      final int qty = (order.quantity is num) ? (order.quantity as num).toInt() : 1;
+
+      final isThisDriver = (agentId.isNotEmpty && agentId == riderId) || (agentCode.isNotEmpty && agentCode == riderCode);
+      final isActive = status == 'in_transit' || status == 'accepted' || status == 'out_for_delivery' || status == 'assigned' || status == 'contacting';
+      final isSameProduct = pName.contains(productName.toLowerCase()) || productName.toLowerCase().contains(pName);
+
+      if (isThisDriver && isActive && isSameProduct) {
+        reservedUnits += qty;
+      }
+    }
+
+    return (totalCustody - reservedUnits).clamp(0, 999999);
+  }
+
+  /// Record order assignment in rider stock custody
+  void recordOrderAssignment({
+    required String riderId,
+    required String riderCode,
+    required String productName,
+    required int quantity,
+  }) {
+    final allocIdx = state.riderAllocations.indexWhere((a) =>
+        (a.riderId.toLowerCase() == riderId.toLowerCase() || a.riderCode.toLowerCase() == riderCode.toLowerCase()) &&
+        (a.productName.toLowerCase().contains(productName.toLowerCase()) || productName.toLowerCase().contains(a.productName.toLowerCase())));
+
+    if (allocIdx != -1) {
+      final alloc = state.riderAllocations[allocIdx];
+      final updatedAllocations = List<RiderStockAllocation>.from(state.riderAllocations);
+      updatedAllocations[allocIdx] = alloc.copyWith(
+        allocatedAt: DateTime.now(),
+      );
+      state = state.copyWith(riderAllocations: updatedAllocations);
+      _storageService.cacheRiderStockAllocations(updatedAllocations);
+    }
+  }
+
+  /// Record order successfully delivered POD: decrements custody units and increments delivered count
+  Future<void> recordOrderDelivered({
+    required String riderId,
+    required String riderCode,
+    required String productName,
+    required int quantity,
+  }) async {
+    final allocIdx = state.riderAllocations.indexWhere((a) =>
+        (a.riderId.toLowerCase() == riderId.toLowerCase() || a.riderCode.toLowerCase() == riderCode.toLowerCase()) &&
+        (a.productName.toLowerCase().contains(productName.toLowerCase()) || productName.toLowerCase().contains(a.productName.toLowerCase())));
+
+    if (allocIdx != -1) {
+      final alloc = state.riderAllocations[allocIdx];
+      final updatedAllocations = List<RiderStockAllocation>.from(state.riderAllocations);
+      updatedAllocations[allocIdx] = alloc.copyWith(
+        inCustodyUnits: (alloc.inCustodyUnits - quantity).clamp(0, 999999),
+        deliveredUnits: alloc.deliveredUnits + quantity,
+      );
+      state = state.copyWith(riderAllocations: updatedAllocations);
+      await _storageService.cacheRiderStockAllocations(updatedAllocations);
+    }
+  }
+
+  /// Record order returned / failed: updates returned count
+  Future<void> recordOrderReturned({
+    required String riderId,
+    required String riderCode,
+    required String productName,
+    required int quantity,
+  }) async {
+    final allocIdx = state.riderAllocations.indexWhere((a) =>
+        (a.riderId.toLowerCase() == riderId.toLowerCase() || a.riderCode.toLowerCase() == riderCode.toLowerCase()) &&
+        (a.productName.toLowerCase().contains(productName.toLowerCase()) || productName.toLowerCase().contains(a.productName.toLowerCase())));
+
+    if (allocIdx != -1) {
+      final alloc = state.riderAllocations[allocIdx];
+      final updatedAllocations = List<RiderStockAllocation>.from(state.riderAllocations);
+      updatedAllocations[allocIdx] = alloc.copyWith(
+        returnedUnits: alloc.returnedUnits + quantity,
+      );
+      state = state.copyWith(riderAllocations: updatedAllocations);
+      await _storageService.cacheRiderStockAllocations(updatedAllocations);
+    }
+  }
+
   Future<Map<String, dynamic>> processStockReturn({
     required String returnNumber,
     required String orderId,
@@ -1189,7 +1177,10 @@ final stockRemoteDataSourceProvider = Provider<StockRemoteDataSource>((ref) {
     );
   } catch (_) {
     return StockRemoteDataSourceImpl(
-      supabaseClient: SupabaseClient('https://mock.supabase.co', 'mock-anon-key'),
+      supabaseClient: SupabaseClient(
+        SupabaseConstants.supabaseUrl,
+        SupabaseConstants.supabaseAnonKey,
+      ),
     );
   }
 });

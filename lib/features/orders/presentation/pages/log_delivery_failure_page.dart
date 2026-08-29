@@ -98,7 +98,7 @@ class _LogDeliveryFailurePageState extends ConsumerState<LogDeliveryFailurePage>
     final orderObj = ordersState.orders.where((o) => o.id == widget.orderId || o.orderNumber == widget.orderId).firstOrNull;
     final gatePin = orderObj?.effectiveGatePin ?? 'GT-${(widget.orderId.length >= 4 ? widget.orderId.substring(widget.orderId.length - 4) : "7182").toUpperCase()}';
 
-    final fullNotes = '$formattedNotes • [Gate PIN: $gatePin • GPS: ${riderLoc.latitude.toStringAsFixed(4)}, ${riderLoc.longitude.toStringAsFixed(4)}]';
+    final fullNotes = '$formattedNotes • [Gate PIN: $gatePin • GPS Proof: ${riderLoc.latitude.toStringAsFixed(5)}°, ${riderLoc.longitude.toStringAsFixed(5)}° (±${riderLoc.accuracyMeters.toStringAsFixed(1)}m)]';
 
     await ref.read(ordersProvider.notifier).logDeliveryFailure(
           orderId: widget.orderId,
@@ -475,7 +475,99 @@ class _LogDeliveryFailurePageState extends ConsumerState<LogDeliveryFailurePage>
                 ],
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
+
+            // Real-time GPS Location Presence Proof Badge
+            Consumer(
+              builder: (context, ref, _) {
+                final riderLoc = ref.watch(riderLocationProvider);
+                final isDarkTheme = theme.brightness == Brightness.dark;
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 14),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: isDarkTheme ? const Color(0xFF7F1D1D).withValues(alpha: 0.25) : const Color(0xFFFEF2F2),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color(0xFFEF4444).withValues(alpha: isDarkTheme ? 0.4 : 0.6),
+                      width: 1.2,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEF4444).withValues(alpha: 0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.gps_fixed_rounded,
+                          color: Color(0xFFDC2626),
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    'GPS ATTEMPT PROOF CAPTURED',
+                                    style: GoogleFonts.jetBrainsMono(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: const Color(0xFFDC2626),
+                                      letterSpacing: 0.5,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFEF4444).withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    'AUTO-CAPTURED',
+                                    style: GoogleFonts.jetBrainsMono(
+                                      fontSize: 8.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: const Color(0xFFDC2626),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              '${riderLoc.latitude.toStringAsFixed(5)}°, ${riderLoc.longitude.toStringAsFixed(5)}° (±${riderLoc.accuracyMeters.toStringAsFixed(1)}m)',
+                              style: GoogleFonts.jetBrainsMono(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.bold,
+                                color: isDarkTheme ? const Color(0xFFE2E8F0) : const Color(0xFF1E293B),
+                              ),
+                            ),
+                            Text(
+                              'Presence proof is saved to database to document that you arrived at the destination.',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isDarkTheme ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
 
             // Submit Button (Submit Failure Report warning) matching log_delivery_failure/screen.png
             SizedBox(

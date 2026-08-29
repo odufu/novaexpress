@@ -421,12 +421,30 @@ class _DCAssignOrderModalState extends ConsumerState<DCAssignOrderModal> {
                   final driver = filteredDrivers[index];
                   final isSelected = _selectedDriverId == driver.id;
 
-                  // Vehicle Stock Match Check
-                  final matchingStock = stockState.stockItems.where(
-                    (s) => s.name.toLowerCase().contains(widget.order.productName.toLowerCase()) ||
-                           widget.order.productName.toLowerCase().contains(s.name.toLowerCase()),
-                  ).toList();
-                  final hasStockInVehicle = matchingStock.isNotEmpty && matchingStock.first.availableCount > 0;
+                  // Real Rider Vehicle Stock Calculation
+                  final driverAllocations = stockState.getAllocationsForRider(driver.id, driver.driverCode);
+                  final matchingAllocations = driverAllocations.where((a) {
+                    final prodA = a.productName.toLowerCase();
+                    final orderP = widget.order.productName.toLowerCase();
+                    return (orderP.isNotEmpty && (prodA.contains(orderP) || orderP.contains(prodA))) ||
+                        (a.sku.isNotEmpty && orderP.contains(a.sku.toLowerCase()));
+                  }).toList();
+
+                  final totalCustodyUnits = matchingAllocations.fold(0, (sum, a) => sum + a.inCustodyUnits);
+
+                  // Active reserved units across other orders
+                  final ordersState = ref.watch(ordersProvider);
+                  final activeReservedUnits = ordersState.orders.where((o) {
+                    final isThisDriver = (o.deliveryAgentId == driver.id || o.deliveryAgentCode == driver.driverCode);
+                    final isActive = o.status == 'in_transit' || o.status == 'accepted' || o.status == 'out_for_delivery' || o.status == 'assigned' || o.status == 'contacting';
+                    final isNotThisOrder = o.id != widget.order.id;
+                    final isSameProduct = o.productName.toLowerCase().contains(widget.order.productName.toLowerCase()) || widget.order.productName.toLowerCase().contains(o.productName.toLowerCase());
+                    return isThisDriver && isActive && isNotThisOrder && isSameProduct;
+                  }).fold(0, (sum, o) => sum + o.quantity);
+
+                  final availableCustodyUnits = (totalCustodyUnits - activeReservedUnits).clamp(0, 999999);
+                  final hasStockInVehicle = totalCustodyUnits > 0;
+                  final hasSufficientStock = widget.order.isClientPackage || availableCustodyUnits >= widget.order.quantity;
 
                   final activeCount = driver.totalAssignedOrders;
                   final isLightWorkload = activeCount == 0;
@@ -436,6 +454,20 @@ class _DCAssignOrderModalState extends ConsumerState<DCAssignOrderModal> {
 
                   return InkWell(
                     onTap: () {
+                      if (!hasSufficientStock) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              totalCustodyUnits == 0
+                                  ? '⚠️ Cannot dispatch: ${driver.name} does not hold "${widget.order.productName}" in vehicle custody. Please allocate stock first.'
+                                  : '⚠️ Insufficient Stock: ${driver.name} only holds $availableCustodyUnits available unit(s) of "${widget.order.productName}" (${widget.order.quantity} required).',
+                            ),
+                            backgroundColor: const Color(0xFFEF4444),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                        return;
+                      }
                       setState(() {
                         _selectedDriverId = driver.id;
                         _selectedDriverName = driver.name;
@@ -448,12 +480,16 @@ class _DCAssignOrderModalState extends ConsumerState<DCAssignOrderModal> {
                       decoration: BoxDecoration(
                         color: isSelected
                             ? const Color(0xFFF37021).withValues(alpha: isDark ? 0.18 : 0.08)
-                            : (isDark ? const Color(0xFF1E293B) : Colors.white),
+                            : (!hasSufficientStock
+                                ? (isDark ? const Color(0xFF1E1A22) : const Color(0xFFFFF7F7))
+                                : (isDark ? const Color(0xFF1E293B) : Colors.white)),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: isSelected
                               ? const Color(0xFFF37021)
-                              : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                              : (!hasSufficientStock
+                                  ? const Color(0xFFFCA5A5).withValues(alpha: 0.5)
+                                  : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
                           width: isSelected ? 1.8 : 1,
                         ),
                       ),
@@ -462,13 +498,15 @@ class _DCAssignOrderModalState extends ConsumerState<DCAssignOrderModal> {
                           Radio<String>(
                             value: driver.id,
                             groupValue: _selectedDriverId,
-                            onChanged: (val) {
-                              setState(() {
-                                _selectedDriverId = driver.id;
-                                _selectedDriverName = driver.name;
-                                _selectedDriverCode = driver.driverCode;
-                              });
-                            },
+                            onChanged: hasSufficientStock
+                                ? (val) {
+                                    setState(() {
+                                      _selectedDriverId = driver.id;
+                                      _selectedDriverName = driver.name;
+                                      _selectedDriverCode = driver.driverCode;
+                                    });
+                                  }
+                                : null,
                             activeColor: const Color(0xFFF37021),
                           ),
                           UserAvatarWidget(
@@ -488,7 +526,11 @@ class _DCAssignOrderModalState extends ConsumerState<DCAssignOrderModal> {
                                   children: [
                                     Text(
                                       driver.name,
-                                      style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
+                                      style: GoogleFonts.inter(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        color: !hasSufficientStock && !isDark ? const Color(0xFF64748B) : null,
+                                      ),
                                     ),
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
@@ -540,19 +582,39 @@ class _DCAssignOrderModalState extends ConsumerState<DCAssignOrderModal> {
                                       '📦 ${driver.totalAssignedOrders} Active Orders',
                                       style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
                                     ),
-                                    if (hasStockInVehicle)
+                                    if (hasSufficientStock)
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                                         decoration: BoxDecoration(
                                           color: const Color(0xFF10B981).withValues(alpha: 0.15),
                                           borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
                                         ),
                                         child: Text(
-                                          '✓ In Vehicle Stock',
+                                          '✓ Stock Ready ($availableCustodyUnits in vehicle)',
                                           style: GoogleFonts.inter(
                                             fontSize: 9,
                                             fontWeight: FontWeight.bold,
                                             color: const Color(0xFF059669),
+                                          ),
+                                        ),
+                                      )
+                                    else
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFEF4444).withValues(alpha: 0.12),
+                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.3)),
+                                        ),
+                                        child: Text(
+                                          hasStockInVehicle
+                                              ? '⚠️ Stock: $availableCustodyUnits in vehicle (${widget.order.quantity} needed)'
+                                              : '⚠️ No Stock in Vehicle (${widget.order.quantity} needed)',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.bold,
+                                            color: const Color(0xFFDC2626),
                                           ),
                                         ),
                                       ),
@@ -563,13 +625,27 @@ class _DCAssignOrderModalState extends ConsumerState<DCAssignOrderModal> {
                           ),
                           const SizedBox(width: 8),
                           ElevatedButton(
-                            onPressed: () => _dispatchToRider(driver.id, driver.name, driver.driverCode),
+                            onPressed: hasSufficientStock
+                                ? () => _dispatchToRider(driver.id, driver.name, driver.driverCode)
+                                : () {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          '⚠️ Cannot dispatch: ${driver.name} has insufficient stock in vehicle custody ($availableCustodyUnits available vs ${widget.order.quantity} required).',
+                                        ),
+                                        backgroundColor: const Color(0xFFEF4444),
+                                      ),
+                                    );
+                                  },
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF2563EB),
+                              backgroundColor: hasSufficientStock ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                             ),
-                            child: const Text('Dispatch', style: TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.bold)),
+                            child: Text(
+                              hasSufficientStock ? 'Dispatch' : 'Low Stock',
+                              style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.bold),
+                            ),
                           ),
                         ],
                       ),

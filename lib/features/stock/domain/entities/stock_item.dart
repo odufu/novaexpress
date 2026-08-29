@@ -58,6 +58,19 @@ class StockItemEntity {
     this.lastAuditDate,
   });
 
+  static const StockItemEntity empty = StockItemEntity(
+    id: '',
+    sku: '',
+    name: '',
+    description: '',
+    price: 0,
+    assignedCount: 0,
+    deliveredCount: 0,
+    availableCount: 0,
+    returnedCount: 0,
+    category: '',
+  );
+
   int get quantityHeld => availableCount;
   int get allocatedCount => reservedCount > 0 
       ? reservedCount 

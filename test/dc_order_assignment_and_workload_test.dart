@@ -53,8 +53,25 @@ void main() {
             ordersRemoteDataSourceProvider.overrideWithValue(mockOrdersDataSource),
             ordersProvider.overrideWith((ref) => _MockOrdersNotifier(initialOrders)),
             stockProvider.overrideWith((ref) => _MockStockNotifier(
-              StockNotifier.defaultStockCatalogue,
-              [sanniStockAlloc, ...StockNotifier.defaultAllocations],
+              const [
+                StockItemEntity(
+                  id: 'prod_respira_01',
+                  sku: 'SKU-RESP-01',
+                  name: 'Respira Detox Tea',
+                  description: 'Herbal respiratory cleanse',
+                  price: 25000,
+                  ownerName: 'Novacare Limited',
+                  inventoryType: InventoryType.distributedInventory,
+                  totalInCustody: 60,
+                  assignedCount: 15,
+                  deliveredCount: 120,
+                  availableCount: 45,
+                  returnedCount: 2,
+                  lowStockThreshold: 5,
+                  category: 'Health & Wellness',
+                ),
+              ],
+              [sanniStockAlloc],
             )),
             dcConsoleProvider.overrideWith((ref) {
               final notifier = DCConsoleNotifier(mockStorage);

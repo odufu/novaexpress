@@ -1,8 +1,14 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../../core/constants/supabase_constants.dart';
 import '../../../../core/helpers/formatters.dart';
+import '../../../../core/helpers/map_launcher_helper.dart';
+import '../../../../core/widgets/signature_pad_modal.dart';
 import '../../../../core/widgets/user_avatar_widget.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
@@ -44,48 +50,58 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
     final dcState = ref.watch(dcConsoleProvider);
     final stockState = ref.watch(stockProvider);
 
-    // Find linked warehouse stock item
-    final targetStock = stockState.stockItems.firstWhere(
-      (s) => s.name.toLowerCase().contains(_currentOrder.productName.toLowerCase()) ||
-             _currentOrder.productName.toLowerCase().contains(s.name.toLowerCase()) ||
-             (s.sku.isNotEmpty && _currentOrder.productSku != null && s.sku.toLowerCase() == _currentOrder.productSku!.toLowerCase()),
-      orElse: () => stockState.stockItems.isNotEmpty
-          ? stockState.stockItems.first
-          : const StockItemEntity(id: '', sku: '', name: '', description: '', price: 0, assignedCount: 0, deliveredCount: 0, availableCount: 0, returnedCount: 0, category: ''),
-    );
+    // Safely find linked warehouse stock item without generic covariance casting error
+    StockItemEntity? matchedStock;
+    try {
+      final lowerName = _currentOrder.productName.toLowerCase();
+      final lowerSku = (_currentOrder.productSku ?? '').toLowerCase();
+      for (final s in stockState.stockItems) {
+        final sName = s.name.toLowerCase();
+        final sSku = s.sku.toLowerCase();
+        if (sName.contains(lowerName) || lowerName.contains(sName) || (lowerSku.isNotEmpty && sSku == lowerSku)) {
+          matchedStock = s;
+          break;
+        }
+      }
+    } catch (_) {}
+    final targetStock = matchedStock ??
+        (stockState.stockItems.isNotEmpty ? stockState.stockItems.first : StockItemEntity.empty);
 
-    // Find assigned driver entity if any
+    // Safely find assigned driver entity if any
     DCFleetDriver? assignedDriver;
     if (_currentOrder.deliveryAgentId != null && _currentOrder.deliveryAgentId!.isNotEmpty) {
-      assignedDriver = dcState.drivers.firstWhere(
-        (d) => d.id == _currentOrder.deliveryAgentId || d.driverCode == _currentOrder.deliveryAgentCode,
-        orElse: () => DCFleetDriver(
-          id: _currentOrder.deliveryAgentId ?? '',
-          name: _currentOrder.deliveryAgentName ?? 'Assigned Rider',
-          phone: _currentOrder.deliveryAgentPhone ?? '+234 800 000 0000',
-          driverCode: _currentOrder.deliveryAgentCode ?? 'PDA',
-          avatarUrl: '',
-          vehicleModel: 'Motorcycle',
-          vehiclePlate: 'ABJ-894-XA',
-          vehicleType: 'Motorcycle',
-          status: 'active',
-          assignedZone: _currentOrder.deliveryCity,
-          totalAssignedOrders: 10,
-          completedOrders: 8,
-          routeProgressPercent: 80.0,
-          efficiencyRating: 4.8,
-          cashInCustody: 25000,
-          itemsInCustody: 5,
-        ),
+      for (final d in dcState.drivers) {
+        if (d.id == _currentOrder.deliveryAgentId || d.driverCode == _currentOrder.deliveryAgentCode) {
+          assignedDriver = d;
+          break;
+        }
+      }
+      assignedDriver ??= DCFleetDriver(
+        id: _currentOrder.deliveryAgentId ?? '',
+        name: _currentOrder.deliveryAgentName ?? 'Assigned Rider',
+        phone: _currentOrder.deliveryAgentPhone ?? '+234 800 000 0000',
+        driverCode: _currentOrder.deliveryAgentCode ?? 'PDA',
+        avatarUrl: '',
+        vehicleModel: 'Motorcycle',
+        vehiclePlate: 'ABJ-894-XA',
+        vehicleType: 'Motorcycle',
+        status: 'active',
+        assignedZone: _currentOrder.deliveryCity,
+        totalAssignedOrders: 10,
+        completedOrders: 8,
+        routeProgressPercent: 80.0,
+        efficiencyRating: 4.8,
+        cashInCustody: 25000,
+        itemsInCustody: 5,
       );
     }
 
     return Dialog(
       backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 780, maxHeight: 850),
+        constraints: const BoxConstraints(maxWidth: 960, maxHeight: 900),
         child: Column(
           children: [
             // 1. Header Banner
@@ -94,41 +110,80 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
             // 2. Scrollable Body
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(18),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Failure Reason Alert (if failed/callback)
                     if (_currentOrder.isFailed) ...[
                       _buildFailureAlertBanner(isDark),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 14),
                     ],
 
-                    // 2x2 Top Summary Cards (Status, Remittance, Stock, Value)
+                    // 2x2 or 1x4 Top Summary Cards (Status, Remittance, Stock, Value)
                     _buildTopKpiRow(isDark),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
 
-                    // Section: Customer & Delivery Information
-                    _buildCustomerSection(isDark),
-                    const SizedBox(height: 20),
+                    // Responsive Main Body: 2-Column on Desktop, 1-Column on Mobile
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isDesktop = constraints.maxWidth >= 680;
+                        if (isDesktop) {
+                          return Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Left Column: Customer & Delivery Info, Custody, Proof of Delivery
+                              Expanded(
+                                flex: 5,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _buildCustomerSection(isDark),
+                                    const SizedBox(height: 16),
+                                    _buildHolderAndRiderSection(isDark, assignedDriver, dcState.drivers),
+                                    if (_currentOrder.isDelivered) ...[
+                                      const SizedBox(height: 16),
+                                      _buildProofOfDeliverySection(isDark),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              // Right Column: Product & Warehouse Inventory, Financial Accounting
+                              Expanded(
+                                flex: 5,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _buildStockAndProductSection(isDark, targetStock),
+                                    const SizedBox(height: 16),
+                                    _buildFinancialAndRemittanceSection(isDark),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          );
+                        }
 
-                    // Section: Product, Stock & Warehouse Bin Source
-                    _buildStockAndProductSection(isDark, targetStock),
-                    const SizedBox(height: 20),
-
-                    // Section: Holder & Rider Custody Information
-                    _buildHolderAndRiderSection(isDark, assignedDriver, dcState.drivers),
-                    const SizedBox(height: 20),
-
-                    // Section: Financial Breakdown & Remittance Settlement
-                    _buildFinancialAndRemittanceSection(isDark),
-                    const SizedBox(height: 20),
-
-                    // Proof of Delivery Evidence (if Delivered)
-                    if (_currentOrder.isDelivered) ...[
-                      _buildProofOfDeliverySection(isDark),
-                      const SizedBox(height: 20),
-                    ],
+                        // Mobile Single-Column Flow
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildCustomerSection(isDark),
+                            const SizedBox(height: 16),
+                            _buildStockAndProductSection(isDark, targetStock),
+                            const SizedBox(height: 16),
+                            _buildHolderAndRiderSection(isDark, assignedDriver, dcState.drivers),
+                            const SizedBox(height: 16),
+                            _buildFinancialAndRemittanceSection(isDark),
+                            if (_currentOrder.isDelivered) ...[
+                              const SizedBox(height: 16),
+                              _buildProofOfDeliverySection(isDark),
+                            ],
+                          ],
+                        );
+                      },
+                    ),
                   ],
                 ),
               ),
@@ -277,7 +332,7 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
   Widget _buildTopKpiRow(bool isDark) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isNarrow = constraints.maxWidth < 550;
+        final isNarrow = constraints.maxWidth < 600;
         final card1 = _buildTopKpiCard(
           'Total Order Value',
           CurrencyFormatter.formatNaira(_currentOrder.totalAmount),
@@ -292,10 +347,10 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
               ? (_currentOrder.isDirectTransfer
                   ? '⚡ Direct Transfer'
                   : (_currentOrder.isRemitted ? '🟢 Remitted & Cleared' : '🟡 In Rider Custody'))
-              : (_currentOrder.isFailed ? '⚠️ Failed Attempt' : '🕒 Order in Progress'),
+              : (_currentOrder.isFailed ? '⚠️ Failed Attempt' : '🕒 In Progress'),
           _currentOrder.isRemitted && _currentOrder.remittanceReference != null
               ? 'Ref: ${_currentOrder.remittanceReference}'
-              : (_currentOrder.isUnremitted ? 'Cash awaiting DC deposit' : 'Settlement pending'),
+              : (_currentOrder.isUnremitted ? 'Cash in custody' : 'Settlement pending'),
           _currentOrder.isRemitted ? const Color(0xFF10B981) : (_currentOrder.isUnremitted ? const Color(0xFFD97706) : const Color(0xFF64748B)),
           isDark,
         );
@@ -309,7 +364,7 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
         );
 
         final card4 = _buildTopKpiCard(
-          'Current Custody Holder',
+          'Custody Holder',
           _currentOrder.deliveryAgentName != null && _currentOrder.deliveryAgentName!.isNotEmpty
               ? '${_currentOrder.deliveryAgentName} (${_currentOrder.deliveryAgentCode ?? "PDA"})'
               : '🏢 DC Warehouse Pool',
@@ -345,25 +400,26 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
 
   Widget _buildTopKpiCard(String label, String value, String sub, Color color, bool isDark) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: color.withValues(alpha: isDark ? 0.12 : 0.06),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text(label, style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
-          const SizedBox(height: 4),
+          Text(label, style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF64748B)), maxLines: 1, overflow: TextOverflow.ellipsis),
+          const SizedBox(height: 3),
           Text(
             value,
-            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: color),
+            style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: color),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 2),
-          Text(sub, style: GoogleFonts.inter(fontSize: 9.5, color: const Color(0xFF94A3B8)), maxLines: 1, overflow: TextOverflow.ellipsis),
+          const SizedBox(height: 1),
+          Text(sub, style: GoogleFonts.inter(fontSize: 9, color: const Color(0xFF94A3B8)), maxLines: 1, overflow: TextOverflow.ellipsis),
         ],
       ),
     );
@@ -377,53 +433,82 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(_currentOrder.customerName, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14)),
-                    Text('Phone: ${_currentOrder.customerPhone}', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-                    if (_currentOrder.customerAltPhone != null && _currentOrder.customerAltPhone!.isNotEmpty)
-                      Text('Alt Phone: ${_currentOrder.customerAltPhone}', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8))),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 420;
+              final custInfo = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(_currentOrder.customerName, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14)),
+                  const SizedBox(height: 2),
+                  Text('Phone: ${_currentOrder.customerPhone}', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                  if (_currentOrder.customerAltPhone != null && _currentOrder.customerAltPhone!.isNotEmpty) ...[
+                    const SizedBox(height: 1),
+                    Text('Alt Phone: ${_currentOrder.customerAltPhone}', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8))),
                   ],
-                ),
-              ),
-              Wrap(
+                ],
+              );
+
+              final actionBtns = Wrap(
                 spacing: 6,
+                runSpacing: 6,
                 children: [
                   OutlinedButton.icon(
                     onPressed: () => _launchUri(Uri.parse('tel:${_currentOrder.customerPhone}')),
-                    icon: const Icon(Icons.call, size: 14, color: Color(0xFF10B981)),
+                    icon: const Icon(Icons.call, size: 13, color: Color(0xFF10B981)),
                     label: const Text('Call', style: TextStyle(fontSize: 11, color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       side: const BorderSide(color: Color(0xFF10B981)),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
                   ),
                   ElevatedButton.icon(
                     onPressed: () => _launchUri(_currentOrder.getWhatsAppLocationRequestUri(riderName: _currentOrder.deliveryAgentName)),
-                    icon: const Icon(Icons.chat_bubble_outline_rounded, size: 14, color: Colors.white),
+                    icon: const Icon(Icons.chat_bubble_outline_rounded, size: 13, color: Colors.white),
                     label: const Text('WhatsApp Pin', style: TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF25D366),
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
                   ),
                   ElevatedButton.icon(
                     onPressed: () => _launchUri(_currentOrder.googleMapsNavUri),
-                    icon: const Icon(Icons.navigation_rounded, size: 14, color: Colors.white),
+                    icon: const Icon(Icons.navigation_rounded, size: 13, color: Colors.white),
                     label: const Text('GPS Nav', style: TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF2563EB),
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
                   ),
                 ],
-              ),
-            ],
+              );
+
+              if (isNarrow) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    custInfo,
+                    const SizedBox(height: 10),
+                    actionBtns,
+                  ],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: custInfo),
+                  const SizedBox(width: 8),
+                  actionBtns,
+                ],
+              );
+            },
           ),
           const SizedBox(height: 12),
           const Divider(height: 1),
@@ -437,6 +522,15 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
           ],
           const SizedBox(height: 6),
           _buildInfoRow('🎯 Geocoding Status:', _currentOrder.confidenceDisplay, isDark, valueColor: _currentOrder.isLocationVerified ? const Color(0xFF10B981) : const Color(0xFF0284C7)),
+          if (_currentOrder.hasCoordinates || _currentOrder.loggedGpsProof != null) ...[
+            const SizedBox(height: 6),
+            _buildInfoRow(
+              '📍 GPS Presence Proof:',
+              '${_currentOrder.hasCoordinates ? "${_currentOrder.latitude!.toStringAsFixed(5)}°, ${_currentOrder.longitude!.toStringAsFixed(5)}°" : _currentOrder.loggedGpsProof} (${_currentOrder.isLocationVerified ? "Verified Doorstep ✓" : "Captured"})',
+              isDark,
+              valueColor: const Color(0xFF10B981),
+            ),
+          ],
           if (_currentOrder.deliveryNotes != null && _currentOrder.deliveryNotes!.isNotEmpty) ...[
             const SizedBox(height: 6),
             _buildInfoRow('📝 Delivery Notes:', _currentOrder.deliveryNotes!, isDark),
@@ -533,7 +627,14 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
                     children: [
                       Row(
                         children: [
-                          Text(assignedDriver.name, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                          Flexible(
+                            child: Text(
+                              assignedDriver.name,
+                              style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13.5),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
                           const SizedBox(width: 6),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -616,10 +717,9 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
             ),
           ),
           const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final statusCol = Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Remittance Status', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
@@ -637,48 +737,448 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
                     ),
                   ),
                 ],
-              ),
-              if (_currentOrder.isUnremitted)
-                ElevatedButton.icon(
-                  onPressed: () => _markOrderAsRemitted(context),
-                  icon: const Icon(Icons.check_circle_outline_rounded, size: 14, color: Colors.white),
-                  label: const Text('Mark Remitted / Cleared', style: TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
-                ),
-            ],
+              );
+
+              if (!_currentOrder.isUnremitted) {
+                return statusCol;
+              }
+
+              final markBtn = ElevatedButton.icon(
+                onPressed: () => _markOrderAsRemitted(context),
+                icon: const Icon(Icons.check_circle_outline_rounded, size: 14, color: Colors.white),
+                label: const Text('Mark Remitted / Cleared', style: TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
+              );
+
+              if (constraints.maxWidth < 420) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    statusCol,
+                    const SizedBox(height: 8),
+                    markBtn,
+                  ],
+                );
+              }
+
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(child: statusCol),
+                  const SizedBox(width: 8),
+                  markBtn,
+                ],
+              );
+            },
           ),
         ],
       ),
     );
   }
 
+  Future<void> _captureOrUploadSignature() async {
+    final result = await SignaturePadModal.show(
+      context: context,
+      orderId: _currentOrder.id,
+      customerName: _currentOrder.customerName,
+    );
+
+    if (!mounted) return;
+
+    if (result != null && result.signatureUrl.isNotEmpty) {
+      final updatedOrder = _currentOrder.copyWith(
+        customerSignatureUrl: result.signatureUrl,
+        deliveryNotes: (_currentOrder.deliveryNotes != null && _currentOrder.deliveryNotes!.isNotEmpty)
+            ? '${_currentOrder.deliveryNotes} [SIGNATURE: ${result.signatureUrl}]'
+            : '[SIGNATURE: ${result.signatureUrl}]',
+      );
+      ref.read(ordersProvider.notifier).updateOrderInList(updatedOrder);
+
+      try {
+        final client = Supabase.instance.client;
+        await client.from(SupabaseConstants.ordersTable).update({
+          'proof_of_delivery_url': result.signatureUrl,
+          'delivery_notes': updatedOrder.deliveryNotes,
+          'updated_at': DateTime.now().toIso8601String(),
+        }).eq('id', _currentOrder.id);
+      } catch (e) {
+        debugPrint('[DC_ORDER_DETAIL] ℹ️ Supabase signature update notice: $e');
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: Color(0xFF16A34A),
+            content: Text('✓ Proof of Delivery signature attached successfully!'),
+          ),
+        );
+      }
+    }
+  }
+
   Widget _buildProofOfDeliverySection(bool isDark) {
+    String? sigUrl = _currentOrder.customerSignatureUrl;
+    if ((sigUrl == null || sigUrl.isEmpty) && _currentOrder.deliveryNotes != null) {
+      final match = RegExp(r'\[(?:Audit\s+)?SIGNATURE:\s*([^\]]+)\]', caseSensitive: false)
+          .firstMatch(_currentOrder.deliveryNotes!);
+      if (match != null) sigUrl = match.group(1)?.trim();
+    }
+
+    final hasSignature = sigUrl != null && sigUrl.isNotEmpty;
+    Uint8List? memoryBytes;
+    if (hasSignature && sigUrl.startsWith('data:image')) {
+      try {
+        final commaIdx = sigUrl.indexOf(',');
+        if (commaIdx != -1) {
+          memoryBytes = base64Decode(sigUrl.substring(commaIdx + 1));
+        }
+      } catch (_) {}
+    }
+
     return _buildSectionContainer(
       isDark: isDark,
-      title: '📝 Digital Proof of Delivery (POD)',
+      title: '📝 Digital Proof of Delivery (POD) & Customer Signature',
       icon: Icons.verified_rounded,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 18),
+              Icon(
+                hasSignature ? Icons.check_circle_rounded : Icons.pending_actions_rounded,
+                color: hasSignature ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                size: 18,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Fulfilled & Signed by ${_currentOrder.customerName}',
-                  style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF10B981)),
+                  hasSignature
+                      ? '✓ Customer Signature Verified & Stored'
+                      : (_currentOrder.isDelivered
+                          ? 'Delivered (Signature Pending Upload)'
+                          : 'Pending Delivery Fulfillment'),
+                  style: GoogleFonts.inter(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.bold,
+                    color: hasSignature ? const Color(0xFF10B981) : (isDark ? Colors.white70 : const Color(0xFF475569)),
+                  ),
                 ),
               ),
-              const SizedBox(width: 8),
-              if (_currentOrder.deliveredAt != null)
-                Text(
-                  'Delivered: ${DateTimeFormatter.formatDate(_currentOrder.deliveredAt!)}',
-                  style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+              ElevatedButton.icon(
+                onPressed: () => _captureOrUploadSignature(),
+                icon: Icon(hasSignature ? Icons.edit_rounded : Icons.add_photo_alternate_rounded, size: 14),
+                label: Text(hasSignature ? 'Update / Re-sign' : 'Upload / Capture POD', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: hasSignature ? const Color(0xFF0284C7) : const Color(0xFF2563EB),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
+              ),
             ],
           ),
+          const SizedBox(height: 12),
+          if (hasSignature) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4), width: 1.5),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                'POD SIGNATURE RECORD',
+                                style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.bold, color: const Color(0xFF10B981)),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Recipient: ${_currentOrder.customerName}',
+                                style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B)),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.fullscreen_rounded, size: 18),
+                        tooltip: 'View Full Signature',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        onPressed: () => _showFullSignaturePreview(context, sigUrl!, isDark),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: () => _showFullSignaturePreview(context, sigUrl!, isDark),
+                    child: Container(
+                      height: 140,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(7),
+                        child: memoryBytes != null
+                            ? Image.memory(
+                                memoryBytes,
+                                fit: BoxFit.contain,
+                                errorBuilder: (_, __, ___) => _buildSignatureFallback(),
+                              )
+                            : (sigUrl.startsWith('http://') || sigUrl.startsWith('https://')
+                                ? Image.network(
+                                    sigUrl,
+                                    fit: BoxFit.contain,
+                                    loadingBuilder: (ctx, child, progress) => progress == null
+                                        ? child
+                                        : const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                                    errorBuilder: (_, __, ___) => _buildSignatureFallback(),
+                                  )
+                                : _buildSignatureFallback()),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+              ),
+              child: InkWell(
+                onTap: () => _captureOrUploadSignature(),
+                child: Column(
+                  children: [
+                    Icon(Icons.draw_rounded, size: 32, color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
+                    const SizedBox(height: 8),
+                    Text(
+                      'No digital signature on file for this order',
+                      style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: isDark ? Colors.white70 : const Color(0xFF334155)),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Click to upload physical waybill photo or sign digitally on pad',
+                      style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          // Physical GPS Telemetry & Presence Verification Record
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _currentOrder.isLocationVerified
+                    ? const Color(0xFF10B981).withValues(alpha: 0.4)
+                    : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.pin_drop_rounded,
+                            size: 16,
+                            color: _currentOrder.isLocationVerified
+                                ? const Color(0xFF10B981)
+                                : const Color(0xFF0284C7),
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              'PHYSICAL PRESENCE GPS PROOF',
+                              style: GoogleFonts.jetBrainsMono(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: _currentOrder.isLocationVerified
+                                    ? const Color(0xFF10B981)
+                                    : const Color(0xFF0284C7),
+                                letterSpacing: 0.5,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    if (_currentOrder.hasCoordinates)
+                      InkWell(
+                        onTap: () {
+                          MapLauncherHelper.launchTurnByTurnNavigation(
+                            context: context,
+                            latitude: _currentOrder.latitude,
+                            longitude: _currentOrder.longitude,
+                            destinationAddress: '${_currentOrder.deliveryAddress}, ${_currentOrder.deliveryCity}',
+                            customerName: _currentOrder.customerName,
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(6),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0284C7).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.map_outlined, size: 12, color: Color(0xFF0284C7)),
+                              const SizedBox(width: 4),
+                              Text(
+                                'View on Map',
+                                style: GoogleFonts.inter(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: const Color(0xFF0284C7),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                _buildInfoRow(
+                  '📍 Arrival Coordinates:',
+                  _currentOrder.hasCoordinates
+                      ? '${_currentOrder.latitude!.toStringAsFixed(5)}°, ${_currentOrder.longitude!.toStringAsFixed(5)}°'
+                      : (_currentOrder.loggedGpsProof ?? 'Logged on Fulfillment'),
+                  isDark,
+                ),
+                const SizedBox(height: 4),
+                _buildInfoRow(
+                  '🚪 Gate Pass PIN:',
+                  _currentOrder.effectiveGatePin,
+                  isDark,
+                  valueColor: const Color(0xFFEA580C),
+                ),
+                const SizedBox(height: 4),
+                _buildInfoRow(
+                  '🛡️ Verification State:',
+                  _currentOrder.isLocationVerified
+                      ? '✓ Real-time GPS Presence Verified & Committed to Database'
+                      : 'Pending Physical Verification',
+                  isDark,
+                  valueColor: _currentOrder.isLocationVerified ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                ),
+              ],
+            ),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSignatureFallback() {
+    return Center(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.verified_rounded, color: Color(0xFF10B981), size: 16),
+          const SizedBox(width: 6),
+          Text('Digital Signature Attached', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
+        ],
+      ),
+    );
+  }
+
+  void _showFullSignaturePreview(BuildContext context, String sigUrl, bool isDark) {
+    Uint8List? bytes;
+    if (sigUrl.startsWith('data:image')) {
+      try {
+        final commaIdx = sigUrl.indexOf(',');
+        if (commaIdx != -1) bytes = base64Decode(sigUrl.substring(commaIdx + 1));
+      } catch (_) {}
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600, maxHeight: 500),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Proof of Delivery (POD) Signature', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
+                        Text('Order #${_currentOrder.orderNumber} • ${_currentOrder.customerName}', style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B))),
+                      ],
+                    ),
+                    IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close_rounded)),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFCBD5E1)),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(11),
+                      child: bytes != null
+                          ? Image.memory(bytes, fit: BoxFit.contain)
+                          : (sigUrl.startsWith('http://') || sigUrl.startsWith('https://')
+                              ? Image.network(sigUrl, fit: BoxFit.contain)
+                              : _buildSignatureFallback()),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -704,7 +1204,13 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
             children: [
               Icon(icon, size: 16, color: const Color(0xFF2563EB)),
               const SizedBox(width: 8),
-              Text(title, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13)),
+              Expanded(
+                child: Text(
+                  title,
+                  style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -758,10 +1264,13 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: GoogleFonts.inter(fontSize: 11.5, fontWeight: isBold ? FontWeight.bold : FontWeight.w500, color: const Color(0xFF64748B)),
+        Expanded(
+          child: Text(
+            label,
+            style: GoogleFonts.inter(fontSize: 11.5, fontWeight: isBold ? FontWeight.bold : FontWeight.w500, color: const Color(0xFF64748B)),
+          ),
         ),
+        const SizedBox(width: 8),
         Text(
           value,
           style: GoogleFonts.inter(

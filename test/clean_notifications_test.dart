@@ -33,5 +33,5 @@ void main() {
     } catch (e) {
       print('Error cleaning notifications: $e');
     }
-  });
+  }, skip: 'Scratch maintenance script');
 }

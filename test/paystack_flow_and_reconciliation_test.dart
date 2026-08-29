@@ -13,7 +13,67 @@ import 'package:novexps/features/orders/domain/entities/order.dart';
 import 'package:novexps/features/orders/presentation/widgets/paystack_transfer_modal.dart';
 import 'package:novexps/features/finance/presentation/widgets/paystack_remittance_modal.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:novexps/features/finance/domain/repositories/finance_repository.dart';
+import 'package:novexps/features/finance/presentation/providers/finance_provider.dart';
+import 'package:novexps/features/finance/domain/entities/transaction_item.dart';
+
+class MockPaystackTestFinanceRepository implements FinanceRepository {
+  @override
+  Future<List<RemittanceEntity>> getAgentRemittances(String agentId) async => [];
+
+  @override
+  Future<RemittanceEntity> submitRemittance({
+    required String agentId,
+    required String companyId,
+    required double amount,
+    required String paymentMethod,
+    double grossCollections = 0.0,
+    double commissionDeducted = 0.0,
+    double transportAllowanceDeducted = 0.0,
+    double failedStipendsDeducted = 0.0,
+    double posFee = 0.0,
+    String? depositReceiptUrl,
+    String? referenceNumber,
+    String? discrepancyReason,
+    double? discrepancyAmount,
+    double? expectedAmount,
+    bool isPartial = false,
+    String? notes,
+    List<RemittanceOrderItem> associatedOrders = const [],
+  }) async => RemittanceEntity(
+    id: 'mock-rem-id',
+    referenceNumber: referenceNumber ?? 'MOCK-REF',
+    amount: amount,
+    paymentMethod: paymentMethod,
+    createdAt: DateTime.now(),
+  );
+
+  @override
+  Future<Map<String, dynamic>> requestPayout({
+    required String agentId,
+    required double amount,
+    required String bankName,
+    required String accountNumber,
+    required String accountName,
+    String? notes,
+  }) async => {'status': 'success'};
+
+  @override
+  Future<List<Map<String, dynamic>>> getPayoutRequests(String agentId) async => [];
+
+  @override
+  Future<List<TransactionItem>> getRiderTransactions(String agentId) async => [];
+
+  @override
+  Future<Map<String, dynamic>?> getPaystackTransactionDetails(String reference) async => null;
+}
+
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  SharedPreferences.setMockInitialValues({});
+  GoogleFonts.config.allowRuntimeFetching = false;
   group('Paystack Remittance & Direct Transfer Verification Suite', () {
     const testRider = UserModel(
       id: 'b1111111-1111-4111-8111-111111111111',
@@ -330,8 +390,12 @@ void main() {
 
     testWidgets('10. RemittanceDetailsPage renders reconciliation matrix and Paystack audit metadata', (WidgetTester tester) async {
       await tester.pumpWidget(
-        const ProviderScope(
-          child: MaterialApp(
+        ProviderScope(
+          overrides: [
+            financeRepositoryProvider.overrideWithValue(MockPaystackTestFinanceRepository()),
+            paystackTxnDetailsProvider.overrideWith((ref, arg) => Future.value(null)),
+          ],
+          child: const MaterialApp(
             home: RemittanceDetailsPage(
               remittanceId: 'PSTK-RMT-PDA7182-835804',
             ),
@@ -357,6 +421,9 @@ void main() {
       expect(find.text('Bank / Processor'), findsOneWidget);
       expect(find.text('Share Receipt'), findsOneWidget);
       expect(find.text('Download Statement (PDF)'), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(seconds: 1));
     });
 
     test('11. Multiple delivered cash orders accumulate cash in custody and pending remittance correctly', () {

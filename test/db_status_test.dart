@@ -32,5 +32,5 @@ void main() {
     } catch (e) {
       print('inventory_audits insert: $e');
     }
-  });
+  }, skip: 'Scratch diagnostic script');
 }

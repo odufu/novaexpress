@@ -62,15 +62,32 @@ class SignatureStorageService {
     required Uint8List pngBytes,
     required String orderId,
   }) async {
+    return uploadSignatureImage(
+      imageBytes: pngBytes,
+      orderId: orderId,
+      ext: 'png',
+      contentType: 'image/png',
+    );
+  }
+
+  /// Uploads any signature or POD image file to Supabase Storage bucket `pod_signatures`
+  /// or falls back to data URI.
+  static Future<String> uploadSignatureImage({
+    required Uint8List imageBytes,
+    required String orderId,
+    String ext = 'png',
+    String contentType = 'image/png',
+  }) async {
     final cleanId = orderId.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '');
-    final fileName = 'sig_${cleanId}_${DateTime.now().millisecondsSinceEpoch}.png';
+    final cleanExt = ext.toLowerCase().replaceAll('.', '');
+    final fileName = 'sig_${cleanId}_${DateTime.now().millisecondsSinceEpoch}.$cleanExt';
 
     try {
       final client = Supabase.instance.client;
       await client.storage.from(SupabaseConstants.podSignaturesBucket).uploadBinary(
         fileName,
-        pngBytes,
-        fileOptions: const FileOptions(contentType: 'image/png', upsert: true),
+        imageBytes,
+        fileOptions: FileOptions(contentType: contentType, upsert: true),
       );
       final publicUrl = client.storage
           .from(SupabaseConstants.podSignaturesBucket)
@@ -78,8 +95,8 @@ class SignatureStorageService {
       return publicUrl;
     } catch (e) {
       debugPrint('[SIGNATURE_SERVICE] ℹ️ Cloud upload fallback to base64: $e');
-      final base64String = base64Encode(pngBytes);
-      return 'data:image/png;base64,$base64String';
+      final base64String = base64Encode(imageBytes);
+      return 'data:$contentType;base64,$base64String';
     }
   }
 }

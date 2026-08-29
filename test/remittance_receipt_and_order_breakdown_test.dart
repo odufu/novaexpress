@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:novexps/core/helpers/formatters.dart';
 import 'package:novexps/core/services/local_storage_service.dart';
 import 'package:novexps/features/auth/domain/entities/user.dart';
@@ -90,6 +91,11 @@ class TestFinanceNotifier extends FinanceNotifier {
 }
 
 void main() {
+  setUpAll(() {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    GoogleFonts.config.allowRuntimeFetching = false;
+  });
+
   group('Remittance Official Receipt & Itemized Order Breakdown Suite', () {
     test('1. RemittanceOrderItem calculates net contribution accurately for delivered vs failed orders', () {
       // Delivered POD Order
@@ -237,6 +243,7 @@ void main() {
         ProviderScope(
           overrides: [
             financeProvider.overrideWith((ref) => TestFinanceNotifier([testRemittance])),
+            paystackTxnDetailsProvider('PSTK-RMT-XYZ').overrideWith((ref) => Future.value(null)),
           ],
           child: const MaterialApp(
             home: RemittanceDetailsPage(remittanceId: 'rem-test-xyz'),

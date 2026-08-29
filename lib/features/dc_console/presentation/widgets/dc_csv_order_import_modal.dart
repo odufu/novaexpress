@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -79,7 +81,7 @@ class ParsedCsvOrderRow {
       if (finalRiderId != null && finalRiderId.isNotEmpty) 'delivery_agent_id': finalRiderId,
       if (finalRiderName != null && finalRiderName.isNotEmpty) 'delivery_agent_name': finalRiderName,
       if (finalRiderCode != null && finalRiderCode.isNotEmpty) 'delivery_agent_code': finalRiderCode,
-      if (finalRiderId != null && finalRiderId.isNotEmpty) 'status': 'in_transit' else 'status': 'assigned',
+      if (finalRiderId != null && finalRiderId.isNotEmpty) 'status': 'assigned' else 'status': 'new',
     };
   }
 }
@@ -133,11 +135,24 @@ ORD-NOV-903,Engr. Tunde Bakare,08099887766,8 Adetokunbo Ademola,Wuse 2,FCT - Abu
         _selectedFileName = file.name;
 
         String rawContent = '';
-        if (file.path != null) {
-          final ioFile = File(file.path!);
-          if (await ioFile.exists()) {
-            rawContent = await ioFile.readAsString();
+        try {
+          final bytes = await file.readAsBytes();
+          if (bytes.isNotEmpty) {
+            try {
+              rawContent = utf8.decode(bytes);
+            } catch (_) {
+              rawContent = latin1.decode(bytes);
+            }
           }
+        } catch (_) {}
+
+        if (rawContent.isEmpty && !kIsWeb && file.path != null) {
+          try {
+            final ioFile = File(file.path!);
+            if (await ioFile.exists()) {
+              rawContent = await ioFile.readAsString();
+            }
+          } catch (_) {}
         }
 
         if (rawContent.trim().isEmpty) {
@@ -238,27 +253,37 @@ ORD-NOV-903,Engr. Tunde Bakare,08099887766,8 Adetokunbo Ademola,Wuse 2,FCT - Abu
       final headerRow = rows.first.map((c) => c.toString().trim().toLowerCase().replaceAll(' ', '_').replaceAll('-', '_')).toList();
 
       int colIndex(List<String> synonyms) {
+        // Exact match first
         for (final syn in synonyms) {
-          final idx = headerRow.indexOf(syn);
+          final s = syn.toLowerCase().replaceAll(' ', '_').replaceAll('-', '_');
+          final idx = headerRow.indexOf(s);
           if (idx != -1) return idx;
+        }
+        // Substring match next
+        for (final syn in synonyms) {
+          final s = syn.toLowerCase().replaceAll(' ', '_').replaceAll('-', '_');
+          for (int i = 0; i < headerRow.length; i++) {
+            final h = headerRow[i];
+            if (h.contains(s) || s.contains(h)) return i;
+          }
         }
         return -1;
       }
 
-      final idxOrderNo = colIndex(['order_number', 'order_no', 'order_id', 'tracking_number', 'tracking_id', 'id', 'ref']);
-      final idxCustName = colIndex(['customer_name', 'customer', 'name', 'recipient', 'client_customer']);
-      final idxPhone = colIndex(['customer_phone', 'phone', 'mobile', 'telephone', 'contact_phone', 'contact']);
-      final idxAltPhone = colIndex(['customer_alt_phone', 'alt_phone', 'secondary_phone', 'other_phone']);
-      final idxAddress = colIndex(['delivery_address', 'address', 'street_address', 'street', 'location', 'destination']);
-      final idxCity = colIndex(['delivery_city', 'city', 'town', 'lga', 'district', 'area']);
+      final idxOrderNo = colIndex(['order_number', 'order_no', 'order_id', 'tracking_number', 'tracking_id', 'tracking', 'waybill', 'invoice_no', 'id', 'ref', 'code']);
+      final idxCustName = colIndex(['customer_name', 'customer', 'name', 'recipient', 'client_customer', 'buyer', 'full_name']);
+      final idxPhone = colIndex(['customer_phone', 'phone_number', 'phone_no', 'phone', 'mobile', 'telephone', 'contact_phone', 'contact', 'tel']);
+      final idxAltPhone = colIndex(['customer_alt_phone', 'alt_phone', 'secondary_phone', 'other_phone', 'phone_2', 'whatsapp']);
+      final idxAddress = colIndex(['delivery_address', 'address', 'street_address', 'street', 'location', 'destination', 'house_address']);
+      final idxCity = colIndex(['delivery_city', 'city', 'town', 'lga', 'district', 'area', 'zone']);
       final idxState = colIndex(['delivery_state', 'state', 'region', 'province']);
-      final idxProduct = colIndex(['product_name', 'product', 'item_name', 'item', 'goods', 'sku']);
-      final idxQty = colIndex(['quantity', 'qty', 'units', 'count', 'number_of_items']);
-      final idxAmount = colIndex(['total_amount', 'amount', 'price', 'total_price', 'value', 'order_amount', 'order_value']);
-      final idxPaymentType = colIndex(['payment_type', 'payment_method', 'payment', 'type', 'pod_or_prepaid']);
-      final idxClient = colIndex(['client_name', 'client', 'merchant', 'vendor', 'company_name', 'company']);
-      final idxNotes = colIndex(['delivery_notes', 'notes', 'remarks', 'instructions', 'comment']);
-      final idxRider = colIndex(['rider_code', 'rider_id', 'assigned_rider', 'agent_code', 'rider']);
+      final idxProduct = colIndex(['product_name', 'product', 'item_name', 'item', 'goods', 'sku', 'package']);
+      final idxQty = colIndex(['quantity', 'qty', 'units', 'count', 'number_of_items', 'pieces', 'pcs']);
+      final idxAmount = colIndex(['total_amount', 'amount', 'price', 'total_price', 'value', 'order_amount', 'order_value', 'total', 'cost']);
+      final idxPaymentType = colIndex(['payment_type', 'payment_method', 'payment', 'type', 'pod_or_prepaid', 'mode', 'payment_mode']);
+      final idxClient = colIndex(['client_name', 'client', 'merchant', 'vendor', 'company_name', 'company', 'seller']);
+      final idxNotes = colIndex(['delivery_notes', 'notes', 'remarks', 'instructions', 'comment', 'description']);
+      final idxRider = colIndex(['rider_code', 'rider_id', 'assigned_rider', 'agent_code', 'rider', 'driver']);
 
       final List<ParsedCsvOrderRow> parsed = [];
 

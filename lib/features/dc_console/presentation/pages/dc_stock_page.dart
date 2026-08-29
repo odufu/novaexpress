@@ -1,12 +1,17 @@
+import 'dart:convert';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/helpers/formatters.dart';
+import '../../../../core/widgets/product_image_widget.dart';
 import '../../../stock/domain/entities/stock_item.dart';
 import '../../../stock/domain/entities/rider_stock_allocation.dart';
 import '../../../stock/presentation/providers/stock_provider.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
 import '../providers/dc_console_provider.dart';
+import '../providers/product_catalog_provider.dart';
 import '../widgets/dc_product_detail_modal.dart';
 
 class DCStockPage extends ConsumerStatefulWidget {
@@ -25,6 +30,10 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
   void initState() {
     super.initState();
     _tabController = TabController(length: 5, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(stockProvider.notifier).fetchStockItems();
+      ref.read(productCatalogProvider.notifier).reloadCatalog();
+    });
   }
 
   @override
@@ -481,19 +490,31 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
 
                       // Product & Client
                       DataCell(
-                        Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(
-                              item.name,
-                              style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold),
-                              overflow: TextOverflow.ellipsis,
+                            ProductImageWidget(
+                              imageUrl: item.imageAsset,
+                              width: 36,
+                              height: 36,
+                              borderRadius: 8,
                             ),
-                            Text(
-                              item.ownerName,
-                              style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
-                              overflow: TextOverflow.ellipsis,
+                            const SizedBox(width: 10),
+                            Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item.name,
+                                  style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  item.ownerName,
+                                  style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -666,14 +687,36 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                 _buildStatusBadge(item),
               ],
             ),
-            const SizedBox(height: 6),
-            Text(
-              item.name,
-              style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold),
-            ),
-            Text(
-              'Company: ${item.ownerName} • ${item.category}',
-              style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                ProductImageWidget(
+                  imageUrl: item.imageAsset,
+                  width: 48,
+                  height: 48,
+                  borderRadius: 10,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.name,
+                        style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        'Company: ${item.ownerName} • ${item.category}',
+                        style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 12),
 
@@ -945,118 +988,285 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
     final descCtrl = TextEditingController();
     final messenger = ScaffoldMessenger.of(context);
 
+    String? selectedImageUrl;
+    bool isUploadingImage = false;
+
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            const Icon(Icons.add_box_rounded, color: Color(0xFF2563EB), size: 22),
-            const SizedBox(width: 8),
-            Text('Register New Product', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 17)),
-          ],
-        ),
-        content: SizedBox(
-          width: 500,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Product Name *', hintText: 'e.g. Respira Detox Tea')),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(child: TextField(controller: skuCtrl, decoration: const InputDecoration(labelText: 'SKU / Barcode Code *'))),
-                    const SizedBox(width: 12),
-                    Expanded(child: TextField(controller: catCtrl, decoration: const InputDecoration(labelText: 'Category'))),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(child: TextField(controller: priceCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Selling Price (₦) *'))),
-                    const SizedBox(width: 12),
-                    Expanded(child: TextField(controller: clientCtrl, decoration: const InputDecoration(labelText: 'Merchant Client'))),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(child: TextField(controller: initQtyCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Initial Shelf Stock (Units)'))),
-                    const SizedBox(width: 12),
-                    Expanded(child: TextField(controller: lowThreshCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Low Stock Alert Threshold'))),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                TextField(controller: binCtrl, decoration: const InputDecoration(labelText: 'Warehouse Storage Bin Tag (e.g. BIN-A1-01)')),
-                const SizedBox(height: 12),
-                TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Product Description (Optional)')),
-              ],
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              const Icon(Icons.add_box_rounded, color: Color(0xFF2563EB), size: 22),
+              const SizedBox(width: 8),
+              Text('Register New Product', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 17)),
+            ],
+          ),
+          content: SizedBox(
+            width: 520,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Product Image Upload Card
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            ProductImageWidget(
+                              imageUrl: selectedImageUrl,
+                              width: 64,
+                              height: 64,
+                              borderRadius: 10,
+                              fit: BoxFit.cover,
+                            ),
+                            if (isUploadingImage)
+                              Container(
+                                width: 64,
+                                height: 64,
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.5),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Center(
+                                  child: SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Product Image / Photo',
+                                style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                selectedImageUrl != null
+                                    ? 'Image attached for stock and catalog'
+                                    : 'Upload a clear product photo or select standard',
+                                style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                              ),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 6,
+                                children: [
+                                  ElevatedButton.icon(
+                                    onPressed: isUploadingImage
+                                        ? null
+                                        : () async {
+                                            try {
+                                              setDialogState(() => isUploadingImage = true);
+                                              final result = await FilePickerPlatform.instance.pickFiles(
+                                                type: FileType.image,
+                                              );
+
+                                              if (result.isNotEmpty) {
+                                                final file = result.first;
+                                                final bytes = await file.readAsBytes();
+
+                                                if (bytes.isNotEmpty) {
+                                                  final ext = file.extension?.toLowerCase() ?? 'jpg';
+                                                  final mimeType = ext == 'png' ? 'image/png' : (ext == 'webp' ? 'image/webp' : 'image/jpeg');
+                                                  final fileName = 'product_${DateTime.now().millisecondsSinceEpoch}.$ext';
+                                                  String? uploadedUrl;
+
+                                                  try {
+                                                    final supa = Supabase.instance.client;
+                                                    await supa.storage.from('products').uploadBinary(
+                                                          fileName,
+                                                          bytes,
+                                                          fileOptions: FileOptions(contentType: mimeType, upsert: true),
+                                                        );
+                                                    uploadedUrl = supa.storage.from('products').getPublicUrl(fileName);
+                                                  } catch (_) {
+                                                    try {
+                                                      final supa = Supabase.instance.client;
+                                                      await supa.storage.from('avatars').uploadBinary(
+                                                            fileName,
+                                                            bytes,
+                                                            fileOptions: FileOptions(contentType: mimeType, upsert: true),
+                                                          );
+                                                      uploadedUrl = supa.storage.from('avatars').getPublicUrl(fileName);
+                                                    } catch (_) {
+                                                      uploadedUrl = 'data:$mimeType;base64,${base64Encode(bytes)}';
+                                                    }
+                                                  }
+
+                                                  setDialogState(() {
+                                                    selectedImageUrl = uploadedUrl;
+                                                    isUploadingImage = false;
+                                                  });
+                                                } else {
+                                                  setDialogState(() => isUploadingImage = false);
+                                                }
+                                              } else {
+                                                setDialogState(() => isUploadingImage = false);
+                                              }
+                                            } catch (e) {
+                                              setDialogState(() => isUploadingImage = false);
+                                              messenger.showSnackBar(
+                                                SnackBar(content: Text('⚠️ Image selection error: $e'), backgroundColor: const Color(0xFFEF4444)),
+                                              );
+                                            }
+                                          },
+                                    icon: const Icon(Icons.cloud_upload_rounded, size: 14, color: Colors.white),
+                                    label: Text(
+                                      selectedImageUrl != null ? 'Change Photo' : 'Upload Image',
+                                      style: const TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF2563EB),
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      minimumSize: Size.zero,
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                  ),
+                                  if (selectedImageUrl != null)
+                                    OutlinedButton.icon(
+                                      onPressed: () {
+                                        setDialogState(() => selectedImageUrl = null);
+                                      },
+                                      icon: const Icon(Icons.close_rounded, size: 13, color: Color(0xFFEF4444)),
+                                      label: const Text('Remove', style: TextStyle(fontSize: 11, color: Color(0xFFEF4444))),
+                                      style: OutlinedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                        minimumSize: Size.zero,
+                                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                        side: const BorderSide(color: Color(0xFFEF4444)),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Product Name *', hintText: 'e.g. Respira Detox Tea')),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(child: TextField(controller: skuCtrl, decoration: const InputDecoration(labelText: 'SKU / Barcode Code *'))),
+                      const SizedBox(width: 12),
+                      Expanded(child: TextField(controller: catCtrl, decoration: const InputDecoration(labelText: 'Category'))),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(child: TextField(controller: priceCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Selling Price (₦) *'))),
+                      const SizedBox(width: 12),
+                      Expanded(child: TextField(controller: clientCtrl, decoration: const InputDecoration(labelText: 'Merchant Client'))),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(child: TextField(controller: initQtyCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Initial Shelf Stock (Units)'))),
+                      const SizedBox(width: 12),
+                      Expanded(child: TextField(controller: lowThreshCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Low Stock Alert Threshold'))),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(controller: binCtrl, decoration: const InputDecoration(labelText: 'Warehouse Storage Bin Tag (e.g. BIN-A1-01)')),
+                  const SizedBox(height: 12),
+                  TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Product Description (Optional)')),
+                ],
+              ),
             ),
           ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: isUploadingImage
+                  ? null
+                  : () async {
+                      final name = nameCtrl.text.trim();
+                      final sku = skuCtrl.text.trim();
+                      if (name.isEmpty || sku.isEmpty) {
+                        messenger.showSnackBar(
+                          const SnackBar(content: Text('⚠️ Product Name and SKU are required.'), backgroundColor: Color(0xFFEF4444)),
+                        );
+                        return;
+                      }
+
+                      final price = double.tryParse(priceCtrl.text.replaceAll(',', '')) ?? 0.0;
+                      final qty = int.tryParse(initQtyCtrl.text) ?? 0;
+                      final threshold = int.tryParse(lowThreshCtrl.text) ?? 3;
+
+                      final created = await ref.read(stockProvider.notifier).addNewProduct(
+                            name: name,
+                            sku: sku,
+                            category: catCtrl.text.trim(),
+                            price: price,
+                            ownerName: clientCtrl.text.trim(),
+                            initialQuantity: qty,
+                            lowStockThreshold: threshold,
+                            binLocation: binCtrl.text.trim(),
+                            description: descCtrl.text.trim(),
+                            imageAsset: selectedImageUrl,
+                          );
+
+                      // Also create corresponding warehouse batch
+                      ref.read(dcConsoleProvider.notifier).addBatch(
+                            DCWarehouseBatch(
+                              id: 'batch_${DateTime.now().millisecondsSinceEpoch}',
+                              batchCode: 'LOT-${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}',
+                              productName: created.name,
+                              sku: created.sku,
+                              clientName: created.ownerName,
+                              waybillNumber: 'INIT-INTAKE',
+                              initialQuantity: qty,
+                              currentQuantity: qty,
+                              allocatedQuantity: 0,
+                              binLocation: binCtrl.text.trim().isNotEmpty ? binCtrl.text.trim() : 'BIN-A1-01',
+                              manufactureDate: DateTime.now(),
+                              expiryDate: DateTime.now().add(const Duration(days: 365)),
+                            ),
+                          );
+
+                      // Immediately sync newly created product into the product catalog
+                      ref.read(productCatalogProvider.notifier).syncFromStockItems([created]);
+
+                      if (ctx.mounted) {
+                        Navigator.of(ctx).pop();
+                      }
+                      messenger.showSnackBar(
+                        SnackBar(
+                          content: Text('✅ ${created.name} registered in DC catalogue with $qty shelf units.'),
+                          backgroundColor: const Color(0xFF10B981),
+                        ),
+                      );
+                    },
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
+              child: const Text('Save & Register Product', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () async {
-              final name = nameCtrl.text.trim();
-              final sku = skuCtrl.text.trim();
-              if (name.isEmpty || sku.isEmpty) {
-                messenger.showSnackBar(
-                  const SnackBar(content: Text('⚠️ Product Name and SKU are required.'), backgroundColor: Color(0xFFEF4444)),
-                );
-                return;
-              }
-
-              final price = double.tryParse(priceCtrl.text.replaceAll(',', '')) ?? 0.0;
-              final qty = int.tryParse(initQtyCtrl.text) ?? 0;
-              final threshold = int.tryParse(lowThreshCtrl.text) ?? 3;
-
-              final created = await ref.read(stockProvider.notifier).addNewProduct(
-                    name: name,
-                    sku: sku,
-                    category: catCtrl.text.trim(),
-                    price: price,
-                    ownerName: clientCtrl.text.trim(),
-                    initialQuantity: qty,
-                    lowStockThreshold: threshold,
-                    binLocation: binCtrl.text.trim(),
-                    description: descCtrl.text.trim(),
-                  );
-
-              // Also create corresponding warehouse batch
-              ref.read(dcConsoleProvider.notifier).addBatch(
-                    DCWarehouseBatch(
-                      id: 'batch_${DateTime.now().millisecondsSinceEpoch}',
-                      batchCode: 'LOT-${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}',
-                      productName: created.name,
-                      sku: created.sku,
-                      clientName: created.ownerName,
-                      waybillNumber: 'INIT-INTAKE',
-                      initialQuantity: qty,
-                      currentQuantity: qty,
-                      allocatedQuantity: 0,
-                      binLocation: binCtrl.text.trim().isNotEmpty ? binCtrl.text.trim() : 'BIN-A1-01',
-                      manufactureDate: DateTime.now(),
-                      expiryDate: DateTime.now().add(const Duration(days: 365)),
-                    ),
-                  );
-
-              if (ctx.mounted) {
-                Navigator.of(ctx).pop();
-              }
-              messenger.showSnackBar(
-                SnackBar(
-                  content: Text('✅ ${created.name} registered in DC catalogue with $qty shelf units.'),
-                  backgroundColor: const Color(0xFF10B981),
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
-            child: const Text('Save & Register Product', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          ),
-        ],
       ),
     );
   }

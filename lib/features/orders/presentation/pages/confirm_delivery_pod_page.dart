@@ -248,10 +248,10 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
       final gatePin = orderObj?.effectiveGatePin ?? 'GT-${(widget.orderId.length >= 4 ? widget.orderId.substring(widget.orderId.length - 4) : "7182").toUpperCase()}';
 
       final notes = isDirectTransfer
-          ? '[POD Paid via Paystack Direct Transfer • Ref: $paymentRef • Gate PIN: $gatePin • GPS: ${riderLoc.latitude.toStringAsFixed(4)}, ${riderLoc.longitude.toStringAsFixed(4)}] ₦0 cash held by PDA. Commission credited to My Balance.'
+          ? '[POD Paid via Paystack Direct Transfer • Ref: $paymentRef • Gate PIN: $gatePin • GPS Proof: ${riderLoc.latitude.toStringAsFixed(5)}°, ${riderLoc.longitude.toStringAsFixed(5)}° (±${riderLoc.accuracyMeters.toStringAsFixed(1)}m)] ₦0 cash held by PDA. Commission credited to My Balance.'
           : (refNo.isNotEmpty
-              ? '[POD Collected via Cash (Ref: $refNo) • Gate PIN: $gatePin • GPS: ${riderLoc.latitude.toStringAsFixed(4)}, ${riderLoc.longitude.toStringAsFixed(4)}] Cash in custody.'
-              : '[POD Collected via Cash • Gate PIN: $gatePin • GPS: ${riderLoc.latitude.toStringAsFixed(4)}, ${riderLoc.longitude.toStringAsFixed(4)}] Cash in custody.');
+              ? '[POD Collected via Cash (Ref: $refNo) • Gate PIN: $gatePin • GPS Proof: ${riderLoc.latitude.toStringAsFixed(5)}°, ${riderLoc.longitude.toStringAsFixed(5)}° (±${riderLoc.accuracyMeters.toStringAsFixed(1)}m)] Cash in custody.'
+              : '[POD Collected via Cash • Gate PIN: $gatePin • GPS Proof: ${riderLoc.latitude.toStringAsFixed(5)}°, ${riderLoc.longitude.toStringAsFixed(5)}° (±${riderLoc.accuracyMeters.toStringAsFixed(1)}m)] Cash in custody.');
 
       await ref.read(ordersProvider.notifier).confirmDeliveryPod(
             orderId: widget.orderId,
@@ -780,17 +780,20 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'Total Payable',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: theme.colorScheme.onSurfaceVariant,
+                      Expanded(
+                        child: Text(
+                          'Total Payable',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
                         ),
                       ),
+                      const SizedBox(width: 8),
                       Text(
                         CurrencyFormatter.formatNaira(order.totalAmount),
                         style: GoogleFonts.jetBrainsMono(
-                          fontSize: 22,
+                          fontSize: 20,
                           fontWeight: FontWeight.bold,
                           color: AppColors.orange,
                         ),
@@ -1135,15 +1138,19 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          'CASH REMITTANCE BREAKDOWN',
-                          style: GoogleFonts.jetBrainsMono(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.8,
-                            color: const Color(0xFFF37021),
+                        Expanded(
+                          child: Text(
+                            'CASH REMITTANCE BREAKDOWN',
+                            style: GoogleFonts.jetBrainsMono(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.8,
+                              color: const Color(0xFFF37021),
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        const SizedBox(width: 6),
                         Text(
                           '₦100 / ₦5k Transfer Fee',
                           style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B)),
@@ -1154,13 +1161,18 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.shopping_bag_outlined, size: 14, color: Color(0xFF64748B)),
-                            const SizedBox(width: 6),
-                            Text('Gross Cash Collected', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-                          ],
+                        Expanded(
+                          child: Row(
+                            children: [
+                              const Icon(Icons.shopping_bag_outlined, size: 14, color: Color(0xFF64748B)),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text('Gross Cash Collected', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)), overflow: TextOverflow.ellipsis),
+                              ),
+                            ],
+                          ),
                         ),
+                        const SizedBox(width: 8),
                         Text(CurrencyFormatter.formatNaira(enteredCash), style: GoogleFonts.jetBrainsMono(fontSize: 12.5, fontWeight: FontWeight.bold)),
                       ],
                     ),
@@ -1168,13 +1180,18 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.percent_rounded, size: 14, color: Color(0xFF16A34A)),
-                            const SizedBox(width: 6),
-                            Text('Less: Commission Retained', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-                          ],
+                        Expanded(
+                          child: Row(
+                            children: [
+                              const Icon(Icons.percent_rounded, size: 14, color: Color(0xFF16A34A)),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text('Less: Commission Retained', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)), overflow: TextOverflow.ellipsis),
+                              ),
+                            ],
+                          ),
                         ),
+                        const SizedBox(width: 8),
                         Text('-${CurrencyFormatter.formatNaira(commissionRate)}', style: GoogleFonts.jetBrainsMono(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF16A34A))),
                       ],
                     ),
@@ -1182,13 +1199,18 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.local_shipping_outlined, size: 14, color: Color(0xFF00A2D3)),
-                            const SizedBox(width: 6),
-                            Text('Less: Fuel/Transport Retained', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-                          ],
+                        Expanded(
+                          child: Row(
+                            children: [
+                              const Icon(Icons.local_shipping_outlined, size: 14, color: Color(0xFF00A2D3)),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text('Less: Fuel/Transport Retained', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)), overflow: TextOverflow.ellipsis),
+                              ),
+                            ],
+                          ),
                         ),
+                        const SizedBox(width: 8),
                         Text('-${CurrencyFormatter.formatNaira(transportAllowance)}', style: GoogleFonts.jetBrainsMono(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF00A2D3))),
                       ],
                     ),
@@ -1196,13 +1218,18 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.receipt_outlined, size: 14, color: Color(0xFFF59E0B)),
-                            const SizedBox(width: 6),
-                            Text('Less: Transfer Fee (Dynamic)', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-                          ],
+                        Expanded(
+                          child: Row(
+                            children: [
+                              const Icon(Icons.receipt_outlined, size: 14, color: Color(0xFFF59E0B)),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text('Less: Transfer Fee (Dynamic)', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)), overflow: TextOverflow.ellipsis),
+                              ),
+                            ],
+                          ),
                         ),
+                        const SizedBox(width: 8),
                         Text('-${CurrencyFormatter.formatNaira(cashTransferFee)}', style: GoogleFonts.jetBrainsMono(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFFF59E0B))),
                       ],
                     ),
@@ -1219,23 +1246,27 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'NET CASH TO REMIT TO DC',
-                                style: GoogleFonts.jetBrainsMono(
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: const Color(0xFFC2410C),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'NET CASH TO REMIT TO DC',
+                                  style: GoogleFonts.jetBrainsMono(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: const Color(0xFFC2410C),
+                                  ),
                                 ),
-                              ),
-                              Text(
-                                'You retain ${CurrencyFormatter.formatNaira(totalRetainedByRider)} in earnings & fees',
-                                style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF9A3412)),
-                              ),
-                            ],
+                                Text(
+                                  'You retain ${CurrencyFormatter.formatNaira(totalRetainedByRider)} in earnings & fees',
+                                  style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF9A3412)),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
                           ),
+                          const SizedBox(width: 8),
                           Text(
                             CurrencyFormatter.formatNaira(netCashRemittance),
                             style: GoogleFonts.jetBrainsMono(
@@ -1257,12 +1288,15 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Proof of Delivery (POD) Signature',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: theme.colorScheme.onSurface,
+                Expanded(
+                  child: Text(
+                    'Proof of Delivery (POD) Signature',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 if (podState.signatureBytes != null)
@@ -1378,6 +1412,98 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
               ),
             ),
             const SizedBox(height: 16),
+
+            // Real-time GPS Location Presence Proof Badge
+            Consumer(
+              builder: (context, ref, _) {
+                final riderLoc = ref.watch(riderLocationProvider);
+                final isDarkTheme = theme.brightness == Brightness.dark;
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 14),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: isDarkTheme ? const Color(0xFF064E3B).withValues(alpha: 0.3) : const Color(0xFFECFDF5),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color(0xFF10B981).withValues(alpha: isDarkTheme ? 0.4 : 0.6),
+                      width: 1.2,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981).withValues(alpha: 0.18),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.gps_fixed_rounded,
+                          color: Color(0xFF10B981),
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    'GPS PRESENCE PROOF CAPTURED',
+                                    style: GoogleFonts.jetBrainsMono(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: const Color(0xFF059669),
+                                      letterSpacing: 0.5,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    'AUTO-CAPTURED',
+                                    style: GoogleFonts.jetBrainsMono(
+                                      fontSize: 8.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: const Color(0xFF059669),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              '${riderLoc.latitude.toStringAsFixed(5)}°, ${riderLoc.longitude.toStringAsFixed(5)}° (±${riderLoc.accuracyMeters.toStringAsFixed(1)}m)',
+                              style: GoogleFonts.jetBrainsMono(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.bold,
+                                color: isDarkTheme ? const Color(0xFFE2E8F0) : const Color(0xFF1E293B),
+                              ),
+                            ),
+                            Text(
+                              'Your exact coordinates are recorded to database as physical proof of presence at customer location.',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isDarkTheme ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
 
             // Customer Confirmed Goods Checkbox
             Container(

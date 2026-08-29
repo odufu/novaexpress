@@ -32,7 +32,7 @@ class RemittanceOrderItem {
     if (isFailed) {
       return -failedStipend; // Failed delivery stipend credit
     }
-    return cashCollected - riderCommission - transportAllowance - posFee;
+    return cashCollected - riderCommission - transportAllowance;
   }
 
   factory RemittanceOrderItem.fromJson(Map<String, dynamic> json) {

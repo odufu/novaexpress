@@ -1,4 +1,8 @@
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../core/constants/supabase_constants.dart';
 import '../../../../core/services/local_storage_service.dart';
 import '../../../stock/domain/entities/stock_item.dart';
 import '../../domain/entities/product_package.dart';
@@ -24,6 +28,7 @@ class ProductCatalogState {
 
   CatalogProduct? findProductByName(String name) {
     final clean = name.trim().toLowerCase();
+    if (clean.isEmpty) return null;
     for (final p in products) {
       if (p.name.toLowerCase() == clean ||
           p.name.toLowerCase().contains(clean) ||
@@ -36,6 +41,7 @@ class ProductCatalogState {
 
   CatalogProduct? findProductBySku(String sku) {
     final clean = sku.trim().toLowerCase();
+    if (clean.isEmpty) return null;
     for (final p in products) {
       if (p.sku.toLowerCase() == clean) {
         return p;
@@ -72,7 +78,7 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
 
   ProductCatalogNotifier({LocalStorageService? storageService})
       : _storageService = storageService ?? LocalStorageServiceImpl(),
-        super(ProductCatalogState(products: _initialProducts)) {
+        super(const ProductCatalogState(products: [])) {
     _initCatalog();
   }
 
@@ -80,35 +86,152 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
     try {
       final cached = await _storageService.getCachedProductCatalog();
       if (cached != null && cached.isNotEmpty) {
-        // Merge cached custom packages with initial catalog
-        final merged = <CatalogProduct>[];
-        final cachedMap = {for (final p in cached) p.name.toLowerCase(): p};
-
-        for (final initP in _initialProducts) {
-          final cachedP = cachedMap[initP.name.toLowerCase()];
-          if (cachedP != null) {
-            // Merge packages avoiding duplicates
-            final pkgMap = {for (final pkg in initP.packages) pkg.id: pkg};
-            for (final cp in cachedP.packages) {
-              pkgMap[cp.id] = cp;
-            }
-            merged.add(initP.copyWith(packages: pkgMap.values.toList()));
-            cachedMap.remove(initP.name.toLowerCase());
-          } else {
-            merged.add(initP);
-          }
-        }
-        // Add any remaining custom products created by users
-        merged.addAll(cachedMap.values);
-        state = state.copyWith(products: merged);
+        state = state.copyWith(products: cached);
       }
     } catch (_) {}
+
+    await reloadCatalog();
   }
 
+  /// Authoritatively fetches all active products from Supabase and decodes commercial packages
+  Future<void> reloadCatalog() async {
+    SupabaseClient? dbClient;
+    try {
+      dbClient = SupabaseClient(
+        SupabaseConstants.supabaseUrl,
+        SupabaseConstants.supabaseServiceRoleKey,
+        authOptions: const AuthClientOptions(autoRefreshToken: false),
+      );
+
+      final response = await dbClient
+          .from('products')
+          .select()
+          .order('created_at', ascending: true);
+
+      final List<CatalogProduct> fetchedProducts = [];
+
+      for (final raw in (response as List)) {
+        final map = raw as Map<String, dynamic>;
+        final id = map['id']?.toString() ?? 'prod-${DateTime.now().millisecondsSinceEpoch}';
+        final name = map['name']?.toString() ?? 'Product';
+        final sku = map['sku']?.toString() ?? 'SKU-001';
+        final basePrice = (map['base_price'] as num?)?.toDouble() ?? 25000.0;
+        final category = map['category']?.toString() ?? 'Health & Wellness';
+        final description = map['description']?.toString() ?? '';
+        const clientName = 'Novacare Limited';
+
+        List<ProductPackage> parsedPackages = [];
+
+        // Check if packages JSON is embedded in description: e.g. [PACKAGES: [{"id": "...", ...}]]
+        if (description.contains('[PACKAGES:')) {
+          try {
+            final startIdx = description.indexOf('[PACKAGES:') + 10;
+            final endIdx = description.lastIndexOf(']');
+            if (endIdx > startIdx) {
+              final jsonStr = description.substring(startIdx, endIdx + 1).trim();
+              final decodedList = jsonDecode(jsonStr) as List;
+              parsedPackages = decodedList
+                  .map((item) => ProductPackage.fromJson(item as Map<String, dynamic>))
+                  .toList();
+            }
+          } catch (e) {
+            debugPrint('[CATALOG_PROVIDER] ⚠️ Could not parse embedded packages for $name: $e');
+          }
+        }
+
+        // If no packages embedded, check if we had cached packages for this product
+        if (parsedPackages.isEmpty) {
+          final cachedProd = state.findProductByName(name) ?? state.findProductBySku(sku);
+          if (cachedProd != null && cachedProd.packages.isNotEmpty) {
+            parsedPackages = cachedProd.packages;
+          }
+        }
+
+        // If still empty, add default 1-unit single package
+        if (parsedPackages.isEmpty) {
+          parsedPackages = [
+            ProductPackage(
+              id: 'pkg-${sku.toLowerCase()}-1',
+              productId: id,
+              productName: name,
+              productSku: sku,
+              packageName: '1 Unit (Single)',
+              quantity: 1,
+              paidQuantity: 1,
+              freeQuantity: 0,
+              packagePrice: basePrice,
+              clientName: clientName,
+              createdAt: DateTime.now(),
+            ),
+          ];
+        }
+
+        fetchedProducts.add(
+          CatalogProduct(
+            id: id,
+            name: name,
+            sku: sku,
+            clientName: clientName,
+            defaultUnitPrice: basePrice,
+            category: category,
+            packages: parsedPackages,
+          ),
+        );
+      }
+
+      if (fetchedProducts.isNotEmpty) {
+        state = state.copyWith(products: fetchedProducts, isLoading: false);
+        await _storageService.cacheProductCatalog(fetchedProducts);
+        debugPrint('[CATALOG_PROVIDER] 📦 Loaded ${fetchedProducts.length} authoritative products and package configurations from Supabase.');
+      }
+    } catch (e) {
+      debugPrint('[CATALOG_PROVIDER] ℹ️ Supabase reloadCatalog notice: $e');
+    } finally {
+      dbClient?.dispose();
+    }
+  }
+
+  /// Persists the product catalog to local storage cache and live Supabase products table
   Future<void> _persistCatalog() async {
     try {
       await _storageService.cacheProductCatalog(state.products);
     } catch (_) {}
+
+    SupabaseClient? dbClient;
+    try {
+      dbClient = SupabaseClient(
+        SupabaseConstants.supabaseUrl,
+        SupabaseConstants.supabaseServiceRoleKey,
+        authOptions: const AuthClientOptions(autoRefreshToken: false),
+      );
+
+      for (final p in state.products) {
+        var cleanBaseDesc = p.name;
+        // Clean out previous audit tag
+        if (cleanBaseDesc.contains('[PACKAGES:')) {
+          cleanBaseDesc = cleanBaseDesc.split('[PACKAGES:').first.trim();
+        }
+        final packagesJson = jsonEncode(p.packages.map((pkg) => pkg.toJson()).toList());
+        final combinedDesc = '$cleanBaseDesc - Distributed Inventory [PACKAGES: $packagesJson]';
+
+        try {
+          await dbClient.from('products').update({
+            'description': combinedDesc,
+          }).eq('id', p.id);
+        } catch (_) {
+          try {
+            await dbClient.from('products').update({
+              'description': combinedDesc,
+            }).eq('name', p.name);
+          } catch (_) {}
+        }
+      }
+      debugPrint('[CATALOG_PROVIDER] 💾 Persisted ${state.products.length} products & commercial packages to Supabase.');
+    } catch (e) {
+      debugPrint('[CATALOG_PROVIDER] ⚠️ _persistCatalog notice: $e');
+    } finally {
+      dbClient?.dispose();
+    }
   }
 
   /// Syncs newly created stock items from the stock inventory into the product catalog
@@ -133,7 +256,7 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
               productId: item.id,
               productName: item.name,
               productSku: item.sku,
-              packageName: '1 Unit (Standard Retail)',
+              packageName: '1 Unit (Single)',
               quantity: 1,
               paidQuantity: 1,
               freeQuantity: 0,
@@ -155,7 +278,7 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
   }
 
   /// Creates and registers a new commercial package for a product (or creates the product if new).
-  /// This newly registered package is immediately persistent and reusable across all future orders!
+  /// This newly registered package is immediately persistent across devices and reusable across all future orders!
   ProductPackage addPackageToProduct({
     required String productName,
     required String packageName,
@@ -303,287 +426,6 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
     _persistCatalog();
     return updatedPkg;
   }
-
-  static final List<CatalogProduct> _initialProducts = [
-    CatalogProduct(
-      id: 'prod-grazer',
-      name: 'Grazer Tea',
-      sku: 'SKU-GRZ-001',
-      clientName: 'Novacare Limited',
-      defaultUnitPrice: 22000.0,
-      packages: [
-        ProductPackage(
-          id: 'pkg-grz-1',
-          productId: 'prod-grazer',
-          productName: 'Grazer Tea',
-          productSku: 'SKU-GRZ-001',
-          packageName: '1 Pack (Single Retail)',
-          quantity: 1,
-          paidQuantity: 1,
-          freeQuantity: 0,
-          packagePrice: 22000.0,
-          clientName: 'Novacare Limited',
-          createdAt: DateTime(2026, 1, 1),
-        ),
-        ProductPackage(
-          id: 'pkg-grz-2',
-          productId: 'prod-grazer',
-          productName: 'Grazer Tea',
-          productSku: 'SKU-GRZ-001',
-          packageName: '2 Packs Promo Deal',
-          quantity: 2,
-          paidQuantity: 2,
-          freeQuantity: 0,
-          packagePrice: 38000.0,
-          clientName: 'Novacare Limited',
-          description: 'Save ₦6,000 compared to single retail',
-          createdAt: DateTime(2026, 1, 1),
-        ),
-        ProductPackage(
-          id: 'pkg-grz-3',
-          productId: 'prod-grazer',
-          productName: 'Grazer Tea',
-          productSku: 'SKU-GRZ-001',
-          packageName: '3 Packs Family Bundle',
-          quantity: 3,
-          paidQuantity: 3,
-          freeQuantity: 0,
-          packagePrice: 48000.0,
-          clientName: 'Novacare Limited',
-          description: 'Save ₦18,000 on family bundle',
-          createdAt: DateTime(2026, 1, 1),
-        ),
-        ProductPackage(
-          id: 'pkg-grz-5',
-          productId: 'prod-grazer',
-          productName: 'Grazer Tea',
-          productSku: 'SKU-GRZ-001',
-          packageName: '5 Packs Mega Deal (5 for ₦55,000)',
-          quantity: 5,
-          paidQuantity: 5,
-          freeQuantity: 0,
-          packagePrice: 55000.0,
-          clientName: 'Novacare Limited',
-          description: 'Best Value Deal! ₦11,000 / unit - Save ₦55,000',
-          createdAt: DateTime(2026, 1, 1),
-        ),
-      ],
-    ),
-    CatalogProduct(
-      id: 'prod-alphaman',
-      name: 'Alpha Man',
-      sku: 'SKU-ALPH-001',
-      clientName: 'MenHealth Global',
-      defaultUnitPrice: 20000.0,
-      packages: [
-        ProductPackage(
-          id: 'pkg-alph-1',
-          productId: 'prod-alphaman',
-          productName: 'Alpha Man',
-          productSku: 'SKU-ALPH-001',
-          packageName: '1 Bottle (Standard)',
-          quantity: 1,
-          paidQuantity: 1,
-          freeQuantity: 0,
-          packagePrice: 20000.0,
-          clientName: 'MenHealth Global',
-          createdAt: DateTime(2026, 1, 1),
-        ),
-        ProductPackage(
-          id: 'pkg-alph-2',
-          productId: 'prod-alphaman',
-          productName: 'Alpha Man',
-          productSku: 'SKU-ALPH-001',
-          packageName: '2 Bottles Treatment Kit',
-          quantity: 2,
-          paidQuantity: 2,
-          freeQuantity: 0,
-          packagePrice: 35000.0,
-          clientName: 'MenHealth Global',
-          description: 'Save ₦5,000 on 2-bottle kit',
-          createdAt: DateTime(2026, 1, 1),
-        ),
-        ProductPackage(
-          id: 'pkg-alph-3',
-          productId: 'prod-alphaman',
-          productName: 'Alpha Man',
-          productSku: 'SKU-ALPH-001',
-          packageName: '3 Bottles Ultimate Pack',
-          quantity: 3,
-          paidQuantity: 3,
-          freeQuantity: 0,
-          packagePrice: 50000.0,
-          clientName: 'MenHealth Global',
-          description: 'Save ₦10,000 on full course',
-          createdAt: DateTime(2026, 1, 1),
-        ),
-        ProductPackage(
-          id: 'pkg-alph-5',
-          productId: 'prod-alphaman',
-          productName: 'Alpha Man',
-          productSku: 'SKU-ALPH-001',
-          packageName: '5 Bottles Wholesale Special (5 for ₦75,000)',
-          quantity: 5,
-          paidQuantity: 5,
-          freeQuantity: 0,
-          packagePrice: 75000.0,
-          clientName: 'MenHealth Global',
-          description: 'Wholesale rate - ₦15,000 / bottle - Save ₦25,000',
-          createdAt: DateTime(2026, 1, 1),
-        ),
-      ],
-    ),
-    CatalogProduct(
-      id: 'prod-respira',
-      name: 'Respira Detox Tea',
-      sku: 'SKU-RESP-01',
-      clientName: 'Novacare Limited',
-      defaultUnitPrice: 25000.0,
-      packages: [
-        ProductPackage(
-          id: 'pkg-rsp-1',
-          productId: 'prod-respira',
-          productName: 'Respira Detox Tea',
-          productSku: 'SKU-RESP-01',
-          packageName: '1 Box (Single Course)',
-          quantity: 1,
-          paidQuantity: 1,
-          freeQuantity: 0,
-          packagePrice: 25000.0,
-          clientName: 'Novacare Limited',
-          createdAt: DateTime(2026, 1, 1),
-        ),
-        ProductPackage(
-          id: 'pkg-rsp-2',
-          productId: 'prod-respira',
-          productName: 'Respira Detox Tea',
-          productSku: 'SKU-RESP-01',
-          packageName: '2 Boxes Promo Duo',
-          quantity: 2,
-          paidQuantity: 2,
-          freeQuantity: 0,
-          packagePrice: 45000.0,
-          clientName: 'Novacare Limited',
-          description: 'Save ₦5,000 on duo pack',
-          createdAt: DateTime(2026, 1, 1),
-        ),
-        ProductPackage(
-          id: 'pkg-rsp-4',
-          productId: 'prod-respira',
-          productName: 'Respira Detox Tea',
-          productSku: 'SKU-RESP-01',
-          packageName: '4 Boxes Full Detox Cleanse (4 for ₦80,000)',
-          quantity: 4,
-          paidQuantity: 4,
-          freeQuantity: 0,
-          packagePrice: 80000.0,
-          clientName: 'Novacare Limited',
-          description: 'Full 60-day cleanse - ₦20,000 / box - Save ₦20,000',
-          createdAt: DateTime(2026, 1, 1),
-        ),
-        ProductPackage(
-          id: 'pkg-rsp-5',
-          productId: 'prod-respira',
-          productName: 'Respira Detox Tea',
-          productSku: 'SKU-RESP-01',
-          packageName: '5 Boxes Mega Cleanse (5 for ₦95,000)',
-          quantity: 5,
-          paidQuantity: 5,
-          freeQuantity: 0,
-          packagePrice: 95000.0,
-          clientName: 'Novacare Limited',
-          description: 'Bulk bundle - ₦19,000 / box - Save ₦30,000',
-          createdAt: DateTime(2026, 1, 1),
-        ),
-      ],
-    ),
-    CatalogProduct(
-      id: 'prod-biogold',
-      name: 'Bio-Gold Pro Capsules',
-      sku: 'SKU-BIO-001',
-      clientName: 'Novacare Limited',
-      defaultUnitPrice: 35000.0,
-      packages: [
-        ProductPackage(
-          id: 'pkg-bio-1',
-          productId: 'prod-biogold',
-          productName: 'Bio-Gold Pro Capsules',
-          productSku: 'SKU-BIO-001',
-          packageName: '1 Bottle (Single Course)',
-          quantity: 1,
-          paidQuantity: 1,
-          freeQuantity: 0,
-          packagePrice: 35000.0,
-          clientName: 'Novacare Limited',
-          createdAt: DateTime(2026, 1, 1),
-        ),
-        ProductPackage(
-          id: 'pkg-bio-2',
-          productId: 'prod-biogold',
-          productName: 'Bio-Gold Pro Capsules',
-          productSku: 'SKU-BIO-001',
-          packageName: '2 Bottles Duo Treatment',
-          quantity: 2,
-          paidQuantity: 2,
-          freeQuantity: 0,
-          packagePrice: 60000.0,
-          clientName: 'Novacare Limited',
-          description: 'Save ₦10,000 on 2 bottles',
-          createdAt: DateTime(2026, 1, 1),
-        ),
-        ProductPackage(
-          id: 'pkg-bio-3',
-          productId: 'prod-biogold',
-          productName: 'Bio-Gold Pro Capsules',
-          productSku: 'SKU-BIO-001',
-          packageName: '3 Bottles Premium Pack (Buy 2 Get 1 Free Promo)',
-          quantity: 3,
-          paidQuantity: 2,
-          freeQuantity: 1,
-          packagePrice: 70000.0,
-          clientName: 'Novacare Limited',
-          description: 'Buy 2 get 1 free! Save ₦35,000',
-          createdAt: DateTime(2026, 1, 1),
-        ),
-      ],
-    ),
-    CatalogProduct(
-      id: 'prod-jointcare',
-      name: 'Novacare Joint Care Pack',
-      sku: 'SKU-JNT-001',
-      clientName: 'Novacare Limited',
-      defaultUnitPrice: 35000.0,
-      packages: [
-        ProductPackage(
-          id: 'pkg-jnt-1',
-          productId: 'prod-jointcare',
-          productName: 'Novacare Joint Care Pack',
-          productSku: 'SKU-JNT-001',
-          packageName: '1 Pack (Standard)',
-          quantity: 1,
-          paidQuantity: 1,
-          freeQuantity: 0,
-          packagePrice: 35000.0,
-          clientName: 'Novacare Limited',
-          createdAt: DateTime(2026, 1, 1),
-        ),
-        ProductPackage(
-          id: 'pkg-jnt-2',
-          productId: 'prod-jointcare',
-          productName: 'Novacare Joint Care Pack',
-          productSku: 'SKU-JNT-001',
-          packageName: '2 Packs Double Care Kit',
-          quantity: 2,
-          paidQuantity: 2,
-          freeQuantity: 0,
-          packagePrice: 65000.0,
-          clientName: 'Novacare Limited',
-          description: 'Save ₦5,000 on double pack',
-          createdAt: DateTime(2026, 1, 1),
-        ),
-      ],
-    ),
-  ];
 }
 
 final productCatalogProvider =

@@ -224,6 +224,30 @@ class OrderEntity {
       ? '${latitude!.toStringAsFixed(5)}, ${longitude!.toStringAsFixed(5)}'
       : 'Not Geocoded';
 
+  /// Returns the extracted GPS proof string or coordinates showing physical presence
+  String? get loggedGpsProof {
+    if (deliveryNotes != null) {
+      final gpsMatch = RegExp(r'\[(?:Audit\s+)?GPS(?:\s+Proof)?:\s*([^\]]+)\]', caseSensitive: false).firstMatch(deliveryNotes!);
+      if (gpsMatch != null && gpsMatch.group(1) != null) {
+        return gpsMatch.group(1)!.trim();
+      }
+    }
+    if (hasCoordinates) {
+      return '${latitude!.toStringAsFixed(5)}°, ${longitude!.toStringAsFixed(5)}°';
+    }
+    return null;
+  }
+
+  String get presenceProofSummary {
+    if (hasCoordinates) {
+      return 'GPS: ${latitude!.toStringAsFixed(5)}°, ${longitude!.toStringAsFixed(5)}° (Presence Verified)';
+    }
+    if (loggedGpsProof != null) {
+      return 'GPS Proof: $loggedGpsProof';
+    }
+    return 'Location Pending';
+  }
+
   String get confidenceDisplay {
     if (isLocationVerified) return 'Verified Gate PIN ($effectiveGatePin)';
     switch (locationConfidence?.toLowerCase()) {

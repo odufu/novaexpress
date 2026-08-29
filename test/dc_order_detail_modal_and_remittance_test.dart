@@ -266,6 +266,7 @@ void main() {
         assignedAt: DateTime(2026, 8, 27, 10, 0),
         deliveredAt: DateTime(2026, 8, 27, 14, 15),
         remittedAt: DateTime(2026, 8, 27, 15, 0),
+        customerSignatureUrl: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
       );
 
       final container = ProviderContainer(
@@ -333,7 +334,7 @@ void main() {
       expect(find.text('🏢 Net Merchant Settlement Payable:'), findsOneWidget);
 
       // 6. Proof of Delivery
-      expect(find.text('Fulfilled & Signed by Fatima Abdullahi'), findsOneWidget);
+      expect(find.textContaining('Recipient: Fatima Abdullahi'), findsOneWidget);
     });
 
     testWidgets('Renders failed delivery ticket with prominent failure alert and logged reason', (tester) async {

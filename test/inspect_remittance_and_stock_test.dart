@@ -53,5 +53,5 @@ void main() {
     for (final p in products) {
       print('Product ID: ${p['id']} | Name: ${p['name']} | Price: ${p['base_price']}');
     }
-  });
+  }, skip: 'Scratch inspect script');
 }

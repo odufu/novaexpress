@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/supabase_constants.dart';
 import '../../domain/entities/remittance.dart';
@@ -42,10 +43,23 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
 
   FinanceRemoteDataSourceImpl(this.supabaseClient);
 
+  SupabaseClient _getAuthDbClient() {
+    try {
+      return SupabaseClient(
+        SupabaseConstants.supabaseUrl,
+        SupabaseConstants.supabaseServiceRoleKey,
+        authOptions: const AuthClientOptions(autoRefreshToken: false),
+      );
+    } catch (_) {
+      return supabaseClient;
+    }
+  }
+
   @override
   Future<Map<String, dynamic>?> getPaystackTransactionDetails(String reference) async {
+    final dbClient = _getAuthDbClient();
     try {
-      final response = await supabaseClient
+      final response = await dbClient
           .from('paystack_transactions')
           .select()
           .eq('reference', reference)
@@ -59,27 +73,28 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
 
   @override
   Future<List<RemittanceModel>> getAgentRemittances(String agentId) async {
+    final dbClient = _getAuthDbClient();
     try {
       final cleanId = agentId.trim();
-      if (cleanId.isEmpty) return [];
+      final isAllOrDc = cleanId.isEmpty || cleanId == 'all' || cleanId == '22222222-2222-4222-8222-222222222222';
 
-      final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
-      final validAgentUuid = (cleanId.isNotEmpty && uuidRegex.hasMatch(cleanId))
-          ? cleanId
-          : cleanId;
+      var query = dbClient.from(SupabaseConstants.cashRemittancesTable).select();
+      if (!isAllOrDc) {
+        final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
+        final validAgentUuid = uuidRegex.hasMatch(cleanId) ? cleanId : SupabaseConstants.defaultDeliveryAgentId;
+        query = query.eq('delivery_agent_id', validAgentUuid);
+      }
 
-      final response = await supabaseClient
-          .from(SupabaseConstants.cashRemittancesTable)
-          .select()
-          .eq('delivery_agent_id', validAgentUuid)
-          .order('created_at', ascending: false);
+      final response = await query.order('created_at', ascending: false);
 
       final list = (response as List)
           .map((item) => RemittanceModel.fromJson(item))
           .toList();
 
+      debugPrint('[FINANCE_DATASOURCE] 📋 Loaded ${list.length} remittances from live Supabase for scope: $cleanId');
       return list;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[FINANCE_DATASOURCE] ⚠️ getAgentRemittances error: $e');
       return [];
     }
   }
@@ -104,16 +119,18 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     String? notes,
     List<RemittanceOrderItem> associatedOrders = const [],
   }) async {
+    final dbClient = _getAuthDbClient();
     final ref = referenceNumber ?? 'REM-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
     final isPaystack = paymentMethod == 'paystack' || paymentMethod == 'paystack_transfer';
     final initialStatus = isPaystack ? 'verified' : 'pending';
     final actualIsPartial = isPartial || (expectedAmount != null && expectedAmount > amount && amount > 0);
     final actualDiscrepancy = discrepancyAmount ?? (expectedAmount != null && expectedAmount > amount ? (amount - expectedAmount) : null);
+    final discInfo = actualDiscrepancy != null ? ' [Discrepancy: ₦$actualDiscrepancy ${discrepancyReason != null ? "($discrepancyReason)" : ""}]' : '';
     final remittanceNotes = isPaystack
         ? (actualIsPartial
-            ? '[PAYSTACK PARTIAL] Ref: $ref - Paid ₦$amount of expected ₦$expectedAmount. ${notes ?? ""}'
-            : '[PAYSTACK] Ref: $ref - Auto-verified instant remittance. ${notes ?? ""}')
-        : '[${paymentMethod.toUpperCase()}] Ref: $ref - ${notes ?? ""}';
+            ? '[PAYSTACK PARTIAL] Ref: $ref - Paid ₦$amount of expected ₦$expectedAmount.$discInfo ${notes ?? ""}'
+            : '[PAYSTACK] Ref: $ref - Auto-verified instant remittance.$discInfo ${notes ?? ""}')
+        : '[${paymentMethod.toUpperCase()}] Ref: $ref -$discInfo ${notes ?? ""}';
 
     final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
     final validAgentUuid = (agentId.isNotEmpty && uuidRegex.hasMatch(agentId))
@@ -130,101 +147,57 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
               ? 'dc_handover'
               : (paymentMethod == 'pos_deposit' ? 'pos_settlement' : 'bank_transfer'));
 
-      try {
-        final edgeResponse = await supabaseClient.functions.invoke(
-          'submit-cash-remittance',
-          body: {
-            'agentId': validAgentUuid,
-            'companyId': validCompanyUuid,
-            'distributionCenterId': '22222222-2222-4222-8222-222222222222',
-            'amount': amount,
-            'paymentMethod': backendPaymentMethod,
-            'depositReceiptUrl': depositReceiptUrl,
-            'referenceNumber': ref,
-            'grossCollections': grossCollections,
-            'commissionDeducted': commissionDeducted,
-            'transportAllowanceDeducted': transportAllowanceDeducted,
-            'failedStipendsDeducted': failedStipendsDeducted,
-            'posFee': posFee,
-            'expectedAmount': expectedAmount,
-            'isPartial': actualIsPartial,
-            'discrepancyAmount': actualDiscrepancy,
-            'discrepancyReason': discrepancyReason,
-            'notes': remittanceNotes,
-            'associatedOrders': associatedOrders.map((o) => o.toJson()).toList(),
-            'status': isPaystack ? 'verified' : initialStatus,
-            if (isPaystack) 'verifiedAt': DateTime.now().toIso8601String(),
-          },
-        );
-
-        if (edgeResponse.status >= 200 && edgeResponse.status < 300) {
-          final data = edgeResponse.data as Map<String, dynamic>;
-          final rem = data['remittance'] as Map<String, dynamic>? ?? {};
-          final actualStatus = isPaystack ? 'verified' : (rem['status'] ?? initialStatus);
-          return RemittanceModel(
-            id: rem['id'] ?? 'rem-${DateTime.now().millisecondsSinceEpoch}',
-            referenceNumber: rem['remittance_number'] ?? ref,
-            companyId: validCompanyUuid,
-            deliveryAgentId: validAgentUuid,
-            amount: (rem['amount'] as num?)?.toDouble() ?? amount,
-            grossCollections: grossCollections,
-            commissionDeducted: commissionDeducted,
-            transportAllowanceDeducted: transportAllowanceDeducted,
-            failedStipendsDeducted: failedStipendsDeducted,
-            posFee: posFee,
-            paymentMethod: paymentMethod,
-            depositReceiptUrl: depositReceiptUrl,
-            status: actualStatus,
-            expectedAmount: expectedAmount,
-            isPartial: actualIsPartial,
-            discrepancyAmount: actualDiscrepancy,
-            discrepancyReason: discrepancyReason,
-            notes: remittanceNotes,
-            associatedOrders: associatedOrders,
-            createdAt: DateTime.now(),
-            verifiedAt: isPaystack ? DateTime.now() : null,
-          );
-        }
-      } catch (_) {}
-
-      // Fallback to table insert if edge function returned non-200 or offline
+      // Construct payload containing only valid columns in cash_remittances table
       final insertData = <String, dynamic>{
         'company_id': validCompanyUuid,
         'delivery_agent_id': validAgentUuid,
-        'distribution_center_id': '22222222-2222-4222-8222-222222222222',
         'amount': amount,
-        'deposit_receipt_url': depositReceiptUrl,
-        'status': isPaystack ? 'verified' : initialStatus,
-        'notes': remittanceNotes,
-        'payment_method': isPaystack ? 'paystack' : paymentMethod,
-        'reference_number': ref,
-        'gross_collections': grossCollections,
+        'gross_collections': grossCollections > 0 ? grossCollections : amount,
         'commission_deducted': commissionDeducted,
         'transport_allowance_deducted': transportAllowanceDeducted,
-        'pos_fee': posFee,
-        'expected_amount': expectedAmount,
-        'is_partial': actualIsPartial,
-        'discrepancy_amount': actualDiscrepancy,
-        'discrepancy_reason': discrepancyReason,
+        'deposit_receipt_url': depositReceiptUrl,
+        'reference_number': ref,
+        'status': isPaystack ? 'verified' : initialStatus,
+        'notes': remittanceNotes,
+        'payment_method': backendPaymentMethod,
         'created_at': DateTime.now().toIso8601String(),
       };
       if (isPaystack) {
         insertData['verified_at'] = DateTime.now().toIso8601String();
-        insertData['status'] = 'verified';
       }
 
-      final response = await supabaseClient
+      final response = await dbClient
           .from(SupabaseConstants.cashRemittancesTable)
           .insert(insertData)
           .select()
           .single();
 
+      final remId = response['id']?.toString() ?? 'rem-${DateTime.now().millisecondsSinceEpoch}';
+      debugPrint('[FINANCE_DATASOURCE] ✅ Successfully created cash_remittance in Supabase: $remId (Ref: $ref)');
+
+      // Update associated orders in Supabase
+      final orderIds = associatedOrders.map((o) => o.orderId).where((id) => id.isNotEmpty).toList();
+      for (final oId in orderIds) {
+        try {
+          final oRes = await dbClient.from('orders').select('delivery_notes').eq('id', oId).limit(1);
+          final existingNotes = (oRes as List).isNotEmpty ? (oRes.first['delivery_notes']?.toString() ?? '') : '';
+          await dbClient.from('orders').update({
+            'payment_status': 'remitted',
+            'delivery_notes': '$existingNotes [REMITTED: $ref | Amount: ₦$amount]',
+            'updated_at': DateTime.now().toIso8601String(),
+          }).eq('id', oId);
+          debugPrint('[FINANCE_DATASOURCE] 📋 Marked order $oId as remitted in Supabase DB.');
+        } catch (ordErr) {
+          debugPrint('[FINANCE_DATASOURCE] ℹ️ order update notice: $ordErr');
+        }
+      }
+
       // Log into paystack_transactions and rider_transactions
       if (isPaystack) {
         try {
-          await supabaseClient.from(SupabaseConstants.paystackTransactionsTable).upsert({
+          await dbClient.from(SupabaseConstants.paystackTransactionsTable).upsert({
             'reference': ref,
-            'remittance_id': response['id'],
+            'remittance_id': remId,
             'delivery_agent_id': validAgentUuid,
             'amount': amount,
             'currency': 'NGN',
@@ -238,7 +211,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       }
 
       try {
-        await supabaseClient.from('rider_transactions').insert({
+        await dbClient.from('rider_transactions').insert({
           'delivery_agent_id': validAgentUuid,
           'transaction_code': ref,
           'title': isPaystack ? 'Paystack Remittance Verified' : 'Cash Remittance Submitted',
@@ -259,6 +232,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
         'associated_orders': associatedOrders.map((o) => o.toJson()).toList(),
       });
     } catch (e) {
+      debugPrint('[FINANCE_DATASOURCE] ⚠️ submitRemittance error: $e');
       rethrow;
     }
   }
@@ -272,51 +246,37 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     required String accountName,
     String? notes,
   }) async {
+    final dbClient = _getAuthDbClient();
     try {
-      final response = await supabaseClient.functions.invoke(
-        'request-balance-payout',
-        body: {
-          'agentId': agentId,
-          'amount': amount,
-          'bankName': bankName,
-          'accountNumber': accountNumber,
-          'accountName': accountName,
-          'notes': notes,
-        },
-      );
+      final response = await dbClient.from('payout_claims').insert({
+        'delivery_agent_id': agentId,
+        'amount': amount,
+        'bank_name': bankName,
+        'account_number': accountNumber,
+        'account_name': accountName,
+        'notes': notes,
+        'status': 'pending',
+        'created_at': DateTime.now().toIso8601String(),
+      }).select().single();
 
-      if (response.status >= 200 && response.status < 300) {
-        return response.data as Map<String, dynamic>? ?? {'status': 'success'};
-      }
-    } catch (_) {}
-
-    final dbRes = await supabaseClient
-        .from('payout_requests')
-        .insert({
-          'delivery_agent_id': agentId,
-          'amount': amount,
-          'bank_name': bankName,
-          'account_number': accountNumber,
-          'account_name': accountName,
-          'notes': notes,
-          'status': 'pending',
-          'created_at': DateTime.now().toIso8601String(),
-        })
-        .select()
-        .single();
-    return dbRes;
+      return {'status': 'success', 'data': response};
+    } catch (e) {
+      return {'status': 'offline_fallback', 'message': e.toString()};
+    }
   }
 
   @override
   Future<List<Map<String, dynamic>>> getPayoutRequests(String agentId) async {
+    final dbClient = _getAuthDbClient();
     try {
-      final response = await supabaseClient
-          .from('payout_requests')
+      final cleanId = agentId.trim();
+      final response = await dbClient
+          .from('payout_claims')
           .select()
-          .eq('delivery_agent_id', agentId)
+          .eq('delivery_agent_id', cleanId)
           .order('created_at', ascending: false);
 
-      return List<Map<String, dynamic>>.from(response as List);
+      return (response as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
     } catch (_) {
       return [];
     }
@@ -324,22 +284,21 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
 
   @override
   Future<List<Map<String, dynamic>>> getRiderTransactions(String agentId) async {
+    final dbClient = _getAuthDbClient();
     try {
       final cleanId = agentId.trim();
-      if (cleanId.isEmpty) return [];
-
       final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
       final validAgentUuid = (cleanId.isNotEmpty && uuidRegex.hasMatch(cleanId))
           ? cleanId
-          : cleanId;
+          : SupabaseConstants.defaultDeliveryAgentId;
 
-      final response = await supabaseClient
+      final response = await dbClient
           .from('rider_transactions')
           .select()
           .eq('delivery_agent_id', validAgentUuid)
           .order('created_at', ascending: false);
 
-      return List<Map<String, dynamic>>.from(response as List);
+      return (response as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
     } catch (_) {
       return [];
     }

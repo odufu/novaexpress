@@ -23,6 +23,7 @@ import 'package:novexps/features/orders/data/repositories/orders_repository_impl
 import 'package:novexps/features/orders/presentation/providers/orders_provider.dart';
 import 'package:novexps/features/stock/data/datasources/stock_remote_datasource.dart';
 import 'package:novexps/features/stock/data/repositories/stock_repository_impl.dart';
+import 'package:novexps/features/stock/domain/entities/rider_stock_allocation.dart';
 import 'package:novexps/features/stock/presentation/providers/stock_provider.dart';
 
 class _MockNotificationsRepo implements NotificationsRepository {
@@ -284,7 +285,27 @@ void main() {
       stockRemoteDataSourceProvider.overrideWithValue(_MockStockRemoteDS()),
       stockProvider.overrideWith((ref) {
         final notifier = StockNotifier(repository: StockRepositoryImpl(remoteDataSource: _MockStockRemoteDS()));
-        notifier.state = const StockState(stockItems: [], isLoading: false);
+        notifier.state = StockState(
+          stockItems: const [],
+          riderAllocations: [
+            RiderStockAllocation(
+              id: 'alloc_emeka',
+              riderId: 'drv-001',
+              riderName: 'Emeka Rider',
+              riderCode: 'PDA-7000',
+              productId: 'prod-1',
+              productName: 'Respira Detox Tea',
+              sku: 'SKU-RESP-01',
+              clientName: 'Novacare Limited',
+              allocatedUnits: 10,
+              deliveredUnits: 0,
+              inCustodyUnits: 10,
+              unitPrice: 25000,
+              allocatedAt: DateTime.now(),
+            ),
+          ],
+          isLoading: false,
+        );
         return notifier;
       }),
       notificationsRemoteDataSourceProvider.overrideWithValue(_MockNotificationsRemoteDS()),
