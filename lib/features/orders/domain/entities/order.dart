@@ -175,6 +175,7 @@ class OrderEntity {
   bool get isDistributedInventory => fulfillmentType == 'distributed_inventory';
   bool get isDelivered => status.toLowerCase() == 'delivered' || status.toLowerCase() == 'completed';
   bool get isFailed => status.toLowerCase() == 'failed' || status.toLowerCase() == 'failed_attempt' || status.toLowerCase() == 'call_back' || status.toLowerCase() == 'cancelled';
+  bool get isCancelled => status.toLowerCase() == 'cancelled';
   bool get isUnassigned => deliveryAgentId == null || deliveryAgentId!.isEmpty;
   bool get isAssignedInTransit => !isUnassigned && !isDelivered && !isFailed;
 

@@ -392,5 +392,68 @@ void main() {
       expect(find.text('Delivery Failed / Rescheduled Ticket'), findsOneWidget);
       expect(find.text('Logged Reason: Customer phone switched off after 4 attempts. Rescheduled to tomorrow.'), findsOneWidget);
     });
+
+    testWidgets('Unassigned order in DCOrderDetailModal displays Dispatch / Assign Rider buttons that open DCAssignOrderModal', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1280, 900));
+
+      final unassignedOrder = OrderEntity(
+        id: 'ord-unassigned-1',
+        orderNumber: 'TRK-9900',
+        customerName: 'Oluwaseun Adeyemi',
+        customerPhone: '+234 802 333 4444',
+        deliveryState: 'Lagos',
+        deliveryCity: 'Ikeja',
+        deliveryAddress: '12 Allen Avenue, Ikeja',
+        productName: 'Grazer Herbal Detox Tea',
+        quantity: 5,
+        paidQuantity: 4,
+        freeQuantity: 1,
+        basePrice: 55000,
+        upsellAmount: 0,
+        totalAmount: 55000,
+        paymentType: 'pay_on_delivery',
+        paymentStatus: 'pending',
+        fulfillmentType: 'distributed_inventory',
+        clientName: 'NovaCare Limited',
+        status: 'pending',
+        deliveryAgentId: null,
+        deliveryAgentName: null,
+        createdAt: DateTime(2026, 8, 29, 10, 0),
+      );
+
+      final container = ProviderContainer(
+        overrides: [
+          ordersProvider.overrideWith((ref) => _MockOrdersNotifier([unassignedOrder])),
+          stockProvider.overrideWith((ref) => _MockStockNotifier([])),
+          dcConsoleProvider.overrideWith((ref) => _MockDCConsoleNotifier()),
+        ],
+      );
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            home: Scaffold(
+              body: DCOrderDetailModal(order: unassignedOrder),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Verify unassigned notice & buttons
+      expect(find.text('This order is currently unassigned in the DC pool and not held in any rider\'s vehicle.'), findsOneWidget);
+      expect(find.text('Assign Rider'), findsOneWidget); // In custody card
+      expect(find.text('Dispatch / Assign Rider'), findsOneWidget); // In footer actions
+
+      // Tap footer "Dispatch / Assign Rider" button
+      await tester.tap(find.text('Dispatch / Assign Rider'));
+      await tester.pumpAndSettle();
+
+      // Verify DCAssignOrderModal opens with rider list
+      expect(find.text('Dispatch Order TRK-9900'), findsOneWidget);
+      expect(find.text('Emeka Okafor'), findsWidgets);
+      expect(find.text('Select a rider above to dispatch'), findsOneWidget);
+    });
   });
 }

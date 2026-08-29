@@ -16,6 +16,7 @@ import '../../../stock/domain/entities/stock_item.dart';
 import '../../../stock/presentation/providers/stock_provider.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
 import '../providers/dc_console_provider.dart';
+import 'dc_assign_order_modal.dart';
 
 class DCOrderDetailModal extends ConsumerStatefulWidget {
   final OrderEntity order;
@@ -658,11 +659,11 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
                     ],
                   ),
                 ),
-                if (!_currentOrder.isDelivered)
+                if (!_currentOrder.isDelivered && !_currentOrder.isCancelled)
                   OutlinedButton.icon(
-                    onPressed: () => _showReassignDialog(context, isDark, allDrivers),
+                    onPressed: () => _openAssignModal(context),
                     icon: const Icon(Icons.swap_horiz_rounded, size: 14),
-                    label: const Text('Reassign', style: TextStyle(fontSize: 11)),
+                    label: const Text('Reassign Rider', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                   ),
               ],
             )
@@ -672,6 +673,7 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
               decoration: BoxDecoration(
                 color: const Color(0xFFF59E0B).withValues(alpha: isDark ? 0.15 : 0.08),
                 borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [
@@ -681,6 +683,17 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
                     child: Text(
                       'This order is currently unassigned in the DC pool and not held in any rider\'s vehicle.',
                       style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500, color: const Color(0xFFD97706)),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  ElevatedButton.icon(
+                    onPressed: () => _openAssignModal(context),
+                    icon: const Icon(Icons.person_add_alt_1_rounded, size: 14, color: Colors.white),
+                    label: const Text('Assign Rider', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFF37021),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
                   ),
                 ],
@@ -1304,13 +1317,24 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
             children: [
               if (_currentOrder.isUnassigned)
                 ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    _showReassignDialog(context, isDark, allDrivers);
-                  },
+                  onPressed: () => _openAssignModal(context),
                   icon: const Icon(Icons.person_add_alt_1_rounded, size: 15, color: Colors.white),
                   label: const Text('Dispatch / Assign Rider', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFF37021),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                )
+              else if (!_currentOrder.isDelivered && !_currentOrder.isCancelled)
+                OutlinedButton.icon(
+                  onPressed: () => _openAssignModal(context),
+                  icon: const Icon(Icons.swap_horiz_rounded, size: 15),
+                  label: const Text('Reassign Rider', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
                 ),
             ],
           ),
@@ -1319,62 +1343,11 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
     );
   }
 
-  void _showReassignDialog(BuildContext context, bool isDark, List<DCFleetDriver> drivers) {
-    final messenger = ScaffoldMessenger.of(context);
-    final stockState = ref.read(stockProvider);
-    final order = _currentOrder;
-
-    showDialog(
+  Future<void> _openAssignModal(BuildContext context) async {
+    await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Assign Order to Rider', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
-        content: SizedBox(
-          width: 450,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: drivers.map((d) {
-                final driverAllocations = stockState.getAllocationsForRider(d.id, d.driverCode);
-                int riderUnits = 0;
-                for (final a in driverAllocations) {
-                  if (a.productName.toLowerCase().contains(order.productName.toLowerCase()) ||
-                      order.productName.toLowerCase().contains(a.productName.toLowerCase())) {
-                    riderUnits += a.inCustodyUnits;
-                  }
-                }
-
-                return ListTile(
-                  leading: UserAvatarWidget(
-                    avatarUrl: d.avatarUrl,
-                    fullName: d.name,
-                    radius: 20,
-                  ),
-                  title: Text(d.name, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13)),
-                  subtitle: Text('${d.driverCode} • Zone: ${d.assignedZone} • In Vehicle: $riderUnits units', style: GoogleFonts.inter(fontSize: 11)),
-                  trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
-                  onTap: () async {
-                    Navigator.of(ctx).pop();
-                    final success = await ref.read(ordersProvider.notifier).assignOrderToRider(
-                          orderId: order.id,
-                          riderId: d.id,
-                          riderName: d.name,
-                          riderCode: d.driverCode,
-                        );
-                    messenger.showSnackBar(
-                      SnackBar(
-                        content: Text(success ? '✅ Order ${order.orderNumber} assigned to ${d.name}!' : '⚠️ Could not assign order.'),
-                        backgroundColor: success ? const Color(0xFF10B981) : const Color(0xFFEF4444),
-                      ),
-                    );
-                  },
-                );
-              }).toList(),
-            ),
-          ),
-        ),
-      ),
+      barrierDismissible: false,
+      builder: (ctx) => DCAssignOrderModal(order: _currentOrder),
     );
   }
 
