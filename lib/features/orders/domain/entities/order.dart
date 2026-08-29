@@ -204,6 +204,7 @@ class OrderEntity {
   int get totalPhysicalQuantity => paidQuantity + freeQuantity > 0 ? paidQuantity + freeQuantity : quantity;
   bool get hasCoordinates => latitude != null && longitude != null && latitude != 0.0 && longitude != 0.0;
   bool get hasSignature => customerSignatureUrl != null && customerSignatureUrl!.isNotEmpty;
+  bool get hasPhotoProof => photoProofUrl != null && photoProofUrl!.isNotEmpty;
 
   /// Returns the explicit or deterministic audit Gate PIN for this order
   String get effectiveGatePin {

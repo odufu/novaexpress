@@ -182,7 +182,10 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
           final oRes = await dbClient.from('orders').select('delivery_notes').eq('id', oId).limit(1);
           final existingNotes = (oRes as List).isNotEmpty ? (oRes.first['delivery_notes']?.toString() ?? '') : '';
           await dbClient.from('orders').update({
-            'payment_status': 'remitted',
+            'payment_status': 'collected',
+            'remittance_status': 'remitted',
+            'financial_settlement_status': 'cash_remitted_verified',
+            'remitted_at': DateTime.now().toIso8601String(),
             'delivery_notes': '$existingNotes [REMITTED: $ref | Amount: ₦$amount]',
             'updated_at': DateTime.now().toIso8601String(),
           }).eq('id', oId);

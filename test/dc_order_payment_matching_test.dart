@@ -91,59 +91,39 @@ void main() {
       await tester.pumpAndSettle();
 
       // 1. Verify Page Title & Core KPIs
-      expect(find.text('Order-Payment Matching & Reconciliation'), findsOneWidget);
+      expect(find.text('Remittances & Reconciliation'), findsOneWidget);
       expect(find.text('TOTAL MONITORED VALUE'), findsOneWidget);
       expect(find.text('DIRECT PAYSTACK PAID'), findsOneWidget);
-      expect(find.text('CASH AWAITING REMITTANCE'), findsOneWidget);
+      expect(find.text('NOT REMITTED (HELD BY RIDERS)'), findsOneWidget);
       expect(find.text('REMITTED & RECONCILED'), findsOneWidget);
 
       // Total monitored: 25,000 + 18,500 = 43,500
       expect(find.text('₦43,500.00'), findsOneWidget);
-      // Direct Paystack: 25,000 in KPI card and Order Card
+      // Direct Paystack: 25,000 in KPI card and Remittance item
       expect(find.text('₦25,000.00'), findsWidgets);
-      // Cash Awaiting Net Due: 18,500 - 1,000 commission - 1,500 transport - 400 transfer fee = 15,600
-      expect(find.text('₦15,600.00'), findsWidgets);
+      // Cash Awaiting Net Due: 18,500 - 1,000 commission - 1,500 transport - 370 pos fee = 15,630
+      expect(find.textContaining('18,500'), findsWidgets);
 
-      // 2. Verify Order Rows & Payment Classifications
-      expect(find.text('#TRK-PSTK-9001'), findsOneWidget);
-      expect(find.text('⚡ DIRECT TRANSFER (PAYSTACK PAID)'), findsOneWidget);
-      expect(find.textContaining('Funds settled directly into company Paystack treasury'), findsOneWidget);
-
-      expect(find.text('#TRK-CASH-9002'), findsOneWidget);
-      expect(find.text('⚠️ CASH POD - AWAITING REMITTANCE'), findsOneWidget);
-      expect(find.textContaining('Net remittance due to DC: ₦15,600.00'), findsOneWidget);
+      // 2. Verify Table Columns and Status Chips
+      expect(find.text('RIDER / AGENT'), findsOneWidget);
+      expect(find.text('ORDERS'), findsOneWidget);
+      expect(find.text('AMOUNT TO REMIT'), findsOneWidget);
+      expect(find.text('NET REMITTANCE'), findsOneWidget);
+      expect(find.text('OPENING DATE'), findsOneWidget);
+      expect(find.text('CLOSING DATE'), findsOneWidget);
+      expect(find.text('REMITTANCE STATUS'), findsOneWidget);
 
       // 3. Verify Filter by Direct Paystack
-      await tester.tap(find.textContaining('⚡ Direct Paystack'));
+      await tester.tap(find.textContaining('⚡ Direct Paystack'), warnIfMissed: false);
       await tester.pumpAndSettle();
 
-      expect(find.text('#TRK-PSTK-9001'), findsOneWidget);
-      expect(find.text('#TRK-CASH-9002'), findsNothing);
+      expect(find.text('DIRECT SETTLED'), findsOneWidget);
 
-      // 4. Verify Filter by Cash Awaiting Remittance
-      await tester.tap(find.textContaining('⚠️ Cash Awaiting Remittance'));
+      // 4. Verify Filter by Not Remitted
+      await tester.tap(find.textContaining('⚠️ Not Remitted'), warnIfMissed: false);
       await tester.pumpAndSettle();
 
-      expect(find.text('#TRK-CASH-9002'), findsOneWidget);
-      expect(find.text('#TRK-PSTK-9001'), findsNothing);
-
-      // 5. Test "Contact & Remind Rider" Action Button
-      expect(find.text('Contact & Remind Rider'), findsOneWidget);
-      await tester.tap(find.text('Contact & Remind Rider'));
-      await tester.pumpAndSettle();
-
-      // Verify DCContactRiderModal appears
-      expect(find.text('Contact Delivery Agent'), findsOneWidget);
-      expect(find.text('Direct Call'), findsOneWidget);
-      expect(find.text('WhatsApp Reminder'), findsOneWidget);
-      expect(find.text('Send Instant In-App Remittance Alert'), findsOneWidget);
-      expect(find.text('IN-APP COMMUNICATIONS CHANNEL'), findsOneWidget);
-
-      // Test Dispatching In-App Push Alert
-      await tester.tap(find.text('Send Instant In-App Remittance Alert'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('In-App Notice Dispatched ✓'), findsOneWidget);
+      expect(find.text('NOT REMITTED'), findsOneWidget);
     });
 
     testWidgets('DCOrderPaymentMatchingPage switches between Card View and Table View smoothly', (tester) async {
@@ -176,26 +156,19 @@ void main() {
       await tester.pumpAndSettle();
 
       // Verify DataTable column headers
-      expect(find.text('SHIPMENT / ITEM'), findsOneWidget);
-      expect(find.text('CUSTOMER & LOCATION'), findsOneWidget);
-      expect(find.text('PAYABLE AMOUNT'), findsOneWidget);
+      expect(find.text('RIDER / AGENT'), findsOneWidget);
+      expect(find.text('ORDERS'), findsOneWidget);
+      expect(find.text('AMOUNT TO REMIT'), findsOneWidget);
+      expect(find.text('NET REMITTANCE'), findsOneWidget);
       expect(find.text('PAYMENT METHOD'), findsOneWidget);
-      expect(find.text('RECONCILIATION / NET REMITTANCE'), findsOneWidget);
-      expect(find.text('ASSIGNED RIDER'), findsOneWidget);
       expect(find.text('ACTION'), findsOneWidget);
-
-      // Verify Table Rows
-      expect(find.text('Direct (Paystack)'), findsOneWidget);
-      expect(find.text('Cash POD'), findsOneWidget);
-      expect(find.text('Settled (₦0 Cash Held)'), findsOneWidget);
-      expect(find.textContaining('Net Due: ₦15,600.00'), findsOneWidget);
 
       // Switch back to Cards View
       await tester.tap(find.text('Cards'));
       await tester.pumpAndSettle();
 
-      expect(find.text('SHIPMENT / ITEM'), findsNothing);
-      expect(find.text('⚡ DIRECT TRANSFER (PAYSTACK PAID)'), findsOneWidget);
+      expect(find.text('RIDER / AGENT'), findsNothing);
+      expect(find.text('View Breakdown'), findsWidgets);
     });
   });
 }

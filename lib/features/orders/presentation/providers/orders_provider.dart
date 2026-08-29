@@ -137,8 +137,8 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
   List<OrderEntity> _sortOrdersByOperationalPriority(List<OrderEntity> rawOrders) {
     final list = [...rawOrders];
     list.sort((a, b) {
-      int getStatusPriority(String status) {
-        switch (status.toLowerCase()) {
+      int getOrderPriority(OrderEntity o) {
+        switch (o.status.toLowerCase()) {
           case 'in_transit':
           case 'picked_up':
             return 0; // Top: Active in progress
@@ -152,18 +152,20 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
           case 'upsell_pending':
             return 2; // Next: Call back
           case 'delivered':
-            return 3; // Delivered (WhatsApp green, moved down)
+            // Prioritize cash in vehicle custody awaiting remittance before already settled/remitted orders
+            final isAwaitingRemittance = o.isUnremitted && !o.isDirectTransfer;
+            return isAwaitingRemittance ? 3 : 4;
           case 'failed':
           case 'cancelled':
           case 'returned':
-            return 4; // Bottom
+            return 5; // Bottom
           default:
             return 2;
         }
       }
 
-      final pA = getStatusPriority(a.status);
-      final pB = getStatusPriority(b.status);
+      final pA = getOrderPriority(a);
+      final pB = getOrderPriority(b);
       if (pA != pB) {
         return pA.compareTo(pB);
       }
@@ -240,11 +242,14 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     try {
       final isRider = _isRiderUser();
       final targetId = (agentId != null && agentId.isNotEmpty) ? agentId : _getActiveAgentId();
+      final user = _ref?.read(authProvider).user;
+      final dcId = user?.distributionCenterId ?? '22222222-2222-4222-8222-222222222222';
+
       List<OrderEntity> fetchedList;
       if (isRider && targetId.isNotEmpty) {
         fetchedList = await _repository.getAssignedOrders(targetId);
       } else {
-        fetchedList = await _repository.getDistributionCenterOrders('22222222-2222-4222-8222-222222222222');
+        fetchedList = await _repository.getDistributionCenterOrders(dcId);
       }
 
       final freshList = _sortOrdersByOperationalPriority(fetchedList);
@@ -280,6 +285,10 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
         debugPrint('[ORDERS_PROVIDER] ⚡ Auto-synced ${freshList.length} orders in real time.');
         state = state.copyWith(orders: freshList);
         await _storageService.cacheOrders(freshList, _getScopeKey());
+        if (_ref != null) {
+          final activeTargetId = isRider ? targetId : dcId;
+          _ref.read(financeProvider.notifier).loadRemittances(activeTargetId);
+        }
       }
     } catch (_) {}
   }
@@ -579,6 +588,35 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     } catch (e) {
       state = state.copyWith(isLoading: false);
     }
+  }
+
+  Future<void> updateOrderPaymentStatus({
+    required String orderId,
+    required String paymentStatus,
+    required String remittanceStatus,
+  }) async {
+    try {
+      await _repository.updateOrderStatus(
+        orderId,
+        'delivered',
+        paymentStatus: remittanceStatus == 'remitted' ? 'remitted' : paymentStatus,
+        notes: remittanceStatus == 'remitted' ? '[REMITTED & VERIFIED INTO DC TREASURY]' : null,
+      );
+      final updatedList = state.orders.map((o) {
+        if (o.id == orderId || o.orderNumber == orderId) {
+          return OrderModel.fromEntity(o).copyWith(
+            paymentStatus: paymentStatus,
+            remittanceStatus: remittanceStatus,
+            financialSettlementStatus: remittanceStatus == 'remitted' ? 'cash_remitted_verified' : o.financialSettlementStatus,
+            remittedAt: remittanceStatus == 'remitted' ? DateTime.now() : o.remittedAt,
+          );
+        }
+        return o;
+      }).toList();
+      final sortedList = _sortOrdersByOperationalPriority(updatedList);
+      state = state.copyWith(orders: sortedList);
+      await _storageService.cacheOrders(sortedList, _getScopeKey());
+    } catch (_) {}
   }
 
   void updateOrderInList(OrderEntity updatedOrder) {

@@ -519,9 +519,19 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
     };
     if (paymentStatus != null) {
       updateData['payment_status'] = paymentStatus;
+      if (paymentStatus == 'remitted') {
+        updateData['remittance_status'] = 'remitted';
+        updateData['financial_settlement_status'] = 'cash_remitted_verified';
+        updateData['remitted_at'] = DateTime.now().toIso8601String();
+      }
     }
     if (paymentType != null) {
       updateData['payment_type'] = paymentType;
+    }
+    if (notes != null && notes.contains('[REMITTED')) {
+      updateData['remittance_status'] = 'remitted';
+      updateData['financial_settlement_status'] = 'cash_remitted_verified';
+      updateData['remitted_at'] = DateTime.now().toIso8601String();
     }
     if (notes != null) {
       updateData['delivery_notes'] = notes;

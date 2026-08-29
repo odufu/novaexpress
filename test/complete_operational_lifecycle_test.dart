@@ -141,6 +141,32 @@ class MockLifecycleOrdersRepository implements OrdersRepository {
   }
 
   @override
+  Future<void> updateOrderStatus(
+    String orderId,
+    String status, {
+    String? paymentStatus,
+    String? paymentType,
+    String? notes,
+    String? customerSignatureUrl,
+    String? photoProofUrl,
+    String? gatePassCode,
+    double? latitude,
+    double? longitude,
+    bool? isLocationVerified,
+  }) async {
+    final idx = dbOrders.indexWhere((o) => o.id == orderId || o.orderNumber == orderId);
+    if (idx != -1) {
+      final remStatus = (paymentStatus == 'remitted' || (notes != null && notes.contains('REMITTED'))) ? 'remitted' : (paymentStatus == 'collected' ? 'remittance_pending' : dbOrders[idx].remittanceStatus);
+      dbOrders[idx] = dbOrders[idx].copyWith(
+        status: status,
+        paymentStatus: paymentStatus ?? dbOrders[idx].paymentStatus,
+        remittanceStatus: remStatus,
+        customerSignatureUrl: customerSignatureUrl ?? dbOrders[idx].customerSignatureUrl,
+      );
+    }
+  }
+
+  @override
   Future<List<OrderEntity>> getAssignedOrders(String deliveryAgentId) async =>
       dbOrders.where((o) => o.deliveryAgentId == deliveryAgentId).toList();
 

@@ -21,6 +21,7 @@ final dcOrdersSingleDateProvider = StateProvider.autoDispose<DateTime?>((ref) =>
 // Master Orders Directory Multi-Attribute Filters
 final dcMasterSearchProvider = StateProvider.autoDispose<String>((ref) => '');
 final dcMasterStatusFilterProvider = StateProvider.autoDispose<String>((ref) => 'all');
+final dcMasterRemittanceFilterProvider = StateProvider.autoDispose<String>((ref) => 'all');
 final dcMasterRiderFilterProvider = StateProvider.autoDispose<String>((ref) => 'all');
 final dcMasterProductFilterProvider = StateProvider.autoDispose<String>((ref) => 'all');
 final dcMasterClientFilterProvider = StateProvider.autoDispose<String>((ref) => 'all');
@@ -460,6 +461,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
     required DateTimeRange? customRange,
     required DateTime? singleDate,
     required String masterStatus,
+    required String masterRemittance,
     required String masterRider,
     required String masterProduct,
     required String masterClient,
@@ -488,9 +490,27 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
         PopupMenuItem(value: 'all', child: Text('All Statuses')),
         PopupMenuItem(value: 'unassigned', child: Text('📦 Unassigned (Pending)')),
         PopupMenuItem(value: 'in_transit', child: Text('🚴 In Transit (Assigned)')),
-        PopupMenuItem(value: 'delivered', child: Text('🟢 Delivered (Fulfilled)')),
+        PopupMenuItem(value: 'delivered', child: Text('🟢 Delivered (All Fulfilled)')),
+        PopupMenuItem(value: 'awaiting_remittance', child: Text('🟡 Delivered (Cash in Custody • Awaiting Remittance)')),
+        PopupMenuItem(value: 'remitted', child: Text('🟢 Delivered (Remitted & Cleared)')),
         PopupMenuItem(value: 'failed', child: Text('⚠️ Failed / Call Back')),
         PopupMenuItem(value: 'returned', child: Text('↩️ Returned to DC')),
+      ],
+    );
+
+    final remittanceBtn = _buildMobileIconPopupFilter(
+      context: context,
+      isDark: isDark,
+      icon: Icons.payments_outlined,
+      tooltip: 'Cash / Remittance ($masterRemittance)',
+      currentValue: masterRemittance,
+      onSelected: (val) => ref.read(dcMasterRemittanceFilterProvider.notifier).state = val,
+      items: const [
+        PopupMenuItem(value: 'all', child: Text('All Settlements')),
+        PopupMenuItem(value: 'awaiting_remittance', child: Text('🟡 Cash in Custody (Awaiting Remittance)')),
+        PopupMenuItem(value: 'remitted', child: Text('🟢 Remitted & Cleared')),
+        PopupMenuItem(value: 'direct_transfer', child: Text('⚡ Direct Transfer / Bank')),
+        PopupMenuItem(value: 'pending_fulfillment', child: Text('🕒 Pending Delivery')),
       ],
     );
 
@@ -558,6 +578,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
             _masterSearchController.clear();
             ref.read(dcMasterSearchProvider.notifier).state = '';
             ref.read(dcMasterStatusFilterProvider.notifier).state = 'all';
+            ref.read(dcMasterRemittanceFilterProvider.notifier).state = 'all';
             ref.read(dcMasterRiderFilterProvider.notifier).state = 'all';
             ref.read(dcMasterProductFilterProvider.notifier).state = 'all';
             ref.read(dcMasterClientFilterProvider.notifier).state = 'all';
@@ -587,6 +608,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
       children: [
         dateBtn,
         statusBtn,
+        remittanceBtn,
         riderBtn,
         productBtn,
         clientBtn,
@@ -611,6 +633,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
   ) {
     final masterSearch = ref.watch(dcMasterSearchProvider).trim().toLowerCase();
     final masterStatus = ref.watch(dcMasterStatusFilterProvider);
+    final masterRemittance = ref.watch(dcMasterRemittanceFilterProvider);
     final masterRider = ref.watch(dcMasterRiderFilterProvider);
     final masterProduct = ref.watch(dcMasterProductFilterProvider);
     final masterClient = ref.watch(dcMasterClientFilterProvider);
@@ -631,6 +654,12 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
           if (!isAssigned || o.status == 'delivered' || o.status == 'cancelled' || o.status == 'failed') return false;
         } else if (masterStatus == 'delivered') {
           if (o.status != 'delivered') return false;
+        } else if (masterStatus == 'awaiting_remittance' || masterStatus == 'delivered_unremitted') {
+          final isCashAwaiting = o.status == 'delivered' && o.isUnremitted && !o.isDirectTransfer;
+          if (!isCashAwaiting) return false;
+        } else if (masterStatus == 'remitted' || masterStatus == 'delivered_remitted') {
+          final isRemitted = o.status == 'delivered' && (o.isRemitted || o.isDirectTransfer);
+          if (!isRemitted) return false;
         } else if (masterStatus == 'failed') {
           if (o.status != 'cancelled' && o.status != 'failed' && o.status != 'call_back') return false;
         } else if (masterStatus == 'returned') {
@@ -638,7 +667,23 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
         }
       }
 
-      // 2. Rider Filter
+      // 2. Remittance / Cash Holding Filter
+      if (masterRemittance != 'all') {
+        if (masterRemittance == 'awaiting_remittance' || masterRemittance == 'unremitted') {
+          final isCashAwaiting = o.isDelivered && o.isUnremitted && !o.isDirectTransfer;
+          if (!isCashAwaiting) return false;
+        } else if (masterRemittance == 'remitted') {
+          final isCleared = o.isDelivered && o.isRemitted && !o.isDirectTransfer;
+          if (!isCleared) return false;
+        } else if (masterRemittance == 'direct_transfer') {
+          final isDirect = o.isDirectTransfer;
+          if (!isDirect) return false;
+        } else if (masterRemittance == 'pending_fulfillment') {
+          if (o.isDelivered) return false;
+        }
+      }
+
+      // 3. Rider Filter
       if (masterRider != 'all') {
         if (masterRider == 'unassigned') {
           if (o.deliveryAgentId != null && o.deliveryAgentId!.isNotEmpty) return false;
@@ -650,18 +695,18 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
         }
       }
 
-      // 3. Product Filter
+      // 4. Product Filter
       if (masterProduct != 'all') {
         if (!o.productName.toLowerCase().contains(masterProduct.toLowerCase())) return false;
       }
 
-      // 4. Client Filter
+      // 5. Client Filter
       if (masterClient != 'all') {
         final client = o.clientName.isNotEmpty ? o.clientName : 'Novacare';
         if (!client.toLowerCase().contains(masterClient.toLowerCase())) return false;
       }
 
-      // 5. Search Query Filter
+      // 6. Search Query Filter
       if (masterSearch.isNotEmpty) {
         final matchesOrderNum = o.orderNumber.toLowerCase().contains(masterSearch);
         final matchesCust = o.customerName.toLowerCase().contains(masterSearch);
@@ -683,6 +728,10 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
     final double totalValuation = filtered.fold(0.0, (acc, o) => acc + o.totalAmount);
     final double deliveredRevenue = filtered.where((o) => o.status == 'delivered').fold(0.0, (acc, o) => acc + o.totalAmount);
 
+    final unremittedOrders = allOrders.where((o) => o.status == 'delivered' && o.isUnremitted && !o.isDirectTransfer).toList();
+    final int unremittedCount = unremittedOrders.length;
+    final double unremittedCash = unremittedOrders.fold(0.0, (acc, o) => acc + o.totalAmount);
+
     // Extract dynamic dropdown items
     final uniqueProducts = allOrders.map((o) => o.productName).where((p) => p.isNotEmpty).toSet().toList()..sort();
     final uniqueClients = allOrders.map((o) => o.clientName).where((c) => c.isNotEmpty).toSet().toList()..sort();
@@ -690,6 +739,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
 
     final bool hasActiveFilters = masterSearch.isNotEmpty ||
         masterStatus != 'all' ||
+        masterRemittance != 'all' ||
         masterRider != 'all' ||
         masterProduct != 'all' ||
         masterClient != 'all' ||
@@ -700,12 +750,12 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. Summary KPI Metric Cards (5 Cards) - Compact & Horizontally Scrollable on Mobile
+          // 1. Summary KPI Metric Cards (6 Cards) - Compact & Horizontally Scrollable on Mobile
           LayoutBuilder(
             builder: (context, constraints) {
-              final isDesktop = constraints.maxWidth >= 1000;
+              final isDesktop = constraints.maxWidth >= 1150;
               if (isDesktop) {
-                final cardWidth = (constraints.maxWidth - 32) / 5;
+                final cardWidth = (constraints.maxWidth - 40) / 6;
                 return Row(
                   children: [
                     _buildDeliveredKpiCard(
@@ -746,6 +796,19 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
                       icon: Icons.check_circle_rounded,
                       iconColor: const Color(0xFF16A34A),
                       width: cardWidth,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildDeliveredKpiCard(
+                      isDark,
+                      title: '🟡 Cash in Custody',
+                      value: CurrencyFormatter.formatNaira(unremittedCash),
+                      subtitle: '$unremittedCount awaiting remittance',
+                      icon: Icons.payments_rounded,
+                      iconColor: const Color(0xFFD97706),
+                      width: cardWidth,
+                      onTap: () {
+                        ref.read(dcMasterStatusFilterProvider.notifier).state = 'awaiting_remittance';
+                      },
                     ),
                     const SizedBox(width: 8),
                     _buildDeliveredKpiCard(
@@ -809,6 +872,19 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
                     const SizedBox(width: 8),
                     _buildDeliveredKpiCard(
                       isDark,
+                      title: '🟡 Cash in Custody',
+                      value: CurrencyFormatter.formatNaira(unremittedCash),
+                      subtitle: '$unremittedCount awaiting remittance',
+                      icon: Icons.payments_rounded,
+                      iconColor: const Color(0xFFD97706),
+                      width: 175,
+                      onTap: () {
+                        ref.read(dcMasterStatusFilterProvider.notifier).state = 'awaiting_remittance';
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    _buildDeliveredKpiCard(
+                      isDark,
                       title: '⚠️ Failed / Returns',
                       value: '$failedCount Issues',
                       subtitle: 'Call backs & returns',
@@ -823,7 +899,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
           ),
           const SizedBox(height: 14),
 
-          // 2. Action Buttons (Placed Directly Under the KPI Cards)
+          // 2. Action Buttons
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -900,57 +976,61 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
                 Row(
                   children: [
                     Expanded(
-                      child: TextField(
-                        key: const Key('dc_master_search_input'),
-                        controller: _masterSearchController,
-                        onChanged: (val) => _onDebouncedSearch(() => ref.read(dcMasterSearchProvider.notifier).state = val),
-                        decoration: InputDecoration(
-                          hintText: 'Search by Order #, Customer Name, Phone, Address, Product, Client, or Rider...',
-                          hintStyle: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)),
-                          prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Color(0xFF64748B)),
-                          suffixIcon: masterSearch.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(Icons.clear_rounded, size: 16),
-                                  onPressed: () {
-                                    _masterSearchController.clear();
-                                    ref.read(dcMasterSearchProvider.notifier).state = '';
-                                  },
-                                )
-                              : null,
-                          filled: true,
-                          fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                          contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                      child: Container(
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                        ),
+                        child: TextField(
+                          key: const Key('dc_master_search_input'),
+                          controller: _masterSearchController,
+                          onChanged: (val) {
+                            _onDebouncedSearch(() {
+                              ref.read(dcMasterSearchProvider.notifier).state = val;
+                            });
+                          },
+                          style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                          decoration: InputDecoration(
+                            hintText: 'Search by Order #, Customer Name, Phone, Address, Product, Client, or Rider...',
+                            hintStyle: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF94A3B8)),
+                            prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Color(0xFF64748B)),
+                            suffixIcon: _masterSearchController.text.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear_rounded, size: 16),
+                                    onPressed: () {
+                                      _masterSearchController.clear();
+                                      ref.read(dcMasterSearchProvider.notifier).state = '';
+                                    },
+                                  )
+                                : null,
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(vertical: 11),
                           ),
                         ),
                       ),
                     ),
                     const SizedBox(width: 10),
-
-                    // View Mode Switcher Toggle
                     Container(
+                      height: 42,
                       decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                       ),
                       child: Row(
                         children: [
                           IconButton(
                             icon: Icon(
-                              Icons.table_rows_rounded,
+                              Icons.table_chart_rounded,
                               size: 18,
                               color: viewMode == 'table' ? const Color(0xFF2563EB) : const Color(0xFF64748B),
                             ),
-                            tooltip: 'Data Table View',
+                            tooltip: 'Table List View',
                             onPressed: () => ref.read(dcMasterViewModeProvider.notifier).state = 'table',
                           ),
+                          Container(width: 1, height: 20, color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                           IconButton(
                             icon: Icon(
                               Icons.grid_view_rounded,
@@ -967,7 +1047,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
                 ),
                 const SizedBox(height: 12),
 
-                // Bottom Row: Adaptive Filters (Icons only on mobile for 0-horizontal scroll, full row on desktop)
+                // Bottom Row: Adaptive Filters
                 LayoutBuilder(
                   builder: (context, filterConstraints) {
                     final isCompact = filterConstraints.maxWidth < 700;
@@ -979,6 +1059,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
                         customRange: customRange,
                         singleDate: singleDate,
                         masterStatus: masterStatus,
+                        masterRemittance: masterRemittance,
                         masterRider: masterRider,
                         masterProduct: masterProduct,
                         masterClient: masterClient,
@@ -1014,7 +1095,9 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
                               DropdownMenuItem(value: 'all', child: Text('All Statuses')),
                               DropdownMenuItem(value: 'unassigned', child: Text('📦 Unassigned (Pending)')),
                               DropdownMenuItem(value: 'in_transit', child: Text('🚴 In Transit (Assigned)')),
-                              DropdownMenuItem(value: 'delivered', child: Text('🟢 Delivered (Fulfilled)')),
+                              DropdownMenuItem(value: 'delivered', child: Text('🟢 Delivered (All Fulfilled)')),
+                              DropdownMenuItem(value: 'awaiting_remittance', child: Text('🟡 Delivered (Cash in Custody • Awaiting Remittance)')),
+                              DropdownMenuItem(value: 'remitted', child: Text('🟢 Delivered (Remitted & Cleared)')),
                               DropdownMenuItem(value: 'failed', child: Text('⚠️ Failed / Call Back')),
                               DropdownMenuItem(value: 'returned', child: Text('↩️ Returned to DC')),
                             ],
@@ -1024,7 +1107,26 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
                           ),
                           const SizedBox(width: 8),
 
-                          // 3. Rider Filter Dropdown
+                          // 3. Remittance / Cash Holding Filter Dropdown
+                          _buildFilterDropdown(
+                            label: 'Remittance',
+                            icon: Icons.payments_outlined,
+                            value: masterRemittance,
+                            isDark: isDark,
+                            items: const [
+                              DropdownMenuItem(value: 'all', child: Text('All Cash / Settlements')),
+                              DropdownMenuItem(value: 'awaiting_remittance', child: Text('🟡 Cash in Custody (Awaiting Remittance)')),
+                              DropdownMenuItem(value: 'remitted', child: Text('🟢 Remitted & Cleared')),
+                              DropdownMenuItem(value: 'direct_transfer', child: Text('⚡ Direct Transfer / Bank')),
+                              DropdownMenuItem(value: 'pending_fulfillment', child: Text('🕒 Pending Delivery')),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) ref.read(dcMasterRemittanceFilterProvider.notifier).state = val;
+                            },
+                          ),
+                          const SizedBox(width: 8),
+
+                          // 4. Rider Filter Dropdown
                           _buildFilterDropdown(
                             label: 'Rider',
                             icon: Icons.two_wheeler_rounded,
@@ -1046,7 +1148,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
                           ),
                           const SizedBox(width: 8),
 
-                          // 4. Product Filter Dropdown
+                          // 5. Product Filter Dropdown
                           _buildFilterDropdown(
                             label: 'Product',
                             icon: Icons.inventory_2_outlined,
@@ -1067,7 +1169,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
                           ),
                           const SizedBox(width: 8),
 
-                          // 5. Client Filter Dropdown
+                          // 6. Client Filter Dropdown
                           _buildFilterDropdown(
                             label: 'Client',
                             icon: Icons.business_rounded,
@@ -1087,7 +1189,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
                             },
                           ),
 
-                          // 6. Reset Filters Button
+                          // 7. Reset Filters Button
                           if (hasActiveFilters) ...[
                             const SizedBox(width: 8),
                             InkWell(
@@ -1095,6 +1197,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
                                 _masterSearchController.clear();
                                 ref.read(dcMasterSearchProvider.notifier).state = '';
                                 ref.read(dcMasterStatusFilterProvider.notifier).state = 'all';
+                                ref.read(dcMasterRemittanceFilterProvider.notifier).state = 'all';
                                 ref.read(dcMasterRiderFilterProvider.notifier).state = 'all';
                                 ref.read(dcMasterProductFilterProvider.notifier).state = 'all';
                                 ref.read(dcMasterClientFilterProvider.notifier).state = 'all';
@@ -1107,19 +1210,19 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
                                 height: 40,
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFEF4444).withValues(alpha: 0.1),
+                                  color: const Color(0xFFEF4444).withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.3)),
+                                  border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.4)),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const Icon(Icons.restart_alt_rounded, size: 15, color: Color(0xFFEF4444)),
-                                    const SizedBox(width: 4),
+                                    const Icon(Icons.restart_alt_rounded, size: 16, color: Color(0xFFEF4444)),
+                                    const SizedBox(width: 6),
                                     Text(
-                                      'Reset',
+                                      'Reset Filters',
                                       style: GoogleFonts.inter(
-                                        fontSize: 11.5,
+                                        fontSize: 12,
                                         fontWeight: FontWeight.bold,
                                         color: const Color(0xFFEF4444),
                                       ),
@@ -1839,8 +1942,9 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
     required IconData icon,
     required Color iconColor,
     required double width,
+    VoidCallback? onTap,
   }) {
-    return Container(
+    final cardContent = Container(
       width: width,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
@@ -1902,6 +2006,15 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
         ],
       ),
     );
+
+    if (onTap != null) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: cardContent,
+      );
+    }
+    return cardContent;
   }
 }
 

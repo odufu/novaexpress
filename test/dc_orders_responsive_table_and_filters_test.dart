@@ -242,7 +242,9 @@ void main() {
 
       expect(find.text('All Statuses'), findsOneWidget);
       expect(find.text('📦 Unassigned (Pending)'), findsOneWidget);
-      expect(find.text('🟢 Delivered (Fulfilled)'), findsOneWidget);
+      expect(find.text('🟢 Delivered (All Fulfilled)'), findsOneWidget);
+      expect(find.text('🟡 Delivered (Cash in Custody • Awaiting Remittance)'), findsOneWidget);
+      expect(find.text('🟢 Delivered (Remitted & Cleared)'), findsOneWidget);
     });
   });
 }
