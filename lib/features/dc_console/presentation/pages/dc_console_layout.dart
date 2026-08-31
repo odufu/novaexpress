@@ -425,12 +425,12 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
               onPressed: () => _scaffoldKey.currentState?.openDrawer(),
             ),
 
-          // Hub Selector Dropdown Badge
+          // Active DC Hub Indicator Pill
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            padding: EdgeInsets.symmetric(horizontal: isCompact ? 7 : 10, vertical: isCompact ? 4 : 6),
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(8),
               border: Border.all(
                 color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
               ),
@@ -439,18 +439,18 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 8,
-                  height: 8,
+                  width: 7,
+                  height: 7,
                   decoration: const BoxDecoration(
                     color: Color(0xFF10B981),
                     shape: BoxShape.circle,
                   ),
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 5),
                 Text(
                   isCompact ? dcState.activeHubCode : dcState.activeHubName,
                   style: GoogleFonts.inter(
-                    fontSize: 12,
+                    fontSize: isCompact ? 11 : 12,
                     fontWeight: FontWeight.bold,
                     color: isDark ? Colors.white : const Color(0xFF0F172A),
                   ),
@@ -470,30 +470,32 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
             ),
           ),
 
+          const SizedBox(width: 8),
+
           // Screen Title Centered on AppBar
           Expanded(
-            child: Center(
-              child: Text(
-                activeTitle,
-                style: GoogleFonts.inter(
-                  fontSize: isCompact ? 15 : 18,
-                  fontWeight: FontWeight.w700,
-                  color: isDark ? Colors.white : const Color(0xFF0F172A),
-                  letterSpacing: -0.2,
-                ),
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
+            child: Text(
+              activeTitle,
+              style: GoogleFonts.inter(
+                fontSize: isCompact ? 13.5 : 17,
+                fontWeight: FontWeight.w700,
+                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                letterSpacing: -0.2,
               ),
+              overflow: TextOverflow.ellipsis,
+              textAlign: isCompact ? TextAlign.left : TextAlign.center,
             ),
           ),
 
-          const SizedBox(width: 10),
+          const SizedBox(width: 4),
 
           // Theme Switcher Toggle
           IconButton(
+            padding: EdgeInsets.all(isCompact ? 4 : 8),
+            constraints: isCompact ? const BoxConstraints(minWidth: 32, minHeight: 32) : null,
             icon: Icon(
               isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
-              size: 20,
+              size: isCompact ? 18 : 20,
               color: const Color(0xFF64748B),
             ),
             onPressed: () => ref.read(themeProvider.notifier).toggleTheme(),
@@ -504,25 +506,27 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
           Stack(
             children: [
               IconButton(
-                icon: const Icon(Icons.notifications_outlined, size: 20, color: Color(0xFF64748B)),
+                padding: EdgeInsets.all(isCompact ? 4 : 8),
+                constraints: isCompact ? const BoxConstraints(minWidth: 32, minHeight: 32) : null,
+                icon: Icon(Icons.notifications_outlined, size: isCompact ? 18 : 20, color: const Color(0xFF64748B)),
                 onPressed: () => context.push('/notifications'),
                 tooltip: 'Notifications',
               ),
               if (unreadCount > 0)
                 Positioned(
-                  top: 8,
-                  right: 8,
+                  top: isCompact ? 4 : 8,
+                  right: isCompact ? 4 : 8,
                   child: Container(
-                    padding: const EdgeInsets.all(4),
+                    padding: const EdgeInsets.all(3),
                     decoration: const BoxDecoration(
                       color: Color(0xFFEF4444),
                       shape: BoxShape.circle,
                     ),
-                    constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                    constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
                     child: Text(
                       '$unreadCount',
                       style: GoogleFonts.inter(
-                        fontSize: 9,
+                        fontSize: 8.5,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
                       ),
@@ -533,7 +537,7 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
             ],
           ),
 
-          const SizedBox(width: 8),
+          const SizedBox(width: 4),
 
           // DC Supervisor Profile & Logout Menu
           PopupMenuButton<String>(
@@ -541,7 +545,7 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             offset: const Offset(0, 48),
             icon: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              padding: EdgeInsets.symmetric(horizontal: isCompact ? 6 : 10, vertical: isCompact ? 4 : 6),
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
                 borderRadius: BorderRadius.circular(8),
@@ -554,7 +558,7 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
                   UserAvatarWidget(
                     avatarUrl: user?.avatarUrl,
                     fullName: user != null && user.fullName.isNotEmpty ? user.fullName : 'Supervisor',
-                    radius: 12,
+                    radius: isCompact ? 10 : 12,
                   ),
                   if (isDesktop) ...[
                     const SizedBox(width: 8),

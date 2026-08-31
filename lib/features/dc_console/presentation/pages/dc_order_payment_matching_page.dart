@@ -714,7 +714,7 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
             // 3. Multi-Attribute Filter Toolbar Card (RepaintBoundary)
             RepaintBoundary(
               child: Container(
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: isDark ? const Color(0xFF1E293B) : Colors.white,
                   borderRadius: BorderRadius.circular(16),
@@ -727,172 +727,201 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
                     ),
                   ],
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Top Row: Search & Rider Filter & Opening Date Filter
-                    Row(
-                      children: [
-                        // Debounced Search Input
-                        Expanded(
-                          child: Container(
-                            height: 42,
-                            decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                            ),
-                            child: TextField(
-                              controller: _searchController,
-                              onChanged: _onSearchChanged,
-                              style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : const Color(0xFF0F172A)),
-                              decoration: InputDecoration(
-                                hintText: 'Search by Rider Name, Code, Ref #, or Order...',
-                                hintStyle: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF94A3B8)),
-                                prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Color(0xFF64748B)),
-                                suffixIcon: searchQuery.isNotEmpty
-                                    ? IconButton(
-                                        icon: const Icon(Icons.clear_rounded, size: 16),
-                                        onPressed: () {
-                                          _searchController.clear();
-                                          ref.read(dcOrderMatchingPageProvider.notifier).state = 1;
-                                          ref.read(dcOrderMatchingSearchProvider.notifier).state = '';
-                                        },
-                                      )
-                                    : null,
-                                border: InputBorder.none,
-                                contentPadding: const EdgeInsets.symmetric(vertical: 11),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
+                child: LayoutBuilder(
+                  builder: (context, boxConstraints) {
+                    final isNarrow = boxConstraints.maxWidth < 750;
 
-                        // Opening Date Filter Dropdown
-                        Container(
-                          height: 42,
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                          ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              value: dateFilter,
-                              icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Color(0xFF64748B)),
-                              dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-                              items: [
-                                DropdownMenuItem(value: 'all_time', child: Text('📅 All Time', style: GoogleFonts.inter(fontSize: 12.5, color: isDark ? Colors.white : const Color(0xFF0F172A)))),
-                                DropdownMenuItem(value: 'today', child: Text('📅 Today', style: GoogleFonts.inter(fontSize: 12.5, color: isDark ? Colors.white : const Color(0xFF0F172A)))),
-                                DropdownMenuItem(value: 'yesterday', child: Text('📅 Yesterday', style: GoogleFonts.inter(fontSize: 12.5, color: isDark ? Colors.white : const Color(0xFF0F172A)))),
-                                DropdownMenuItem(value: 'this_week', child: Text('📅 This Week', style: GoogleFonts.inter(fontSize: 12.5, color: isDark ? Colors.white : const Color(0xFF0F172A)))),
-                                DropdownMenuItem(value: 'this_month', child: Text('📅 This Month', style: GoogleFonts.inter(fontSize: 12.5, color: isDark ? Colors.white : const Color(0xFF0F172A)))),
-                                DropdownMenuItem(value: 'older', child: Text('⚠️ Long-Term (> 2 Days)', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFFF59E0B)))),
-                              ],
-                              onChanged: (val) {
-                                if (val != null) {
-                                  ref.read(dcOrderMatchingPageProvider.notifier).state = 1;
-                                  ref.read(dcOrderMatchingDateFilterProvider.notifier).state = val;
-                                }
-                              },
-                            ),
-                          ),
+                    final searchBox = Container(
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                      ),
+                      child: TextField(
+                        controller: _searchController,
+                        onChanged: _onSearchChanged,
+                        style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                        decoration: InputDecoration(
+                          hintText: 'Search by Rider Name, Code, Ref #, or Order...',
+                          hintStyle: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)),
+                          prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Color(0xFF64748B)),
+                          suffixIcon: searchQuery.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear_rounded, size: 16),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    ref.read(dcOrderMatchingPageProvider.notifier).state = 1;
+                                    ref.read(dcOrderMatchingSearchProvider.notifier).state = '';
+                                  },
+                                )
+                              : null,
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(vertical: 11),
                         ),
-                        const SizedBox(width: 10),
+                      ),
+                    );
 
-                        // Rider Dropdown Filter
-                        Container(
-                          height: 42,
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                          ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String?>(
-                              value: selectedRiderFilter,
-                              hint: Text('All Fleet Riders', style: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF64748B))),
-                              icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Color(0xFF64748B)),
-                              dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-                              items: [
-                                DropdownMenuItem<String?>(
-                                  value: null,
-                                  child: Text('All Fleet Riders', style: GoogleFonts.inter(fontSize: 12.5, color: isDark ? Colors.white : const Color(0xFF0F172A))),
-                                ),
-                                ...uniqueRiders.entries.map((e) {
-                                  return DropdownMenuItem<String?>(
-                                    value: e.key,
-                                    child: Text('🚴 ${e.value} (${e.key})', style: GoogleFonts.inter(fontSize: 12.5, color: isDark ? Colors.white : const Color(0xFF0F172A))),
-                                  );
-                                }),
-                              ],
-                              onChanged: (val) {
-                                ref.read(dcOrderMatchingPageProvider.notifier).state = 1;
-                                ref.read(dcOrderMatchingRiderFilterProvider.notifier).state = val;
-                              },
-                            ),
-                          ),
+                    final dateDropdown = Container(
+                      height: 42,
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          isExpanded: true,
+                          value: dateFilter,
+                          icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Color(0xFF64748B)),
+                          dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                          items: [
+                            DropdownMenuItem(value: 'all_time', child: Text('📅 All Time', style: GoogleFonts.inter(fontSize: 12, color: isDark ? Colors.white : const Color(0xFF0F172A)), overflow: TextOverflow.ellipsis)),
+                            DropdownMenuItem(value: 'today', child: Text('📅 Today', style: GoogleFonts.inter(fontSize: 12, color: isDark ? Colors.white : const Color(0xFF0F172A)), overflow: TextOverflow.ellipsis)),
+                            DropdownMenuItem(value: 'yesterday', child: Text('📅 Yesterday', style: GoogleFonts.inter(fontSize: 12, color: isDark ? Colors.white : const Color(0xFF0F172A)), overflow: TextOverflow.ellipsis)),
+                            DropdownMenuItem(value: 'this_week', child: Text('📅 This Week', style: GoogleFonts.inter(fontSize: 12, color: isDark ? Colors.white : const Color(0xFF0F172A)), overflow: TextOverflow.ellipsis)),
+                            DropdownMenuItem(value: 'this_month', child: Text('📅 This Month', style: GoogleFonts.inter(fontSize: 12, color: isDark ? Colors.white : const Color(0xFF0F172A)), overflow: TextOverflow.ellipsis)),
+                            DropdownMenuItem(value: 'older', child: Text('⚠️ Long-Term (> 2 Days)', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFFF59E0B)), overflow: TextOverflow.ellipsis)),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) {
+                              ref.read(dcOrderMatchingPageProvider.notifier).state = 1;
+                              ref.read(dcOrderMatchingDateFilterProvider.notifier).state = val;
+                            }
+                          },
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
+                      ),
+                    );
 
-                    // Bottom Row: Filter Chips / Tabs & View Switcher
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        // Filter Chips (Remitted vs Not Remitted)
-                        Expanded(
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            physics: const BouncingScrollPhysics(),
-                            child: Row(
-                              children: [
-                                _buildFilterChip('all', 'All Remittances (${allLifecycleItems.length})', Icons.dashboard_rounded),
-                                const SizedBox(width: 8),
-                                _buildFilterChip('not_remitted', '⚠️ Not Remitted (${notRemittedItems.length})', Icons.warning_amber_rounded, color: const Color(0xFFF59E0B)),
-                                const SizedBox(width: 8),
-                                _buildFilterChip('remitted', '✅ Remitted & Cleared (${remittedItems.length})', Icons.check_circle_rounded, color: const Color(0xFF10B981)),
-                                const SizedBox(width: 8),
-                                _buildFilterChip('direct_paystack', '⚡ Direct Paystack (${directPaystackItems.length})', Icons.bolt_rounded, color: const Color(0xFF00A2D3)),
-                              ],
+                    final riderDropdown = Container(
+                      height: 42,
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String?>(
+                          isExpanded: true,
+                          value: selectedRiderFilter,
+                          hint: Text('All Fleet Riders', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)), overflow: TextOverflow.ellipsis),
+                          icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Color(0xFF64748B)),
+                          dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                          items: [
+                            DropdownMenuItem<String?>(
+                              value: null,
+                              child: Text('All Fleet Riders', style: GoogleFonts.inter(fontSize: 12, color: isDark ? Colors.white : const Color(0xFF0F172A)), overflow: TextOverflow.ellipsis),
                             ),
-                          ),
+                            ...uniqueRiders.entries.map((e) {
+                              return DropdownMenuItem<String?>(
+                                value: e.key,
+                                child: Text('🚴 ${e.value} (${e.key})', style: GoogleFonts.inter(fontSize: 12, color: isDark ? Colors.white : const Color(0xFF0F172A)), overflow: TextOverflow.ellipsis),
+                              );
+                            }),
+                          ],
+                          onChanged: (val) {
+                            ref.read(dcOrderMatchingPageProvider.notifier).state = 1;
+                            ref.read(dcOrderMatchingRiderFilterProvider.notifier).state = val;
+                          },
                         ),
-                        const SizedBox(width: 12),
+                      ),
+                    );
 
-                        // View Mode Switcher (Table vs Cards)
-                        Container(
-                          padding: const EdgeInsets.all(3),
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                    final filterChips = SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      child: Row(
+                        children: [
+                          _buildFilterChip('all', 'All Remittances (${allLifecycleItems.length})', Icons.dashboard_rounded),
+                          const SizedBox(width: 8),
+                          _buildFilterChip('not_remitted', '⚠️ Not Remitted (${notRemittedItems.length})', Icons.warning_amber_rounded, color: const Color(0xFFF59E0B)),
+                          const SizedBox(width: 8),
+                          _buildFilterChip('remitted', '✅ Remitted & Cleared (${remittedItems.length})', Icons.check_circle_rounded, color: const Color(0xFF10B981)),
+                          const SizedBox(width: 8),
+                          _buildFilterChip('direct_paystack', '⚡ Direct Paystack (${directPaystackItems.length})', Icons.bolt_rounded, color: const Color(0xFF00A2D3)),
+                        ],
+                      ),
+                    );
+
+                    final viewSwitcher = Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildViewToggleBtn(
+                            icon: Icons.table_chart_rounded,
+                            label: 'Table',
+                            isSelected: isTableView,
+                            isDark: isDark,
+                            onTap: () => ref.read(dcOrderMatchingTableViewProvider.notifier).state = true,
                           ),
-                          child: Row(
+                          _buildViewToggleBtn(
+                            icon: Icons.grid_view_rounded,
+                            label: 'Cards',
+                            isSelected: !isTableView,
+                            isDark: isDark,
+                            onTap: () => ref.read(dcOrderMatchingTableViewProvider.notifier).state = false,
+                          ),
+                        ],
+                      ),
+                    );
+
+                    if (isNarrow) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          searchBox,
+                          const SizedBox(height: 10),
+                          Row(
                             children: [
-                              _buildViewToggleBtn(
-                                icon: Icons.table_chart_rounded,
-                                label: 'Table',
-                                isSelected: isTableView,
-                                isDark: isDark,
-                                onTap: () => ref.read(dcOrderMatchingTableViewProvider.notifier).state = true,
-                              ),
-                              _buildViewToggleBtn(
-                                icon: Icons.grid_view_rounded,
-                                label: 'Cards',
-                                isSelected: !isTableView,
-                                isDark: isDark,
-                                onTap: () => ref.read(dcOrderMatchingTableViewProvider.notifier).state = false,
-                              ),
+                              Expanded(child: dateDropdown),
+                              const SizedBox(width: 8),
+                              Expanded(child: riderDropdown),
                             ],
                           ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(child: filterChips),
+                              const SizedBox(width: 8),
+                              viewSwitcher,
+                            ],
+                          ),
+                        ],
+                      );
+                    }
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(flex: 5, child: searchBox),
+                            const SizedBox(width: 10),
+                            SizedBox(width: 170, child: dateDropdown),
+                            const SizedBox(width: 10),
+                            SizedBox(width: 200, child: riderDropdown),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(child: filterChips),
+                            const SizedBox(width: 12),
+                            viewSwitcher,
+                          ],
                         ),
                       ],
-                    ),
-                  ],
+                    );
+                  },
                 ),
               ),
             ),
@@ -1439,12 +1468,15 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
                           children: [
                             Row(
                               children: [
-                                Text(
-                                  item.riderName,
-                                  style: GoogleFonts.inter(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                Flexible(
+                                  child: Text(
+                                    item.riderName,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                                 const SizedBox(width: 8),
