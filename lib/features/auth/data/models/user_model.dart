@@ -69,8 +69,12 @@ class UserModel extends UserEntity {
       bankName: json['bank_name'] ?? 'First Bank of Nigeria',
       bankAccountNumber: json['bank_account_number'] ?? '3081294821',
       bankAccountName: json['bank_account_name'] ?? (json['first_name'] != null ? '${json['first_name']} ${json['last_name'] ?? ""}'.trim() : 'Field Agent Logistics'),
-      agentStatus: json['current_status'] ?? 'available',
-      avatarUrl: json['avatar_url']?.toString(),
+      agentStatus: json['current_status'] ?? json['status'] ?? 'available',
+      avatarUrl: json['avatar_url']?.toString() ??
+          json['photo_url']?.toString() ??
+          json['profile_photo_url']?.toString() ??
+          json['avatar']?.toString() ??
+          json['image_url']?.toString(),
     );
   }
 
@@ -84,7 +88,9 @@ class UserModel extends UserEntity {
       'phone': phone,
       'role': role,
       'company_id': companyId,
+      'delivery_agent_id': deliveryAgentId,
       'delivery_agent_code': deliveryAgentCode,
+      'distribution_center_id': distributionCenterId,
       'distribution_center_name': distributionCenterName,
       'lifetime_deliveries_count': lifetimeDeliveriesCount,
       'rating': rating,

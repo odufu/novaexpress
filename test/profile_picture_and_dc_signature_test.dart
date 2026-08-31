@@ -2,9 +2,11 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:novexps/core/services/local_storage_service.dart';
 import 'package:novexps/core/services/signature_storage_service.dart';
 import 'package:novexps/core/widgets/signature_pad_modal.dart';
 import 'package:novexps/core/widgets/user_avatar_widget.dart';
+import 'package:novexps/features/auth/data/models/user_model.dart';
 import 'package:novexps/features/auth/domain/entities/user.dart';
 import 'package:novexps/features/auth/presentation/providers/auth_provider.dart';
 import 'package:novexps/features/dc_console/presentation/widgets/dc_order_detail_modal.dart';
@@ -98,6 +100,50 @@ void main() {
       );
 
       expect(find.byType(Image), findsOneWidget);
+    });
+
+    test('2b. UserModel.fromJson parses avatarUrl across Supabase column variants and aliases', () {
+      final json1 = {
+        'id': 'u-1',
+        'email': 'joel.odufu@novaexpress.ng',
+        'first_name': 'Joel',
+        'last_name': 'Odufu',
+        'avatar_url': 'https://supabase.co/avatars/joel.jpg',
+      };
+      final user1 = UserModel.fromJson(json1);
+      expect(user1.avatarUrl, equals('https://supabase.co/avatars/joel.jpg'));
+
+      final json2 = {
+        'id': 'u-2',
+        'email': 'emeka.rider@novaexpress.ng',
+        'first_name': 'Emeka',
+        'last_name': 'Rider',
+        'photo_url': 'https://supabase.co/avatars/emeka.png',
+      };
+      final user2 = UserModel.fromJson(json2);
+      expect(user2.avatarUrl, equals('https://supabase.co/avatars/emeka.png'));
+    });
+
+    test('2c. LocalStorageService caches and restores user profile including avatarUrl across app refreshes', () async {
+      final storage = LocalStorageServiceImpl();
+      const testUser = UserModel(
+        id: 'u-101',
+        email: 'joel.odufu@novaexpress.ng',
+        firstName: 'Joel',
+        lastName: 'Odufu',
+        phone: '08031234567',
+        role: 'delivery_agent',
+        avatarUrl: 'https://oygtaeriljuelhshfvkv.supabase.co/storage/v1/object/public/avatars/avatar_joel.jpg',
+      );
+
+      await storage.cacheUserProfile(testUser.toJson());
+      final restoredJson = await storage.getCachedUserProfile();
+      expect(restoredJson, isNotNull);
+
+      final restoredUser = UserModel.fromJson(restoredJson!);
+      expect(restoredUser.id, equals('u-101'));
+      expect(restoredUser.email, equals('joel.odufu@novaexpress.ng'));
+      expect(restoredUser.avatarUrl, equals('https://oygtaeriljuelhshfvkv.supabase.co/storage/v1/object/public/avatars/avatar_joel.jpg'));
     });
   });
 

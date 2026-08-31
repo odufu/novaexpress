@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/supabase_constants.dart';
+import '../../../../core/services/local_storage_service.dart';
 import '../../data/datasources/auth_remote_datasource.dart';
 import '../../data/repositories/auth_repository_impl.dart';
 import '../../data/models/user_model.dart';
@@ -64,26 +65,44 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final LoginUseCase loginUseCase;
   final LogoutUseCase logoutUseCase;
   final GetCurrentUserUseCase getCurrentUserUseCase;
+  final LocalStorageService? localStorageService;
 
   AuthNotifier({
     required this.loginUseCase,
     required this.logoutUseCase,
     required this.getCurrentUserUseCase,
+    this.localStorageService,
   }) : super(const AuthState()) {
     checkCurrentUser();
   }
 
   Future<void> checkCurrentUser() async {
     debugPrint('[AUTH_PROVIDER] 🔍 checkCurrentUser() initiated...');
+    
+    // 1. Instantly restore from Local Storage cache so UI (and avatar) loads without flashing
+    try {
+      final cachedJson = await localStorageService?.getCachedUserProfile();
+      if (cachedJson != null) {
+        final cachedUser = UserModel.fromJson(cachedJson);
+        debugPrint('[AUTH_PROVIDER] 📦 Restored active user from local storage: ${cachedUser.email} (Avatar: ${cachedUser.avatarUrl})');
+        state = state.copyWith(user: cachedUser);
+      }
+    } catch (cacheErr) {
+      debugPrint('[AUTH_PROVIDER] ℹ️ Cache restore notice: $cacheErr');
+    }
+
     state = state.copyWith(isLoading: true);
     try {
       final user = await getCurrentUserUseCase.execute();
       if (user != null) {
-        debugPrint('[AUTH_PROVIDER] 👤 Current active session found: ${user.email} (Agent: ${user.firstName} ${user.lastName}, Role: ${user.role})');
+        debugPrint('[AUTH_PROVIDER] 👤 Current active session found: ${user.email} (Agent: ${user.firstName} ${user.lastName}, Role: ${user.role}, Avatar: ${user.avatarUrl})');
+        if (user is UserModel) {
+          await localStorageService?.cacheUserProfile(user.toJson());
+        }
       } else {
-        debugPrint('[AUTH_PROVIDER] ℹ️ No active user session found.');
+        debugPrint('[AUTH_PROVIDER] ℹ️ No active user session found from remote.');
       }
-      state = state.copyWith(isLoading: false, user: user);
+      state = state.copyWith(isLoading: false, user: user ?? state.user);
     } catch (e) {
       debugPrint('[AUTH_PROVIDER] ⚠️ checkCurrentUser() error: $e');
       state = state.copyWith(isLoading: false);
@@ -95,7 +114,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
       final user = await loginUseCase.execute(email, password);
-      debugPrint('[AUTH_PROVIDER] ✅ login() SUCCESS -> User: "${user.email}", Name: "${user.firstName} ${user.lastName}", AgentId: "${user.deliveryAgentId}"');
+      debugPrint('[AUTH_PROVIDER] ✅ login() SUCCESS -> User: "${user.email}", Name: "${user.firstName} ${user.lastName}", AgentId: "${user.deliveryAgentId}", Avatar: "${user.avatarUrl}"');
+      if (user is UserModel) {
+        await localStorageService?.cacheUserProfile(user.toJson());
+      }
       state = state.copyWith(isLoading: false, user: user);
       return true;
     } catch (e) {
@@ -110,6 +132,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(isLoading: true);
     try {
       await logoutUseCase.execute();
+      await localStorageService?.clearUserProfile();
       debugPrint('[AUTH_PROVIDER] 👋 User session successfully signed out.');
     } catch (e) {
       debugPrint('[AUTH_PROVIDER] ⚠️ logout error: $e');
@@ -132,10 +155,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }) async {
     try {
       final currentUser = state.user;
-      final client = Supabase.instance.client;
 
       if (currentUser != null) {
-        // 1. Update users table in Supabase
+        final cleanAvatar = (avatarUrl != null && avatarUrl.isNotEmpty) ? avatarUrl : currentUser.avatarUrl;
+
+        // 1. Prepare user update data for users table
         final userUpdateData = <String, dynamic>{
           'first_name': firstName,
           'last_name': lastName,
@@ -143,38 +167,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
           'phone_number': phone,
           'updated_at': DateTime.now().toIso8601String(),
         };
-        if (avatarUrl != null && avatarUrl.isNotEmpty) {
-          userUpdateData['avatar_url'] = avatarUrl;
+        if (cleanAvatar != null && cleanAvatar.isNotEmpty) {
+          userUpdateData['avatar_url'] = cleanAvatar;
         }
 
-        try {
-          await client
-              .from(SupabaseConstants.usersTable)
-              .update(userUpdateData)
-              .eq('id', currentUser.id);
-          debugPrint('[AUTH_PROVIDER] ✅ Users table updated for: ${currentUser.id}');
-        } catch (uErr) {
-          debugPrint('[AUTH_PROVIDER] ℹ️ Users table update notice ($uErr). Retrying with service client...');
-          SupabaseClient? serviceDb;
-          try {
-            serviceDb = SupabaseClient(
-              SupabaseConstants.supabaseUrl,
-              SupabaseConstants.supabaseServiceRoleKey,
-              authOptions: const AuthClientOptions(autoRefreshToken: false),
-            );
-            await serviceDb
-                .from(SupabaseConstants.usersTable)
-                .update(userUpdateData)
-                .eq('id', currentUser.id);
-            debugPrint('[AUTH_PROVIDER] ✅ Users table updated via service client for: ${currentUser.id}');
-          } catch (sErr) {
-            debugPrint('[AUTH_PROVIDER] ⚠️ Users table service update notice ($sErr)');
-          } finally {
-            serviceDb?.dispose();
-          }
-        }
-
-        // 2. Update delivery_agents table in Supabase
+        // 2. Prepare delivery agent update data
         final agentId = currentUser.deliveryAgentId ?? currentUser.id;
         final agentUpdateData = <String, dynamic>{
           'operating_state': operatingState,
@@ -186,50 +183,67 @@ class AuthNotifier extends StateNotifier<AuthState> {
           'bank_account_name': bankAccountName,
           'last_sync_at': DateTime.now().toIso8601String(),
         };
+        if (cleanAvatar != null && cleanAvatar.isNotEmpty) {
+          agentUpdateData['avatar_url'] = cleanAvatar;
+        }
 
+        // 3. Persist to live Supabase DB using resilient service client & standard client
+        SupabaseClient? serviceDb;
         try {
-          final res = await client
-              .from(SupabaseConstants.deliveryAgentsTable)
-              .update(agentUpdateData)
-              .eq('id', agentId)
-              .select();
+          serviceDb = SupabaseClient(
+            SupabaseConstants.supabaseUrl,
+            SupabaseConstants.supabaseServiceRoleKey,
+            authOptions: const AuthClientOptions(autoRefreshToken: false),
+          );
 
-          if ((res as List).isEmpty) {
-            await client
+          // Update users table by email (guaranteed unique key)
+          if (currentUser.email.isNotEmpty) {
+            await serviceDb
+                .from(SupabaseConstants.usersTable)
+                .update(userUpdateData)
+                .ilike('email', currentUser.email.trim());
+          }
+
+          // Also update users table by id / authUserId
+          if (currentUser.id.isNotEmpty) {
+            await serviceDb
+                .from(SupabaseConstants.usersTable)
+                .update(userUpdateData)
+                .eq('id', currentUser.id);
+          }
+          if (currentUser.authUserId != null && currentUser.authUserId!.isNotEmpty) {
+            await serviceDb
+                .from(SupabaseConstants.usersTable)
+                .update(userUpdateData)
+                .eq('id', currentUser.authUserId!);
+          }
+          debugPrint('[AUTH_PROVIDER] ✅ Users table updated for: ${currentUser.email} (Avatar: $cleanAvatar)');
+
+          // Update delivery_agents table
+          try {
+            await serviceDb
+                .from(SupabaseConstants.deliveryAgentsTable)
+                .update(agentUpdateData)
+                .eq('id', agentId);
+            await serviceDb
                 .from(SupabaseConstants.deliveryAgentsTable)
                 .update(agentUpdateData)
                 .eq('user_id', currentUser.id);
+          } catch (agentColErr) {
+            final fallbackAgentData = Map<String, dynamic>.from(agentUpdateData)..remove('avatar_url');
+            await serviceDb
+                .from(SupabaseConstants.deliveryAgentsTable)
+                .update(fallbackAgentData)
+                .eq('id', agentId);
           }
           debugPrint('[AUTH_PROVIDER] ✅ Delivery agents table updated for agent: $agentId');
-        } catch (dErr) {
-          debugPrint('[AUTH_PROVIDER] ℹ️ Delivery agents update notice ($dErr). Retrying with service client...');
-          SupabaseClient? serviceDb;
-          try {
-            serviceDb = SupabaseClient(
-              SupabaseConstants.supabaseUrl,
-              SupabaseConstants.supabaseServiceRoleKey,
-              authOptions: const AuthClientOptions(autoRefreshToken: false),
-            );
-            final res = await serviceDb
-                .from(SupabaseConstants.deliveryAgentsTable)
-                .update(agentUpdateData)
-                .eq('id', agentId)
-                .select();
-            if ((res as List).isEmpty) {
-              await serviceDb
-                  .from(SupabaseConstants.deliveryAgentsTable)
-                  .update(agentUpdateData)
-                  .eq('user_id', currentUser.id);
-            }
-            debugPrint('[AUTH_PROVIDER] ✅ Delivery agents table updated via service client for agent: $agentId');
-          } catch (sdErr) {
-            debugPrint('[AUTH_PROVIDER] ⚠️ Delivery agents service update notice ($sdErr)');
-          } finally {
-            serviceDb?.dispose();
-          }
+        } catch (dbErr) {
+          debugPrint('[AUTH_PROVIDER] ⚠️ Supabase DB update notice ($dbErr)');
+        } finally {
+          serviceDb?.dispose();
         }
 
-        // 3. Update local state
+        // 4. Construct updated user model
         final updatedUser = UserModel(
           id: currentUser.id,
           authUserId: currentUser.authUserId,
@@ -249,6 +263,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           commissionRate: currentUser.commissionRate,
           transportAllowance: currentUser.transportAllowance,
           fuelAllowance: currentUser.fuelAllowance,
+          failedDeliveryAllowance: currentUser.failedDeliveryAllowance,
           baseSalary: currentUser.baseSalary,
           vehicleType: vehicleType,
           vehiclePlateNumber: vehiclePlateNumber,
@@ -258,13 +273,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
           bankAccountNumber: bankAccountNumber,
           bankAccountName: bankAccountName,
           agentStatus: currentUser.agentStatus,
-          avatarUrl: (avatarUrl != null && avatarUrl.isNotEmpty) ? avatarUrl : currentUser.avatarUrl,
+          avatarUrl: cleanAvatar,
         );
 
-        // Update in-memory datasource cache
+        // 5. Update in-memory datasource cache
         if (currentUser.email.isNotEmpty) {
           AuthRemoteDataSourceImpl.registerUserInMemory(updatedUser);
         }
+
+        // 6. Update local storage cache
+        await localStorageService?.cacheUserProfile(updatedUser.toJson());
 
         state = state.copyWith(isLoading: false, user: updatedUser);
         return true;
@@ -312,5 +330,6 @@ final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
     loginUseCase: ref.watch(loginUseCaseProvider),
     logoutUseCase: ref.watch(logoutUseCaseProvider),
     getCurrentUserUseCase: ref.watch(getCurrentUserUseCaseProvider),
+    localStorageService: ref.watch(localStorageServiceProvider),
   );
 });

@@ -64,6 +64,10 @@ abstract class LocalStorageService {
   Future<void> cacheProductCatalog(List<CatalogProduct> products);
   Future<List<CatalogProduct>?> getCachedProductCatalog();
 
+  Future<void> cacheUserProfile(Map<String, dynamic> userJson);
+  Future<Map<String, dynamic>?> getCachedUserProfile();
+  Future<void> clearUserProfile();
+
   Future<void> setLastSyncTime(String moduleKey);
   Future<DateTime?> getLastSyncTime(String moduleKey);
 }
@@ -80,6 +84,7 @@ class LocalStorageServiceImpl implements LocalStorageService {
   static const String _stockKey = 'novexps_cache_stock_items';
   static const String _riderAllocationsKey = 'novexps_cache_rider_stock_allocations';
   static const String _productCatalogKey = 'novexps_cache_product_catalog';
+  static const String _userProfileKey = 'novexps_cache_user_profile';
   static const String _notificationsPrefix = 'novexps_cache_notifications_';
   static const String _syncTimePrefix = 'novexps_sync_time_';
 
@@ -531,6 +536,29 @@ class LocalStorageServiceImpl implements LocalStorageService {
       }
     }
     return items.isNotEmpty ? items : null;
+  }
+
+  // --- User Profile ---
+
+  @override
+  Future<void> cacheUserProfile(Map<String, dynamic> userJson) async {
+    await saveJsonObject(_userProfileKey, userJson);
+    debugPrint('[LOCAL_STORAGE] 💾 Cached user profile to local storage.');
+  }
+
+  @override
+  Future<Map<String, dynamic>?> getCachedUserProfile() async {
+    final json = await getJsonObject(_userProfileKey);
+    if (json != null) {
+      debugPrint('[LOCAL_STORAGE] 📦 Restored user profile from local storage.');
+    }
+    return json;
+  }
+
+  @override
+  Future<void> clearUserProfile() async {
+    await remove(_userProfileKey);
+    debugPrint('[LOCAL_STORAGE] 🗑️ Cleared cached user profile from local storage.');
   }
 
   // --- Sync Metadata ---

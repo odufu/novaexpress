@@ -660,10 +660,34 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
         if (agentRes != null) {
           deliveryAgentId = agentRes['id'];
-          final userAvatar = userRes?['avatar_url'] ?? merged['avatar_url'];
+          final userAvatar = userRes?['avatar_url'] ??
+              agentRes['avatar_url'] ??
+              agentRes['photo_url'] ??
+              agentRes['profile_photo_url'] ??
+              merged['avatar_url'];
+
           merged.addAll(agentRes);
           if (userAvatar != null && userAvatar.toString().isNotEmpty) {
             merged['avatar_url'] = userAvatar;
+          }
+
+          // If user record wasn't found earlier, try finding it via agent's user_id
+          if (userRes == null && agentRes['user_id'] != null) {
+            try {
+              final linkedUser = await dbClient
+                  .from(SupabaseConstants.usersTable)
+                  .select()
+                  .eq('id', agentRes['user_id'])
+                  .maybeSingle();
+              if (linkedUser != null) {
+                if (linkedUser['avatar_url'] != null && linkedUser['avatar_url'].toString().isNotEmpty) {
+                  merged['avatar_url'] = linkedUser['avatar_url'];
+                }
+                if (linkedUser['first_name'] != null) merged['first_name'] = linkedUser['first_name'];
+                if (linkedUser['last_name'] != null) merged['last_name'] = linkedUser['last_name'];
+                if (linkedUser['email'] != null) merged['email'] = linkedUser['email'];
+              }
+            } catch (_) {}
           }
 
           final dcId = agentRes['distribution_center_id'];
