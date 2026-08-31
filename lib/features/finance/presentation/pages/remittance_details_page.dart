@@ -1,4 +1,5 @@
 import 'dart:ui' as ui;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -332,23 +333,35 @@ class _RemittanceDetailsPageState extends ConsumerState<RemittanceDetailsPage> {
       final cleanRef = remit.referenceNumber.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
       final fileName = 'Official_Receipt_$cleanRef.png';
 
-      downloadBytes(
+      final savedPath = await downloadBytes(
         bytes: pngBytes,
         fileName: fileName,
         mimeType: 'image/png',
       );
 
       if (mounted) {
+        const isWeb = kIsWeb;
+        final successMsg = isWeb
+            ? 'Official receipt ($fileName) downloaded successfully!'
+            : 'Official receipt saved to device storage:\n${savedPath ?? fileName}';
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: const Color(0xFF10B981),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            duration: const Duration(seconds: 4),
             content: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+                const Icon(Icons.check_circle_rounded, color: Colors.white, size: 22),
                 const SizedBox(width: 10),
-                Expanded(child: Text('Official receipt ($fileName) downloaded successfully!')),
+                Expanded(
+                  child: Text(
+                    successMsg,
+                    style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: Colors.white),
+                  ),
+                ),
               ],
             ),
           ),
@@ -733,15 +746,18 @@ Thank you for your timely settlement!
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                'SETTLEMENT RECONCILIATION',
-                                style: GoogleFonts.inter(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.8,
-                                  color: const Color(0xFF475569),
+                              Flexible(
+                                child: Text(
+                                  'SETTLEMENT RECONCILIATION',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.8,
+                                    color: const Color(0xFF475569),
+                                  ),
                                 ),
                               ),
+                              const SizedBox(width: 8),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                 decoration: BoxDecoration(
@@ -817,15 +833,18 @@ Thank you for your timely settlement!
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                'RECONCILED ORDERS BREAKDOWN',
-                                style: GoogleFonts.inter(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.8,
-                                  color: const Color(0xFF475569),
+                              Flexible(
+                                child: Text(
+                                  'RECONCILED ORDERS BREAKDOWN',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.8,
+                                    color: const Color(0xFF475569),
+                                  ),
                                 ),
                               ),
+                              const SizedBox(width: 8),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                 decoration: BoxDecoration(
@@ -891,13 +910,15 @@ Thank you for your timely settlement!
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                'AUDIT & TRANSACTION DETAILS',
-                                style: GoogleFonts.inter(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.8,
-                                  color: const Color(0xFF475569),
+                              Flexible(
+                                child: Text(
+                                  'AUDIT & TRANSACTION DETAILS',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.8,
+                                    color: const Color(0xFF475569),
+                                  ),
                                 ),
                               ),
                               if (isLoadingTxn)
@@ -1021,46 +1042,52 @@ Thank you for your timely settlement!
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: isFailed
-                          ? const Color(0xFFEF4444).withValues(alpha: 0.12)
-                          : const Color(0xFF10B981).withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      order.orderNumber,
-                      style: GoogleFonts.jetBrainsMono(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: isFailed ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+              Expanded(
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: isFailed
+                            ? const Color(0xFFEF4444).withValues(alpha: 0.12)
+                            : const Color(0xFF10B981).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        order.orderNumber,
+                        style: GoogleFonts.jetBrainsMono(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: isFailed ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                    decoration: BoxDecoration(
-                      color: isFailed
-                          ? const Color(0xFFEF4444).withValues(alpha: 0.1)
-                          : const Color(0xFF2563EB).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      isFailed ? 'FAILED ATTEMPT' : (order.isDirectTransfer ? 'DIRECT TRANSFER' : 'CASH POD'),
-                      style: GoogleFonts.inter(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                        color: isFailed ? const Color(0xFFEF4444) : const Color(0xFF2563EB),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: isFailed
+                            ? const Color(0xFFEF4444).withValues(alpha: 0.1)
+                            : const Color(0xFF2563EB).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        isFailed ? 'FAILED ATTEMPT' : (order.isDirectTransfer ? 'DIRECT TRANSFER' : 'CASH POD'),
+                        style: GoogleFonts.inter(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          color: isFailed ? const Color(0xFFEF4444) : const Color(0xFF2563EB),
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
+              const SizedBox(width: 6),
               Text(
                 itemDate,
                 style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8)),
@@ -1078,7 +1105,7 @@ Thank you for your timely settlement!
           ),
           const SizedBox(height: 8),
 
-          // Financial Grid for this order
+          // Financial Grid for this order - 100% responsive
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             decoration: BoxDecoration(
@@ -1087,32 +1114,40 @@ Thank you for your timely settlement!
               border: Border.all(color: isDark ? const Color(0xFF334155).withValues(alpha: 0.5) : const Color(0xFFE2E8F0)),
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildOrderMiniMetric(
-                  'Collection',
-                  CurrencyFormatter.formatNaira(order.cashCollected),
-                  isDark,
-                  valColor: order.cashCollected > 0 ? theme.colorScheme.onSurface : const Color(0xFF94A3B8),
+                Expanded(
+                  child: _buildOrderMiniMetric(
+                    'Collection',
+                    CurrencyFormatter.formatNaira(order.cashCollected),
+                    isDark,
+                    valColor: order.cashCollected > 0 ? theme.colorScheme.onSurface : const Color(0xFF94A3B8),
+                  ),
                 ),
-                _buildOrderMiniMetric(
-                  'Commission',
-                  '-${CurrencyFormatter.formatNaira(order.riderCommission)}',
-                  isDark,
-                  valColor: const Color(0xFF16A34A),
+                Expanded(
+                  child: _buildOrderMiniMetric(
+                    'Commission',
+                    '-${CurrencyFormatter.formatNaira(order.riderCommission)}',
+                    isDark,
+                    valColor: const Color(0xFF16A34A),
+                  ),
                 ),
-                _buildOrderMiniMetric(
-                  'Transport',
-                  '-${CurrencyFormatter.formatNaira(order.transportAllowance)}',
-                  isDark,
-                  valColor: const Color(0xFF2563EB),
+                Expanded(
+                  child: _buildOrderMiniMetric(
+                    'Transport',
+                    '-${CurrencyFormatter.formatNaira(order.transportAllowance)}',
+                    isDark,
+                    valColor: const Color(0xFF2563EB),
+                  ),
                 ),
-                _buildOrderMiniMetric(
-                  'Net Handover',
-                  CurrencyFormatter.formatNaira(order.netToDC),
-                  isDark,
-                  valColor: const Color(0xFF10B981),
-                  isBold: true,
+                Expanded(
+                  child: _buildOrderMiniMetric(
+                    'Net Handover',
+                    CurrencyFormatter.formatNaira(order.netToDC),
+                    isDark,
+                    valColor: const Color(0xFF10B981),
+                    isBold: true,
+                    isRightAlign: true,
+                  ),
                 ),
               ],
             ),
@@ -1122,21 +1157,34 @@ Thank you for your timely settlement!
     );
   }
 
-  Widget _buildOrderMiniMetric(String label, String value, bool isDark, {Color? valColor, bool isBold = false}) {
+  Widget _buildOrderMiniMetric(
+    String label,
+    String value,
+    bool isDark, {
+    Color? valColor,
+    bool isBold = false,
+    bool isRightAlign = false,
+  }) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: isRightAlign ? CrossAxisAlignment.end : CrossAxisAlignment.start,
       children: [
         Text(
           label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: GoogleFonts.inter(fontSize: 9.5, color: const Color(0xFF94A3B8), fontWeight: FontWeight.w500),
         ),
         const SizedBox(height: 1),
-        Text(
-          value,
-          style: GoogleFonts.jetBrainsMono(
-            fontSize: 10.5,
-            fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
-            color: valColor ?? (isDark ? Colors.white : const Color(0xFF1E293B)),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: isRightAlign ? Alignment.centerRight : Alignment.centerLeft,
+          child: Text(
+            value,
+            style: GoogleFonts.jetBrainsMono(
+              fontSize: 10.5,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+              color: valColor ?? (isDark ? Colors.white : const Color(0xFF1E293B)),
+            ),
           ),
         ),
       ],
@@ -1144,70 +1192,100 @@ Thank you for your timely settlement!
   }
 
   Widget _buildDetailRow(String label, String value, bool isDark, {Color? valColor, bool isBold = false}) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Expanded(
-          child: Text(
-            label,
-            style: GoogleFonts.inter(
-              fontSize: 12,
-              color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
-              fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 4,
+            child: Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 11.5,
+                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
+              ),
             ),
           ),
-        ),
-        Text(
-          value,
-          style: GoogleFonts.jetBrainsMono(
-            fontSize: 12.5,
-            fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
-            color: valColor ?? (isDark ? Colors.white : const Color(0xFF0F172A)),
+          const SizedBox(width: 10),
+          Expanded(
+            flex: 6,
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: GoogleFonts.jetBrainsMono(
+                fontSize: 12,
+                fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+                color: valColor ?? (isDark ? Colors.white : const Color(0xFF0F172A)),
+              ),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
   Widget _buildCopyableRow(BuildContext context, String label, String value, bool isDark) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Expanded(
-          child: Text(
-            label,
-            style: GoogleFonts.inter(
-              fontSize: 12,
-              color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 4,
+            child: Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 11.5,
+                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
-        ),
-        InkWell(
-          onTap: () {
-            Clipboard.setData(ClipboardData(text: value));
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('$label copied to clipboard'),
-                duration: const Duration(seconds: 1),
-              ),
-            );
-          },
-          child: Row(
-            children: [
-              Text(
-                value,
-                style: GoogleFonts.jetBrainsMono(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: const Color(0xFF2563EB),
+          const SizedBox(width: 10),
+          Expanded(
+            flex: 6,
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(4),
+                onTap: () {
+                  Clipboard.setData(ClipboardData(text: value));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('$label copied to clipboard'),
+                      duration: const Duration(seconds: 1),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                },
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        value,
+                        textAlign: TextAlign.right,
+                        style: GoogleFonts.jetBrainsMono(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF2563EB),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.copy_rounded, size: 12, color: Color(0xFF2563EB)),
+                  ],
                 ),
               ),
-              const SizedBox(width: 4),
-              const Icon(Icons.copy_rounded, size: 12, color: Color(0xFF2563EB)),
-            ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
