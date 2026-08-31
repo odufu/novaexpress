@@ -342,15 +342,22 @@ class _RemittanceDetailsPageState extends ConsumerState<RemittanceDetailsPage> {
       if (mounted) {
         const isWeb = kIsWeb;
         final successMsg = isWeb
-            ? 'Official receipt ($fileName) downloaded successfully!'
-            : 'Official receipt saved to device storage:\n${savedPath ?? fileName}';
+            ? 'Official receipt ($fileName) downloaded to your browser!'
+            : 'Official receipt saved to Downloads:\n${savedPath ?? fileName}';
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: const Color(0xFF10B981),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            duration: const Duration(seconds: 4),
+            duration: const Duration(seconds: 5),
+            action: (!isWeb && savedPath != null)
+                ? SnackBarAction(
+                    label: 'SHOW FILE',
+                    textColor: Colors.amberAccent,
+                    onPressed: () => openSavedFile(savedPath),
+                  )
+                : null,
             content: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
