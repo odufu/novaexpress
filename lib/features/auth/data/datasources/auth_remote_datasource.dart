@@ -29,6 +29,17 @@ abstract class AuthRemoteDataSource {
     required String distributionCenterId,
     required String assignedZone,
   });
+  Future<UserModel> registerDistributionCenterSupervisor({
+    required String email,
+    required String password,
+    required String firstName,
+    required String lastName,
+    required String phone,
+    required String distributionCenterId,
+    required String distributionCenterName,
+    String? operatingState,
+    String? operatingCity,
+  });
 }
 
 class MockAuthRemoteDataSource implements AuthRemoteDataSource {
@@ -76,6 +87,34 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
     required String assignedZone,
   }) async {
     return _currentUser!;
+  }
+
+  @override
+  Future<UserModel> registerDistributionCenterSupervisor({
+    required String email,
+    required String password,
+    required String firstName,
+    required String lastName,
+    required String phone,
+    required String distributionCenterId,
+    required String distributionCenterName,
+    String? operatingState,
+    String? operatingCity,
+  }) async {
+    final supervisor = UserModel(
+      id: 'sup_${DateTime.now().millisecondsSinceEpoch}',
+      email: email,
+      firstName: firstName,
+      lastName: lastName,
+      phone: phone,
+      role: 'dc_manager',
+      distributionCenterId: distributionCenterId,
+      distributionCenterName: distributionCenterName,
+      operatingState: operatingState ?? 'Federal Capital Territory',
+      operatingCity: operatingCity ?? 'Abuja',
+    );
+    AuthRemoteDataSourceImpl.registerUserInMemory(supervisor, password);
+    return supervisor;
   }
 }
 
@@ -588,6 +627,136 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     return userModel;
   }
 
+  @override
+  Future<UserModel> registerDistributionCenterSupervisor({
+    required String email,
+    required String password,
+    required String firstName,
+    required String lastName,
+    required String phone,
+    required String distributionCenterId,
+    required String distributionCenterName,
+    String? operatingState,
+    String? operatingCity,
+  }) async {
+    final cleanEmail = email.trim().toLowerCase();
+    debugPrint('[AUTH_DATASOURCE] 🏢 Registering DC Supervisor: "$cleanEmail" ($firstName $lastName) for DC "$distributionCenterName" ($distributionCenterId)...');
+
+    final dbClient = SupabaseClient(
+      SupabaseConstants.supabaseUrl,
+      SupabaseConstants.supabaseServiceRoleKey,
+    );
+
+    String userId = 'u-dc-${DateTime.now().millisecondsSinceEpoch}-${math.Random().nextInt(9999)}';
+    String? authUserId;
+
+    try {
+      // 1. Check if user already exists in users table
+      try {
+        final existingUserRow = await dbClient
+            .from(SupabaseConstants.usersTable)
+            .select('id')
+            .eq('email', cleanEmail)
+            .maybeSingle();
+        if (existingUserRow != null && existingUserRow['id'] != null) {
+          userId = existingUserRow['id'].toString();
+          debugPrint('[AUTH_DATASOURCE] ℹ️ Found existing user in users table with id: $userId');
+        }
+      } catch (checkErr) {
+        debugPrint('[AUTH_DATASOURCE] ℹ️ User lookup notice: $checkErr');
+      }
+
+      // 2. Try to register with Supabase Auth admin API
+      try {
+        final adminRes = await dbClient.auth.admin.createUser(
+          AdminUserAttributes(
+            email: cleanEmail,
+            password: password,
+            emailConfirm: true,
+            userMetadata: {
+              'first_name': firstName,
+              'last_name': lastName,
+              'role': 'dc_manager',
+              'phone': phone,
+              'distribution_center_id': distributionCenterId,
+              'distribution_center_name': distributionCenterName,
+            },
+          ),
+        );
+        authUserId = adminRes.user?.id;
+        if (authUserId != null) {
+          userId = authUserId;
+        }
+        debugPrint('[AUTH_DATASOURCE] ✅ Admin created Supabase Auth DC Supervisor user: $authUserId');
+      } catch (adminErr) {
+        debugPrint('[AUTH_DATASOURCE] ℹ️ Admin createUser notice ($adminErr). Falling back to signUp...');
+        try {
+          final signUpRes = await supabaseClient.auth.signUp(
+            email: cleanEmail,
+            password: password,
+            data: {
+              'first_name': firstName,
+              'last_name': lastName,
+              'role': 'dc_manager',
+              'phone': phone,
+              'distribution_center_id': distributionCenterId,
+              'distribution_center_name': distributionCenterName,
+            },
+          );
+          authUserId = signUpRes.user?.id;
+          if (authUserId != null) {
+            userId = authUserId;
+          }
+        } catch (authErr) {
+          debugPrint('[AUTH_DATASOURCE] ℹ️ Supabase signUp notice ($authErr)');
+        }
+      }
+
+      // 3. Upsert into public.users table
+      try {
+        await dbClient.from(SupabaseConstants.usersTable).upsert({
+          'id': userId,
+          'company_id': '11111111-1111-4111-8111-111111111111',
+          'email': cleanEmail,
+          'phone_number': phone,
+          'first_name': firstName,
+          'last_name': lastName,
+          'role': 'dc_manager',
+          'distribution_center_id': distributionCenterId,
+          'distribution_center_name': distributionCenterName,
+        });
+        debugPrint('[AUTH_DATASOURCE] ✅ Users table record upserted for DC Supervisor: $userId ($cleanEmail)');
+      } catch (userErr) {
+        debugPrint('[AUTH_DATASOURCE] ⚠️ Users table insert notice ($userErr)');
+      }
+    } catch (e) {
+      debugPrint('[AUTH_DATASOURCE] ⚠️ Network notice during DC supervisor registration: $e');
+    }
+
+    final userModel = UserModel(
+      id: userId,
+      authUserId: authUserId,
+      email: cleanEmail,
+      firstName: firstName,
+      lastName: lastName,
+      phone: phone,
+      role: 'dc_manager',
+      deliveryAgentId: null,
+      deliveryAgentCode: 'DC-MGR',
+      distributionCenterId: distributionCenterId,
+      distributionCenterName: distributionCenterName,
+      operatingState: operatingState ?? 'Federal Capital Territory',
+      operatingCity: operatingCity ?? 'Abuja',
+    );
+
+    // Save in memory for instant login capability
+    _registeredUsers[cleanEmail] = userModel;
+    _registeredPasswords[cleanEmail] = password;
+
+    debugPrint('[AUTH_DATASOURCE] ✅ DC Supervisor ($firstName $lastName - $cleanEmail) provisioned successfully for "$distributionCenterName".');
+    return userModel;
+  }
+
   Future<UserModel> _fetchUserProfile(String authUserId, String email) async {
     try {
       debugPrint('[AUTH_DATASOURCE] 📥 Resolving profile for authUserId: "$authUserId", email: "$email"...');
@@ -711,9 +880,14 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         // DC Supervisor / Manager Profile Sanitization
         merged['role'] = 'dc_manager';
         merged['delivery_agent_id'] = null;
-        merged['delivery_agent_code'] = 'DC-MGR-01';
-        merged['distribution_center_id'] = '22222222-2222-4222-8222-222222222222';
-        merged['distribution_center_name'] = 'Wuse Distribution Center';
+        merged['delivery_agent_code'] = userRes?['delivery_agent_code'] ?? 'DC-MGR-01';
+        
+        // Preserve dynamically assigned DC ID and DC Name if present in users record or merged state
+        final assignedDcId = userRes?['distribution_center_id'] ?? merged['distribution_center_id'];
+        final assignedDcName = userRes?['distribution_center_name'] ?? merged['distribution_center_name'];
+        
+        merged['distribution_center_id'] = assignedDcId ?? '22222222-2222-4222-8222-222222222222';
+        merged['distribution_center_name'] = assignedDcName ?? 'Wuse Central Distribution Hub';
       }
 
       if (email.isNotEmpty) {

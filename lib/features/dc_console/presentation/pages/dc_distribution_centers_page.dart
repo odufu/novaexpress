@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/services/location_lookup_service.dart';
 import '../../../../core/widgets/app_loading_overlay.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/entities/distribution_center.dart';
 import '../providers/dc_console_provider.dart';
 
@@ -813,7 +815,34 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
     final phoneCtrl = TextEditingController(text: existingDc?.contactPhone ?? '+234 ');
     final emailCtrl = TextEditingController(text: existingDc?.contactEmail ?? '');
     final managerCtrl = TextEditingController(text: existingDc?.managerName ?? '');
+    final supervisorEmailCtrl = TextEditingController(
+      text: existingDc?.contactEmail ?? '',
+    );
+    final supervisorPasswordCtrl = TextEditingController(text: 'Password123!');
     final capacityCtrl = TextEditingController(text: existingDc != null ? existingDc.storageCapacityUnits.toString() : '35000');
+
+    bool obscurePassword = true;
+    bool emailManuallyEdited = false;
+
+    if (!isEditing) {
+      supervisorEmailCtrl.text = 'supervisor.dc@novaexpress.ng';
+    }
+
+    supervisorEmailCtrl.addListener(() {
+      if (supervisorEmailCtrl.text.isNotEmpty &&
+          !supervisorEmailCtrl.text.startsWith('supervisor.')) {
+        emailManuallyEdited = true;
+      }
+    });
+
+    codeCtrl.addListener(() {
+      if (!emailManuallyEdited && !isEditing) {
+        final c = codeCtrl.text.trim().toLowerCase().replaceAll('dc-', '').replaceAll(RegExp(r'[^a-z0-9]'), '');
+        if (c.isNotEmpty) {
+          supervisorEmailCtrl.text = 'supervisor.$c@novaexpress.ng';
+        }
+      }
+    });
 
     String selectedState = existingDc?.state ?? 'Federal Capital Territory';
     if (!LocationLookupService.getAllStates().contains(selectedState)) {
@@ -892,6 +921,7 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
                         const SizedBox(width: 12),
                         Expanded(
                           child: DropdownButtonFormField<String>(
+                            isExpanded: true,
                             value: LocationLookupService.getAllStates().contains(selectedState)
                                 ? selectedState
                                 : LocationLookupService.getAllStates().first,
@@ -958,8 +988,9 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
                           child: TextField(
                             controller: managerCtrl,
                             decoration: const InputDecoration(
-                              labelText: 'Station Manager Name',
+                              labelText: 'Station Supervisor Full Name *',
                               hintText: 'e.g. Folake Adebayo',
+                              prefixIcon: Icon(Icons.person_outline_rounded, size: 16),
                             ),
                           ),
                         ),
@@ -971,18 +1002,112 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
                             decoration: const InputDecoration(
                               labelText: 'Contact Phone Number',
                               hintText: '+234 812 345 6789',
+                              prefixIcon: Icon(Icons.phone_outlined, size: 16),
                             ),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 12),
-                    TextField(
-                      controller: emailCtrl,
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: const InputDecoration(
-                        labelText: 'Official Hub Email Address',
-                        hintText: 'hub.contact@novaexpress.com',
+
+                    // Dedicated DC Supervisor Login Credentials Section
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2563EB).withValues(alpha: isDark ? 0.12 : 0.05),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF2563EB).withValues(alpha: 0.25)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.admin_panel_settings_rounded, size: 18, color: Color(0xFF2563EB)),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  isEditing ? 'Station Supervisor Portal Account' : 'Supervisor Portal Login Credentials *',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF2563EB).withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Text(
+                                  'Auth Scoped',
+                                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF2563EB)),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'The supervisor will use these credentials to log in independently and manage inventory, local stock, riders, and dispatch orders for this DC.',
+                            style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: supervisorEmailCtrl,
+                                  keyboardType: TextInputType.emailAddress,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Supervisor Login Email *',
+                                    hintText: 'supervisor.dc@novaexpress.ng',
+                                    prefixIcon: Icon(Icons.email_outlined, size: 16),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: TextField(
+                                  controller: supervisorPasswordCtrl,
+                                  obscureText: obscurePassword,
+                                  decoration: InputDecoration(
+                                    labelText: 'Supervisor Password *',
+                                    hintText: 'Password123!',
+                                    prefixIcon: const Icon(Icons.lock_outline_rounded, size: 16),
+                                    suffixIcon: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        IconButton(
+                                          icon: Icon(
+                                            obscurePassword ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                                            size: 16,
+                                          ),
+                                          onPressed: () => setState(() => obscurePassword = !obscurePassword),
+                                          tooltip: obscurePassword ? 'Show password' : 'Hide password',
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(Icons.casino_rounded, size: 16, color: Color(0xFFF37021)),
+                                          onPressed: () {
+                                            final gen = 'SupPass@${DateTime.now().millisecond}#';
+                                            setState(() {
+                                              supervisorPasswordCtrl.text = gen;
+                                              obscurePassword = false;
+                                            });
+                                          },
+                                          tooltip: 'Generate Strong Password',
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -1001,27 +1126,34 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.map_rounded, size: 16, color: Color(0xFF2563EB)),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        'LGAs of Delivery Coverage *',
-                                        style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '${selectedLgas.length} of ${availableLgas.length} LGAs covered in $selectedState',
-                                    style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
-                                  ),
-                                ],
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.map_rounded, size: 16, color: Color(0xFF2563EB)),
+                                        const SizedBox(width: 6),
+                                        Expanded(
+                                          child: Text(
+                                            'LGAs of Delivery Coverage *',
+                                            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '${selectedLgas.length} of ${availableLgas.length} LGAs covered in $selectedState',
+                                      style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
                               ),
                               Row(
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
                                   TextButton(
                                     onPressed: () {
@@ -1152,6 +1284,8 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
                   final code = codeCtrl.text.trim().toUpperCase();
                   final city = cityCtrl.text.trim();
                   final address = addressCtrl.text.trim();
+                  final supEmail = supervisorEmailCtrl.text.trim();
+                  final supPass = supervisorPasswordCtrl.text.trim();
 
                   if (name.isEmpty || code.isEmpty || city.isEmpty || address.isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -1173,6 +1307,16 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
                     return;
                   }
 
+                  if (!isEditing && (supEmail.isEmpty || supPass.isEmpty)) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('⚠️ Supervisor Login Email and Password are required to provision portal authentication.'),
+                        backgroundColor: Color(0xFFEF4444),
+                      ),
+                    );
+                    return;
+                  }
+
                   final capacity = int.tryParse(capacityCtrl.text.replaceAll(',', '')) ?? 25000;
                   final zones = List<String>.from(selectedLgas);
 
@@ -1180,7 +1324,7 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
                     final savedDc = await showAppLoadingDialog<DistributionCenter>(
                       context: ctx,
                       message: isEditing ? 'Updating Distribution Center...' : 'Registering Distribution Center...',
-                      subMessage: 'Syncing fulfillment network directory & live database...',
+                      subMessage: 'Provisioning supervisor auth account & syncing fulfillment network...',
                       isDark: isDark,
                       task: () async {
                         if (isEditing) {
@@ -1191,7 +1335,7 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
                             city: city,
                             address: address,
                             contactPhone: phoneCtrl.text.trim(),
-                            contactEmail: emailCtrl.text.trim(),
+                            contactEmail: supEmail.isNotEmpty ? supEmail : emailCtrl.text.trim(),
                             managerName: managerCtrl.text.trim(),
                             isHub: isHub,
                             isActive: isActive,
@@ -1202,6 +1346,7 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
                           await ref.read(dcConsoleProvider.notifier).updateDistributionCenter(updated);
                           return updated;
                         } else {
+                          final authDataSource = ref.read(authRemoteDataSourceProvider);
                           return await ref.read(dcConsoleProvider.notifier).createDistributionCenter(
                                 name: name,
                                 code: code,
@@ -1209,11 +1354,14 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
                                 city: city,
                                 address: address,
                                 contactPhone: phoneCtrl.text.trim(),
-                                contactEmail: emailCtrl.text.trim(),
+                                contactEmail: supEmail.isNotEmpty ? supEmail : emailCtrl.text.trim(),
                                 managerName: managerCtrl.text.trim(),
+                                supervisorEmail: supEmail,
+                                supervisorPassword: supPass,
                                 isHub: isHub,
                                 operatingZones: zones,
                                 storageCapacityUnits: capacity,
+                                authDataSource: authDataSource,
                               );
                         }
                       },
@@ -1229,6 +1377,8 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
                           isDark: isDark,
                           dc: savedDc,
                           isEditing: isEditing,
+                          supervisorEmail: supEmail.isNotEmpty ? supEmail : 'supervisor.${code.toLowerCase()}@novaexpress.ng',
+                          supervisorPassword: supPass.isNotEmpty ? supPass : 'Password123!',
                         );
                       }
                     }
@@ -1270,6 +1420,8 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
     required bool isDark,
     required DistributionCenter dc,
     required bool isEditing,
+    String? supervisorEmail,
+    String? supervisorPassword,
   }) {
     showDialog(
       context: context,
@@ -1279,67 +1431,141 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
         content: SizedBox(
-          width: 440,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
+          width: 480,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Center(
+                    child: Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 38),
+                  ),
                 ),
-                child: const Center(
-                  child: Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 38),
-                ),
-              ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-              Text(
-                isEditing ? 'Distribution Center Updated!' : 'Distribution Center Registered!',
-                style: GoogleFonts.inter(
-                  fontSize: 17,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                Text(
+                  isEditing ? 'Distribution Center Updated!' : 'Distribution Center Registered!',
+                  style: GoogleFonts.inter(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 6),
-              Text(
-                isEditing
-                    ? '${dc.name} details have been updated across the network.'
-                    : '${dc.name} has been enrolled into the national fulfillment network.',
-                style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 6),
+                Text(
+                  isEditing
+                      ? '${dc.name} details have been updated across the network.'
+                      : '${dc.name} has been enrolled into the national fulfillment network.',
+                  style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
 
-              // Summary Info Card
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                // Summary Info Card
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    children: [
+                      _buildRow('DC Name:', dc.name, isDark, isBold: true),
+                      const SizedBox(height: 6),
+                      _buildRow('DC Code:', dc.code, isDark, valueColor: const Color(0xFF2563EB)),
+                      const SizedBox(height: 6),
+                      _buildRow('Classification:', dc.isHub ? '⭐ Primary Regional Hub' : '🛰️ Satellite Depot', isDark),
+                      const SizedBox(height: 6),
+                      _buildRow('Location:', dc.fullLocation, isDark),
+                      const SizedBox(height: 6),
+                      _buildRow('Capacity:', dc.displayCapacity, isDark),
+                      const SizedBox(height: 6),
+                      _buildRow('Coverage Zones:', '${dc.operatingZones.length} LGAs Covered', isDark),
+                    ],
+                  ),
                 ),
-                child: Column(
-                  children: [
-                    _buildRow('DC Name:', dc.name, isDark, isBold: true),
-                    const SizedBox(height: 6),
-                    _buildRow('DC Code:', dc.code, isDark, valueColor: const Color(0xFF2563EB)),
-                    const SizedBox(height: 6),
-                    _buildRow('Classification:', dc.isHub ? '⭐ Primary Regional Hub' : '🛰️ Satellite Depot', isDark),
-                    const SizedBox(height: 6),
-                    _buildRow('Location:', dc.fullLocation, isDark),
-                    const SizedBox(height: 6),
-                    _buildRow('Capacity:', dc.displayCapacity, isDark),
-                    const SizedBox(height: 6),
-                    _buildRow('Coverage Zones:', '${dc.operatingZones.length} Zones', isDark),
-                  ],
-                ),
-              ),
-            ],
+
+                if (supervisorEmail != null && supervisorPassword != null) ...[
+                  const SizedBox(height: 14),
+                  // Dedicated Supervisor Login Credentials Slip
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981).withValues(alpha: isDark ? 0.12 : 0.06),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.key_rounded, size: 16, color: Color(0xFF10B981)),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Supervisor Portal Login Credentials',
+                              style: GoogleFonts.inter(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        _buildRow('Portal Role:', 'DC Supervisor / Hub Manager', isDark, valueColor: const Color(0xFF10B981)),
+                        const SizedBox(height: 6),
+                        _buildRow('Login Email:', supervisorEmail, isDark, isBold: true),
+                        const SizedBox(height: 6),
+                        _buildRow('Password:', supervisorPassword, isDark, isBold: true),
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              Clipboard.setData(ClipboardData(
+                                text: 'NovaExpress DC Supervisor Credentials\n'
+                                    'Hub: ${dc.name} (${dc.code})\n'
+                                    'State: ${dc.state}\n'
+                                    'Role: DC Supervisor\n'
+                                    'Email: $supervisorEmail\n'
+                                    'Password: $supervisorPassword\n'
+                                    'Portal: https://novaexpress.ng/dc',
+                              ));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('📋 Copied DC Supervisor login credentials to clipboard!'),
+                                  backgroundColor: Color(0xFF10B981),
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.copy_rounded, size: 14, color: Color(0xFF10B981)),
+                            label: const Text(
+                              'Copy Supervisor Login Slip',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF10B981)),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: Color(0xFF10B981)),
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
         actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 20),

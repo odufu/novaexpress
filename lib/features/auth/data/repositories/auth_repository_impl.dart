@@ -64,4 +64,29 @@ class AuthRepositoryImpl implements AuthRepository {
       assignedZone: assignedZone,
     );
   }
+
+  @override
+  Future<UserEntity> registerDistributionCenterSupervisor({
+    required String email,
+    required String password,
+    required String firstName,
+    required String lastName,
+    required String phone,
+    required String distributionCenterId,
+    required String distributionCenterName,
+    String? operatingState,
+    String? operatingCity,
+  }) async {
+    return await remoteDataSource.registerDistributionCenterSupervisor(
+      email: email,
+      password: password,
+      firstName: firstName,
+      lastName: lastName,
+      phone: phone,
+      distributionCenterId: distributionCenterId,
+      distributionCenterName: distributionCenterName,
+      operatingState: operatingState,
+      operatingCity: operatingCity,
+    );
+  }
 }

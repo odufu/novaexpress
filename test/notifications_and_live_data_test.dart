@@ -156,6 +156,28 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
         role: 'delivery_agent',
         deliveryAgentId: 'mock-agent-id',
       );
+  @override
+  Future<UserModel> registerDistributionCenterSupervisor({
+    required String email,
+    required String password,
+    required String firstName,
+    required String lastName,
+    required String phone,
+    required String distributionCenterId,
+    required String distributionCenterName,
+    String? operatingState,
+    String? operatingCity,
+  }) async =>
+      UserModel(
+        id: 'mock-sup-id',
+        email: email,
+        firstName: firstName,
+        lastName: lastName,
+        phone: phone,
+        role: 'dc_manager',
+        distributionCenterId: distributionCenterId,
+        distributionCenterName: distributionCenterName,
+      );
 }
 
 class MockAuthNotifier extends AuthNotifier {

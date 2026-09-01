@@ -141,6 +141,20 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
     required String assignedZone,
   }) async =>
       testUserModel;
+
+  @override
+  Future<UserModel> registerDistributionCenterSupervisor({
+    required String email,
+    required String password,
+    required String firstName,
+    required String lastName,
+    required String phone,
+    required String distributionCenterId,
+    required String distributionCenterName,
+    String? operatingState,
+    String? operatingCity,
+  }) async =>
+      testUserModel;
 }
 
 class MockOrdersRemoteDataSource implements OrdersRemoteDataSource {

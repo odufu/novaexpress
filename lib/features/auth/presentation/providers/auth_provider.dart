@@ -7,6 +7,7 @@ import '../../data/datasources/auth_remote_datasource.dart';
 import '../../data/repositories/auth_repository_impl.dart';
 import '../../data/models/user_model.dart';
 import '../../domain/entities/user.dart';
+import '../../domain/repositories/auth_repository.dart';
 import '../../domain/usecases/get_current_user.dart';
 import '../../domain/usecases/login.dart';
 import '../../domain/usecases/logout.dart';
@@ -65,15 +66,57 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final LoginUseCase loginUseCase;
   final LogoutUseCase logoutUseCase;
   final GetCurrentUserUseCase getCurrentUserUseCase;
+  final AuthRepository? authRepository;
   final LocalStorageService? localStorageService;
 
   AuthNotifier({
     required this.loginUseCase,
     required this.logoutUseCase,
     required this.getCurrentUserUseCase,
+    this.authRepository,
     this.localStorageService,
   }) : super(const AuthState()) {
     checkCurrentUser();
+  }
+
+  Future<UserEntity> registerDistributionCenterSupervisor({
+    required String email,
+    required String password,
+    required String firstName,
+    required String lastName,
+    required String phone,
+    required String distributionCenterId,
+    required String distributionCenterName,
+    String? operatingState,
+    String? operatingCity,
+  }) async {
+    if (authRepository != null) {
+      return await authRepository!.registerDistributionCenterSupervisor(
+        email: email,
+        password: password,
+        firstName: firstName,
+        lastName: lastName,
+        phone: phone,
+        distributionCenterId: distributionCenterId,
+        distributionCenterName: distributionCenterName,
+        operatingState: operatingState,
+        operatingCity: operatingCity,
+      );
+    }
+    final mockUser = UserModel(
+      id: 'sup_${DateTime.now().millisecondsSinceEpoch}',
+      email: email,
+      firstName: firstName,
+      lastName: lastName,
+      phone: phone,
+      role: 'dc_manager',
+      distributionCenterId: distributionCenterId,
+      distributionCenterName: distributionCenterName,
+      operatingState: operatingState ?? 'Federal Capital Territory',
+      operatingCity: operatingCity ?? 'Abuja',
+    );
+    AuthRemoteDataSourceImpl.registerUserInMemory(mockUser, password);
+    return mockUser;
   }
 
   Future<void> checkCurrentUser() async {
@@ -330,6 +373,7 @@ final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
     loginUseCase: ref.watch(loginUseCaseProvider),
     logoutUseCase: ref.watch(logoutUseCaseProvider),
     getCurrentUserUseCase: ref.watch(getCurrentUserUseCaseProvider),
+    authRepository: ref.watch(authRepositoryProvider),
     localStorageService: ref.watch(localStorageServiceProvider),
   );
 });

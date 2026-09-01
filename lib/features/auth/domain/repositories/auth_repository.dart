@@ -24,4 +24,15 @@ abstract class AuthRepository {
     required String distributionCenterId,
     required String assignedZone,
   });
+  Future<UserEntity> registerDistributionCenterSupervisor({
+    required String email,
+    required String password,
+    required String firstName,
+    required String lastName,
+    required String phone,
+    required String distributionCenterId,
+    required String distributionCenterName,
+    String? operatingState,
+    String? operatingCity,
+  });
 }

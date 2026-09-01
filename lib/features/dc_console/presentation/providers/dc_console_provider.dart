@@ -653,9 +653,12 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     String? contactPhone,
     String? contactEmail,
     String? managerName,
+    String? supervisorEmail,
+    String? supervisorPassword,
     bool isHub = false,
     List<String> operatingZones = const [],
     int storageCapacityUnits = 25000,
+    AuthRemoteDataSource? authDataSource,
   }) async {
     final cleanCode = code.trim().toUpperCase();
     final cleanName = name.trim();
@@ -668,8 +671,10 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
       throw Exception("A distribution center with code '$cleanCode' already exists (${existing.name}). Please choose a unique DC code.");
     }
 
+    final dcId = 'dc_${cleanCode.toLowerCase().replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_')}_${DateTime.now().millisecondsSinceEpoch}';
+
     final newDc = DistributionCenter(
-      id: 'dc_${DateTime.now().millisecondsSinceEpoch}',
+      id: dcId,
       companyId: '11111111-1111-4111-8111-111111111111',
       name: cleanName,
       code: cleanCode,
@@ -694,7 +699,57 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     state = state.copyWith(distributionCenters: updatedList);
     await _storageService.cacheDistributionCenters(updatedList);
 
-    // 2. Persist to live Supabase DB
+    // 2. Provision supervisor auth credentials at the auth level
+    final effectiveSupEmail = (supervisorEmail != null && supervisorEmail.trim().isNotEmpty)
+        ? supervisorEmail.trim()
+        : (contactEmail != null && contactEmail.trim().isNotEmpty
+            ? contactEmail.trim()
+            : 'supervisor.${cleanCode.toLowerCase()}@novaexpress.ng');
+    final effectiveSupPass = (supervisorPassword != null && supervisorPassword.trim().isNotEmpty)
+        ? supervisorPassword.trim()
+        : 'Password123!';
+
+    final nameParts = (managerName ?? 'Operations Supervisor').trim().split(' ');
+    final firstName = nameParts.isNotEmpty ? nameParts.first : 'Operations';
+    final lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : 'Supervisor';
+    final phone = contactPhone?.trim().isNotEmpty == true ? contactPhone!.trim() : '+234 800 000 0000';
+
+    try {
+      if (authDataSource != null) {
+        await authDataSource.registerDistributionCenterSupervisor(
+          email: effectiveSupEmail,
+          password: effectiveSupPass,
+          firstName: firstName,
+          lastName: lastName,
+          phone: phone,
+          distributionCenterId: newDc.id,
+          distributionCenterName: newDc.name,
+          operatingState: stateName,
+          operatingCity: city,
+        );
+      } else {
+        final registeredSupervisor = UserModel(
+          id: 'u-sup-${newDc.code.toLowerCase()}',
+          email: effectiveSupEmail.toLowerCase(),
+          firstName: firstName,
+          lastName: lastName,
+          phone: phone,
+          role: 'dc_manager',
+          deliveryAgentId: null,
+          deliveryAgentCode: 'DC-MGR',
+          distributionCenterId: newDc.id,
+          distributionCenterName: newDc.name,
+          operatingState: stateName,
+          operatingCity: city,
+        );
+        AuthRemoteDataSourceImpl.registerUserInMemory(registeredSupervisor, effectiveSupPass);
+      }
+      debugPrint('[DC_CONSOLE_PROVIDER] 👤 DC Supervisor account provisioned for $effectiveSupEmail ($cleanName)');
+    } catch (authErr) {
+      debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ Supervisor auth provisioning note: $authErr');
+    }
+
+    // 3. Persist to live Supabase DB
     SupabaseClient? dbClient;
     try {
       dbClient = SupabaseClient(
