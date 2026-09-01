@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../features/dc_console/domain/entities/distribution_center.dart';
 import '../../features/dc_console/domain/entities/dc_fleet_driver.dart';
 import '../../features/dc_console/domain/entities/dc_payout_claim.dart';
 import '../../features/dc_console/domain/entities/dc_transaction_record.dart';
@@ -28,6 +29,8 @@ abstract class LocalStorageService {
   Future<void> clearAll();
 
   // Domain-specific caching methods
+  Future<void> cacheDistributionCenters(List<DistributionCenter> dcs);
+  Future<List<DistributionCenter>?> getCachedDistributionCenters();
   Future<void> cacheFleetDrivers(List<DCFleetDriver> drivers);
   Future<List<DCFleetDriver>?> getCachedFleetDrivers();
 
@@ -73,6 +76,7 @@ abstract class LocalStorageService {
 }
 
 class LocalStorageServiceImpl implements LocalStorageService {
+  static const String _distributionCentersKey = 'novexps_cache_distribution_centers';
   static const String _fleetDriversKey = 'novexps_cache_fleet_drivers';
   static const String _payoutClaimsKey = 'novexps_cache_payout_claims';
   static const String _ordersKey = 'novexps_cache_orders';
@@ -533,6 +537,30 @@ class LocalStorageServiceImpl implements LocalStorageService {
         items.add(CatalogProduct.fromJson(map));
       } catch (e) {
         debugPrint('[LOCAL_STORAGE] ⚠️ Error parsing cached product catalog: $e');
+      }
+    }
+    return items.isNotEmpty ? items : null;
+  }
+
+  // --- Distribution Centers ---
+
+  @override
+  Future<void> cacheDistributionCenters(List<DistributionCenter> dcs) async {
+    final list = dcs.map((d) => d.toJson()).toList();
+    await saveJsonList(_distributionCentersKey, list);
+    debugPrint('[LOCAL_STORAGE] 💾 Cached ${dcs.length} distribution centers to local storage.');
+  }
+
+  @override
+  Future<List<DistributionCenter>?> getCachedDistributionCenters() async {
+    final rawList = await getJsonList(_distributionCentersKey);
+    if (rawList == null) return null;
+    final items = <DistributionCenter>[];
+    for (final map in rawList) {
+      try {
+        items.add(DistributionCenter.fromJson(map));
+      } catch (e) {
+        debugPrint('[LOCAL_STORAGE] ⚠️ Error parsing cached distribution center: $e');
       }
     }
     return items.isNotEmpty ? items : null;

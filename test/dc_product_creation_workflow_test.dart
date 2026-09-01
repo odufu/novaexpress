@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:novexps/core/services/local_storage_service.dart';
-import 'package:novexps/features/dc_console/domain/entities/dc_transaction_record.dart';
 import 'package:novexps/features/dc_console/domain/entities/product_package.dart';
 import 'package:novexps/features/dc_console/presentation/pages/dc_stock_page.dart';
 import 'package:novexps/features/dc_console/presentation/providers/dc_console_provider.dart';

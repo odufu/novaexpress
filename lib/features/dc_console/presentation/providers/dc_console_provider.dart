@@ -11,6 +11,90 @@ import '../../domain/entities/dc_finance_settings.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
 import '../../domain/entities/dc_payout_claim.dart';
 import '../../domain/entities/dc_transaction_record.dart';
+import '../../domain/entities/distribution_center.dart';
+
+final List<DistributionCenter> defaultDistributionCenters = [
+  DistributionCenter(
+    id: '22222222-2222-4222-8222-222222222222',
+    companyId: '11111111-1111-4111-8111-111111111111',
+    name: 'Wuse Central Distribution Hub',
+    code: 'DC-ABJ-01',
+    state: 'Abuja FCT',
+    city: 'Abuja',
+    address: 'Plot 42, Cadastral Zone B03, Wuse II, Abuja',
+    contactPhone: '+234 802 345 6789',
+    contactEmail: 'wuse.dc@novaexpress.com',
+    managerName: 'Adekunle Supervisor',
+    isHub: true,
+    isActive: true,
+    operatingZones: const ['Wuse I', 'Wuse II', 'Maitama', 'Garki', 'Jabi', 'Utako', 'Central Area', 'Guzape'],
+    storageCapacityUnits: 50000,
+    totalAssignedRiders: 12,
+    activeInventoryBatches: 8,
+    createdAt: DateTime(2026, 1, 1),
+    updatedAt: DateTime(2026, 1, 1),
+  ),
+  DistributionCenter(
+    id: '33333333-3333-4333-8333-333333333333',
+    companyId: '11111111-1111-4111-8111-111111111111',
+    name: 'Ikeja Commercial Hub DC',
+    code: 'DC-LOS-01',
+    state: 'Lagos State',
+    city: 'Ikeja',
+    address: '12 Mobolaji Bank Anthony Way, Ikeja, Lagos',
+    contactPhone: '+234 803 111 2233',
+    contactEmail: 'ikeja.dc@novaexpress.com',
+    managerName: 'Babajide Olawale',
+    isHub: true,
+    isActive: true,
+    operatingZones: const ['Ikeja', 'Alausa', 'Opebi', 'Allen Avenue', 'Maryland', 'GRA Ikeja', 'Oregun'],
+    storageCapacityUnits: 75000,
+    totalAssignedRiders: 24,
+    activeInventoryBatches: 15,
+    createdAt: DateTime(2026, 1, 1),
+    updatedAt: DateTime(2026, 1, 1),
+  ),
+  DistributionCenter(
+    id: '44444444-4444-4444-8444-444444444444',
+    companyId: '11111111-1111-4111-8111-111111111111',
+    name: 'Port Harcourt Gateway DC',
+    code: 'DC-PHC-01',
+    state: 'Rivers State',
+    city: 'Port Harcourt',
+    address: '7 Trans-Amadi Industrial Layout, Port Harcourt',
+    contactPhone: '+234 805 777 8899',
+    contactEmail: 'phc.dc@novaexpress.com',
+    managerName: 'Chinedu Nnamdi',
+    isHub: false,
+    isActive: true,
+    operatingZones: const ['Trans-Amadi', 'GRA Phase 2', 'Old GRA', 'D/Line', 'Rumuokwuta', 'Peter Odili Road'],
+    storageCapacityUnits: 30000,
+    totalAssignedRiders: 8,
+    activeInventoryBatches: 5,
+    createdAt: DateTime(2026, 1, 1),
+    updatedAt: DateTime(2026, 1, 1),
+  ),
+  DistributionCenter(
+    id: '55555555-5555-4555-8555-555555555555',
+    companyId: '11111111-1111-4111-8111-111111111111',
+    name: 'Kano Northern Depot DC',
+    code: 'DC-KAN-01',
+    state: 'Kano State',
+    city: 'Kano',
+    address: '18 Bompai Road, Commercial District, Kano',
+    contactPhone: '+234 806 444 5566',
+    contactEmail: 'kano.dc@novaexpress.com',
+    managerName: 'Ibrahim Danladi',
+    isHub: false,
+    isActive: true,
+    operatingZones: const ['Bompai', 'Nassarawa', 'Sabon Gari', 'Fagge', 'Tarauni'],
+    storageCapacityUnits: 25000,
+    totalAssignedRiders: 6,
+    activeInventoryBatches: 4,
+    createdAt: DateTime(2026, 1, 1),
+    updatedAt: DateTime(2026, 1, 1),
+  ),
+];
 
 class DCWarehouseBatch {
   final String id;
@@ -176,10 +260,14 @@ class DCConsoleState {
   final String activeHubId;
   final String activeHubName;
   final String activeHubCode;
-  final int activeTabIndex; // 0..6
+  final int activeTabIndex; // 0..10
   final bool isSidebarCollapsed;
   final String searchQuery;
   final String fleetFilter; // 'all', 'active', 'at_rest', 'delayed'
+  final List<DistributionCenter> distributionCenters;
+  final String? selectedDcId;
+  final String dcFilter; // 'all', 'hubs', 'satellites', 'active', 'inactive'
+  final String selectedStateFilter; // 'all', 'Abuja FCT', 'Lagos State', etc.
   final List<DCFleetDriver> drivers;
   final List<DCWarehouseBatch> warehouseBatches;
   final List<DCReturnItem> returnItems;
@@ -194,12 +282,16 @@ class DCConsoleState {
 
   const DCConsoleState({
     this.activeHubId = '22222222-2222-4222-8222-222222222222',
-    this.activeHubName = 'Wuse Distribution Center',
-    this.activeHubCode = 'DC-WUSE-01',
+    this.activeHubName = 'Wuse Central Distribution Hub',
+    this.activeHubCode = 'DC-ABJ-01',
     this.activeTabIndex = 0,
     this.isSidebarCollapsed = false,
     this.searchQuery = '',
     this.fleetFilter = 'all',
+    this.distributionCenters = const [],
+    this.selectedDcId,
+    this.dcFilter = 'all',
+    this.selectedStateFilter = 'all',
     this.drivers = const [],
     this.warehouseBatches = const [],
     this.returnItems = const [],
@@ -228,6 +320,10 @@ class DCConsoleState {
     bool? isSidebarCollapsed,
     String? searchQuery,
     String? fleetFilter,
+    List<DistributionCenter>? distributionCenters,
+    String? selectedDcId,
+    String? dcFilter,
+    String? selectedStateFilter,
     List<DCFleetDriver>? drivers,
     List<DCWarehouseBatch>? warehouseBatches,
     List<DCReturnItem>? returnItems,
@@ -251,6 +347,10 @@ class DCConsoleState {
       isSidebarCollapsed: isSidebarCollapsed ?? this.isSidebarCollapsed,
       searchQuery: searchQuery ?? this.searchQuery,
       fleetFilter: fleetFilter ?? this.fleetFilter,
+      distributionCenters: distributionCenters ?? this.distributionCenters,
+      selectedDcId: selectedDcId ?? this.selectedDcId,
+      dcFilter: dcFilter ?? this.dcFilter,
+      selectedStateFilter: selectedStateFilter ?? this.selectedStateFilter,
       drivers: drivers ?? this.drivers,
       warehouseBatches: warehouseBatches ?? this.warehouseBatches,
       returnItems: returnItems ?? this.returnItems,
@@ -266,6 +366,38 @@ class DCConsoleState {
       isLoading: isLoading ?? this.isLoading,
       selectedDriverId: selectedDriverId ?? this.selectedDriverId,
     );
+  }
+
+  List<DistributionCenter> get filteredDistributionCenters {
+    var list = distributionCenters.isNotEmpty ? distributionCenters : defaultDistributionCenters;
+    if (dcFilter != 'all') {
+      if (dcFilter == 'hubs') {
+        list = list.where((d) => d.isHub).toList();
+      } else if (dcFilter == 'satellites') {
+        list = list.where((d) => !d.isHub).toList();
+      } else if (dcFilter == 'active') {
+        list = list.where((d) => d.isActive).toList();
+      } else if (dcFilter == 'inactive') {
+        list = list.where((d) => !d.isActive).toList();
+      }
+    }
+
+    if (selectedStateFilter != 'all') {
+      list = list.where((d) => d.state.toLowerCase() == selectedStateFilter.toLowerCase()).toList();
+    }
+
+    if (searchQuery.trim().isNotEmpty) {
+      final q = searchQuery.toLowerCase().trim();
+      list = list.where((d) =>
+          d.name.toLowerCase().contains(q) ||
+          d.code.toLowerCase().contains(q) ||
+          d.city.toLowerCase().contains(q) ||
+          d.state.toLowerCase().contains(q) ||
+          d.address.toLowerCase().contains(q) ||
+          (d.managerName != null && d.managerName!.toLowerCase().contains(q)) ||
+          d.operatingZones.any((z) => z.toLowerCase().contains(q))).toList();
+    }
+    return list;
   }
 
   List<DCTransactionRecord> get filteredTransactions {
@@ -342,7 +474,7 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
 
   DCConsoleNotifier([LocalStorageService? storageService])
       : _storageService = storageService ?? LocalStorageServiceImpl(),
-        super(const DCConsoleState()) {
+        super(DCConsoleState(distributionCenters: defaultDistributionCenters)) {
     if (!isTestEnvironment) {
       _initDrivers();
     }
@@ -350,6 +482,7 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
 
   Future<void> _initDrivers() async {
     // 1. Instant hydration from persistent local cache
+    final cachedDcs = await _storageService.getCachedDistributionCenters();
     final cached = await _storageService.getCachedFleetDrivers();
     final cachedBatches = await _storageService.getCachedWarehouseBatches();
     final cachedReturns = await _storageService.getCachedReturnItems();
@@ -361,6 +494,7 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     }
 
     state = state.copyWith(
+      distributionCenters: (cachedDcs != null && cachedDcs.isNotEmpty) ? cachedDcs : defaultDistributionCenters,
       drivers: cached ?? state.drivers,
       warehouseBatches: cachedBatches ?? state.warehouseBatches,
       returnItems: cachedReturns ?? state.returnItems,
@@ -368,6 +502,9 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
       transactions: cachedTxns ?? state.transactions,
     );
 
+    if (cachedDcs != null && cachedDcs.isNotEmpty) {
+      debugPrint('[DC_CONSOLE_PROVIDER] ⚡ Hydrated ${cachedDcs.length} distribution centers from local storage cache.');
+    }
     if (cached != null && cached.isNotEmpty) {
       debugPrint('[DC_CONSOLE_PROVIDER] ⚡ Hydrated ${cached.length} drivers from local storage cache.');
     }
@@ -380,12 +517,14 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
 
     // 2. Fetch fresh real data from live Supabase DB
     if (!isTestEnvironment) {
+      await loadDistributionCentersFromDatabase();
       await loadDriversFromDatabase();
       await loadPayoutClaimsFromDatabase();
       await loadTransactionsFromDatabase();
     }
   }
 
+  List<DistributionCenter> get distributionCenters => state.distributionCenters.isNotEmpty ? state.distributionCenters : defaultDistributionCenters;
   List<DCFleetDriver> get drivers => state.drivers;
   List<DCWarehouseBatch> get warehouseBatches => state.warehouseBatches;
 
@@ -409,8 +548,20 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     state = state.copyWith(fleetFilter: filter);
   }
 
+  void setDcFilter(String filter) {
+    state = state.copyWith(dcFilter: filter);
+  }
+
+  void setSelectedStateFilter(String stateName) {
+    state = state.copyWith(selectedStateFilter: stateName);
+  }
+
   void selectDriver(String? driverId) {
     state = state.copyWith(selectedDriverId: driverId);
+  }
+
+  void selectDistributionCenter(String? dcId) {
+    state = state.copyWith(selectedDcId: dcId);
   }
 
   void updateFinanceSettings(DCFinanceSettings newSettings) {
@@ -435,6 +586,242 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
       activeHubCode: hubCode,
       activeHubId: hubId,
     );
+  }
+
+  void switchActiveHub(DistributionCenter dc) {
+    state = state.copyWith(
+      activeHubId: dc.id,
+      activeHubName: dc.name,
+      activeHubCode: dc.code,
+    );
+  }
+
+  Future<void> loadDistributionCentersFromDatabase() async {
+    SupabaseClient? dbClient;
+    try {
+      dbClient = SupabaseClient(
+        SupabaseConstants.supabaseUrl,
+        SupabaseConstants.supabaseServiceRoleKey,
+        authOptions: const AuthClientOptions(autoRefreshToken: false),
+      );
+
+      final response = await dbClient
+          .from('distribution_centers')
+          .select()
+          .order('name', ascending: true);
+
+      if (response.isNotEmpty) {
+        final fetchedList = <DistributionCenter>[];
+        for (final raw in response) {
+          try {
+            fetchedList.add(DistributionCenter.fromJson(raw));
+          } catch (e) {
+            debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ Error parsing live DC ($e)');
+          }
+        }
+
+        // Merge with existing default distribution centers so seed hubs are preserved
+        final mergedMap = <String, DistributionCenter>{};
+        for (final def in defaultDistributionCenters) {
+          mergedMap[def.id] = def;
+        }
+        for (final loc in state.distributionCenters) {
+          mergedMap[loc.id] = loc;
+        }
+        for (final fetched in fetchedList) {
+          mergedMap[fetched.id] = fetched;
+        }
+
+        final combined = mergedMap.values.toList();
+        state = state.copyWith(distributionCenters: combined);
+        await _storageService.cacheDistributionCenters(combined);
+        debugPrint('[DC_CONSOLE_PROVIDER] 🏢 Loaded ${combined.length} distribution centers from Supabase.');
+      }
+    } catch (e) {
+      debugPrint('[DC_CONSOLE_PROVIDER] ℹ️ Error loading distribution centers from DB ($e).');
+    } finally {
+      dbClient?.dispose();
+    }
+  }
+
+  Future<DistributionCenter> createDistributionCenter({
+    required String name,
+    required String code,
+    required String stateName,
+    required String city,
+    required String address,
+    String? contactPhone,
+    String? contactEmail,
+    String? managerName,
+    bool isHub = false,
+    List<String> operatingZones = const [],
+    int storageCapacityUnits = 25000,
+  }) async {
+    final cleanCode = code.trim().toUpperCase();
+    final cleanName = name.trim();
+
+    // Check for duplicate code
+    final existing = state.distributionCenters.where(
+      (d) => d.code.toUpperCase() == cleanCode,
+    ).firstOrNull;
+    if (existing != null) {
+      throw Exception("A distribution center with code '$cleanCode' already exists (${existing.name}). Please choose a unique DC code.");
+    }
+
+    final newDc = DistributionCenter(
+      id: 'dc_${DateTime.now().millisecondsSinceEpoch}',
+      companyId: '11111111-1111-4111-8111-111111111111',
+      name: cleanName,
+      code: cleanCode,
+      state: stateName.trim(),
+      city: city.trim(),
+      address: address.trim(),
+      contactPhone: contactPhone?.trim().isNotEmpty == true ? contactPhone!.trim() : '+234 800 000 0000',
+      contactEmail: contactEmail?.trim().isNotEmpty == true ? contactEmail!.trim() : '${cleanCode.toLowerCase()}@novaexpress.com',
+      managerName: managerName?.trim().isNotEmpty == true ? managerName!.trim() : 'Operations Supervisor',
+      isHub: isHub,
+      isActive: true,
+      operatingZones: operatingZones.isNotEmpty ? operatingZones : [city.trim()],
+      storageCapacityUnits: storageCapacityUnits > 0 ? storageCapacityUnits : 25000,
+      totalAssignedRiders: 0,
+      activeInventoryBatches: 0,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+
+    // 1. Immediately update local state & cache
+    final updatedList = [newDc, ...state.distributionCenters];
+    state = state.copyWith(distributionCenters: updatedList);
+    await _storageService.cacheDistributionCenters(updatedList);
+
+    // 2. Persist to live Supabase DB
+    SupabaseClient? dbClient;
+    try {
+      dbClient = SupabaseClient(
+        SupabaseConstants.supabaseUrl,
+        SupabaseConstants.supabaseServiceRoleKey,
+        authOptions: const AuthClientOptions(autoRefreshToken: false),
+      );
+
+      await dbClient.from('distribution_centers').upsert({
+        'id': newDc.id.startsWith('dc_') ? null : newDc.id,
+        'company_id': newDc.companyId,
+        'name': newDc.name,
+        'code': newDc.code,
+        'state': newDc.state,
+        'city': newDc.city,
+        'address': newDc.address,
+        'contact_phone': newDc.contactPhone,
+        'contact_email': newDc.contactEmail,
+        'is_hub': newDc.isHub,
+        'is_active': newDc.isActive,
+      }, onConflict: 'code');
+      debugPrint('[DC_CONSOLE_PROVIDER] 💾 Created DC "${newDc.name}" ($cleanCode) in Supabase.');
+    } catch (e) {
+      debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ Supabase DC create note: $e');
+    } finally {
+      dbClient?.dispose();
+    }
+
+    return newDc;
+  }
+
+  Future<void> updateDistributionCenter(DistributionCenter updatedDc) async {
+    final updatedList = state.distributionCenters.map((d) {
+      return d.id == updatedDc.id ? updatedDc : d;
+    }).toList();
+
+    state = state.copyWith(distributionCenters: updatedList);
+    await _storageService.cacheDistributionCenters(updatedList);
+
+    SupabaseClient? dbClient;
+    try {
+      dbClient = SupabaseClient(
+        SupabaseConstants.supabaseUrl,
+        SupabaseConstants.supabaseServiceRoleKey,
+        authOptions: const AuthClientOptions(autoRefreshToken: false),
+      );
+
+      await dbClient.from('distribution_centers').update({
+        'name': updatedDc.name,
+        'state': updatedDc.state,
+        'city': updatedDc.city,
+        'address': updatedDc.address,
+        'contact_phone': updatedDc.contactPhone,
+        'contact_email': updatedDc.contactEmail,
+        'is_hub': updatedDc.isHub,
+        'is_active': updatedDc.isActive,
+      }).eq('id', updatedDc.id);
+      debugPrint('[DC_CONSOLE_PROVIDER] 💾 Updated DC "${updatedDc.name}" in Supabase.');
+    } catch (e) {
+      debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ Supabase DC update note: $e');
+    } finally {
+      dbClient?.dispose();
+    }
+  }
+
+  Future<void> toggleDistributionCenterStatus(String dcId, bool isActive) async {
+    final updatedList = state.distributionCenters.map((d) {
+      if (d.id == dcId) {
+        return d.copyWith(isActive: isActive, updatedAt: DateTime.now());
+      }
+      return d;
+    }).toList();
+
+    state = state.copyWith(distributionCenters: updatedList);
+    await _storageService.cacheDistributionCenters(updatedList);
+
+    SupabaseClient? dbClient;
+    try {
+      dbClient = SupabaseClient(
+        SupabaseConstants.supabaseUrl,
+        SupabaseConstants.supabaseServiceRoleKey,
+        authOptions: const AuthClientOptions(autoRefreshToken: false),
+      );
+
+      await dbClient.from('distribution_centers').update({
+        'is_active': isActive,
+      }).eq('id', dcId);
+      debugPrint('[DC_CONSOLE_PROVIDER] 💾 Toggled DC "$dcId" active=$isActive in Supabase.');
+    } catch (e) {
+      debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ Supabase DC toggle note: $e');
+    } finally {
+      dbClient?.dispose();
+    }
+  }
+
+  Future<void> updateOperatingZones(String dcId, List<String> zones) async {
+    final updatedList = state.distributionCenters.map((d) {
+      if (d.id == dcId) {
+        return d.copyWith(operatingZones: zones, updatedAt: DateTime.now());
+      }
+      return d;
+    }).toList();
+
+    state = state.copyWith(distributionCenters: updatedList);
+    await _storageService.cacheDistributionCenters(updatedList);
+  }
+
+  Future<void> deleteDistributionCenter(String dcId) async {
+    final updatedList = state.distributionCenters.where((d) => d.id != dcId).toList();
+    state = state.copyWith(distributionCenters: updatedList);
+    await _storageService.cacheDistributionCenters(updatedList);
+
+    SupabaseClient? dbClient;
+    try {
+      dbClient = SupabaseClient(
+        SupabaseConstants.supabaseUrl,
+        SupabaseConstants.supabaseServiceRoleKey,
+        authOptions: const AuthClientOptions(autoRefreshToken: false),
+      );
+
+      await dbClient.from('distribution_centers').delete().eq('id', dcId);
+      debugPrint('[DC_CONSOLE_PROVIDER] 🗑️ Deleted DC "$dcId" from Supabase.');
+    } catch (e) {
+      debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ Supabase DC delete note: $e');
+    } finally {
+      dbClient?.dispose();
+    }
   }
 
   void addBatch(DCWarehouseBatch batch) {

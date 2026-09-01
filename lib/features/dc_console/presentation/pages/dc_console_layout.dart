@@ -8,8 +8,10 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../notifications/presentation/providers/notifications_provider.dart';
 import '../../../stock/presentation/providers/stock_provider.dart';
 import '../../../users/presentation/widgets/edit_profile_modal.dart';
+import '../../domain/entities/distribution_center.dart';
 import '../providers/dc_console_provider.dart';
 import 'dc_dashboard_page.dart';
+import 'dc_distribution_centers_page.dart';
 import 'dc_finance_page.dart';
 import 'dc_order_payment_matching_page.dart';
 import 'dc_orders_page.dart';
@@ -36,6 +38,7 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(stockProvider.notifier).fetchStockItems();
+      ref.read(dcConsoleProvider.notifier).loadDistributionCentersFromDatabase();
       ref.read(dcConsoleProvider.notifier).loadDriversFromDatabase();
       ref.read(dcConsoleProvider.notifier).loadTransactionsFromDatabase();
     });
@@ -112,6 +115,8 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
       case 8:
         return const DCRidersPage();
       case 9:
+        return const DCDistributionCentersPage();
+      case 10:
         return const DCSettingsPage();
       default:
         return const DCDashboardPage();
@@ -217,7 +222,8 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
                 _buildNavItem(6, 'Returns & QC Desk', Icons.assignment_return_rounded, state.activeTabIndex == 6, isCollapsed, isDrawer),
                 _buildNavItem(7, 'Rider Payouts', Icons.payments_rounded, state.activeTabIndex == 7, isCollapsed, isDrawer),
                 _buildNavItem(8, 'Riders & Fleet', Icons.badge_rounded, state.activeTabIndex == 8, isCollapsed, isDrawer),
-                _buildNavItem(9, 'Policy & Settings', Icons.tune_rounded, state.activeTabIndex == 9, isCollapsed, isDrawer),
+                _buildNavItem(9, 'Distribution Centers', Icons.apartment_rounded, state.activeTabIndex == 9, isCollapsed, isDrawer),
+                _buildNavItem(10, 'Policy & Settings', Icons.tune_rounded, state.activeTabIndex == 10, isCollapsed, isDrawer),
               ],
             ),
           ),
@@ -387,6 +393,8 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
       case 8:
         return 'Fleet & Riders';
       case 9:
+        return 'Distribution Centers';
+      case 10:
         return 'DC Settings';
       default:
         return 'Distribution Center';
@@ -425,48 +433,107 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
               onPressed: () => _scaffoldKey.currentState?.openDrawer(),
             ),
 
-          // Active DC Hub Indicator Pill
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: isCompact ? 7 : 10, vertical: isCompact ? 4 : 6),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+          // Active DC Hub Indicator Pill with Quick Hub Switcher Popup
+          PopupMenuButton<DistributionCenter>(
+            tooltip: 'Switch Active Distribution Center',
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            onSelected: (selectedDc) {
+              dcNotifier.switchActiveHub(selectedDc);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Switched active hub to ${selectedDc.name} (${selectedDc.code})'),
+                  backgroundColor: const Color(0xFF10B981),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            },
+            itemBuilder: (ctx) {
+              final dcs = dcState.distributionCenters.isNotEmpty ? dcState.distributionCenters : defaultDistributionCenters;
+              return dcs.map((dc) {
+                final isSelected = dc.id == dcState.activeHubId || dc.code == dcState.activeHubCode;
+                return PopupMenuItem<DistributionCenter>(
+                  value: dc,
+                  child: Row(
+                    children: [
+                      Icon(
+                        dc.isHub ? Icons.warehouse_rounded : Icons.apartment_rounded,
+                        size: 18,
+                        color: isSelected ? const Color(0xFFF37021) : const Color(0xFF64748B),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              dc.name,
+                              style: GoogleFonts.inter(
+                                fontSize: 12.5,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                color: isSelected ? const Color(0xFFF37021) : (isDark ? Colors.white : const Color(0xFF0F172A)),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              '${dc.code} • ${dc.fullLocation}',
+                              style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (isSelected)
+                        const Icon(Icons.check_rounded, size: 16, color: Color(0xFFF37021)),
+                    ],
+                  ),
+                );
+              }).toList();
+            },
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: isCompact ? 7 : 10, vertical: isCompact ? 4 : 6),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                ),
               ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 7,
-                  height: 7,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF10B981),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 5),
-                Text(
-                  isCompact ? dcState.activeHubCode : dcState.activeHubName,
-                  style: GoogleFonts.inter(
-                    fontSize: isCompact ? 11 : 12,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : const Color(0xFF0F172A),
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (!isCompact) ...[
-                  const SizedBox(width: 4),
-                  Text(
-                    '(${dcState.activeHubCode})',
-                    style: GoogleFonts.firaCode(
-                      fontSize: 11,
-                      color: const Color(0xFF64748B),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 7,
+                    height: 7,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF10B981),
+                      shape: BoxShape.circle,
                     ),
                   ),
+                  const SizedBox(width: 5),
+                  Text(
+                    isCompact ? dcState.activeHubCode : dcState.activeHubName,
+                    style: GoogleFonts.inter(
+                      fontSize: isCompact ? 11 : 12,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (!isCompact) ...[
+                    const SizedBox(width: 4),
+                    Text(
+                      '(${dcState.activeHubCode})',
+                      style: GoogleFonts.firaCode(
+                        fontSize: 11,
+                        color: const Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(width: 4),
+                  const Icon(Icons.arrow_drop_down_rounded, size: 16, color: Color(0xFF64748B)),
                 ],
-              ],
+              ),
             ),
           ),
 
