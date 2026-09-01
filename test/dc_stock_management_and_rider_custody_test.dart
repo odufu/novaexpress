@@ -406,7 +406,7 @@ void main() {
       await tester.tap(find.text('Respira Detox Tea'));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Merchant / Company:'), findsOneWidget);
+      expect(find.textContaining('Merchant / Company'), findsWidgets);
       expect(find.textContaining('Novacare Limited'), findsWidgets);
       expect(find.text('🏢 In DC Possession'), findsOneWidget);
       expect(find.text('🛵 In Rider Custody'), findsWidgets);

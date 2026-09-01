@@ -299,6 +299,7 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
   }
 
   @override
+  @override
   Future<StockItemModel> createProduct({
     required String name,
     required String sku,
@@ -314,12 +315,18 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
   }) async {
     final dbClient = _getAuthDbClient();
     const compId = '11111111-1111-4111-8111-111111111111';
-    final payload = <String, dynamic>{
+
+    var finalDesc = description?.trim().isNotEmpty == true ? description!.trim() : '$name - Distributed Inventory';
+    if (imageAsset != null && imageAsset.trim().isNotEmpty && !finalDesc.contains('[IMAGE_URL:')) {
+      finalDesc = '$finalDesc [IMAGE_URL: ${imageAsset.trim()}]';
+    }
+
+    final cleanPayload = <String, dynamic>{
       'company_id': companyId ?? compId,
       'name': name.trim(),
       'sku': sku.trim().toUpperCase(),
       'category': category.trim().isNotEmpty ? category.trim() : 'General',
-      'description': description?.trim().isNotEmpty == true ? description!.trim() : '$name - Distributed Inventory',
+      'description': finalDesc,
       'base_price': price,
       'stock_quantity': stockQuantity,
       'low_stock_threshold': lowStockThreshold,
@@ -327,20 +334,45 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
       'created_at': DateTime.now().toIso8601String(),
     };
 
-    if (imageAsset != null && imageAsset.trim().isNotEmpty) {
-      payload['image_url'] = imageAsset.trim();
-      payload['image_asset'] = imageAsset.trim();
-    }
+    Map<String, dynamic>? res;
 
+    // 1. Try upsert with image_url (if schema supports image_url)
     try {
-      final res = await dbClient
+      final payloadWithImg = Map<String, dynamic>.from(cleanPayload);
+      if (imageAsset != null && imageAsset.trim().isNotEmpty) {
+        payloadWithImg['image_url'] = imageAsset.trim();
+      }
+      res = await dbClient
           .from('products')
-          .upsert(payload, onConflict: 'sku')
+          .upsert(payloadWithImg, onConflict: 'sku')
           .select()
           .single();
+    } catch (upsertImgErr) {
+      debugPrint('[STOCK_DATASOURCE] ℹ️ Upsert with image_url notice: $upsertImgErr. Retrying with clean core schema...');
+      // 2. Try upsert with clean core schema (image is safely preserved inside description tag)
+      try {
+        res = await dbClient
+            .from('products')
+            .upsert(cleanPayload, onConflict: 'sku')
+            .select()
+            .single();
+      } catch (cleanUpsertErr) {
+        debugPrint('[STOCK_DATASOURCE] ℹ️ Clean upsert notice: $cleanUpsertErr. Retrying with clean insert...');
+        // 3. Try direct insert
+        try {
+          res = await dbClient
+              .from('products')
+              .insert(cleanPayload)
+              .select()
+              .single();
+        } catch (insertErr) {
+          debugPrint('[STOCK_DATASOURCE] ⚠️ Fallback insert error: $insertErr');
+        }
+      }
+    }
 
-      debugPrint('[STOCK_DATASOURCE] ✅ Successfully created/upserted product in Supabase DB: ${res['name']} (${res['id']})');
-
+    if (res != null) {
+      debugPrint('[STOCK_DATASOURCE] ✅ Successfully created/persisted product in Supabase DB: ${res['name']} (${res['id']})');
       final resMap = Map<String, dynamic>.from(res);
       resMap['available_count'] = stockQuantity;
       resMap['total_in_custody'] = stockQuantity;
@@ -349,44 +381,28 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
       resMap['returned_count'] = 0;
       if (imageAsset != null && imageAsset.trim().isNotEmpty) {
         resMap['image_asset'] = imageAsset.trim();
+        resMap['image_url'] = imageAsset.trim();
       }
       return StockItemModel.fromJson(resMap);
-    } catch (e) {
-      debugPrint('[STOCK_DATASOURCE] ⚠️ createProduct error: $e');
-      try {
-        final simpleRes = await dbClient
-            .from('products')
-            .insert(payload)
-            .select()
-            .single();
-        final resMap = Map<String, dynamic>.from(simpleRes);
-        resMap['available_count'] = stockQuantity;
-        resMap['total_in_custody'] = stockQuantity;
-        if (imageAsset != null && imageAsset.trim().isNotEmpty) {
-          resMap['image_asset'] = imageAsset.trim();
-        }
-        return StockItemModel.fromJson(resMap);
-      } catch (insertErr) {
-        debugPrint('[STOCK_DATASOURCE] ⚠️ fallback insert error: $insertErr');
-      }
-
-      return StockItemModel(
-        id: 'prod_${DateTime.now().millisecondsSinceEpoch}',
-        sku: sku.trim().toUpperCase(),
-        name: name.trim(),
-        description: description ?? '$name - Distributed Inventory',
-        price: price,
-        ownerName: ownerName ?? 'Novacare Limited',
-        assignedCount: 0,
-        deliveredCount: 0,
-        availableCount: stockQuantity,
-        totalInCustody: stockQuantity,
-        returnedCount: 0,
-        category: category,
-        imageAsset: imageAsset,
-        lowStockThreshold: lowStockThreshold,
-      );
     }
+
+    // Offline / Local-only fallback
+    return StockItemModel(
+      id: 'prod_${DateTime.now().millisecondsSinceEpoch}',
+      sku: sku.trim().toUpperCase(),
+      name: name.trim(),
+      description: finalDesc,
+      price: price,
+      ownerName: ownerName ?? 'Novacare Limited',
+      assignedCount: 0,
+      deliveredCount: 0,
+      availableCount: stockQuantity,
+      totalInCustody: stockQuantity,
+      returnedCount: 0,
+      category: category,
+      imageAsset: imageAsset,
+      lowStockThreshold: lowStockThreshold,
+    );
   }
 
   @override

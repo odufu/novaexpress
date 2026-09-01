@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../providers/dc_console_provider.dart';
 import '../widgets/dc_driver_manifest_table.dart';
+import '../widgets/dc_rider_detail_modal.dart';
+import '../widgets/dc_onboard_rider_modal.dart';
 
 class DCFleetPage extends ConsumerWidget {
   const DCFleetPage({super.key});
@@ -74,12 +76,13 @@ class DCFleetPage extends ConsumerWidget {
           // Full Driver Manifest Table
           DCDriverManifestTable(
             drivers: dcState.filteredDrivers,
-            onAddDriver: () {},
+            onAddDriver: () => DCOnboardRiderModal.show(context),
             onExportCSV: () {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('✅ Fleet manifest exported.')),
               );
             },
+            onDriverTap: (driver) => DCRiderDetailModal.show(context, driver),
           ),
         ],
       ),

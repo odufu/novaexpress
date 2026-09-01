@@ -14,6 +14,7 @@ import '../../domain/entities/order.dart';
 import '../../domain/repositories/orders_repository.dart';
 import '../../../stock/presentation/providers/stock_provider.dart';
 import '../../../finance/presentation/providers/finance_provider.dart';
+import '../../../dc_console/presentation/providers/dc_console_provider.dart';
 
 final ordersRemoteDataSourceProvider = Provider<OrdersRemoteDataSource>((ref) {
   try {
@@ -447,7 +448,7 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
         );
 
         // If rider has no custody or available stock is less than required, reject assignment
-        if (totalCustody == 0 || available < targetOrder.quantity) {
+        if (stockState.stockItems.isNotEmpty && (totalCustody == 0 || available < targetOrder.quantity)) {
           final errorMsg = totalCustody == 0
               ? 'Cannot assign order: Rider $riderName does not have "${targetOrder.productName}" in vehicle custody.'
               : 'Cannot assign order: Rider $riderName has insufficient stock ($available available, ${targetOrder.quantity} required).';
@@ -472,6 +473,20 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
           productName: targetOrder.productName,
           quantity: targetOrder.quantity,
         );
+      }
+
+      // Dynamic Rider Terms Lookup: read rider's custom contract terms from DC Console provider
+      double dynamicEntitlement = targetOrder.agentEntitlement;
+      double dynamicTransport = targetOrder.transportFee;
+      if (_ref != null) {
+        final dcDrivers = _ref.read(dcConsoleProvider).drivers;
+        for (final d in dcDrivers) {
+          if (d.id == riderId || d.driverCode == riderCode) {
+            if (d.commissionRate > 0) dynamicEntitlement = d.commissionRate;
+            if (d.transportAllowance > 0) dynamicTransport = d.transportAllowance;
+            break;
+          }
+        }
       }
 
       final updatedList = state.orders.map((o) {
@@ -501,7 +516,8 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
             clientName: o.clientName,
             packageCustodyId: o.packageCustodyId,
             clientDeliveryFee: o.clientDeliveryFee,
-            agentEntitlement: o.agentEntitlement,
+            agentEntitlement: dynamicEntitlement,
+            transportFee: dynamicTransport,
             deliveryNotes: o.deliveryNotes,
             createdAt: o.createdAt,
             deliveryAgentId: riderId,

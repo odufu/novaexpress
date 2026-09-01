@@ -387,6 +387,7 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
                         cells: [
                           // Agent Code
                           DataCell(
+                            onTap: () => widget.onDriverTap?.call(driver),
                             Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -406,6 +407,7 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
 
                           // Rider Name & Contact
                           DataCell(
+                            onTap: () => widget.onDriverTap?.call(driver),
                             Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -441,6 +443,7 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
 
                           // Operating Model
                           DataCell(
+                            onTap: () => widget.onDriverTap?.call(driver),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
@@ -473,6 +476,7 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
 
                           // Agreement Structure
                           DataCell(
+                            onTap: () => widget.onDriverTap?.call(driver),
                             Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -491,6 +495,7 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
 
                           // Zone & Vehicle
                           DataCell(
+                            onTap: () => widget.onDriverTap?.call(driver),
                             Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -512,10 +517,14 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
                           ),
 
                           // Shift Status
-                          DataCell(_buildStatusPill(driver.status)),
+                          DataCell(
+                            onTap: () => widget.onDriverTap?.call(driver),
+                            _buildStatusPill(driver.status),
+                          ),
 
                           // Shift Performance & Progress Bar (Delivery over Total Orders)
                           DataCell(
+                            onTap: () => widget.onDriverTap?.call(driver),
                             SizedBox(
                               width: 120,
                               child: Column(
@@ -574,6 +583,7 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
 
                           // Live Cash in Hand (COD)
                           DataCell(
+                            onTap: () => widget.onDriverTap?.call(driver),
                             Text(
                               CurrencyFormatter.formatNaira(driver.cashInCustody),
                               style: GoogleFonts.inter(
@@ -586,6 +596,7 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
 
                           // Stock in Custody
                           DataCell(
+                            onTap: () => widget.onDriverTap?.call(driver),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                               decoration: BoxDecoration(

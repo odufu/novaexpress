@@ -126,6 +126,40 @@ class StockItemEntity {
     }
   }
 
+  String get cleanDescription {
+    if (description.isEmpty) {
+      return '$name commercial inventory unit managed and tracked under NovaXpress distribution network.';
+    }
+    var desc = description;
+
+    // Remove [IMAGE_URL: ...] tag
+    if (desc.contains('[IMAGE_URL:')) {
+      desc = desc.replaceAll(RegExp(r'\[IMAGE_URL:\s*[^\]]+\]'), '').trim();
+    }
+
+    // Remove [PACKAGES: ...] tag (including nested JSON brackets)
+    if (desc.contains('[PACKAGES:')) {
+      final start = desc.indexOf('[PACKAGES:');
+      final end = desc.lastIndexOf(']');
+      if (end > start) {
+        desc = (desc.substring(0, start) + desc.substring(end + 1)).trim();
+      } else {
+        desc = desc.substring(0, start).trim();
+      }
+    }
+
+    // Remove trailing metadata like '- Distributed Inventory'
+    desc = desc.replaceAll(RegExp(r'-\s*Distributed Inventory', caseSensitive: false), '').trim();
+
+    // Clean up punctuation or whitespace
+    desc = desc.replaceAll(RegExp(r'[\s\-_]+$'), '').trim();
+
+    if (desc.isEmpty || desc.toLowerCase() == name.toLowerCase()) {
+      return '$name commercial inventory unit managed and tracked under NovaXpress distribution network.';
+    }
+    return desc;
+  }
+
   StockItemEntity copyWith({
     String? id,
     String? sku,

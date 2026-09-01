@@ -285,3 +285,160 @@ class KpiTileSkeleton extends StatelessWidget {
     );
   }
 }
+
+class DCKpiCardSkeleton extends StatelessWidget {
+  const DCKpiCardSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+      ),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              AppSkeletonLoader(width: 18, height: 18, borderRadius: 4),
+              SizedBox(width: 8),
+              AppSkeletonLoader(width: 120, height: 14, borderRadius: 4),
+            ],
+          ),
+          SizedBox(height: 12),
+          AppSkeletonLoader(width: 100, height: 26, borderRadius: 6),
+          SizedBox(height: 8),
+          AppSkeletonLoader(width: 150, height: 12, borderRadius: 4),
+        ],
+      ),
+    );
+  }
+}
+
+class DCProductCardSkeleton extends StatelessWidget {
+  const DCProductCardSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+      ),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              AppSkeletonLoader(width: 90, height: 14, borderRadius: 4),
+              AppSkeletonLoader(width: 80, height: 20, borderRadius: 10),
+            ],
+          ),
+          SizedBox(height: 10),
+          Row(
+            children: [
+              AppSkeletonLoader(width: 44, height: 44, borderRadius: 10),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AppSkeletonLoader(width: 160, height: 16, borderRadius: 4),
+                    SizedBox(height: 6),
+                    AppSkeletonLoader(width: 110, height: 12, borderRadius: 4),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 12),
+          Divider(height: 1),
+          SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(child: AppSkeletonLoader(width: double.infinity, height: 14, borderRadius: 4)),
+              SizedBox(width: 8),
+              Expanded(child: AppSkeletonLoader(width: double.infinity, height: 14, borderRadius: 4)),
+            ],
+          ),
+          SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(child: AppSkeletonLoader(width: double.infinity, height: 14, borderRadius: 4)),
+              SizedBox(width: 8),
+              Expanded(child: AppSkeletonLoader(width: double.infinity, height: 14, borderRadius: 4)),
+            ],
+          ),
+          SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(child: AppSkeletonLoader(width: double.infinity, height: 34, borderRadius: 8)),
+              SizedBox(width: 8),
+              Expanded(child: AppSkeletonLoader(width: double.infinity, height: 34, borderRadius: 8)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class DCProductTableRowSkeleton extends StatelessWidget {
+  const DCProductTableRowSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        border: Border(bottom: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
+      ),
+      child: const Row(
+        children: [
+          AppSkeletonLoader(width: 80, height: 14, borderRadius: 4),
+          SizedBox(width: 24),
+          AppSkeletonLoader(width: 36, height: 36, borderRadius: 8),
+          SizedBox(width: 10),
+          Expanded(
+            flex: 2,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AppSkeletonLoader(width: 140, height: 14, borderRadius: 4),
+                SizedBox(height: 4),
+                AppSkeletonLoader(width: 90, height: 11, borderRadius: 4),
+              ],
+            ),
+          ),
+          SizedBox(width: 16),
+          Expanded(child: AppSkeletonLoader(width: 80, height: 14, borderRadius: 4)),
+          SizedBox(width: 16),
+          Expanded(child: AppSkeletonLoader(width: 70, height: 14, borderRadius: 4)),
+          SizedBox(width: 16),
+          Expanded(child: AppSkeletonLoader(width: 70, height: 14, borderRadius: 4)),
+          SizedBox(width: 16),
+          AppSkeletonLoader(width: 75, height: 22, borderRadius: 10),
+          SizedBox(width: 16),
+          AppSkeletonLoader(width: 80, height: 28, borderRadius: 6),
+        ],
+      ),
+    );
+  }
+}

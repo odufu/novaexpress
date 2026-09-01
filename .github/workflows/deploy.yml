@@ -45,10 +45,12 @@ jobs:
           echo "Building WebAssembly (WASM) for repository: $REPO_NAME"
           flutter build web --wasm --release --base-href "/${REPO_NAME}/"
 
-      - name: Configure SPA Routing Fallback (404.html)
+      - name: Configure SPA Routing Fallback (404.html) & Jekyll Override
         run: |
           # Copy index.html to 404.html so GoRouter deep links and page refreshes work smoothly on GitHub Pages
           cp build/web/index.html build/web/404.html
+          # Disable Jekyll so special folders and headers are preserved
+          touch build/web/.nojekyll
 
       - name: Add COOP & COEP Headers for WebAssembly Support
         run: |

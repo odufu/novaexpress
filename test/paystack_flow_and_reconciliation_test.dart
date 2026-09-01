@@ -418,9 +418,8 @@ void main() {
       expect(find.text('Payment Method'), findsOneWidget);
       expect(find.text('Transaction Reference'), findsOneWidget);
       expect(find.text('Paystack Channel'), findsOneWidget);
-      expect(find.text('Bank / Processor'), findsOneWidget);
-      expect(find.text('Share Receipt'), findsOneWidget);
-      expect(find.text('Download Statement (PDF)'), findsOneWidget);
+      expect(find.text('Copy & Share Receipt Summary'), findsOneWidget);
+      expect(find.text('Download Receipt as Image (PNG)'), findsWidgets);
 
       await tester.pumpWidget(const SizedBox());
       await tester.pump(const Duration(seconds: 1));

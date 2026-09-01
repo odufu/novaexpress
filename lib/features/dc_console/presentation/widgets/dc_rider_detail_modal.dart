@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/helpers/formatters.dart';
+import '../../../../core/widgets/app_loading_overlay.dart';
 import '../../../../core/widgets/user_avatar_widget.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
@@ -1688,7 +1689,12 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
   }
 
   void _showAssignProductToThisRiderDialog(BuildContext context, bool isDark, DCFleetDriver driver, List<StockItemEntity> stockItems) {
-    final availableProducts = stockItems.where((p) => p.availableCount > 0).toList();
+    final Map<String, StockItemEntity> uniqueMap = {};
+    for (final p in stockItems.where((p) => p.availableCount > 0)) {
+      uniqueMap[p.id] = p;
+    }
+    final availableProducts = uniqueMap.values.toList();
+
     if (availableProducts.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -1707,7 +1713,7 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
-          final targetProd = availableProducts.firstWhere((p) => p.id == selectedProdId, orElse: () => availableProducts.first);
+          final targetProd = uniqueMap[selectedProdId] ?? availableProducts.first;
 
           return AlertDialog(
             backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
@@ -1727,12 +1733,17 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     DropdownButtonFormField<String>(
-                      value: selectedProdId,
+                      value: uniqueMap.containsKey(selectedProdId) ? selectedProdId : availableProducts.first.id,
+                      isExpanded: true,
                       decoration: const InputDecoration(labelText: 'Select Product in DC Possession *'),
                       items: availableProducts.map((p) {
                         return DropdownMenuItem(
                           value: p.id,
-                          child: Text('${p.name} (${p.sku}) • In DC: ${p.availableCount} units'),
+                          child: Text(
+                            '${p.name} (${p.sku}) • In DC: ${p.availableCount} units',
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
                         );
                       }).toList(),
                       onChanged: (val) {
@@ -1809,22 +1820,146 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
                     return;
                   }
 
-                  final res = await ref.read(stockProvider.notifier).assignStockToRider(
-                        productIdOrSku: targetProd.id,
-                        riderId: driver.id,
-                        riderName: driver.name,
-                        riderCode: driver.driverCode,
-                        quantity: qty,
-                      );
+                  // Confirmation dialog with double-tap protection & universal loading overlay
+                  showDialog<void>(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (confirmCtx) {
+                      bool isSubmitting = false;
+                      return StatefulBuilder(
+                        builder: (confirmCtx, setConfirmState) => AlertDialog(
+                          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                          title: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF2563EB).withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(Icons.two_wheeler_rounded, color: Color(0xFF2563EB), size: 20),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  'Confirm Vehicle Allocation',
+                                  style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
+                          ),
+                          content: SizedBox(
+                            width: 420,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Confirm physical handover of stock units to the assigned rider:',
+                                  style: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF64748B)),
+                                ),
+                                const SizedBox(height: 12),
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      _buildModalConfirmRow('Product:', targetProd.name, isDark),
+                                      const SizedBox(height: 6),
+                                      _buildModalConfirmRow('Rider Recipient:', '${driver.name} (${driver.driverCode})', isDark),
+                                      const SizedBox(height: 6),
+                                      _buildModalConfirmRow('Vehicle Zone:', driver.assignedZone, isDark),
+                                      const Divider(height: 16),
+                                      _buildModalConfirmRow(
+                                        'Units to Transfer:',
+                                        '$qty Units',
+                                        isDark,
+                                        isBold: true,
+                                        valueColor: const Color(0xFF2563EB),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      _buildModalConfirmRow(
+                                        'Remaining Shelf Stock:',
+                                        '${targetProd.availableCount - qty} Units',
+                                        isDark,
+                                        valueColor: const Color(0xFF10B981),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  '⚠️ Double-tap protection active. This will shift custody to the rider vehicle immediately.',
+                                  style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
+                                ),
+                              ],
+                            ),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: isSubmitting ? null : () => Navigator.of(confirmCtx).pop(),
+                              child: const Text('Go Back / Edit'),
+                            ),
+                            ElevatedButton.icon(
+                              onPressed: isSubmitting
+                                  ? null
+                                  : () async {
+                                      setConfirmState(() => isSubmitting = true);
+                                      final res = await showAppLoadingDialog(
+                                        context: confirmCtx,
+                                        message: 'Allocating Stock to Vehicle...',
+                                        subMessage: 'Assigning $qty units to ${driver.name} (${driver.driverCode})...',
+                                        isDark: isDark,
+                                        task: () => ref.read(stockProvider.notifier).assignStockToRider(
+                                              productIdOrSku: targetProd.id,
+                                              riderId: driver.id,
+                                              riderName: driver.name,
+                                              riderCode: driver.driverCode,
+                                              quantity: qty,
+                                            ),
+                                      );
 
-                  if (ctx.mounted) {
-                    Navigator.of(ctx).pop();
-                  }
-                  messenger.showSnackBar(
-                    SnackBar(
-                      content: Text(res['message']?.toString() ?? '✅ Stock assigned to ${driver.name}!'),
-                      backgroundColor: res['success'] == true ? const Color(0xFF10B981) : const Color(0xFFEF4444),
-                    ),
+                                      if (res?['success'] == true) {
+                                        if (confirmCtx.mounted) Navigator.of(confirmCtx).pop();
+                                        if (ctx.mounted) Navigator.of(ctx).pop();
+                                        messenger.showSnackBar(
+                                          SnackBar(
+                                            content: Text(res?['message']?.toString() ?? '✅ Stock assigned to ${driver.name}!'),
+                                            backgroundColor: const Color(0xFF10B981),
+                                          ),
+                                        );
+                                      } else {
+                                        setConfirmState(() => isSubmitting = false);
+                                        messenger.showSnackBar(
+                                          SnackBar(
+                                            content: Text(res?['message']?.toString() ?? '❌ Failed to assign stock.'),
+                                            backgroundColor: const Color(0xFFEF4444),
+                                          ),
+                                        );
+                                      }
+                                    },
+                              icon: isSubmitting
+                                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                  : const Icon(Icons.check_circle_rounded, size: 16, color: Colors.white),
+                              label: Text(
+                                isSubmitting ? 'Allocating...' : 'Yes, Transfer $qty Units',
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF2563EB),
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
                   );
                 },
                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
@@ -1939,22 +2074,144 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
                 return;
               }
 
-              final res = await ref.read(stockProvider.notifier).increaseRiderStock(
-                    skuOrName: item.sku.isNotEmpty ? item.sku : item.productName,
-                    riderId: driver.id,
-                    riderName: driver.name,
-                    riderCode: driver.driverCode,
-                    additionalUnits: qty,
-                  );
+              // Confirmation dialog with double-tap protection & universal loading overlay
+              showDialog<void>(
+                context: context,
+                barrierDismissible: false,
+                builder: (confirmCtx) {
+                  bool isSubmitting = false;
+                  return StatefulBuilder(
+                    builder: (confirmCtx, setConfirmState) => AlertDialog(
+                      backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                      title: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.add_circle_outline_rounded, color: Color(0xFF10B981), size: 20),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Confirm Stock Top Up',
+                              style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                      content: SizedBox(
+                        width: 420,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Confirm adding more stock units into the rider\'s active vehicle custody:',
+                              style: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF64748B)),
+                            ),
+                            const SizedBox(height: 12),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                              ),
+                              child: Column(
+                                children: [
+                                  _buildModalConfirmRow('Product:', item.productName, isDark),
+                                  const SizedBox(height: 6),
+                                  _buildModalConfirmRow('Rider Recipient:', '${driver.name} (${driver.driverCode})', isDark),
+                                  const Divider(height: 16),
+                                  _buildModalConfirmRow(
+                                    'Units to Add:',
+                                    '+$qty Units',
+                                    isDark,
+                                    isBold: true,
+                                    valueColor: const Color(0xFF10B981),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  _buildModalConfirmRow(
+                                    'New Rider Custody Total:',
+                                    '${item.inCustodyUnits + qty} Units',
+                                    isDark,
+                                    valueColor: const Color(0xFF2563EB),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              '⚠️ Double-tap protection active. Inventory balance will update immediately upon confirmation.',
+                              style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: isSubmitting ? null : () => Navigator.of(confirmCtx).pop(),
+                          child: const Text('Go Back / Edit'),
+                        ),
+                        ElevatedButton.icon(
+                          onPressed: isSubmitting
+                              ? null
+                              : () async {
+                                  setConfirmState(() => isSubmitting = true);
+                                  final res = await showAppLoadingDialog(
+                                    context: confirmCtx,
+                                    message: 'Topping Up Vehicle Stock...',
+                                    subMessage: 'Transferring +$qty units to ${driver.name}...',
+                                    isDark: isDark,
+                                    task: () => ref.read(stockProvider.notifier).increaseRiderStock(
+                                          skuOrName: item.sku.isNotEmpty ? item.sku : item.productName,
+                                          riderId: driver.id,
+                                          riderName: driver.name,
+                                          riderCode: driver.driverCode,
+                                          additionalUnits: qty,
+                                        ),
+                                  );
 
-              if (ctx.mounted) {
-                Navigator.of(ctx).pop();
-              }
-              messenger.showSnackBar(
-                SnackBar(
-                  content: Text(res['message']?.toString() ?? '✅ +$qty units transferred to ${driver.name}!'),
-                  backgroundColor: res['success'] == true ? const Color(0xFF10B981) : const Color(0xFFEF4444),
-                ),
+                                  if (res?['success'] == true) {
+                                    if (confirmCtx.mounted) Navigator.of(confirmCtx).pop();
+                                    if (ctx.mounted) Navigator.of(ctx).pop();
+                                    messenger.showSnackBar(
+                                      SnackBar(
+                                        content: Text(res?['message']?.toString() ?? '✅ +$qty units transferred to ${driver.name}!'),
+                                        backgroundColor: const Color(0xFF10B981),
+                                      ),
+                                    );
+                                  } else {
+                                    setConfirmState(() => isSubmitting = false);
+                                    messenger.showSnackBar(
+                                      SnackBar(
+                                        content: Text(res?['message']?.toString() ?? '❌ Failed to top up stock.'),
+                                        backgroundColor: const Color(0xFFEF4444),
+                                      ),
+                                    );
+                                  }
+                                },
+                          icon: isSubmitting
+                              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                              : const Icon(Icons.check_circle_rounded, size: 16, color: Colors.white),
+                          label: Text(
+                            isSubmitting ? 'Adding...' : 'Yes, Top Up +$qty Units',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF10B981),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               );
             },
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
@@ -1977,6 +2234,35 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
         ),
         child: Text(label, style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB))),
       ),
+    );
+  }
+
+  Widget _buildModalConfirmRow(String label, String value, bool isDark, {bool isBold = false, Color? valueColor}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            value,
+            style: GoogleFonts.jetBrainsMono(
+              fontSize: 12.5,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+              color: valueColor ?? (isDark ? Colors.white : const Color(0xFF0F172A)),
+            ),
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.right,
+          ),
+        ),
+      ],
     );
   }
 

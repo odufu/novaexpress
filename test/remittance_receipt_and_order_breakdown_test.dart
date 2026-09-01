@@ -270,17 +270,16 @@ void main() {
       expect(find.text('RECONCILED ORDERS BREAKDOWN'), findsOneWidget);
       expect(find.text('ORD-9001'), findsOneWidget);
       expect(find.text('Aisha Bello'), findsOneWidget);
-      expect(find.text('DELIVERED (POD)'), findsOneWidget);
+      expect(find.text('CASH POD'), findsOneWidget);
 
       // Failed attempt order with stipend
       expect(find.text('ORD-9002-F'), findsOneWidget);
       expect(find.text('Tunde Bakare'), findsOneWidget);
-      expect(find.text('FAILED ATTEMPT (STIPEND APPLIED)'), findsOneWidget);
-      expect(find.text('Failed Attempt Stipend Credit:'), findsOneWidget);
+      expect(find.text('FAILED ATTEMPT'), findsOneWidget);
 
       // Action Buttons
-      expect(find.text('Share Receipt'), findsOneWidget);
-      expect(find.text('Download Statement (PDF)'), findsOneWidget);
+      expect(find.text('Copy & Share Receipt Summary'), findsOneWidget);
+      expect(find.text('Download Receipt as Image (PNG)'), findsWidgets);
     });
 
     test('4. FinancialSummary dynamically accumulates remittances and reconciles custody balance', () {

@@ -349,5 +349,79 @@ void main() {
       expect(updatedAlloc.inCustodyUnits, equals(2)); // 5 - 3 = 2
       expect(updatedAlloc.returnedUnits, equals(3));
     });
+
+    test('7. Newly created product "ura clear" with image persists across restart simulations', () async {
+      const prodName = 'ura clear';
+      const prodSku = 'SKU-URA-01';
+      const imgUrl = 'https://oygtaeriljuelhshfvkv.supabase.co/storage/v1/object/public/products/product_ura.png';
+
+      final catalogNotifier = ProductCatalogNotifier(storageService: storage);
+
+      // 1. Create product via stockNotifier
+      final created = await stockNotifier.addNewProduct(
+        name: prodName,
+        sku: prodSku,
+        category: 'Health & Wellness',
+        price: 30000.0,
+        initialQuantity: 75,
+        imageAsset: imgUrl,
+      );
+
+      expect(created.name, equals('ura clear'));
+      expect(created.imageAsset, equals(imgUrl));
+
+      // 2. Sync to product catalog
+      final catalogProduct = await catalogNotifier.registerNewProduct(
+        name: prodName,
+        sku: prodSku,
+        baseUnitPrice: 30000.0,
+      );
+
+      expect(catalogProduct.name, equals('ura clear'));
+      expect(catalogProduct.packages.length, equals(4)); // 1-Unit, 2-Pack, 3-Pack, 5-Pack
+
+      // 3. Verify local storage has it cached
+      final cachedCatalog = await storage.getCachedProductCatalog();
+      expect(cachedCatalog, isNotNull);
+      expect(cachedCatalog!.any((p) => p.name == 'ura clear'), isTrue);
+
+      final cachedStock = await storage.getCachedStockItems();
+      expect(cachedStock, isNotNull);
+      expect(cachedStock!.any((s) => s.name == 'ura clear'), isTrue);
+
+      // 4. Simulate App Restart (new notifiers initialized with storage)
+      final reloadedCatalogNotifier = ProductCatalogNotifier(storageService: storage);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(reloadedCatalogNotifier.state.products.any((p) => p.name == 'ura clear'), isTrue);
+
+      final reloadedStockNotifier = StockNotifier(repository: repo, storageService: storage);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(reloadedStockNotifier.state.stockItems.any((s) => s.name == 'ura clear'), isTrue);
+    });
+
+    test('8. StockItemModel parses image_url and embedded [IMAGE_URL:] in description correctly', () {
+      final jsonWithUrl = {
+        'id': 'prod-123',
+        'name': 'ura clear',
+        'sku': 'SKU-URA-01',
+        'base_price': 30000.0,
+        'image_url': 'https://example.com/ura.png',
+        'description': 'Ura Clear Skin Solution',
+      };
+
+      final model1 = StockItemModel.fromJson(jsonWithUrl);
+      expect(model1.imageAsset, equals('https://example.com/ura.png'));
+
+      final jsonWithEmbeddedDesc = {
+        'id': 'prod-124',
+        'name': 'ura clear 2',
+        'sku': 'SKU-URA-02',
+        'base_price': 35000.0,
+        'description': 'Ura Clear Skin Solution [IMAGE_URL: data:image/png;base64,ABC123XYZ] [PACKAGES: []]',
+      };
+
+      final model2 = StockItemModel.fromJson(jsonWithEmbeddedDesc);
+      expect(model2.imageAsset, equals('data:image/png;base64,ABC123XYZ'));
+    });
   });
 }

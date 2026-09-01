@@ -42,14 +42,17 @@ serve(async (req: Request) => {
 
     if (rpcError) {
       // Direct update fallback if RPC is not loaded
+      const updateData: Record<string, unknown> = {
+        current_latitude: payload.latitude,
+        current_longitude: payload.longitude,
+        last_location_update: new Date().toISOString(),
+      };
+      if (payload.isOnDuty !== undefined) {
+        updateData.is_on_duty = payload.isOnDuty;
+      }
       await supabaseClient
         .from("delivery_agents")
-        .update({
-          current_latitude: payload.latitude,
-          current_longitude: payload.longitude,
-          last_location_update: new Date().toISOString(),
-          if (payload.isOnDuty !== undefined) is_on_duty: payload.isOnDuty,
-        })
+        .update(updateData)
         .eq("id", payload.agentId);
     }
 

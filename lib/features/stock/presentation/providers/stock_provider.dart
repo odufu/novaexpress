@@ -333,22 +333,45 @@ class StockNotifier extends StateNotifier<StockState> {
         // DC Master Overview
         final items = await repository.getVehicleStockItems();
         final allocations = await repository.getRiderStockAllocations();
+
+        final List<StockItemEntity> mergedItems = List.from(items);
+        for (final localItem in state.stockItems) {
+          if (!mergedItems.any((i) => i.id == localItem.id || i.sku.toLowerCase() == localItem.sku.toLowerCase() || i.name.toLowerCase() == localItem.name.toLowerCase())) {
+            mergedItems.add(localItem);
+          }
+        }
+
         state = state.copyWith(
           isLoading: false,
-          stockItems: items,
+          stockItems: mergedItems,
           riderAllocations: allocations.isNotEmpty ? allocations : state.riderAllocations,
         );
-        _storageService.cacheStockItems(items);
+        _storageService.cacheStockItems(mergedItems);
         if (allocations.isNotEmpty) {
           _storageService.cacheRiderStockAllocations(allocations);
         }
       }
     } catch (e) {
+      debugPrint('[STOCK_PROVIDER] ❌ fetchStockItems error: $e');
+      final cached = await _storageService.getCachedStockItems();
+      final cachedAllocations = await _storageService.getCachedRiderStockAllocations();
+
+      final fallbackItems = (cached != null && cached.isNotEmpty) ? cached : state.stockItems;
+      final fallbackAlloc = (cachedAllocations != null && cachedAllocations.isNotEmpty) ? cachedAllocations : state.riderAllocations;
+
       state = state.copyWith(
         isLoading: false,
-        errorMessage: 'Failed to sync vehicle stock.',
+        stockItems: fallbackItems,
+        riderAllocations: fallbackAlloc,
+        errorMessage: fallbackItems.isEmpty
+            ? 'Unable to connect to NovaXpress server. Please check your network connection and try again.'
+            : 'Offline Mode: Showing cached inventory. Live sync failed due to network instability.',
       );
     }
+  }
+
+  void clearError() {
+    state = state.copyWith(errorMessage: null);
   }
 
   void setSearchQuery(String query) {

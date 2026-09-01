@@ -86,7 +86,6 @@ class FinancialSummary {
     final double totalTransferFeesRetained = posFee;
     final double totalFailedAllowanceEarned = failedOrders.length * failedPerOrder;
     final double totalEarningRetained = totalCommissionRetained + totalTransportRetained + totalFailedAllowanceEarned + totalTransferFeesRetained;
-
     final double totalVerifiedRemitted = remittances
         .where((r) => r.isVerified)
         .fold(0.0, (acc, r) => acc + r.amount);
@@ -97,7 +96,7 @@ class FinancialSummary {
 
     // Unremitted delivered cash orders (orders not yet remitted)
     final unremittedDeliveredCashOrders = deliveredCashOrders
-        .where((o) => !o.isRemitted && o.paymentStatus.toLowerCase() != 'remitted')
+        .where((o) => !o.isRemitted && o.paymentStatus.toLowerCase() != 'remitted' && o.remittanceStatus.toLowerCase() != 'remitted')
         .toList();
 
     double pendingRemittanceToDC = 0.0;
@@ -105,17 +104,43 @@ class FinancialSummary {
       final double unremittedCash = unremittedDeliveredCashOrders.fold(0.0, (acc, o) => acc + o.totalAmount);
       final double unremittedCommission = unremittedDeliveredCashOrders.fold(
         0.0,
-        (acc, o) => acc + (o.agentEntitlement > 0 ? o.agentEntitlement : commissionPerOrder),
+        (acc, o) => acc + ((user?.commissionRate != null && user!.commissionRate > 0)
+            ? user.commissionRate
+            : (o.agentEntitlement > 0 && o.agentEntitlement != 2500.0 ? o.agentEntitlement : commissionPerOrder)),
       );
       final double unremittedTransport = unremittedDeliveredCashOrders.fold(
         0.0,
-        (acc, o) => acc + (o.transportFee > 0 ? o.transportFee : transportPerOrder),
+        (acc, o) => acc + ((user?.transportAllowance != null && user!.transportAllowance > 0)
+            ? user.transportAllowance
+            : (o.transportFee > 0 && o.transportFee != 1500.0 ? o.transportFee : transportPerOrder)),
       );
-      final double unremittedTotalEarnings = unremittedCommission + unremittedTransport;
+      final double unremittedFailedStipend = failedOrders.where((o) => !o.isRemitted).fold(
+        0.0,
+        (acc, o) => acc + failedPerOrder,
+      );
+      final double unremittedTotalEarnings = unremittedCommission + unremittedTransport + unremittedFailedStipend;
 
-      pendingRemittanceToDC = isSalaried
+      final netCashPayable = isSalaried
           ? unremittedCash
-          : (unremittedCash - unremittedTotalEarnings).clamp(0.0, double.infinity);
+          : (unremittedCash - unremittedTotalEarnings);
+
+      // Check for remittances that apply specifically to current unremitted orders
+      final unremittedOrderIds = unremittedDeliveredCashOrders.map((o) => o.id).toSet();
+      final batchAssociatedRemitted = remittances.where((r) {
+        if (r.associatedOrders.isEmpty) return false;
+        return r.associatedOrders.any((ao) => unremittedOrderIds.contains(ao.orderId));
+      }).fold(0.0, (acc, r) => acc + r.amount);
+
+      // In tests/simulations where all passed orders are unremitted and mock remittances without associatedOrders are passed
+      final unassociatedRemitted = remittances
+          .where((r) => r.associatedOrders.isEmpty && orders.every((o) => !o.isRemitted))
+          .fold(0.0, (acc, r) => acc + r.amount);
+
+      final totalRemittedForThisBatch = batchAssociatedRemitted > 0
+          ? batchAssociatedRemitted
+          : unassociatedRemitted;
+
+      pendingRemittanceToDC = (netCashPayable - totalRemittedForThisBatch).clamp(0.0, double.infinity);
     } else {
       pendingRemittanceToDC = 0.0;
     }

@@ -87,7 +87,17 @@ class StockItemModel extends StockItemEntity {
         ? InventoryType.novaExpressInventory 
         : InventoryType.distributedInventory;
 
-    String? imageAsset = json['image_asset']?.toString();
+    String? imageAsset = json['image_asset']?.toString() ?? json['image_url']?.toString();
+    final desc = json['description']?.toString() ?? '';
+    if ((imageAsset == null || imageAsset.isEmpty) && desc.contains('[IMAGE_URL:')) {
+      try {
+        final start = desc.indexOf('[IMAGE_URL:') + 11;
+        final end = desc.indexOf(']', start);
+        if (end > start) {
+          imageAsset = desc.substring(start, end).trim();
+        }
+      } catch (_) {}
+    }
     if (imageAsset == null || imageAsset.isEmpty) {
       final lower = name.toLowerCase();
       if (lower.contains('respira')) {
@@ -105,7 +115,7 @@ class StockItemModel extends StockItemEntity {
       id: json['id']?.toString() ?? '',
       sku: sku,
       name: name,
-      description: json['description']?.toString() ?? '',
+      description: desc,
       price: price,
       ownerName: ownerName,
       inventoryType: invType,
@@ -132,6 +142,7 @@ class StockItemModel extends StockItemEntity {
       'name': name,
       'description': description,
       'price': price,
+      'base_price': price,
       'owner_name': ownerName,
       'inventory_type': inventoryType == InventoryType.novaExpressInventory ? 'novaexpress_inventory' : 'distributed_inventory',
       'total_in_custody': totalInCustody,
@@ -145,6 +156,7 @@ class StockItemModel extends StockItemEntity {
       'reorder_level': reorderLevel,
       'category': category,
       'image_asset': imageAsset,
+      'image_url': imageAsset,
       'batch_number': batchNumber,
       'last_audit_date': lastAuditDate,
     };

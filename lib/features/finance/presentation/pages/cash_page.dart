@@ -13,7 +13,7 @@ import '../../domain/entities/remittance.dart';
 import '../providers/finance_provider.dart';
 
 final cashFilterProvider = StateProvider.autoDispose<String>((ref) => 'all');
-final cashMetricTabProvider = StateProvider.autoDispose<int>((ref) => 0);
+final cashMetricTabProvider = StateProvider.autoDispose<int>((ref) => 1);
 
 class CashPage extends ConsumerStatefulWidget {
   const CashPage({super.key});
@@ -78,7 +78,7 @@ class _CashPageState extends ConsumerState<CashPage> {
     final double recentTransport = mostRecentOrder != null && mostRecentOrder.isCashPod
         ? (user?.fuelAllowance ?? 1500.0)
         : 0.0;
-    final double recentToRemit = mostRecentOrder != null && mostRecentOrder.isCashPod
+    final double recentToRemit = mostRecentOrder != null && mostRecentOrder.isCashPod && !mostRecentOrder.isRemitted
         ? (recentCollected - recentCommission - recentTransport).clamp(0.0, double.infinity)
         : 0.0;
 
@@ -147,24 +147,13 @@ class _CashPageState extends ConsumerState<CashPage> {
                 child: SafeArea(
                   bottom: false,
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Top Navigation & Actions Bar
                         Row(
                           children: [
-                            IconButton(
-                              icon: const Icon(Icons.arrow_back, color: Colors.white),
-                              onPressed: () {
-                                if (context.canPop()) {
-                                  context.pop();
-                                } else {
-                                  context.go('/');
-                                }
-                              },
-                            ),
-                            const SizedBox(width: 4),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -173,15 +162,16 @@ class _CashPageState extends ConsumerState<CashPage> {
                                     'Remittance & Finance',
                                     style: GoogleFonts.inter(
                                       color: Colors.white,
-                                      fontSize: 19,
+                                      fontSize: 20,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
+                                  const SizedBox(height: 1),
                                   Text(
                                     '$agentCode • $agentName',
                                     style: GoogleFonts.inter(
                                       color: const Color(0xFF94A3B8),
-                                      fontSize: 11.5,
+                                      fontSize: 12,
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),

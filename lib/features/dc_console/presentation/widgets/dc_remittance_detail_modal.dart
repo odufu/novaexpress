@@ -322,17 +322,19 @@ class _DCRemittanceDetailModalState extends ConsumerState<DCRemittanceDetailModa
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             Text(
                               rem.referenceNumber,
                               style: GoogleFonts.jetBrainsMono(
-                                fontSize: 16,
+                                fontSize: isMobile ? 14 : 16,
                                 fontWeight: FontWeight.bold,
                                 color: isDark ? Colors.white : const Color(0xFF0F172A),
                               ),
                             ),
-                            const SizedBox(width: 8),
                             _buildStatusPill(rem.status, rem.isDirectTransfer),
                           ],
                         ),
@@ -343,6 +345,7 @@ class _DCRemittanceDetailModalState extends ConsumerState<DCRemittanceDetailModa
                               : 'Rider Cash Custody Batch • ${rem.orderCount} Contained Orders',
                           style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
                           overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
                         ),
                       ],
                     ),
@@ -403,105 +406,234 @@ class _DCRemittanceDetailModalState extends ConsumerState<DCRemittanceDetailModa
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                           ),
-                          child: Row(
-                            children: [
-                              UserAvatarWidget(
-                                avatarUrl: rem.riderAvatarUrl,
-                                fullName: rem.riderName,
-                                radius: 22,
-                                showBorder: true,
-                                borderColor: const Color(0xFFF37021),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
+                          child: LayoutBuilder(
+                            builder: (context, riderConstraints) {
+                              final isNarrowRider = riderConstraints.maxWidth < 500;
+                              if (isNarrowRider) {
+                                return Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Row(
                                       children: [
-                                        Flexible(
-                                          child: Text(
-                                            rem.riderName,
-                                            style: GoogleFonts.inter(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.bold,
-                                              color: isDark ? Colors.white : const Color(0xFF0F172A),
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
+                                        UserAvatarWidget(
+                                          avatarUrl: rem.riderAvatarUrl,
+                                          fullName: rem.riderName,
+                                          radius: 20,
+                                          showBorder: true,
+                                          borderColor: const Color(0xFFF37021),
                                         ),
-                                        const SizedBox(width: 6),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFFF37021).withValues(alpha: 0.12),
-                                            borderRadius: BorderRadius.circular(6),
-                                          ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
-                                              const Icon(Icons.person_pin_rounded, size: 10, color: Color(0xFFF37021)),
-                                              const SizedBox(width: 3),
+                                              Row(
+                                                children: [
+                                                  Flexible(
+                                                    child: Text(
+                                                      rem.riderName,
+                                                      style: GoogleFonts.inter(
+                                                        fontSize: 13.5,
+                                                        fontWeight: FontWeight.bold,
+                                                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                                      ),
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 6),
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: const Color(0xFFF37021).withValues(alpha: 0.12),
+                                                      borderRadius: BorderRadius.circular(6),
+                                                    ),
+                                                    child: Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        const Icon(Icons.person_pin_rounded, size: 10, color: Color(0xFFF37021)),
+                                                        const SizedBox(width: 3),
+                                                        Text(
+                                                          'Profile',
+                                                          style: GoogleFonts.inter(fontSize: 9.5, fontWeight: FontWeight.bold, color: const Color(0xFFF37021)),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 2),
                                               Text(
-                                                'View Profile',
-                                                style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFFF37021)),
+                                                '${rem.riderCode} • ${rem.riderPhone ?? 'Hub Personnel'}',
+                                                style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
                                               ),
                                             ],
                                           ),
                                         ),
+                                        const Icon(Icons.chevron_right_rounded, size: 18, color: Color(0xFF94A3B8)),
                                       ],
                                     ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      'Driver Code: ${rem.riderCode} • ${rem.riderPhone ?? 'Assigned Hub Personnel'}',
-                                      style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
+                                    const SizedBox(height: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: isDark ? const Color(0xFF0F172A).withValues(alpha: 0.5) : const Color(0xFFF1F5F9),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Flexible(
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const Icon(Icons.schedule_rounded, size: 11, color: Color(0xFF94A3B8)),
+                                                const SizedBox(width: 4),
+                                                Flexible(
+                                                  child: Text(
+                                                    'Open: ${_formatDateTime(rem.openingDate)}',
+                                                    style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Flexible(
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  rem.isVerified ? Icons.check_circle_outline_rounded : Icons.hourglass_top_rounded,
+                                                  size: 11,
+                                                  color: rem.isVerified ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Flexible(
+                                                  child: Text(
+                                                    'Closed: ${_formatDateTime(rem.closingDate)}',
+                                                    style: GoogleFonts.inter(
+                                                      fontSize: 10.5,
+                                                      fontWeight: FontWeight.w600,
+                                                      color: rem.isVerified ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                                                    ),
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ],
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
+                                );
+                              }
+
+                              return Row(
                                 children: [
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(Icons.schedule_rounded, size: 13, color: Color(0xFF94A3B8)),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        'Opened: ${_formatDateTime(rem.openingDate)}',
-                                        style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
-                                      ),
-                                    ],
+                                  UserAvatarWidget(
+                                    avatarUrl: rem.riderAvatarUrl,
+                                    fullName: rem.riderName,
+                                    radius: 22,
+                                    showBorder: true,
+                                    borderColor: const Color(0xFFF37021),
                                   ),
-                                  const SizedBox(height: 2),
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        rem.isVerified ? Icons.check_circle_outline_rounded : Icons.hourglass_top_rounded,
-                                        size: 13,
-                                        color: rem.isVerified ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        'Closed: ${_formatDateTime(rem.closingDate)}',
-                                        style: GoogleFonts.inter(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                          color: rem.isVerified ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Flexible(
+                                              child: Text(
+                                                rem.riderName,
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFF37021).withValues(alpha: 0.12),
+                                                borderRadius: BorderRadius.circular(6),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  const Icon(Icons.person_pin_rounded, size: 10, color: Color(0xFFF37021)),
+                                                  const SizedBox(width: 3),
+                                                  Text(
+                                                    'View Profile',
+                                                    style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFFF37021)),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
                                         ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          'Driver Code: ${rem.riderCode} • ${rem.riderPhone ?? 'Assigned Hub Personnel'}',
+                                          style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.schedule_rounded, size: 13, color: Color(0xFF94A3B8)),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            'Opened: ${_formatDateTime(rem.openingDate)}',
+                                            style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            rem.isVerified ? Icons.check_circle_outline_rounded : Icons.hourglass_top_rounded,
+                                            size: 13,
+                                            color: rem.isVerified ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            'Closed: ${_formatDateTime(rem.closingDate)}',
+                                            style: GoogleFonts.inter(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                              color: rem.isVerified ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ],
                                   ),
+                                  const SizedBox(width: 6),
+                                  const Icon(Icons.chevron_right_rounded, size: 18, color: Color(0xFF94A3B8)),
                                 ],
-                              ),
-                              const SizedBox(width: 6),
-                              const Icon(Icons.chevron_right_rounded, size: 18, color: Color(0xFF94A3B8)),
-                            ],
+                              );
+                            },
                           ),
                         ),
                       ),
@@ -590,6 +722,7 @@ class _DCRemittanceDetailModalState extends ConsumerState<DCRemittanceDetailModa
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
+                              const SizedBox(width: 8),
                               Text(
                                 CurrencyFormatter.formatNaira(rem.netAmount),
                                 style: GoogleFonts.jetBrainsMono(
@@ -626,7 +759,7 @@ class _DCRemittanceDetailModalState extends ConsumerState<DCRemittanceDetailModa
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          'Tap order for Proof of Delivery (POD)',
+                          'Tap order for POD',
                           style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
                         ),
                       ],
@@ -664,16 +797,16 @@ class _DCRemittanceDetailModalState extends ConsumerState<DCRemittanceDetailModa
 
             // 3. Bottom Action Bar
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
                 borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
                 border: Border(top: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  OutlinedButton.icon(
+              child: LayoutBuilder(
+                builder: (context, actionConstraints) {
+                  final isNarrowActions = actionConstraints.maxWidth < 480;
+                  final contactRiderButton = OutlinedButton.icon(
                     onPressed: () {
                       final fallbackOrder = rem.orders.isNotEmpty
                           ? rem.orders.first
@@ -707,53 +840,72 @@ class _DCRemittanceDetailModalState extends ConsumerState<DCRemittanceDetailModa
                         ),
                       );
                     },
-                    icon: const Icon(Icons.phone_in_talk_rounded, size: 16),
-                    label: const Text('Contact Rider', style: TextStyle(fontSize: 12.5)),
+                    icon: const Icon(Icons.phone_in_talk_rounded, size: 15),
+                    label: Text(isNarrowActions ? 'Contact' : 'Contact Rider', style: const TextStyle(fontSize: 12)),
                     style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
-                  ),
-                  Row(
-                    children: [
-                      if (rem.isAwaitingRemittance)
-                        ElevatedButton.icon(
+                  );
+
+                  final clearActionWidget = rem.isAwaitingRemittance
+                      ? ElevatedButton.icon(
                           onPressed: _isProcessing ? null : () => _verifyAndSettleRemittance(context),
                           icon: _isProcessing
                               ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                               : const Icon(Icons.verified_rounded, size: 16, color: Colors.white),
                           label: Text(
                             _isProcessing ? 'Clearing...' : 'Verify & Clear (${CurrencyFormatter.formatNaira(rem.netAmount)})',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12.5),
+                            overflow: TextOverflow.ellipsis,
                           ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF10B981),
-                            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
                         )
-                      else
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      : Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           decoration: BoxDecoration(
                             color: const Color(0xFF10B981).withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
                           ),
                           child: Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 16),
+                              const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 15),
                               const SizedBox(width: 6),
-                              Text(
-                                'Cleared into DC Treasury',
-                                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF10B981)),
+                              Flexible(
+                                child: Text(
+                                  'Cleared into DC Treasury',
+                                  style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color(0xFF10B981)),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                             ],
                           ),
-                        ),
+                        );
+
+                  if (isNarrowActions) {
+                    return Row(
+                      children: [
+                        contactRiderButton,
+                        const SizedBox(width: 8),
+                        Expanded(child: clearActionWidget),
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      contactRiderButton,
+                      clearActionWidget,
                     ],
-                  ),
-                ],
+                  );
+                },
               ),
             ),
           ],
@@ -822,7 +974,18 @@ class _DCRemittanceDetailModalState extends ConsumerState<DCRemittanceDetailModa
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: GoogleFonts.inter(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))),
+        Expanded(
+          child: Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 11.5,
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(width: 8),
         Text(
           value,
           style: GoogleFonts.jetBrainsMono(

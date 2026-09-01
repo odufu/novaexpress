@@ -287,6 +287,13 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
         );
       }
 
+      // Preserve any locally cached / created products not yet in fetchedProducts
+      for (final localProd in state.products) {
+        if (!fetchedProducts.any((fp) => fp.id == localProd.id || fp.name.toLowerCase() == localProd.name.toLowerCase() || fp.sku.toUpperCase() == localProd.sku.toUpperCase())) {
+          fetchedProducts.add(localProd);
+        }
+      }
+
       if (fetchedProducts.isNotEmpty) {
         state = state.copyWith(products: fetchedProducts, isLoading: false);
         await _storageService.cacheProductCatalog(fetchedProducts);
@@ -323,9 +330,29 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
         final combinedDesc = '$cleanBaseDesc - Distributed Inventory [PACKAGES: $packagesJson]';
 
         try {
-          await dbClient.from('products').update({
+          final res = await dbClient.from('products').update({
             'description': combinedDesc,
-          }).eq('id', p.id);
+          }).eq('id', p.id).select();
+
+          if ((res as List).isEmpty) {
+            final resByName = await dbClient.from('products').update({
+              'description': combinedDesc,
+            }).eq('name', p.name).select();
+
+            if ((resByName as List).isEmpty) {
+              // Not yet created in remote DB, upsert it now cleanly
+              const compId = '11111111-1111-4111-8111-111111111111';
+              await dbClient.from('products').upsert({
+                'company_id': compId,
+                'name': p.name,
+                'sku': p.sku,
+                'category': p.category,
+                'base_price': p.defaultUnitPrice,
+                'description': combinedDesc,
+                'is_active': true,
+              }, onConflict: 'sku');
+            }
+          }
         } catch (_) {
           try {
             await dbClient.from('products').update({

@@ -7,7 +7,8 @@ import '../../../orders/presentation/providers/orders_provider.dart';
 import '../providers/dc_console_provider.dart';
 import '../widgets/dc_driver_manifest_table.dart';
 import '../widgets/dc_city_map_widget.dart';
-import '../widgets/dc_create_order_modal.dart';
+import '../widgets/dc_rider_detail_modal.dart';
+import '../widgets/dc_onboard_rider_modal.dart';
 
 class DCDashboardPage extends ConsumerWidget {
   const DCDashboardPage({super.key});
@@ -17,7 +18,6 @@ class DCDashboardPage extends ConsumerWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final dcState = ref.watch(dcConsoleProvider);
-    final dcNotifier = ref.read(dcConsoleProvider.notifier);
     final ordersState = ref.watch(ordersProvider);
     final financeState = ref.watch(financeProvider);
 
@@ -34,171 +34,186 @@ class DCDashboardPage extends ConsumerWidget {
           // Hub Header Banner
           LayoutBuilder(
             builder: (context, constraints) {
-              final isMobile = constraints.maxWidth < 650;
-              final headerInfo = Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          dcState.activeHubName,
-                          style: GoogleFonts.inter(
-                            fontSize: isMobile ? 18 : 22,
-                            fontWeight: FontWeight.w800,
-                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+              final isNarrow = constraints.maxWidth < 650;
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0)),
+                ),
+                child: isNarrow
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF10B981),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  dcState.activeHubName,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
                           ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF10B981).withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          dcState.activeHubCode,
-                          style: GoogleFonts.firaCode(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF059669),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                dcState.activeHubCode,
+                                style: GoogleFonts.firaCode(
+                                  fontSize: 11,
+                                  color: const Color(0xFF64748B),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  'Online',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF10B981),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF10B981),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            dcState.activeHubName,
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              dcState.activeHubCode,
+                              style: GoogleFonts.firaCode(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFF059669),
+                              ),
+                            ),
+                          ),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              'Online',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF10B981),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Primary Operations & PDA Fleet Control Desk • Plot 402 Aminu Kano Crescent, Wuse 2, Abuja',
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      color: const Color(0xFF64748B),
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              );
-
-              final actionButtons = Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      showDialog(
-                        context: context,
-                        barrierDismissible: false,
-                        builder: (ctx) => const DCCreateOrderModal(),
-                      );
-                    },
-                    icon: const Icon(Icons.add_rounded, size: 16, color: Colors.white),
-                    label: const Text(
-                      'Create Order',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFF37021),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                  ),
-                  ElevatedButton.icon(
-                    onPressed: () => dcNotifier.setActiveTab(1),
-                    icon: const Icon(Icons.outbox_rounded, size: 16, color: Colors.white),
-                    label: const Text(
-                      'Orders & Routes',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF031632),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                  ),
-                ],
-              );
-
-              if (isMobile) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    headerInfo,
-                    const SizedBox(height: 12),
-                    actionButtons,
-                  ],
-                );
-              }
-
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(child: headerInfo),
-                  const SizedBox(width: 12),
-                  actionButtons,
-                ],
               );
             },
           ),
 
           const SizedBox(height: 20),
 
-          // 4 Core Business Metric Tiles
+          // Hub KPIs Strip
           LayoutBuilder(
             builder: (context, constraints) {
-              final double cardWidth;
-              if (constraints.maxWidth < 600) {
-                cardWidth = constraints.maxWidth;
-              } else if (constraints.maxWidth < 1000) {
-                cardWidth = (constraints.maxWidth - 12) / 2;
+              final isMobile = constraints.maxWidth < 600;
+              final isTablet = constraints.maxWidth >= 600 && constraints.maxWidth < 1100;
+              const spacing = 12.0;
+
+              double cardWidth;
+              if (isMobile) {
+                cardWidth = (constraints.maxWidth - spacing) / 2;
+              } else if (isTablet) {
+                cardWidth = (constraints.maxWidth - (spacing * 3)) / 4;
               } else {
-                cardWidth = (constraints.maxWidth - 36) / 4;
+                cardWidth = (constraints.maxWidth - (spacing * 3)) / 4;
               }
 
               return Wrap(
-                spacing: 12,
-                runSpacing: 12,
+                spacing: spacing,
+                runSpacing: spacing,
                 children: [
                   _buildMetricCard(
                     title: 'Restock Picking Queue',
                     value: '$unassignedCount Orders',
                     subtext: 'Awaiting rider allocation',
-                    icon: Icons.inventory_2_rounded,
+                    icon: Icons.inventory_2_outlined,
                     color: const Color(0xFFF37021),
                     isDark: isDark,
                     width: cardWidth,
-                    onTap: () => dcNotifier.setActiveTab(1),
                   ),
                   _buildMetricCard(
                     title: 'In-Transit Orders',
                     value: '$inTransitCount Active Routes',
                     subtext: 'Active field deliveries',
-                    icon: Icons.local_shipping_rounded,
+                    icon: Icons.local_shipping_outlined,
                     color: const Color(0xFF2563EB),
                     isDark: isDark,
                     width: cardWidth,
-                    onTap: () => dcNotifier.setActiveTab(1),
                   ),
                   _buildMetricCard(
                     title: 'Cash in Fleet Custody',
                     value: CurrencyFormatter.formatNaira(pendingRemittance),
                     subtext: 'Pending COD remittance',
-                    icon: Icons.account_balance_wallet_rounded,
+                    icon: Icons.account_balance_wallet_outlined,
                     color: const Color(0xFF10B981),
                     isDark: isDark,
                     width: cardWidth,
-                    onTap: () => dcNotifier.setActiveTab(2),
                   ),
                   _buildMetricCard(
                     title: 'Returns Awaiting QC',
                     value: '$pendingReturnsCount Orders',
                     subtext: 'Pending QC or rescheduling',
-                    icon: Icons.assignment_return_rounded,
+                    icon: Icons.assignment_return_outlined,
                     color: const Color(0xFF8B5CF6),
                     isDark: isDark,
                     width: cardWidth,
-                    onTap: () => dcNotifier.setActiveTab(6),
                   ),
                 ],
               );
@@ -207,15 +222,18 @@ class DCDashboardPage extends ConsumerWidget {
 
           const SizedBox(height: 24),
 
-          // GPS City Map Canvas
+          // Map & Live Fleet Visualization
           Container(
             height: 380,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFCBD5E1),
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 10,
+                  color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.05),
+                  blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
               ],
@@ -224,12 +242,7 @@ class DCDashboardPage extends ConsumerWidget {
               borderRadius: BorderRadius.circular(20),
               child: DCCityMapWidget(
                 drivers: dcState.drivers,
-                onDriverSelected: (driver) {
-                  dcNotifier.selectDriver(driver.id);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Selected ${driver.name} (${driver.driverCode}) in ${driver.assignedZone}')),
-                  );
-                },
+                onDriverSelected: (driver) => DCRiderDetailModal.show(context, driver),
               ),
             ),
           ),
@@ -239,16 +252,13 @@ class DCDashboardPage extends ConsumerWidget {
           // Driver Manifest Section
           DCDriverManifestTable(
             drivers: dcState.filteredDrivers,
-            onAddDriver: () => dcNotifier.setActiveTab(6),
+            onAddDriver: () => DCOnboardRiderModal.show(context),
             onExportCSV: () {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('✅ DC Rider Manifest exported as CSV.')),
               );
             },
-            onDriverTap: (driver) {
-              dcNotifier.selectDriver(driver.id);
-              dcNotifier.setActiveTab(6);
-            },
+            onDriverTap: (driver) => DCRiderDetailModal.show(context, driver),
           ),
         ],
       ),
@@ -263,7 +273,7 @@ class DCDashboardPage extends ConsumerWidget {
     required Color color,
     required bool isDark,
     required double width,
-    required VoidCallback onTap,
+    VoidCallback? onTap,
   }) {
     return InkWell(
       onTap: onTap,

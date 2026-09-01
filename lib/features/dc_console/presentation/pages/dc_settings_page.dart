@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/helpers/formatters.dart';
+import '../../../../core/widgets/app_loading_overlay.dart';
 import '../../domain/entities/dc_finance_settings.dart';
 import '../providers/dc_console_provider.dart';
 
@@ -136,47 +137,58 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
     super.dispose();
   }
 
-  void _saveSettings() {
-    final draft = ref.read(dcSettingsDraftProvider);
-    final updated = DCFinanceSettings(
-      posChargeMode: draft.chargeMode,
-      posFlatRate: double.tryParse(_posFlatRateController.text) ?? 350.0,
-      posTierAmount: double.tryParse(_posTierAmountController.text) ?? 5000.0,
-      posTierFee: double.tryParse(_posTierFeeController.text) ?? 100.0,
-      posMaxCapFee: double.tryParse(_posMaxCapFeeController.text) ?? 1500.0,
-      isPosFeeReimbursable: draft.isReimbursable,
-      paystackDirectFeePercent: double.tryParse(_paystackFeePercentController.text) ?? 1.5,
-      paystackFeeCap: double.tryParse(_paystackFeeCapController.text) ?? 2000.0,
-      defaultCommissionRate: double.tryParse(_commissionRateController.text) ?? 1000.0,
-      defaultTransportAllowance: double.tryParse(_transportAllowanceController.text) ?? 1500.0,
-      defaultFailedStipend: double.tryParse(_failedStipendController.text) ?? 500.0,
-      settlementBankName: _bankNameController.text.trim(),
-      settlementAccountNumber: _accountNumberController.text.trim(),
-      settlementAccountName: _accountNameController.text.trim(),
-      autoReconcileWebhooks: draft.autoReconcile,
+  Future<void> _saveSettings(bool isDark) async {
+    await showAppLoadingDialog(
+      context: context,
+      message: 'Applying Policy & Rules...',
+      subMessage: 'Updating distribution center reconciliation matrices...',
+      isDark: isDark,
+      task: () async {
+        final draft = ref.read(dcSettingsDraftProvider);
+        final updated = DCFinanceSettings(
+          posChargeMode: draft.chargeMode,
+          posFlatRate: double.tryParse(_posFlatRateController.text) ?? 350.0,
+          posTierAmount: double.tryParse(_posTierAmountController.text) ?? 5000.0,
+          posTierFee: double.tryParse(_posTierFeeController.text) ?? 100.0,
+          posMaxCapFee: double.tryParse(_posMaxCapFeeController.text) ?? 1500.0,
+          isPosFeeReimbursable: draft.isReimbursable,
+          paystackDirectFeePercent: double.tryParse(_paystackFeePercentController.text) ?? 1.5,
+          paystackFeeCap: double.tryParse(_paystackFeeCapController.text) ?? 2000.0,
+          defaultCommissionRate: double.tryParse(_commissionRateController.text) ?? 1000.0,
+          defaultTransportAllowance: double.tryParse(_transportAllowanceController.text) ?? 1500.0,
+          defaultFailedStipend: double.tryParse(_failedStipendController.text) ?? 500.0,
+          settlementBankName: _bankNameController.text.trim(),
+          settlementAccountNumber: _accountNumberController.text.trim(),
+          settlementAccountName: _accountNameController.text.trim(),
+          autoReconcileWebhooks: draft.autoReconcile,
+        );
+
+        ref.read(dcConsoleProvider.notifier).updateFinanceSettings(updated);
+        await Future.delayed(const Duration(milliseconds: 300));
+      },
     );
 
-    ref.read(dcConsoleProvider.notifier).updateFinanceSettings(updated);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                '✅ Finance & POS Remittance Rules successfully saved and applied to live reconciliations.',
-                style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '✅ Finance & POS Remittance Rules successfully saved and applied.',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
+          backgroundColor: const Color(0xFF10B981),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
-        backgroundColor: const Color(0xFF059669),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
+      );
+    }
   }
 
   void _resetDefaults() {
@@ -196,7 +208,10 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
     ref.read(dcConsoleProvider.notifier).updateFinanceSettings(defaults);
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('🔄 Reset to default NovaExpress standard policies.')),
+      const SnackBar(
+        content: Text('🔄 Reset to default NovaExpress standard policies.'),
+        backgroundColor: Color(0xFF2563EB),
+      ),
     );
   }
 
@@ -206,145 +221,211 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
     final isDark = theme.brightness == Brightness.dark;
     final activeHubName = ref.watch(dcConsoleProvider.select((s) => s.activeHubName));
 
-    return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0B1120) : const Color(0xFFF8FAFC),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Top Header & Save Actions
-            _buildPageHeader(isDark, activeHubName),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 700;
 
-            const SizedBox(height: 20),
+        return Padding(
+          padding: EdgeInsets.all(isMobile ? 12 : 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top Minimalist Header & Save Actions
+              _buildPageHeader(isDark, activeHubName, isMobile),
 
-            // Tab Navigation Bar
-            Container(
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF151D36) : Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
+              const SizedBox(height: 12),
+
+              // Tab Navigation Bar
+              Container(
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                ),
+                child: TabBar(
+                  controller: _tabController,
+                  isScrollable: true,
+                  tabAlignment: TabAlignment.start,
+                  indicatorColor: const Color(0xFFF37021),
+                  indicatorWeight: 3,
+                  labelColor: isDark ? Colors.white : const Color(0xFF0F172A),
+                  unselectedLabelColor: const Color(0xFF64748B),
+                  labelStyle: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12.5),
+                  unselectedLabelStyle: GoogleFonts.inter(fontWeight: FontWeight.w500, fontSize: 12.5),
+                  tabs: const [
+                    Tab(icon: Icon(Icons.payments_outlined, size: 16), text: 'Finance & POS Rules'),
+                    Tab(icon: Icon(Icons.handshake_outlined, size: 16), text: 'Rider Entitlements'),
+                    Tab(icon: Icon(Icons.account_balance_outlined, size: 16), text: 'Settlement Accounts'),
+                    Tab(icon: Icon(Icons.tune_rounded, size: 16), text: 'Automation & Webhooks'),
+                  ],
+                ),
               ),
-              child: TabBar(
-                controller: _tabController,
-                isScrollable: true,
-                tabAlignment: TabAlignment.start,
-                indicatorColor: const Color(0xFFF37021),
-                indicatorWeight: 3,
-                labelColor: isDark ? Colors.white : const Color(0xFF031632),
-                unselectedLabelColor: const Color(0xFF64748B),
-                labelStyle: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13),
-                unselectedLabelStyle: GoogleFonts.inter(fontWeight: FontWeight.w500, fontSize: 13),
-                tabs: const [
-                  Tab(icon: Icon(Icons.account_balance_wallet_rounded, size: 18), text: 'Finance & POS Rules'),
-                  Tab(icon: Icon(Icons.handshake_rounded, size: 18), text: 'Rider Entitlements'),
-                  Tab(icon: Icon(Icons.account_balance_rounded, size: 18), text: 'Settlement Accounts'),
-                  Tab(icon: Icon(Icons.tune_rounded, size: 18), text: 'Automation & Webhooks'),
-                ],
-              ),
-            ),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 12),
 
-            // Tab Views
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  _buildFinanceAndPosTab(isDark),
-                  _buildEntitlementsTab(isDark),
-                  _buildSettlementBankTab(isDark),
-                  _buildAutomationTab(isDark),
-                ],
+              // Responsive Tab Views
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildFinanceAndPosTab(isDark, isMobile),
+                    _buildEntitlementsTab(isDark, isMobile),
+                    _buildSettlementBankTab(isDark, isMobile),
+                    _buildAutomationTab(isDark, isMobile),
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
-      ),
+            ],
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildPageHeader(bool isDark, String activeHubName) {
+  Widget _buildPageHeader(bool isDark, String activeHubName, bool isMobile) {
+    if (isMobile) {
+      return Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF37021).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.settings_suggest_rounded, color: Color(0xFFF37021), size: 18),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Distribution Center Policy & Finance Settings',
+                    style: GoogleFonts.inter(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Configure POS transfer fee rules, delivery commission, and settlement matrices.',
+              style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _resetDefaults,
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                    ),
+                    child: Text('Reset Defaults', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _saveSettings(isDark),
+                    icon: const Icon(Icons.check_rounded, size: 15, color: Colors.white),
+                    label: const Text('Apply & Save Rules', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2563EB),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF151D36) : Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF37021).withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(10),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF37021).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.settings_suggest_rounded, color: Color(0xFFF37021), size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Distribution Center Policy & Finance Settings',
+                        style: GoogleFonts.inter(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      child: const Icon(Icons.settings_suggest_rounded, color: Color(0xFFF37021), size: 22),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Distribution Center Policy & Finance Settings',
-                            style: GoogleFonts.inter(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: isDark ? Colors.white : const Color(0xFF031632),
-                            ),
-                          ),
-                          Text(
-                            'Configure POS transfer fees (Flat vs Dynamic), Paystack automated rules, and real-time reconciliation matrices.',
-                            style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
-                          ),
-                        ],
+                      Text(
+                        'Configure POS transfer fees (Flat vs Dynamic), Paystack automated rules, and real-time reconciliation matrices.',
+                        style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
           const SizedBox(width: 16),
           Wrap(
-            spacing: 10,
+            spacing: 8,
             children: [
               OutlinedButton.icon(
                 onPressed: _resetDefaults,
-                icon: const Icon(Icons.restore_rounded, size: 16),
-                label: const Text('Reset Defaults'),
+                icon: const Icon(Icons.restore_rounded, size: 15),
+                label: const Text('Reset Defaults', style: TextStyle(fontSize: 12)),
                 style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
               ),
               ElevatedButton.icon(
-                onPressed: _saveSettings,
-                icon: const Icon(Icons.save_rounded, size: 16, color: Colors.white),
+                onPressed: () => _saveSettings(isDark),
+                icon: const Icon(Icons.save_rounded, size: 15, color: Colors.white),
                 label: Text(
                   'Apply & Save Rules',
-                  style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: Colors.white),
+                  style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 12),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF031632),
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  backgroundColor: const Color(0xFF2563EB),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
               ),
             ],
@@ -357,22 +438,22 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
   // ==========================================
   // TAB 1: FINANCE & POS RULES (Flat vs Dynamic)
   // ==========================================
-  Widget _buildFinanceAndPosTab(bool isDark) {
+  Widget _buildFinanceAndPosTab(bool isDark, bool isMobile) {
     return ListView(
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       children: [
-        // 1. POS Transfer Charge Rule Selector
+        // 1. POS Transfer Charge Strategy
         Consumer(
           builder: (context, ref, _) {
             final chargeMode = ref.watch(dcSettingsDraftProvider.select((s) => s.chargeMode));
             final isReimbursable = ref.watch(dcSettingsDraftProvider.select((s) => s.isReimbursable));
 
             return Container(
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.all(isMobile ? 14 : 18),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF151D36) : Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -385,110 +466,73 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'POS Remittance Transfer Fee Strategy',
-                              style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF031632)),
+                              'POS Transfer Fee Strategy',
+                              style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
                             ),
-                            const SizedBox(height: 2),
                             Text(
-                              'Choose whether POS cash handover transfers use tiered dynamic scaling or a fixed flat fee.',
-                              style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                              'Strategy for cash handover transfers.',
+                              style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(width: 12),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
                           color: const Color(0xFF2563EB).withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          chargeMode == 'dynamic' ? 'DYNAMIC TIERED ACTIVE' : 'FLAT RATE ACTIVE',
-                          style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w800, color: const Color(0xFF2563EB)),
+                          chargeMode == 'dynamic' ? 'DYNAMIC ACTIVE' : 'FLAT RATE ACTIVE',
+                          style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w800, color: const Color(0xFF2563EB)),
                         ),
                       ),
                     ],
                   ),
 
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
 
-                  // Segmented Choice Cards
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildChoiceCard(
-                          title: 'Dynamic Tiered Scaling',
-                          subtitle: 'Fee scales with transfer amount (e.g. ₦100 per ₦5,000 cash deposited)',
-                          icon: Icons.auto_graph_rounded,
-                          isSelected: chargeMode == 'dynamic',
-                          onTap: () => ref.read(dcSettingsDraftProvider.notifier).setChargeMode('dynamic'),
-                          isDark: isDark,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: _buildChoiceCard(
-                          title: 'Flat Rate Fee',
-                          subtitle: 'A fixed standard fee per deposit regardless of volume (e.g. ₦350 flat)',
-                          icon: Icons.tag_rounded,
-                          isSelected: chargeMode == 'flat',
-                          onTap: () => ref.read(dcSettingsDraftProvider.notifier).setChargeMode('flat'),
-                          isDark: isDark,
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 18),
-                  const Divider(height: 1),
-                  const SizedBox(height: 18),
-
-                  // Inputs based on choice
-                  if (chargeMode == 'dynamic') ...[
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildInputField(
-                            label: 'Tier Step Amount (₦)',
-                            controller: _posTierAmountController,
-                            hint: '5000',
-                            isDark: isDark,
-                            helper: 'Bracket size in Naira',
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildInputField(
-                            label: 'Fee per Tier (₦)',
-                            controller: _posTierFeeController,
-                            hint: '100',
-                            isDark: isDark,
-                            helper: 'Charged per bracket',
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildInputField(
-                            label: 'Maximum Cap Fee (₦)',
-                            controller: _posMaxCapFeeController,
-                            hint: '1500',
-                            isDark: isDark,
-                            helper: 'Maximum charge ceiling',
-                          ),
-                        ),
-                      ],
+                  // Segmented Choice Cards (Stacked on Mobile, Row on Desktop)
+                  if (isMobile) ...[
+                    _buildChoiceCard(
+                      title: 'Dynamic Tiered Scaling',
+                      subtitle: 'Scales with amount (₦100 per ₦5,000)',
+                      icon: Icons.auto_graph_rounded,
+                      isSelected: chargeMode == 'dynamic',
+                      onTap: () => ref.read(dcSettingsDraftProvider.notifier).setChargeMode('dynamic'),
+                      isDark: isDark,
+                    ),
+                    const SizedBox(height: 8),
+                    _buildChoiceCard(
+                      title: 'Flat Rate Fee',
+                      subtitle: 'Fixed fee per deposit (e.g. ₦350 flat)',
+                      icon: Icons.tag_rounded,
+                      isSelected: chargeMode == 'flat',
+                      onTap: () => ref.read(dcSettingsDraftProvider.notifier).setChargeMode('flat'),
+                      isDark: isDark,
                     ),
                   ] else ...[
                     Row(
                       children: [
                         Expanded(
-                          child: _buildInputField(
-                            label: 'Fixed Flat POS Transfer Fee (₦)',
-                            controller: _posFlatRateController,
-                            hint: '350',
+                          child: _buildChoiceCard(
+                            title: 'Dynamic Tiered Scaling',
+                            subtitle: 'Fee scales with transfer amount (₦100 per ₦5,000 cash)',
+                            icon: Icons.auto_graph_rounded,
+                            isSelected: chargeMode == 'dynamic',
+                            onTap: () => ref.read(dcSettingsDraftProvider.notifier).setChargeMode('dynamic'),
                             isDark: isDark,
-                            helper: 'Standard fee applied to all cash deposits',
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildChoiceCard(
+                            title: 'Flat Rate Fee',
+                            subtitle: 'Fixed standard fee per deposit regardless of volume',
+                            icon: Icons.tag_rounded,
+                            isSelected: chargeMode == 'flat',
+                            onTap: () => ref.read(dcSettingsDraftProvider.notifier).setChargeMode('flat'),
+                            isDark: isDark,
                           ),
                         ),
                       ],
@@ -496,12 +540,87 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
                   ],
 
                   const SizedBox(height: 14),
+                  const Divider(height: 1),
+                  const SizedBox(height: 14),
+
+                  // Dynamic / Flat Inputs
+                  if (chargeMode == 'dynamic') ...[
+                    if (isMobile) ...[
+                      _buildInputField(
+                        label: 'Tier Step Amount (₦)',
+                        controller: _posTierAmountController,
+                        hint: '5000',
+                        isDark: isDark,
+                        helper: 'Bracket size in Naira',
+                      ),
+                      const SizedBox(height: 10),
+                      _buildInputField(
+                        label: 'Fee per Tier (₦)',
+                        controller: _posTierFeeController,
+                        hint: '100',
+                        isDark: isDark,
+                        helper: 'Charged per bracket',
+                      ),
+                      const SizedBox(height: 10),
+                      _buildInputField(
+                        label: 'Maximum Cap Fee (₦)',
+                        controller: _posMaxCapFeeController,
+                        hint: '1500',
+                        isDark: isDark,
+                        helper: 'Maximum charge ceiling',
+                      ),
+                    ] else ...[
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildInputField(
+                              label: 'Tier Step Amount (₦)',
+                              controller: _posTierAmountController,
+                              hint: '5000',
+                              isDark: isDark,
+                              helper: 'Bracket size in Naira',
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _buildInputField(
+                              label: 'Fee per Tier (₦)',
+                              controller: _posTierFeeController,
+                              hint: '100',
+                              isDark: isDark,
+                              helper: 'Charged per bracket',
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _buildInputField(
+                              label: 'Maximum Cap Fee (₦)',
+                              controller: _posMaxCapFeeController,
+                              hint: '1500',
+                              isDark: isDark,
+                              helper: 'Maximum charge ceiling',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ] else ...[
+                    _buildInputField(
+                      label: 'Fixed Flat POS Transfer Fee (₦)',
+                      controller: _posFlatRateController,
+                      hint: '350',
+                      isDark: isDark,
+                      helper: 'Standard fee applied to all cash deposits',
+                    ),
+                  ],
+
+                  const SizedBox(height: 12),
 
                   // Reimbursable policy switch
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: Text('Company Reimburses POS Transfer Fees', style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13)),
-                    subtitle: Text('When enabled, the rider retains the POS transfer charge from collected cash and it is factored into reconciliation.', style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B))),
+                    title: Text('Company Reimburses POS Transfer Fees', style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 12.5)),
+                    subtitle: Text('Rider retains POS charge from collected cash and it is factored into reconciliation.', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
                     value: isReimbursable,
                     activeColor: const Color(0xFF10B981),
                     onChanged: (val) => ref.read(dcSettingsDraftProvider.notifier).setReimbursable(val),
@@ -512,7 +631,7 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
           },
         ),
 
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
 
         // 2. Interactive Reconciliation Simulator Card
         Consumer(
@@ -537,68 +656,50 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
             final netToRemit = (simAmount - riderRetained - (isReimbursable ? currentPosFee : 0.0)).clamp(0.0, double.infinity);
 
             return Container(
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.all(isMobile ? 14 : 18),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: isDark
-                      ? [const Color(0xFF0F172A), const Color(0xFF1E293B)]
-                      : [const Color(0xFFF1F5F9), const Color(0xFFE2E8F0)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(16),
+                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: const Color(0xFF2563EB).withValues(alpha: 0.3)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.calculate_rounded, color: Color(0xFF2563EB), size: 20),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Live Financial Reconciliation Simulator',
-                            style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold),
-                          ),
-                        ],
+                      const Icon(Icons.calculate_rounded, color: Color(0xFF2563EB), size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Live Financial Reconciliation Simulator',
+                          style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold),
+                        ),
                       ),
-                      Text('Formula Preview', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  Row(
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _simAmountController,
+                    keyboardType: TextInputType.number,
+                    style: GoogleFonts.jetBrainsMono(fontSize: 13),
+                    decoration: InputDecoration(
+                      labelText: 'Sample Collected Cash (₦)',
+                      labelStyle: GoogleFonts.inter(fontSize: 11.5),
+                      filled: true,
+                      fillColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
                     children: [
-                      SizedBox(
-                        width: 220,
-                        child: TextField(
-                          controller: _simAmountController,
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            labelText: 'Sample Collected Cash (₦)',
-                            labelStyle: GoogleFonts.inter(fontSize: 12),
-                            filled: true,
-                            fillColor: isDark ? const Color(0xFF0B1021) : Colors.white,
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Wrap(
-                          spacing: 12,
-                          runSpacing: 8,
-                          children: [
-                            _buildSimMetricPill('Mode', chargeMode.toUpperCase(), const Color(0xFF2563EB)),
-                            _buildSimMetricPill('POS Fee', CurrencyFormatter.formatNaira(currentPosFee), const Color(0xFFEF4444)),
-                            _buildSimMetricPill('Rider Cut Retained', CurrencyFormatter.formatNaira(riderRetained), const Color(0xFF8B5CF6)),
-                            _buildSimMetricPill('Net To Remit to DC', CurrencyFormatter.formatNaira(netToRemit), const Color(0xFF10B981), isBold: true),
-                          ],
-                        ),
-                      ),
+                      _buildSimMetricPill('Mode', chargeMode.toUpperCase(), const Color(0xFF2563EB)),
+                      _buildSimMetricPill('POS Fee', CurrencyFormatter.formatNaira(currentPosFee), const Color(0xFFEF4444)),
+                      _buildSimMetricPill('Rider Cut', CurrencyFormatter.formatNaira(riderRetained), const Color(0xFF8B5CF6)),
+                      _buildSimMetricPill('Net To Remit', CurrencyFormatter.formatNaira(netToRemit), const Color(0xFF10B981), isBold: true),
                     ],
                   ),
                 ],
@@ -607,46 +708,64 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
           },
         ),
 
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
 
         // 3. Paystack Direct Transfer Rules
         Container(
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.all(isMobile ? 14 : 18),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF151D36) : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Paystack Gateway Charges & Settlements', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 4),
-              Text('Standard gateway fees charged by Paystack for customer direct transfers to company Nuban.', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildInputField(
-                      label: 'Direct Paystack Fee (%)',
-                      controller: _paystackFeePercentController,
-                      hint: '1.5',
-                      isDark: isDark,
-                      helper: 'Standard Paystack percentage',
+              Text('Paystack Gateway Charges', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 2),
+              Text('Gateway fees charged for customer direct transfers.', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
+              const SizedBox(height: 12),
+              if (isMobile) ...[
+                _buildInputField(
+                  label: 'Direct Paystack Fee (%)',
+                  controller: _paystackFeePercentController,
+                  hint: '1.5',
+                  isDark: isDark,
+                  helper: 'Standard Paystack percentage',
+                ),
+                const SizedBox(height: 10),
+                _buildInputField(
+                  label: 'Paystack Max Fee Cap (₦)',
+                  controller: _paystackFeeCapController,
+                  hint: '2000',
+                  isDark: isDark,
+                  helper: 'Cap on high volume transactions',
+                ),
+              ] else ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildInputField(
+                        label: 'Direct Paystack Fee (%)',
+                        controller: _paystackFeePercentController,
+                        hint: '1.5',
+                        isDark: isDark,
+                        helper: 'Standard Paystack percentage',
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: _buildInputField(
-                      label: 'Paystack Max Fee Cap (₦)',
-                      controller: _paystackFeeCapController,
-                      hint: '2000',
-                      isDark: isDark,
-                      helper: 'Cap on high volume transactions',
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildInputField(
+                        label: 'Paystack Max Fee Cap (₦)',
+                        controller: _paystackFeeCapController,
+                        hint: '2000',
+                        isDark: isDark,
+                        helper: 'Cap on high volume transactions',
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
@@ -657,57 +776,83 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
   // ==========================================
   // TAB 2: ENTITLEMENTS & AGREEMENTS
   // ==========================================
-  Widget _buildEntitlementsTab(bool isDark) {
+  Widget _buildEntitlementsTab(bool isDark, bool isMobile) {
     return ListView(
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       children: [
         Container(
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.all(isMobile ? 14 : 18),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF151D36) : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Default Rider Delivery Entitlements', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 4),
-              Text('Standard compensation matrix assigned to newly onboarded delivery agents across the distribution center.', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildInputField(
-                      label: 'Default Delivery Commission (₦ / drop)',
-                      controller: _commissionRateController,
-                      hint: '1000',
-                      isDark: isDark,
-                      helper: 'Base delivery fee per drop',
+              Text('Default Rider Delivery Entitlements', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 2),
+              Text('Standard compensation matrix for onboarded delivery agents.', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
+              const SizedBox(height: 14),
+              if (isMobile) ...[
+                _buildInputField(
+                  label: 'Delivery Commission (₦ / drop)',
+                  controller: _commissionRateController,
+                  hint: '1000',
+                  isDark: isDark,
+                  helper: 'Base delivery fee per drop',
+                ),
+                const SizedBox(height: 10),
+                _buildInputField(
+                  label: 'Transport Allowance (₦ / drop)',
+                  controller: _transportAllowanceController,
+                  hint: '1500',
+                  isDark: isDark,
+                  helper: 'Fuel subsidy per drop',
+                ),
+                const SizedBox(height: 10),
+                _buildInputField(
+                  label: 'Failed Attempt Stipend (₦ / drop)',
+                  controller: _failedStipendController,
+                  hint: '500',
+                  isDark: isDark,
+                  helper: 'Compensation for verified attempt',
+                ),
+              ] else ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildInputField(
+                        label: 'Delivery Commission (₦ / drop)',
+                        controller: _commissionRateController,
+                        hint: '1000',
+                        isDark: isDark,
+                        helper: 'Base delivery fee per drop',
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: _buildInputField(
-                      label: 'Default Transport / Fuel Allowance (₦ / drop)',
-                      controller: _transportAllowanceController,
-                      hint: '1500',
-                      isDark: isDark,
-                      helper: 'Fuel subsidy per drop',
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _buildInputField(
+                        label: 'Transport Allowance (₦ / drop)',
+                        controller: _transportAllowanceController,
+                        hint: '1500',
+                        isDark: isDark,
+                        helper: 'Fuel subsidy per drop',
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: _buildInputField(
-                      label: 'Failed Attempt Stipend (₦ / drop)',
-                      controller: _failedStipendController,
-                      hint: '500',
-                      isDark: isDark,
-                      helper: 'Compensation for verified attempt',
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _buildInputField(
+                        label: 'Failed Attempt Stipend (₦ / drop)',
+                        controller: _failedStipendController,
+                        hint: '500',
+                        isDark: isDark,
+                        helper: 'Compensation for verified attempt',
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
@@ -718,38 +863,38 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
   // ==========================================
   // TAB 3: SETTLEMENT ACCOUNTS
   // ==========================================
-  Widget _buildSettlementBankTab(bool isDark) {
+  Widget _buildSettlementBankTab(bool isDark, bool isMobile) {
     return ListView(
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       children: [
         Container(
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.all(isMobile ? 14 : 18),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF151D36) : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('DC Corporate Settlement Bank Account', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 4),
-              Text('The designated corporate banking account into which Paystack transfers and POS handovers settle.', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-              const SizedBox(height: 16),
+              Text('DC Corporate Settlement Bank Account', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 2),
+              Text('Designated corporate account for Paystack & POS settlements.', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
+              const SizedBox(height: 14),
               _buildInputField(
                 label: 'Receiving Bank Name',
                 controller: _bankNameController,
                 hint: 'Titan Trust Bank',
                 isDark: isDark,
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 10),
               _buildInputField(
                 label: 'Settlement Account Number (NUBAN)',
                 controller: _accountNumberController,
                 hint: '0098234123',
                 isDark: isDark,
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 10),
               _buildInputField(
                 label: 'Account Name',
                 controller: _accountNameController,
@@ -766,30 +911,30 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
   // ==========================================
   // TAB 4: AUTOMATION & WEBHOOKS
   // ==========================================
-  Widget _buildAutomationTab(bool isDark) {
+  Widget _buildAutomationTab(bool isDark, bool isMobile) {
     return ListView(
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       children: [
         Consumer(
           builder: (context, ref, _) {
             final autoReconcile = ref.watch(dcSettingsDraftProvider.select((s) => s.autoReconcile));
 
             return Container(
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.all(isMobile ? 14 : 18),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF151D36) : Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Automated Webhook & Reconciliation Rules', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 14),
+                  Text('Automated Webhook & Reconciliation', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 10),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: Text('Instant Paystack Auto-Reconciliation', style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13)),
-                    subtitle: Text('Automatically settle transactions and clear rider remittance custody as soon as Paystack webhooks fire without waiting for manual supervisor clicks.', style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B))),
+                    title: Text('Instant Paystack Auto-Reconciliation', style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 12.5)),
+                    subtitle: Text('Automatically settle transactions and clear rider remittance custody as soon as Paystack webhooks fire without manual clicks.', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
                     value: autoReconcile,
                     activeColor: const Color(0xFF10B981),
                     onChanged: (val) => ref.read(dcSettingsDraftProvider.notifier).setAutoReconcile(val),
@@ -816,27 +961,27 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(10),
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: isSelected
               ? const Color(0xFF2563EB).withValues(alpha: isDark ? 0.15 : 0.08)
               : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: isSelected ? const Color(0xFF2563EB) : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-            width: isSelected ? 2 : 1,
+            width: isSelected ? 1.5 : 1,
           ),
         ),
         child: Row(
           children: [
             Icon(
               icon,
-              size: 24,
+              size: 20,
               color: isSelected ? const Color(0xFF2563EB) : const Color(0xFF64748B),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -844,17 +989,17 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
                   Text(
                     title,
                     style: GoogleFonts.inter(
-                      fontSize: 13,
+                      fontSize: 12.5,
                       fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                      color: isSelected ? const Color(0xFF2563EB) : (isDark ? Colors.white : const Color(0xFF031632)),
+                      color: isSelected ? const Color(0xFF2563EB) : (isDark ? Colors.white : const Color(0xFF0F172A)),
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(subtitle, style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
+                  const SizedBox(height: 1),
+                  Text(subtitle, style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B))),
                 ],
               ),
             ),
-            if (isSelected) const Icon(Icons.check_circle_rounded, color: Color(0xFF2563EB), size: 18),
+            if (isSelected) const Icon(Icons.check_circle_rounded, color: Color(0xFF2563EB), size: 16),
           ],
         ),
       ),
@@ -871,26 +1016,29 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 6),
+        Text(
+          label,
+          style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w600, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+        ),
+        const SizedBox(height: 4),
         TextField(
           controller: controller,
-          style: GoogleFonts.inter(fontSize: 13),
+          style: GoogleFonts.inter(fontSize: 12.5),
           decoration: InputDecoration(
             hintText: hint,
             helperText: helper,
-            helperStyle: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF94A3B8)),
+            helperStyle: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8)),
             filled: true,
             fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           ),
         ),
       ],
@@ -899,19 +1047,19 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
 
   Widget _buildSimMetricPill(String label, String value, Color color, {bool isBold = false}) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(6),
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: GoogleFonts.inter(fontSize: 10, color: color, fontWeight: FontWeight.bold)),
+          Text(label, style: GoogleFonts.inter(fontSize: 9.5, color: color, fontWeight: FontWeight.bold)),
           Text(
             value,
-            style: GoogleFonts.inter(fontSize: 12, fontWeight: isBold ? FontWeight.w900 : FontWeight.bold, color: color),
+            style: GoogleFonts.inter(fontSize: 11.5, fontWeight: isBold ? FontWeight.w900 : FontWeight.bold, color: color),
           ),
         ],
       ),

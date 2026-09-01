@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -32,7 +33,8 @@ class StockDetailsGrazerPage extends ConsumerWidget {
     // 1. Find matched stock item
     StockItemEntity? matchedItem;
     for (final item in stockState.stockItems) {
-      if (item.name.toLowerCase() == productName.toLowerCase()) {
+      if (item.name.toLowerCase() == productName.toLowerCase() ||
+          item.sku.toLowerCase() == productName.toLowerCase()) {
         matchedItem = item;
         break;
       }
@@ -41,8 +43,8 @@ class StockDetailsGrazerPage extends ConsumerWidget {
 
     final String displayName = item?.name ?? productName;
     final String displaySku = item?.sku ?? 'RDT-001';
-    final String displayDesc = (item != null && item.description.isNotEmpty)
-        ? item.description
+    final String displayDesc = (item != null && item.cleanDescription.isNotEmpty)
+        ? item.cleanDescription
         : 'Premium organic herbal blend formulated for detox, purification, and daily wellness. Store in cool, dry conditions.';
     final int assigned = item?.assignedCount ?? 0;
     final int delivered = item?.deliveredCount ?? 0;
@@ -53,11 +55,38 @@ class StockDetailsGrazerPage extends ConsumerWidget {
     final String? imageAsset = item?.imageAsset;
 
     // 2. Find commercial packages for this product
+    List<ProductPackage> packages = [];
+
     final catalogProduct = catalogState.products.firstWhere(
       (p) => p.name.toLowerCase() == displayName.toLowerCase() || p.sku.toLowerCase() == displaySku.toLowerCase(),
       orElse: () => CatalogProduct(id: '', name: displayName, sku: displaySku, clientName: ownerName, defaultUnitPrice: unitPrice, packages: []),
     );
-    final packages = catalogProduct.packages;
+
+    if (catalogProduct.packages.isNotEmpty) {
+      packages = catalogProduct.packages;
+    } else if (item != null && item.description.contains('[PACKAGES:')) {
+      try {
+        final startIdx = item.description.indexOf('[PACKAGES:') + 10;
+        final endIdx = item.description.lastIndexOf(']');
+        if (endIdx > startIdx) {
+          final jsonStr = item.description.substring(startIdx, endIdx + 1).trim();
+          final decodedList = jsonDecode(jsonStr) as List;
+          packages = decodedList
+              .map((it) => ProductPackage.fromJson(it as Map<String, dynamic>))
+              .toList();
+        }
+      } catch (_) {}
+    }
+
+    if (packages.isEmpty) {
+      packages = ProductCatalogNotifier.buildDefaultPackagesForProduct(
+        productId: item?.id ?? displaySku,
+        productName: displayName,
+        productSku: displaySku,
+        baseUnitPrice: unitPrice,
+        clientName: ownerName,
+      );
+    }
 
     // 3. Find active orders assigned to rider requiring this product
     final tiedOrders = ordersState.orders.where((o) {
