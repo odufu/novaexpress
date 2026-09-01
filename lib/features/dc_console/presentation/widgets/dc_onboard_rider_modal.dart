@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../../core/constants/nigeria_locations.dart';
 import '../../../../core/helpers/formatters.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
@@ -17,6 +16,8 @@ class DCOnboardDraftState {
   final bool mustChangePassword;
   final String vehicleType;
   final String compensationType;
+  final String? selectedDcId;
+  final List<String> selectedLgas;
   final String selectedBank;
   final Map<String, dynamic>? createdCredentialsSlip;
 
@@ -24,8 +25,10 @@ class DCOnboardDraftState {
     this.currentStep = 0,
     this.isSubmitting = false,
     this.personnelType = 'pda',
-    this.operatingState = 'FCT - Abuja',
-    this.assignedZone = 'Wuse 2',
+    this.operatingState = 'Federal Capital Territory',
+    this.assignedZone = 'Abuja Municipal (AMAC)',
+    this.selectedDcId,
+    this.selectedLgas = const [],
     this.mustChangePassword = true,
     this.vehicleType = 'Motorcycle',
     this.compensationType = 'commission',
@@ -39,6 +42,8 @@ class DCOnboardDraftState {
     String? personnelType,
     String? operatingState,
     String? assignedZone,
+    String? Function()? selectedDcId,
+    List<String>? selectedLgas,
     bool? mustChangePassword,
     String? vehicleType,
     String? compensationType,
@@ -51,6 +56,8 @@ class DCOnboardDraftState {
       personnelType: personnelType ?? this.personnelType,
       operatingState: operatingState ?? this.operatingState,
       assignedZone: assignedZone ?? this.assignedZone,
+      selectedDcId: selectedDcId != null ? selectedDcId() : this.selectedDcId,
+      selectedLgas: selectedLgas ?? this.selectedLgas,
       mustChangePassword: mustChangePassword ?? this.mustChangePassword,
       vehicleType: vehicleType ?? this.vehicleType,
       compensationType: compensationType ?? this.compensationType,
@@ -67,6 +74,32 @@ class DCOnboardDraftNotifier extends StateNotifier<DCOnboardDraftState> {
   void nextStep() => state = state.copyWith(currentStep: (state.currentStep + 1).clamp(0, 4));
   void previousStep() => state = state.copyWith(currentStep: (state.currentStep - 1).clamp(0, 4));
   void setPersonnelType(String type) => state = state.copyWith(personnelType: type);
+  void setSelectedDc(String dcId, String stateName, List<String> dcLgas) {
+    state = state.copyWith(
+      selectedDcId: () => dcId,
+      operatingState: stateName,
+      assignedZone: dcLgas.isNotEmpty ? dcLgas.first : state.assignedZone,
+      selectedLgas: List.from(dcLgas),
+    );
+  }
+  void toggleLga(String lga) {
+    final current = List<String>.from(state.selectedLgas);
+    if (current.contains(lga)) {
+      current.remove(lga);
+    } else {
+      current.add(lga);
+    }
+    state = state.copyWith(
+      selectedLgas: current,
+      assignedZone: current.isNotEmpty ? current.first : state.assignedZone,
+    );
+  }
+  void setSelectedLgas(List<String> lgas) {
+    state = state.copyWith(
+      selectedLgas: lgas,
+      assignedZone: lgas.isNotEmpty ? lgas.first : state.assignedZone,
+    );
+  }
   void setOperatingLocation(String stateVal, String zoneVal) => state = state.copyWith(operatingState: stateVal, assignedZone: zoneVal);
   void setAssignedZone(String zone) => state = state.copyWith(assignedZone: zone);
   void setMustChangePassword(bool val) => state = state.copyWith(mustChangePassword: val);
@@ -229,6 +262,19 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
     String finalDriverCode = driverCode;
     String finalDriverId = 'drv-${DateTime.now().millisecondsSinceEpoch}';
 
+    final dcState = ref.read(dcConsoleProvider);
+    final targetDcId = draftState.selectedDcId ?? dcState.activeHubId;
+    final targetDc = dcState.distributionCenters.firstWhere(
+      (dc) => dc.id == targetDcId,
+      orElse: () => dcState.distributionCenters.isNotEmpty
+          ? dcState.distributionCenters.first
+          : defaultDistributionCenters.first,
+    );
+
+    final riderLgas = draftState.selectedLgas.isNotEmpty
+        ? draftState.selectedLgas
+        : (targetDc.coveredLgas.isNotEmpty ? targetDc.coveredLgas : [draftState.assignedZone]);
+
     // 1. Register rider in database & authentication system
     try {
       final createdUser = await ref.read(authRemoteDataSourceProvider).registerDeliveryAgent(
@@ -248,8 +294,8 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
         bankName: draftState.selectedBank,
         bankAccountNumber: _accountNumberController.text.trim().isEmpty ? '2019847291' : _accountNumberController.text.trim(),
         bankAccountName: _accountNameController.text.trim().isEmpty ? fullName : _accountNameController.text.trim(),
-        distributionCenterId: '22222222-2222-4222-8222-222222222222',
-        assignedZone: draftState.assignedZone,
+        distributionCenterId: targetDc.id,
+        assignedZone: riderLgas.first,
       );
       if (createdUser.deliveryAgentCode?.isNotEmpty == true) {
         finalDriverCode = createdUser.deliveryAgentCode!;
@@ -273,7 +319,9 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
       vehiclePlate: _vehiclePlateController.text.trim(),
       vehicleType: draftState.vehicleType,
       status: 'active',
-      assignedZone: draftState.assignedZone,
+      assignedZone: riderLgas.first,
+      distributionCenterId: targetDc.id,
+      coveredLgas: riderLgas,
       totalAssignedOrders: 0,
       completedOrders: 0,
       routeProgressPercent: 0.0,
@@ -602,41 +650,145 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
           ],
         ),
         const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: DropdownButtonFormField<String>(
-                value: draftState.operatingState,
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Operating State (36 States + FCT)'),
-                items: NigeriaLocations.states.map((s) => DropdownMenuItem(value: s, child: Text(s, style: GoogleFonts.inter(fontSize: 13), overflow: TextOverflow.ellipsis))).toList(),
-                onChanged: (val) {
-                  if (val != null) {
-                    final cities = NigeriaLocations.getCitiesForState(val);
-                    ref.read(dcOnboardDraftProvider.notifier).setOperatingLocation(val, cities.isNotEmpty ? cities.first : 'Central');
-                  }
-                },
+        const SizedBox(height: 16),
+
+        // Distribution Center & Restricted LGA Coverage Section
+        Builder(
+          builder: (context) {
+            final dcState = ref.watch(dcConsoleProvider);
+            final dcs = dcState.distributionCenters.isNotEmpty ? dcState.distributionCenters : defaultDistributionCenters;
+            final currentDcId = draftState.selectedDcId ?? dcState.activeHubId;
+            final currentDc = dcs.firstWhere(
+              (dc) => dc.id == currentDcId,
+              orElse: () => dcs.first,
+            );
+
+            final dcLgas = currentDc.coveredLgas.isNotEmpty ? currentDc.coveredLgas : [currentDc.city];
+            final selectedLgas = draftState.selectedLgas.isNotEmpty
+                ? draftState.selectedLgas.where((l) => dcLgas.contains(l)).toList()
+                : List<String>.from(dcLgas);
+
+            return Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: DropdownButtonFormField<String>(
-                value: NigeriaLocations.getCitiesForState(draftState.operatingState).contains(draftState.assignedZone)
-                    ? draftState.assignedZone
-                    : (NigeriaLocations.getCitiesForState(draftState.operatingState).isNotEmpty
-                        ? NigeriaLocations.getCitiesForState(draftState.operatingState).first
-                        : null),
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Primary Operational Zone / LGA'),
-                items: NigeriaLocations.getCitiesForState(draftState.operatingState).map((z) => DropdownMenuItem(value: z, child: Text(z, style: GoogleFonts.inter(fontSize: 13), overflow: TextOverflow.ellipsis))).toList(),
-                onChanged: (val) {
-                  if (val != null) {
-                    ref.read(dcOnboardDraftProvider.notifier).setAssignedZone(val);
-                  }
-                },
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.apartment_rounded, size: 18, color: Color(0xFF2563EB)),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Assigned Distribution Center & Territory',
+                        style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    value: currentDc.id,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'Parent Distribution Hub *'),
+                    dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                    items: dcs.map((dc) {
+                      return DropdownMenuItem<String>(
+                        value: dc.id,
+                        child: Text('${dc.name} (${dc.state}) - ${dc.coveredLgas.length} LGAs', style: const TextStyle(fontSize: 13), overflow: TextOverflow.ellipsis),
+                      );
+                    }).toList(),
+                    onChanged: (newDcId) {
+                      if (newDcId != null) {
+                        final found = dcs.firstWhere((dc) => dc.id == newDcId);
+                        ref.read(dcOnboardDraftProvider.notifier).setSelectedDc(
+                          found.id,
+                          found.state,
+                          found.coveredLgas,
+                        );
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Restricted LGA Selection Banner & Chips
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.shield_outlined, size: 14, color: Color(0xFFF37021)),
+                                const SizedBox(width: 5),
+                                Text(
+                                  'Restricted Rider LGA Coverage *',
+                                  style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Coverage restricted strictly to LGAs attached to ${currentDc.name}',
+                              style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          TextButton(
+                            onPressed: () {
+                              ref.read(dcOnboardDraftProvider.notifier).setSelectedLgas(List.from(dcLgas));
+                            },
+                            style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 6)),
+                            child: const Text('Select All', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              ref.read(dcOnboardDraftProvider.notifier).setSelectedLgas([]);
+                            },
+                            style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 6)),
+                            child: const Text('Clear', style: TextStyle(fontSize: 11, color: Color(0xFFEF4444))),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 120),
+                    child: SingleChildScrollView(
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: dcLgas.map((lga) {
+                          final isSelected = selectedLgas.contains(lga);
+                          return FilterChip(
+                            label: Text(lga, style: TextStyle(fontSize: 11.5, color: isSelected ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF334155)))),
+                            selected: isSelected,
+                            selectedColor: const Color(0xFF2563EB),
+                            checkmarkColor: Colors.white,
+                            backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                            side: BorderSide(color: isSelected ? const Color(0xFF2563EB) : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))),
+                            onSelected: (selected) {
+                              ref.read(dcOnboardDraftProvider.notifier).toggleLga(lga);
+                            },
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
+            );
+          },
         ),
         const SizedBox(height: 16),
         Text('Emergency Contact & Guarantor', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold)),

@@ -19,6 +19,9 @@ class DCFleetDriver {
   final double currentLatitude;
   final double currentLongitude;
 
+  final String? distributionCenterId;
+  final List<String> coveredLgas;
+
   // Onboarding & Unique Compensation Agreement
   final String personnelType; // 'pda' (Personal Distribution Agent) | 'in_house_rider' (Company Rider)
   final String compensationType; // 'commission' | 'salary' | 'hybrid'
@@ -45,6 +48,8 @@ class DCFleetDriver {
     required this.vehicleType,
     required this.status,
     required this.assignedZone,
+    this.distributionCenterId,
+    this.coveredLgas = const [],
     required this.totalAssignedOrders,
     required this.completedOrders,
     required this.routeProgressPercent,
@@ -74,6 +79,21 @@ class DCFleetDriver {
   bool get isInHouseRider => personnelType.toLowerCase() == 'in_house_rider';
   double get totalPerDeliveryEntitlement => commissionRate + transportAllowance;
 
+  bool coversLga(String rawLga) {
+    if (coveredLgas.isEmpty) {
+      if (assignedZone.isEmpty) return true;
+      final target = rawLga.trim().toLowerCase();
+      final zone = assignedZone.trim().toLowerCase();
+      return zone == target || target.contains(zone) || zone.contains(target);
+    }
+    final target = rawLga.trim().toLowerCase();
+    if (target.isEmpty) return true;
+    return coveredLgas.any((lga) {
+      final l = lga.trim().toLowerCase();
+      return l == target || target.contains(l) || l.contains(target);
+    });
+  }
+
   DCFleetDriver copyWith({
     String? id,
     String? driverCode,
@@ -86,6 +106,8 @@ class DCFleetDriver {
     String? vehicleType,
     String? status,
     String? assignedZone,
+    String? distributionCenterId,
+    List<String>? coveredLgas,
     int? totalAssignedOrders,
     int? completedOrders,
     double? routeProgressPercent,
@@ -119,6 +141,8 @@ class DCFleetDriver {
       vehicleType: vehicleType ?? this.vehicleType,
       status: status ?? this.status,
       assignedZone: assignedZone ?? this.assignedZone,
+      distributionCenterId: distributionCenterId ?? this.distributionCenterId,
+      coveredLgas: coveredLgas ?? this.coveredLgas,
       totalAssignedOrders: totalAssignedOrders ?? this.totalAssignedOrders,
       completedOrders: completedOrders ?? this.completedOrders,
       routeProgressPercent: routeProgressPercent ?? this.routeProgressPercent,
@@ -167,6 +191,16 @@ class DCFleetDriver {
     final agentCode = json['agent_code'] as String? ?? json['driver_code'] as String? ?? json['driverCode'] as String? ?? 'PDA-7000';
     final pType = json['personnel_type'] as String? ?? json['personnelType'] as String? ?? 'pda';
     final cType = json['compensation_type'] as String? ?? json['compensationType'] as String? ?? 'commission';
+    final dcId = json['distribution_center_id'] as String? ?? json['distributionCenterId'] as String?;
+    
+    List<String> parseLgas(dynamic raw) {
+      if (raw == null) return [];
+      if (raw is List) return raw.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+      if (raw is String) return raw.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+      return [];
+    }
+
+    final lgas = parseLgas(json['covered_lgas'] ?? json['coveredLgas'] ?? json['lgas']);
 
     return DCFleetDriver(
       id: json['id'] as String? ?? 'drv-${DateTime.now().millisecondsSinceEpoch}',
@@ -180,6 +214,8 @@ class DCFleetDriver {
       vehicleType: json['vehicle_type'] as String? ?? json['vehicleType'] as String? ?? 'Motorcycle',
       status: json['current_status'] as String? ?? json['status'] as String? ?? 'active',
       assignedZone: json['operating_city'] as String? ?? json['assigned_zone'] as String? ?? json['assignedZone'] as String? ?? 'Wuse 2 & Central',
+      distributionCenterId: dcId,
+      coveredLgas: lgas,
       totalAssignedOrders: json['total_assigned_orders'] as int? ?? json['totalAssignedOrders'] as int? ?? 0,
       completedOrders: json['completed_orders'] as int? ?? json['completedOrders'] as int? ?? 0,
       routeProgressPercent: (json['route_progress_percent'] as num?)?.toDouble() ?? (json['routeProgressPercent'] as num?)?.toDouble() ?? 0.0,
@@ -216,6 +252,8 @@ class DCFleetDriver {
       'vehicle_type': vehicleType,
       'current_status': status,
       'operating_city': assignedZone,
+      'distribution_center_id': distributionCenterId,
+      'covered_lgas': coveredLgas,
       'total_assigned_orders': totalAssignedOrders,
       'completed_orders': completedOrders,
       'route_progress_percent': routeProgressPercent,

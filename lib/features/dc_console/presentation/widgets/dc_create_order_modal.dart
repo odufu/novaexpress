@@ -2,8 +2,10 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../../core/constants/nigeria_locations.dart';
 import '../../../../core/helpers/formatters.dart';
+import '../../../../core/services/location_lookup_service.dart';
+import '../../../orders/domain/entities/order.dart';
+import '../../../orders/domain/services/order_routing_service.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
 import '../../../stock/presentation/providers/stock_provider.dart';
 import '../../domain/entities/product_package.dart';
@@ -14,6 +16,7 @@ import 'dc_csv_order_import_modal.dart';
 class DCCreateOrderDraftState {
   final String selectedState;
   final String selectedCity;
+  final String selectedLga;
   final String? selectedProductId;
   final String selectedProductName;
   final ProductPackage? selectedPackage;
@@ -33,8 +36,9 @@ class DCCreateOrderDraftState {
   final bool isSubmitting;
 
   const DCCreateOrderDraftState({
-    this.selectedState = 'FCT - Abuja',
-    this.selectedCity = 'Wuse 2',
+    this.selectedState = 'Federal Capital Territory',
+    this.selectedCity = 'Abuja Municipal (AMAC)',
+    this.selectedLga = 'Abuja Municipal (AMAC)',
     this.selectedProductId,
     this.selectedProductName = 'Grazer Tea',
     this.selectedPackage,
@@ -64,6 +68,7 @@ class DCCreateOrderDraftState {
   DCCreateOrderDraftState copyWith({
     String? selectedState,
     String? selectedCity,
+    String? selectedLga,
     String? Function()? selectedProductId,
     String? selectedProductName,
     ProductPackage? Function()? selectedPackage,
@@ -85,6 +90,7 @@ class DCCreateOrderDraftState {
     return DCCreateOrderDraftState(
       selectedState: selectedState ?? this.selectedState,
       selectedCity: selectedCity ?? this.selectedCity,
+      selectedLga: selectedLga ?? this.selectedLga,
       selectedProductId: selectedProductId != null ? selectedProductId() : this.selectedProductId,
       selectedProductName: selectedProductName ?? this.selectedProductName,
       selectedPackage: selectedPackage != null ? selectedPackage() : this.selectedPackage,
@@ -109,8 +115,9 @@ class DCCreateOrderDraftState {
 class DCCreateOrderDraftNotifier extends StateNotifier<DCCreateOrderDraftState> {
   DCCreateOrderDraftNotifier() : super(const DCCreateOrderDraftState());
 
-  void setLocation(String stateVal, String cityVal) => state = state.copyWith(selectedState: stateVal, selectedCity: cityVal);
-  void setCity(String cityVal) => state = state.copyWith(selectedCity: cityVal);
+  void setLocation(String stateVal, String lgaVal) => state = state.copyWith(selectedState: stateVal, selectedLga: lgaVal, selectedCity: lgaVal);
+  void setCity(String cityVal) => state = state.copyWith(selectedCity: cityVal, selectedLga: cityVal);
+  void setLga(String lgaVal) => state = state.copyWith(selectedLga: lgaVal, selectedCity: lgaVal);
   void setUnitPrice(double price) => state = state.copyWith(
     unitPrice: price,
     selectedPackage: state.selectedPackage != null
@@ -269,18 +276,72 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
             ? _productNameController.text.trim()
             : draft.selectedProductName);
 
+    final stockAllocations = ref.read(stockProvider).riderAllocations;
+    final dcs = dcState.distributionCenters.isNotEmpty ? dcState.distributionCenters : defaultDistributionCenters;
+    final drivers = dcState.drivers;
+
+    final provisionalOrder = OrderEntity(
+      id: 'ord-${DateTime.now().millisecondsSinceEpoch}',
+      orderNumber: orderNumber,
+      customerName: _nameController.text.trim(),
+      customerPhone: _phoneController.text.trim(),
+      customerAltPhone: _altPhoneController.text.trim().isNotEmpty ? _altPhoneController.text.trim() : null,
+      deliveryState: draft.selectedState,
+      deliveryCity: draft.selectedCity,
+      deliveryAddress: _addressController.text.trim(),
+      landmark: _landmarkController.text.trim().isNotEmpty ? _landmarkController.text.trim() : null,
+      lga: draft.selectedLga,
+      productName: fullProductName,
+      productSku: draft.selectedProductId ?? pkg?.productId,
+      quantity: totalUnits,
+      paidQuantity: paidUnits,
+      freeQuantity: freeUnits,
+      basePrice: basePrice,
+      upsellAmount: draft.upsellAmount,
+      totalAmount: draft.totalAmount,
+      paymentType: draft.paymentType,
+      paymentStatus: draft.paymentType == 'prepaid' ? 'paid' : 'pending',
+      fulfillmentType: 'distributed_inventory',
+      clientName: draft.clientName,
+      clientCompany: draft.clientCompany,
+      clientPhone: draft.clientPhone,
+      clientEmail: draft.clientEmail,
+      packageDealId: draft.selectedPackage?.id,
+      packageDealName: draft.selectedPackage?.packageName,
+      clientDeliveryFee: 5000.0,
+      agentEntitlement: 2500.0,
+      deliveryNotes: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
+      status: 'pending',
+      createdAt: DateTime.now(),
+    );
+
+    // Run the intelligent stock-aware routing engine
+    final routingResult = OrderRoutingService.routeOrder(
+      order: provisionalOrder,
+      distributionCenters: dcs,
+      drivers: drivers,
+      stockAllocations: stockAllocations,
+    );
+
+    final assignedDriver = draft.assignImmediately && draft.selectedRiderId != null
+        ? drivers.firstWhere((d) => d.id == draft.selectedRiderId, orElse: () => routingResult.driver!)
+        : routingResult.driver;
+
+    final assignedDcId = routingResult.distributionCenter?.id ?? dcState.activeHubId;
+
     final orderPayload = <String, dynamic>{
-      'id': 'ord-${DateTime.now().millisecondsSinceEpoch}',
+      'id': provisionalOrder.id,
       'order_number': orderNumber,
-      'product_id': draft.selectedProductId ?? pkg?.productId,
-      'customer_name': _nameController.text.trim(),
-      'customer_phone': _phoneController.text.trim(),
-      'customer_alt_phone': _altPhoneController.text.trim().isNotEmpty ? _altPhoneController.text.trim() : null,
-      'delivery_state': draft.selectedState,
-      'delivery_city': draft.selectedCity,
-      'delivery_address': _addressController.text.trim(),
-      'landmark': _landmarkController.text.trim().isNotEmpty ? _landmarkController.text.trim() : null,
-      'product_name': fullProductName,
+      'product_id': provisionalOrder.productSku,
+      'customer_name': provisionalOrder.customerName,
+      'customer_phone': provisionalOrder.customerPhone,
+      'customer_alt_phone': provisionalOrder.customerAltPhone,
+      'delivery_state': provisionalOrder.deliveryState,
+      'delivery_city': provisionalOrder.deliveryCity,
+      'delivery_address': provisionalOrder.deliveryAddress,
+      'landmark': provisionalOrder.landmark,
+      'lga': provisionalOrder.lga,
+      'product_name': provisionalOrder.productName,
       'quantity': totalUnits,
       'paid_quantity': paidUnits,
       'free_quantity': freeUnits,
@@ -288,7 +349,7 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
       'upsell_amount': draft.upsellAmount,
       'total_amount': draft.totalAmount,
       'payment_type': draft.paymentType,
-      'payment_status': draft.paymentType == 'prepaid' ? 'paid' : 'pending',
+      'payment_status': provisionalOrder.paymentStatus,
       'fulfillment_type': 'distributed_inventory',
       'client_id': draft.clientId,
       'client_name': draft.clientName,
@@ -298,14 +359,15 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
       'package_deal_id': draft.selectedPackage?.id,
       'package_deal_name': draft.selectedPackage?.packageName,
       'client_delivery_fee': 5000.0,
-      'agent_entitlement': 2500.0,
+      'agent_entitlement': assignedDriver != null && assignedDriver.commissionRate > 0 ? assignedDriver.commissionRate : 2500.0,
       'delivery_notes': _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
-      'status': draft.assignImmediately && draft.selectedRiderId != null ? 'assigned' : 'unassigned',
+      'status': assignedDriver != null ? 'assigned' : 'pending_dispatch',
       'financial_settlement_status': draft.paymentType == 'prepaid' ? 'direct_transfer_settled' : 'pending_remittance',
-      'distribution_center_id': dcState.activeHubId,
-      'delivery_agent_id': draft.assignImmediately ? draft.selectedRiderId : null,
-      'delivery_agent_name': draft.assignImmediately ? draft.selectedRiderName : null,
-      'delivery_agent_code': draft.assignImmediately ? draft.selectedRiderCode : null,
+      'distribution_center_id': assignedDcId,
+      'delivery_agent_id': assignedDriver?.id,
+      'delivery_agent_name': assignedDriver?.name,
+      'delivery_agent_code': assignedDriver?.driverCode,
+      'delivery_agent_phone': assignedDriver?.phone,
       'created_at': DateTime.now().toIso8601String(),
     };
 
@@ -324,7 +386,7 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Order $orderNumber created successfully and logged in database!',
+                    'Order $orderNumber created! ${routingResult.dispatchDiagnosis}',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -573,128 +635,137 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                       ],
                       const SizedBox(height: 12),
 
-                      // Responsive State & Zone Pickers (All 36 Nigerian States + FCT)
-                      if (isMobile) ...[
-                        DropdownButtonFormField<String>(
-                          value: draft.selectedState,
-                          isExpanded: true,
-                          style: GoogleFonts.inter(fontSize: 13.5, color: isDark ? Colors.white : Colors.black87),
-                          dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-                          decoration: _buildInputDecoration(
-                            label: 'Delivery State (36 States + FCT)',
-                            hint: 'Select State',
-                            icon: Icons.map_rounded,
-                            isDark: isDark,
-                          ),
-                          items: NigeriaLocations.states.map((s) {
-                            return DropdownMenuItem(
-                              value: s,
-                              child: Text(s, overflow: TextOverflow.ellipsis),
-                            );
-                          }).toList(),
-                          onChanged: (v) {
-                            if (v != null) {
-                              final newCities = NigeriaLocations.getCitiesForState(v);
-                              ref.read(dcCreateOrderDraftProvider.notifier).setLocation(
-                                    v,
-                                    newCities.isNotEmpty ? newCities.first : 'Central',
-                                  );
-                            }
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                        DropdownButtonFormField<String>(
-                          value: NigeriaLocations.getCitiesForState(draft.selectedState).contains(draft.selectedCity)
-                              ? draft.selectedCity
-                              : (NigeriaLocations.getCitiesForState(draft.selectedState).isNotEmpty
-                                  ? NigeriaLocations.getCitiesForState(draft.selectedState).first
-                                  : null),
-                          isExpanded: true,
-                          style: GoogleFonts.inter(fontSize: 13.5, color: isDark ? Colors.white : Colors.black87),
-                          dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-                          decoration: _buildInputDecoration(
-                            label: 'Delivery Zone / LGA / City',
-                            hint: 'Select Zone',
-                            icon: Icons.location_city_rounded,
-                            isDark: isDark,
-                          ),
-                          items: NigeriaLocations.getCitiesForState(draft.selectedState).map((z) {
-                            return DropdownMenuItem(
-                              value: z,
-                              child: Text(z, overflow: TextOverflow.ellipsis),
-                            );
-                          }).toList(),
-                          onChanged: (v) {
-                            if (v != null) {
-                              ref.read(dcCreateOrderDraftProvider.notifier).setCity(v);
-                            }
-                          },
-                        ),
-                      ] else ...[
-                        Row(
-                          children: [
-                            Expanded(
-                              child: DropdownButtonFormField<String>(
-                                value: draft.selectedState,
-                                isExpanded: true,
-                                style: GoogleFonts.inter(fontSize: 13.5, color: isDark ? Colors.white : Colors.black87),
-                                dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-                                decoration: _buildInputDecoration(
-                                  label: 'Delivery State (36 States + FCT)',
-                                  hint: 'Select State',
-                                  icon: Icons.map_rounded,
-                                  isDark: isDark,
+                      // Responsive State & LGA Pickers (All 36 Nigerian States + FCT via LocationLookupService)
+                      Builder(
+                        builder: (context) {
+                          final allStates = LocationLookupService.getAllStates();
+                          final currentState = allStates.contains(draft.selectedState)
+                              ? draft.selectedState
+                              : LocationLookupService.normalizeStateName(draft.selectedState);
+                          final stateLgas = LocationLookupService.getLgasForState(currentState);
+                          final currentLga = stateLgas.contains(draft.selectedLga)
+                              ? draft.selectedLga
+                              : (stateLgas.isNotEmpty ? stateLgas.first : 'Central');
+
+                          if (isMobile) {
+                            return Column(
+                              children: [
+                                DropdownButtonFormField<String>(
+                                  value: allStates.contains(currentState) ? currentState : allStates.first,
+                                  isExpanded: true,
+                                  style: GoogleFonts.inter(fontSize: 13.5, color: isDark ? Colors.white : Colors.black87),
+                                  dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                                  decoration: _buildInputDecoration(
+                                    label: 'Delivery State (36 States + FCT) *',
+                                    hint: 'Select State',
+                                    icon: Icons.map_rounded,
+                                    isDark: isDark,
+                                  ),
+                                  items: allStates.map((s) {
+                                    return DropdownMenuItem(
+                                      value: s,
+                                      child: Text(s, overflow: TextOverflow.ellipsis),
+                                    );
+                                  }).toList(),
+                                  onChanged: (v) {
+                                    if (v != null) {
+                                      final newLgas = LocationLookupService.getLgasForState(v);
+                                      ref.read(dcCreateOrderDraftProvider.notifier).setLocation(
+                                            v,
+                                            newLgas.isNotEmpty ? newLgas.first : 'Central',
+                                          );
+                                    }
+                                  },
                                 ),
-                                items: NigeriaLocations.states.map((s) {
-                                  return DropdownMenuItem(
-                                    value: s,
-                                    child: Text(s, overflow: TextOverflow.ellipsis),
-                                  );
-                                }).toList(),
-                                onChanged: (v) {
-                                  if (v != null) {
-                                    final newCities = NigeriaLocations.getCitiesForState(v);
-                                    ref.read(dcCreateOrderDraftProvider.notifier).setLocation(
-                                          v,
-                                          newCities.isNotEmpty ? newCities.first : 'Central',
-                                        );
-                                  }
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: DropdownButtonFormField<String>(
-                                value: NigeriaLocations.getCitiesForState(draft.selectedState).contains(draft.selectedCity)
-                                    ? draft.selectedCity
-                                    : (NigeriaLocations.getCitiesForState(draft.selectedState).isNotEmpty
-                                        ? NigeriaLocations.getCitiesForState(draft.selectedState).first
-                                        : null),
-                                isExpanded: true,
-                                style: GoogleFonts.inter(fontSize: 13.5, color: isDark ? Colors.white : Colors.black87),
-                                dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-                                decoration: _buildInputDecoration(
-                                  label: 'Delivery Zone / LGA / City',
-                                  hint: 'Select Zone',
-                                  icon: Icons.location_city_rounded,
-                                  isDark: isDark,
+                                const SizedBox(height: 12),
+                                DropdownButtonFormField<String>(
+                                  value: currentLga,
+                                  isExpanded: true,
+                                  style: GoogleFonts.inter(fontSize: 13.5, color: isDark ? Colors.white : Colors.black87),
+                                  dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                                  decoration: _buildInputDecoration(
+                                    label: 'Delivery LGA / Coverage Area *',
+                                    hint: 'Select LGA',
+                                    icon: Icons.location_city_rounded,
+                                    isDark: isDark,
+                                  ),
+                                  items: stateLgas.map((z) {
+                                    return DropdownMenuItem(
+                                      value: z,
+                                      child: Text(z, overflow: TextOverflow.ellipsis),
+                                    );
+                                  }).toList(),
+                                  onChanged: (v) {
+                                    if (v != null) {
+                                      ref.read(dcCreateOrderDraftProvider.notifier).setLga(v);
+                                    }
+                                  },
                                 ),
-                                items: NigeriaLocations.getCitiesForState(draft.selectedState).map((z) {
-                                  return DropdownMenuItem(
-                                    value: z,
-                                    child: Text(z, overflow: TextOverflow.ellipsis),
-                                  );
-                                }).toList(),
-                                onChanged: (v) {
-                                  if (v != null) {
-                                    ref.read(dcCreateOrderDraftProvider.notifier).setCity(v);
-                                  }
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                              ],
+                            );
+                          } else {
+                            return Row(
+                              children: [
+                                Expanded(
+                                  child: DropdownButtonFormField<String>(
+                                    value: allStates.contains(currentState) ? currentState : allStates.first,
+                                    isExpanded: true,
+                                    style: GoogleFonts.inter(fontSize: 13.5, color: isDark ? Colors.white : Colors.black87),
+                                    dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                                    decoration: _buildInputDecoration(
+                                      label: 'Delivery State (36 States + FCT) *',
+                                      hint: 'Select State',
+                                      icon: Icons.map_rounded,
+                                      isDark: isDark,
+                                    ),
+                                    items: allStates.map((s) {
+                                      return DropdownMenuItem(
+                                        value: s,
+                                        child: Text(s, overflow: TextOverflow.ellipsis),
+                                      );
+                                    }).toList(),
+                                    onChanged: (v) {
+                                      if (v != null) {
+                                        final newLgas = LocationLookupService.getLgasForState(v);
+                                        ref.read(dcCreateOrderDraftProvider.notifier).setLocation(
+                                              v,
+                                              newLgas.isNotEmpty ? newLgas.first : 'Central',
+                                            );
+                                      }
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: DropdownButtonFormField<String>(
+                                    value: currentLga,
+                                    isExpanded: true,
+                                    style: GoogleFonts.inter(fontSize: 13.5, color: isDark ? Colors.white : Colors.black87),
+                                    dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                                    decoration: _buildInputDecoration(
+                                      label: 'Delivery LGA / Coverage Area *',
+                                      hint: 'Select LGA',
+                                      icon: Icons.location_city_rounded,
+                                      isDark: isDark,
+                                    ),
+                                    items: stateLgas.map((z) {
+                                      return DropdownMenuItem(
+                                        value: z,
+                                        child: Text(z, overflow: TextOverflow.ellipsis),
+                                      );
+                                    }).toList(),
+                                    onChanged: (v) {
+                                      if (v != null) {
+                                        ref.read(dcCreateOrderDraftProvider.notifier).setLga(v);
+                                      }
+                                    },
+                                  ),
+                                ),
+                              ],
+                            );
+                          }
+                        },
+                      ),
                       const SizedBox(height: 12),
 
                       TextFormField(
@@ -1257,12 +1328,104 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                         title: Text('Assign immediately to a Rider', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold)),
                         subtitle: Text(
                           draft.assignImmediately
-                              ? 'Order routes directly to selected rider terminal'
-                              : 'Order enters DC Unassigned Pool for queue dispatching',
+                              ? 'Manual override: Order routes directly to selected rider terminal'
+                              : 'Intelligent Auto-Routing: Matches DC, LGA Handler, and Vehicle Custody Stock',
                           style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
                         ),
                         activeColor: const Color(0xFF2563EB),
                       ),
+
+                      if (!draft.assignImmediately) ...[
+                        Builder(
+                          builder: (context) {
+                            final provOrder = OrderEntity(
+                              id: 'ord-provisional',
+                              orderNumber: 'TRK-PREVIEW',
+                              customerName: _nameController.text.trim(),
+                              customerPhone: _phoneController.text.trim(),
+                              deliveryState: draft.selectedState,
+                              deliveryCity: draft.selectedCity,
+                              deliveryAddress: _addressController.text.trim(),
+                              lga: draft.selectedLga,
+                              productName: draft.selectedProductName,
+                              productSku: draft.selectedProductId,
+                              quantity: draft.quantity,
+                              paidQuantity: draft.quantity,
+                              basePrice: draft.unitPrice * draft.quantity,
+                              upsellAmount: 0.0,
+                              totalAmount: draft.totalAmount,
+                              paymentType: draft.paymentType,
+                              paymentStatus: 'pending',
+                              fulfillmentType: 'distributed_inventory',
+                              status: 'pending',
+                              createdAt: DateTime.now(),
+                            );
+
+                            final routePreview = OrderRoutingService.routeOrder(
+                              order: provOrder,
+                              distributionCenters: dcState.distributionCenters.isNotEmpty ? dcState.distributionCenters : defaultDistributionCenters,
+                              drivers: dcState.drivers,
+                              stockAllocations: ref.watch(stockProvider).riderAllocations,
+                            );
+
+                            final isAutoRider = routePreview.isAssignedToRider;
+                            final isAutoDc = routePreview.isRoutedToDc;
+
+                            final badgeBg = isAutoRider
+                                ? const Color(0xFF10B981).withValues(alpha: 0.12)
+                                : (isAutoDc ? const Color(0xFFF59E0B).withValues(alpha: 0.12) : const Color(0xFFEF4444).withValues(alpha: 0.12));
+                            final badgeBorder = isAutoRider
+                                ? const Color(0xFF10B981)
+                                : (isAutoDc ? const Color(0xFFF59E0B) : const Color(0xFFEF4444));
+                            final badgeIcon = isAutoRider
+                                ? Icons.auto_mode_rounded
+                                : (isAutoDc ? Icons.apartment_rounded : Icons.warning_amber_rounded);
+
+                            return Container(
+                              margin: const EdgeInsets.only(top: 8),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: badgeBg,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: badgeBorder.withValues(alpha: 0.4)),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(badgeIcon, size: 18, color: badgeBorder),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          isAutoRider
+                                              ? 'Automated Dispatch Match (Active)'
+                                              : (isAutoDc ? 'Automated DC Queue Routing (No Rider with Stock)' : 'Routing Notice'),
+                                          style: GoogleFonts.inter(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: badgeBorder,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          routePreview.dispatchDiagnosis,
+                                          style: GoogleFonts.inter(
+                                            fontSize: 11.5,
+                                            color: isDark ? Colors.white70 : const Color(0xFF334155),
+                                            height: 1.3,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ],
 
                       if (draft.assignImmediately) ...[
                         const SizedBox(height: 10),

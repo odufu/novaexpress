@@ -555,6 +555,28 @@ class _DCAssignOrderModalState extends ConsumerState<DCAssignOrderModal> {
                                       '📍 ${driver.assignedZone}',
                                       style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
                                     ),
+                                    if (widget.order.lga != null && widget.order.lga!.isNotEmpty)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                        decoration: BoxDecoration(
+                                          color: driver.coversLga(widget.order.lga!)
+                                              ? const Color(0xFF2563EB).withValues(alpha: 0.12)
+                                              : (isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          driver.coversLga(widget.order.lga!)
+                                              ? '✓ Covers LGA: ${widget.order.lga}'
+                                              : 'Other Area',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.bold,
+                                            color: driver.coversLga(widget.order.lga!)
+                                                ? const Color(0xFF2563EB)
+                                                : const Color(0xFF94A3B8),
+                                          ),
+                                        ),
+                                      ),
                                     Text(
                                       '📦 ${driver.totalAssignedOrders} Active Orders',
                                       style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),

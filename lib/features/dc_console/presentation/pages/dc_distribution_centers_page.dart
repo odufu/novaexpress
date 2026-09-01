@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../../core/services/location_lookup_service.dart';
 import '../../../../core/widgets/app_loading_overlay.dart';
 import '../../domain/entities/distribution_center.dart';
 import '../providers/dc_console_provider.dart';
@@ -15,24 +16,7 @@ class DCDistributionCentersPage extends ConsumerStatefulWidget {
 class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCentersPage> {
   final TextEditingController _searchController = TextEditingController();
 
-  static const List<String> _nigerianStates = [
-    'All States',
-    'Abuja FCT',
-    'Lagos State',
-    'Rivers State',
-    'Kano State',
-    'Oyo State',
-    'Kaduna State',
-    'Enugu State',
-    'Delta State',
-    'Edo State',
-    'Ogun State',
-    'Anambra State',
-    'Akwa Ibom State',
-    'Plateau State',
-    'Cross River State',
-    'Imo State',
-  ];
+  List<String> get _nigerianStates => ['All States', ...LocationLookupService.getAllStates()];
 
   @override
   void dispose() {
@@ -830,317 +814,453 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
     final emailCtrl = TextEditingController(text: existingDc?.contactEmail ?? '');
     final managerCtrl = TextEditingController(text: existingDc?.managerName ?? '');
     final capacityCtrl = TextEditingController(text: existingDc != null ? existingDc.storageCapacityUnits.toString() : '35000');
-    final zonesCtrl = TextEditingController(text: existingDc?.operatingZones.join(', ') ?? 'Wuse I, Wuse II, Maitama, Garki');
 
-    String selectedState = existingDc?.state ?? 'Abuja FCT';
+    String selectedState = existingDc?.state ?? 'Federal Capital Territory';
+    if (!LocationLookupService.getAllStates().contains(selectedState)) {
+      selectedState = LocationLookupService.normalizeStateName(selectedState);
+    }
     bool isHub = existingDc?.isHub ?? false;
     bool isActive = existingDc?.isActive ?? true;
+
+    List<String> availableLgas = LocationLookupService.getLgasForState(selectedState);
+    List<String> selectedLgas = existingDc != null && existingDc.operatingZones.isNotEmpty
+        ? List<String>.from(existingDc.operatingZones)
+        : (availableLgas.isNotEmpty ? List<String>.from(availableLgas) : ['Abuja Municipal (AMAC)']);
+
+    String lgaSearchQuery = '';
 
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (dialogCtx) => StatefulBuilder(
-        builder: (ctx, setState) => AlertDialog(
-          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2563EB).withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.apartment_rounded, color: Color(0xFF2563EB), size: 20),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                isEditing ? 'Edit Distribution Center' : 'Register New Distribution Center',
-                style: GoogleFonts.inter(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : const Color(0xFF0F172A),
-                ),
-              ),
-            ],
-          ),
-          content: SizedBox(
-            width: 520,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextField(
-                    controller: nameCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Distribution Center Name *',
-                      hintText: 'e.g. Lekki Regional Fulfillment Hub',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: codeCtrl,
-                          textCapitalization: TextCapitalization.characters,
-                          decoration: const InputDecoration(
-                            labelText: 'Unique DC Code *',
-                            hintText: 'e.g. DC-LOS-03',
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
-                          value: selectedState,
-                          decoration: const InputDecoration(labelText: 'State / Territory *'),
-                          dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-                          items: _nigerianStates.where((s) => s != 'All States').map((state) {
-                            return DropdownMenuItem<String>(
-                              value: state,
-                              child: Text(state, style: const TextStyle(fontSize: 13)),
-                            );
-                          }).toList(),
-                          onChanged: (val) {
-                            if (val != null) setState(() => selectedState = val);
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: cityCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'City / Municipality *',
-                            hintText: 'e.g. Lekki',
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextField(
-                          controller: capacityCtrl,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: 'Storage Capacity (Units)',
-                            hintText: 'e.g. 50000',
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: addressCtrl,
-                    maxLines: 2,
-                    decoration: const InputDecoration(
-                      labelText: 'Full Physical Warehouse Address *',
-                      hintText: 'Plot number, street, industrial layout, nearest landmark',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: managerCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'Station Manager Name',
-                            hintText: 'e.g. Folake Adebayo',
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextField(
-                          controller: phoneCtrl,
-                          keyboardType: TextInputType.phone,
-                          decoration: const InputDecoration(
-                            labelText: 'Contact Phone Number',
-                            hintText: '+234 812 345 6789',
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: emailCtrl,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(
-                      labelText: 'Official Hub Email Address',
-                      hintText: 'lekki.dc@novaexpress.com',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: zonesCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Operating Coverage Delivery Zones (Comma Separated)',
-                      hintText: 'e.g. Lekki Phase 1, Ikoyi, Victoria Island, Ajah',
-                    ),
-                  ),
-                  const SizedBox(height: 14),
+        builder: (ctx, setState) {
+          final filteredLgas = lgaSearchQuery.trim().isEmpty
+              ? availableLgas
+              : availableLgas.where((l) => l.toLowerCase().contains(lgaSearchQuery.toLowerCase())).toList();
 
-                  // Hub Classification Checkbox
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(10),
+          return AlertDialog(
+            backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2563EB).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.apartment_rounded, color: Color(0xFF2563EB), size: 20),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  isEditing ? 'Edit Distribution Center' : 'Register New Distribution Center',
+                  style: GoogleFonts.inter(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 580,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: nameCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Distribution Center Name *',
+                        hintText: 'e.g. Lekki Regional Fulfillment Hub',
+                      ),
                     ),
-                    child: Row(
+                    const SizedBox(height: 12),
+                    Row(
                       children: [
-                        Checkbox(
-                          value: isHub,
-                          activeColor: const Color(0xFFF37021),
-                          onChanged: (val) => setState(() => isHub = val ?? false),
-                        ),
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Designate as Primary Regional Hub',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
-                                ),
-                              ),
-                              Text(
-                                'Hubs manage inter-city waybills and fulfill inventory replenishment to satellite depots.',
-                                style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
-                              ),
-                            ],
+                          child: TextField(
+                            controller: codeCtrl,
+                            textCapitalization: TextCapitalization.characters,
+                            decoration: const InputDecoration(
+                              labelText: 'Unique DC Code *',
+                              hintText: 'e.g. DC-LOS-03',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            value: LocationLookupService.getAllStates().contains(selectedState)
+                                ? selectedState
+                                : LocationLookupService.getAllStates().first,
+                            decoration: const InputDecoration(labelText: 'Operating State (Nigeria) *'),
+                            dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                            items: LocationLookupService.getAllStates().map((state) {
+                              return DropdownMenuItem<String>(
+                                value: state,
+                                child: Text(state, style: const TextStyle(fontSize: 13), overflow: TextOverflow.ellipsis),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              if (val != null) {
+                                setState(() {
+                                  selectedState = val;
+                                  availableLgas = LocationLookupService.getLgasForState(val);
+                                  selectedLgas = List.from(availableLgas);
+                                  cityCtrl.text = availableLgas.isNotEmpty ? availableLgas.first : val;
+                                });
+                              }
+                            },
                           ),
                         ),
                       ],
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: cityCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'City / Municipality *',
+                              hintText: 'e.g. Lekki',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: capacityCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'Storage Capacity (Units)',
+                              hintText: 'e.g. 50000',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: addressCtrl,
+                      maxLines: 2,
+                      decoration: const InputDecoration(
+                        labelText: 'Full Physical Warehouse Address *',
+                        hintText: 'Plot number, street, industrial layout, nearest landmark',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: managerCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Station Manager Name',
+                              hintText: 'e.g. Folake Adebayo',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: phoneCtrl,
+                            keyboardType: TextInputType.phone,
+                            decoration: const InputDecoration(
+                              labelText: 'Contact Phone Number',
+                              hintText: '+234 812 345 6789',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: emailCtrl,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: const InputDecoration(
+                        labelText: 'Official Hub Email Address',
+                        hintText: 'hub.contact@novaexpress.com',
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // LGA Coverage Selector Box
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.map_rounded, size: 16, color: Color(0xFF2563EB)),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'LGAs of Delivery Coverage *',
+                                        style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${selectedLgas.length} of ${availableLgas.length} LGAs covered in $selectedState',
+                                    style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                                  ),
+                                ],
+                              ),
+                              Row(
+                                children: [
+                                  TextButton(
+                                    onPressed: () {
+                                      setState(() => selectedLgas = List.from(availableLgas));
+                                    },
+                                    style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
+                                    child: const Text('Select All', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                  ),
+                                  TextButton(
+                                    onPressed: () {
+                                      setState(() => selectedLgas.clear());
+                                    },
+                                    style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
+                                    child: const Text('Clear', style: TextStyle(fontSize: 11, color: Color(0xFFEF4444))),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+
+                          if (availableLgas.length > 8) ...[
+                            Container(
+                              height: 34,
+                              margin: const EdgeInsets.only(bottom: 8),
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                              ),
+                              child: TextField(
+                                onChanged: (val) => setState(() => lgaSearchQuery = val),
+                                style: const TextStyle(fontSize: 11.5),
+                                decoration: const InputDecoration(
+                                  hintText: 'Filter LGAs...',
+                                  hintStyle: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                                  prefixIcon: Icon(Icons.search_rounded, size: 15, color: Color(0xFF94A3B8)),
+                                  border: InputBorder.none,
+                                  contentPadding: EdgeInsets.symmetric(vertical: 8),
+                                ),
+                              ),
+                            ),
+                          ],
+
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxHeight: 140),
+                            child: SingleChildScrollView(
+                              child: Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: filteredLgas.map((lga) {
+                                  final isSelected = selectedLgas.contains(lga);
+                                  return FilterChip(
+                                    label: Text(lga, style: TextStyle(fontSize: 11.5, color: isSelected ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF334155)))),
+                                    selected: isSelected,
+                                    selectedColor: const Color(0xFF2563EB),
+                                    checkmarkColor: Colors.white,
+                                    backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                    side: BorderSide(color: isSelected ? const Color(0xFF2563EB) : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))),
+                                    onSelected: (selected) {
+                                      setState(() {
+                                        if (selected) {
+                                          selectedLgas.add(lga);
+                                        } else {
+                                          selectedLgas.remove(lga);
+                                        }
+                                      });
+                                    },
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Hub Classification Checkbox
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          Checkbox(
+                            value: isHub,
+                            activeColor: const Color(0xFFF37021),
+                            onChanged: (val) => setState(() => isHub = val ?? false),
+                          ),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Designate as Primary Regional Hub',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                  ),
+                                ),
+                                Text(
+                                  'Hubs manage inter-city waybills and fulfill inventory replenishment to satellite depots.',
+                                  style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final name = nameCtrl.text.trim();
-                final code = codeCtrl.text.trim().toUpperCase();
-                final city = cityCtrl.text.trim();
-                final address = addressCtrl.text.trim();
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  final name = nameCtrl.text.trim();
+                  final code = codeCtrl.text.trim().toUpperCase();
+                  final city = cityCtrl.text.trim();
+                  final address = addressCtrl.text.trim();
 
-                if (name.isEmpty || code.isEmpty || city.isEmpty || address.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('⚠️ DC Name, Code, City, and Address are required fields.'),
-                      backgroundColor: Color(0xFFEF4444),
-                    ),
-                  );
-                  return;
-                }
+                  if (name.isEmpty || code.isEmpty || city.isEmpty || address.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('⚠️ DC Name, Code, City, and Address are required fields.'),
+                        backgroundColor: Color(0xFFEF4444),
+                      ),
+                    );
+                    return;
+                  }
 
-                final capacity = int.tryParse(capacityCtrl.text.replaceAll(',', '')) ?? 25000;
-                final zones = zonesCtrl.text
-                    .split(',')
-                    .map((z) => z.trim())
-                    .where((z) => z.isNotEmpty)
-                    .toList();
+                  if (selectedLgas.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('⚠️ Please attach at least 1 LGA of coverage to this Distribution Center.'),
+                        backgroundColor: Color(0xFFEF4444),
+                      ),
+                    );
+                    return;
+                  }
 
-                try {
-                  final savedDc = await showAppLoadingDialog<DistributionCenter>(
-                    context: ctx,
-                    message: isEditing ? 'Updating Distribution Center...' : 'Registering Distribution Center...',
-                    subMessage: 'Syncing fulfillment network directory & live database...',
-                    isDark: isDark,
-                    task: () async {
-                      if (isEditing) {
-                        final updated = existingDc.copyWith(
-                          name: name,
-                          code: code,
-                          state: selectedState,
-                          city: city,
-                          address: address,
-                          contactPhone: phoneCtrl.text.trim(),
-                          contactEmail: emailCtrl.text.trim(),
-                          managerName: managerCtrl.text.trim(),
-                          isHub: isHub,
-                          isActive: isActive,
-                          storageCapacityUnits: capacity,
-                          operatingZones: zones.isNotEmpty ? zones : [city],
-                          updatedAt: DateTime.now(),
-                        );
-                        await ref.read(dcConsoleProvider.notifier).updateDistributionCenter(updated);
-                        return updated;
-                      } else {
-                        return await ref.read(dcConsoleProvider.notifier).createDistributionCenter(
-                              name: name,
-                              code: code,
-                              stateName: selectedState,
-                              city: city,
-                              address: address,
-                              contactPhone: phoneCtrl.text.trim(),
-                              contactEmail: emailCtrl.text.trim(),
-                              managerName: managerCtrl.text.trim(),
-                              isHub: isHub,
-                              operatingZones: zones,
-                              storageCapacityUnits: capacity,
-                            );
+                  final capacity = int.tryParse(capacityCtrl.text.replaceAll(',', '')) ?? 25000;
+                  final zones = List<String>.from(selectedLgas);
+
+                  try {
+                    final savedDc = await showAppLoadingDialog<DistributionCenter>(
+                      context: ctx,
+                      message: isEditing ? 'Updating Distribution Center...' : 'Registering Distribution Center...',
+                      subMessage: 'Syncing fulfillment network directory & live database...',
+                      isDark: isDark,
+                      task: () async {
+                        if (isEditing) {
+                          final updated = existingDc.copyWith(
+                            name: name,
+                            code: code,
+                            state: selectedState,
+                            city: city,
+                            address: address,
+                            contactPhone: phoneCtrl.text.trim(),
+                            contactEmail: emailCtrl.text.trim(),
+                            managerName: managerCtrl.text.trim(),
+                            isHub: isHub,
+                            isActive: isActive,
+                            storageCapacityUnits: capacity,
+                            operatingZones: zones,
+                            updatedAt: DateTime.now(),
+                          );
+                          await ref.read(dcConsoleProvider.notifier).updateDistributionCenter(updated);
+                          return updated;
+                        } else {
+                          return await ref.read(dcConsoleProvider.notifier).createDistributionCenter(
+                                name: name,
+                                code: code,
+                                stateName: selectedState,
+                                city: city,
+                                address: address,
+                                contactPhone: phoneCtrl.text.trim(),
+                                contactEmail: emailCtrl.text.trim(),
+                                managerName: managerCtrl.text.trim(),
+                                isHub: isHub,
+                                operatingZones: zones,
+                                storageCapacityUnits: capacity,
+                              );
+                        }
+                      },
+                    );
+
+                    if (savedDc != null) {
+                      if (ctx.mounted) {
+                        Navigator.of(ctx).pop();
                       }
-                    },
-                  );
-
-                  if (savedDc != null) {
-                    if (ctx.mounted) {
-                      Navigator.of(ctx).pop();
+                      if (context.mounted) {
+                        _showDCSuccessModal(
+                          context: context,
+                          isDark: isDark,
+                          dc: savedDc,
+                          isEditing: isEditing,
+                        );
+                      }
                     }
-                    if (context.mounted) {
-                      _showDCSuccessModal(
-                        context: context,
+                  } catch (e) {
+                    var reason = e.toString();
+                    if (reason.startsWith('Exception: ')) {
+                      reason = reason.substring(11);
+                    }
+                    if (reason.contains('SocketException') || reason.contains('Failed host lookup')) {
+                      reason = 'Network connection error: Unable to connect to live database. Please check your internet connection.';
+                    }
+
+                    if (ctx.mounted) {
+                      _showDCFailureModal(
+                        context: ctx,
                         isDark: isDark,
-                        dc: savedDc,
-                        isEditing: isEditing,
+                        reason: reason,
+                        dcName: name,
+                        code: code,
                       );
                     }
                   }
-                } catch (e) {
-                  var reason = e.toString();
-                  if (reason.startsWith('Exception: ')) {
-                    reason = reason.substring(11);
-                  }
-                  if (reason.contains('SocketException') || reason.contains('Failed host lookup')) {
-                    reason = 'Network connection error: Unable to connect to live database. Please check your internet connection.';
-                  }
-
-                  if (ctx.mounted) {
-                    _showDCFailureModal(
-                      context: ctx,
-                      isDark: isDark,
-                      reason: reason,
-                      dcName: name,
-                      code: code,
-                    );
-                  }
-                }
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
-              child: Text(
-                isEditing ? 'Save Changes' : 'Register DC Hub',
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
+                child: Text(
+                  isEditing ? 'Save Changes' : 'Register DC Hub',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -1369,130 +1489,175 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
   void _showZoneManagementModal(BuildContext context, DistributionCenter dc, bool isDark) {
     final zonesList = List<String>.from(dc.operatingZones);
     final zoneInputCtrl = TextEditingController();
+    final stateLgas = LocationLookupService.getLgasForState(dc.state);
 
     showDialog(
       context: context,
       builder: (dialogCtx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Row(
-            children: [
-              const Icon(Icons.map_rounded, color: Color(0xFF2563EB), size: 20),
-              const SizedBox(width: 8),
-              Text(
-                'Manage Delivery Zones (${dc.name})',
-                style: GoogleFonts.inter(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : const Color(0xFF0F172A),
-                ),
-              ),
-            ],
-          ),
-          content: SizedBox(
-            width: 480,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+        builder: (ctx, setDialogState) {
+          final unaddedLgas = stateLgas.where((lga) => !zonesList.contains(lga)).toList();
+
+          return AlertDialog(
+            backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
               children: [
-                Text(
-                  'Add or remove neighborhoods and delivery zones covered by this distribution hub:',
-                  style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
-                ),
-                const SizedBox(height: 14),
-
-                // Add Zone Input Field
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: zoneInputCtrl,
-                        decoration: const InputDecoration(
-                          hintText: 'Enter new zone name (e.g. Asokoro, Gwarinpa)...',
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        ),
-                        onSubmitted: (val) {
-                          final clean = val.trim();
-                          if (clean.isNotEmpty && !zonesList.contains(clean)) {
-                            setDialogState(() {
-                              zonesList.add(clean);
-                              zoneInputCtrl.clear();
-                            });
-                          }
-                        },
-                      ),
+                const Icon(Icons.map_rounded, color: Color(0xFF2563EB), size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Manage LGA Coverage (${dc.name})',
+                    style: GoogleFonts.inter(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
                     ),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
-                      onPressed: () {
-                        final clean = zoneInputCtrl.text.trim();
-                        if (clean.isNotEmpty && !zonesList.contains(clean)) {
-                          setDialogState(() {
-                            zonesList.add(clean);
-                            zoneInputCtrl.clear();
-                          });
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2563EB),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      ),
-                      child: const Text('+ Add', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // Active Zones Chips
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 220),
-                  child: SingleChildScrollView(
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: zonesList.map((z) {
-                        return Chip(
-                          label: Text(z, style: const TextStyle(fontSize: 12)),
-                          deleteIcon: const Icon(Icons.close, size: 14),
-                          onDeleted: () {
-                            setDialogState(() => zonesList.remove(z));
-                          },
-                          backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-                          side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
-                        );
-                      }).toList(),
-                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                await ref.read(dcConsoleProvider.notifier).updateOperatingZones(dc.id, zonesList);
-                if (ctx.mounted) {
-                  Navigator.of(ctx).pop();
-                }
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Updated ${zonesList.length} coverage zones for ${dc.name}'),
-                      backgroundColor: const Color(0xFF10B981),
+            content: SizedBox(
+              width: 520,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Select LGAs and operational delivery zones attached to this Distribution Hub in ${dc.state}:',
+                      style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
                     ),
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
-              child: const Text('Save Zones', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 14),
+
+                    // Add Custom Zone Input Field
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: zoneInputCtrl,
+                            decoration: const InputDecoration(
+                              hintText: 'Add custom neighborhood or LGA name...',
+                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            ),
+                            onSubmitted: (val) {
+                              final clean = val.trim();
+                              if (clean.isNotEmpty && !zonesList.contains(clean)) {
+                                setDialogState(() {
+                                  zonesList.add(clean);
+                                  zoneInputCtrl.clear();
+                                });
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: () {
+                            final clean = zoneInputCtrl.text.trim();
+                            if (clean.isNotEmpty && !zonesList.contains(clean)) {
+                              setDialogState(() {
+                                zonesList.add(clean);
+                                zoneInputCtrl.clear();
+                              });
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2563EB),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          ),
+                          child: const Text('+ Add', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Active Zones / Covered LGAs
+                    Text(
+                      'Active Covered LGAs (${zonesList.length})',
+                      style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                    ),
+                    const SizedBox(height: 6),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 140),
+                      child: SingleChildScrollView(
+                        child: zonesList.isEmpty
+                            ? Text('No LGAs attached. Please select at least 1 LGA.', style: TextStyle(fontSize: 11.5, color: Colors.orange.shade400))
+                            : Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: zonesList.map((z) {
+                                  return Chip(
+                                    label: Text(z, style: const TextStyle(fontSize: 11.5)),
+                                    deleteIcon: const Icon(Icons.close, size: 14),
+                                    onDeleted: () {
+                                      setDialogState(() => zonesList.remove(z));
+                                    },
+                                    backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                                    side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                                  );
+                                }).toList(),
+                              ),
+                      ),
+                    ),
+
+                    if (unaddedLgas.isNotEmpty) ...[
+                      const SizedBox(height: 14),
+                      Text(
+                        'Available LGAs in ${dc.state} (Tap to attach):',
+                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF64748B)),
+                      ),
+                      const SizedBox(height: 6),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 100),
+                        child: SingleChildScrollView(
+                          child: Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: unaddedLgas.map((lga) {
+                              return ActionChip(
+                                label: Text('+ $lga', style: const TextStyle(fontSize: 11)),
+                                backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                                side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                                onPressed: () {
+                                  setDialogState(() => zonesList.add(lga));
+                                },
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ),
-          ],
-        ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  await ref.read(dcConsoleProvider.notifier).updateOperatingZones(dc.id, zonesList);
+                  if (ctx.mounted) {
+                    Navigator.of(ctx).pop();
+                  }
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Updated ${zonesList.length} coverage zones for ${dc.name}'),
+                        backgroundColor: const Color(0xFF10B981),
+                      ),
+                    );
+                  }
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
+                child: const Text('Save Zones', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:novexps/core/services/location_lookup_service.dart';
 
 class DistributionCenter {
   final String id;
@@ -43,7 +44,32 @@ class DistributionCenter {
 
   bool get isPrimaryHub => isHub;
   String get fullLocation => '$city, $state';
+  List<String> get coveredLgas => operatingZones;
   String get displayCapacity => '${storageCapacityUnits.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')} Units';
+
+  bool coversLga(String rawLga) {
+    if (operatingZones.isEmpty) return true;
+    final target = rawLga.trim().toLowerCase();
+    if (target.isEmpty) return true;
+    return operatingZones.any((zone) {
+      final z = zone.trim().toLowerCase();
+      return z == target || target.contains(z) || z.contains(target);
+    });
+  }
+
+  bool coversLocation({required String stateName, required String lgaName}) {
+    // Canonical State normalization
+    final normSelf = LocationLookupService.normalizeStateName(state).trim().toLowerCase();
+    final normTarget = LocationLookupService.normalizeStateName(stateName).trim().toLowerCase();
+
+    final stateMatches = normSelf == normTarget ||
+        normSelf.contains(normTarget) ||
+        normTarget.contains(normSelf);
+
+    if (!stateMatches) return false;
+    if (lgaName.trim().isEmpty) return true;
+    return coversLga(lgaName);
+  }
 
   DistributionCenter copyWith({
     String? id,

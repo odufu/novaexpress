@@ -32,6 +32,8 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
+    - assets/
+    - assets/nigeria-state-and-lgas.json
     - assets/images/
     - assets/images/logo/
     - assets/images/products/

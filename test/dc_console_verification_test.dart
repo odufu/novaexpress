@@ -19,6 +19,7 @@ import 'package:novexps/features/orders/presentation/providers/orders_provider.d
 import 'package:novexps/features/stock/data/datasources/stock_remote_datasource.dart';
 import 'package:novexps/features/stock/data/models/stock_item_model.dart';
 import 'package:novexps/features/stock/data/repositories/stock_repository_impl.dart';
+import 'package:novexps/features/stock/domain/entities/rider_stock_allocation.dart';
 import 'package:novexps/features/stock/presentation/providers/stock_provider.dart';
 
 import 'package:novexps/features/finance/data/datasources/finance_remote_datasource.dart';
@@ -145,6 +146,8 @@ class _MockFinanceRemoteDS implements FinanceRemoteDataSource {
 class _MockStockRemoteDS implements StockRemoteDataSource {
   @override
   Future<List<StockItemModel>> getVehicleStockItems([String? agentId]) async => [];
+  @override
+  Future<List<RiderStockAllocation>> getRiderStockAllocations([String? riderId]) async => [];
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
@@ -291,8 +294,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(DCDashboardPage), findsOneWidget);
-      expect(find.text('Wuse Distribution Center'), findsOneWidget);
-      expect(find.text('DC-WUSE-01'), findsOneWidget);
+      expect(find.text('Wuse Central Distribution Hub'), findsOneWidget);
+      expect(find.text('DC-ABJ-01'), findsOneWidget);
       expect(find.text('Restock Picking Queue'), findsOneWidget);
       expect(find.text('In-Transit Orders'), findsOneWidget);
       expect(find.text('Cash in Fleet Custody'), findsOneWidget);
