@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import '../../../../core/constants/supabase_constants.dart';
@@ -190,6 +191,7 @@ class StockNotifier extends StateNotifier<StockState> {
         _ref = ref,
         super(const StockState(stockItems: [], riderAllocations: [])) {
     _initCache();
+    _subscribeToRealtimeStock();
     if (_ref != null) {
       _ref.listen<AuthState>(authProvider, (previous, next) {
         final nextAgentId = next.user?.deliveryAgentId ?? next.user?.id;
@@ -198,6 +200,43 @@ class StockNotifier extends StateNotifier<StockState> {
         }
       });
     }
+  }
+
+  RealtimeChannel? _stockRealtimeChannel;
+
+  void _subscribeToRealtimeStock() {
+    try {
+      final client = Supabase.instance.client;
+      _stockRealtimeChannel = client.channel('public:stock_channel')
+        ..onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'products',
+          callback: (payload) {
+            debugPrint('[STOCK_PROVIDER] ⚡ Realtime event on products (${payload.eventType}). Refreshing stock...');
+            fetchStockItems();
+          },
+        )
+        ..onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'stock_transfers',
+          callback: (payload) {
+            debugPrint('[STOCK_PROVIDER] ⚡ Realtime event on stock_transfers (${payload.eventType}). Refreshing custody...');
+            fetchStockItems();
+          },
+        )
+        ..subscribe();
+      debugPrint('[STOCK_PROVIDER] 📡 Realtime channel active for warehouse and vehicle stock.');
+    } catch (e) {
+      debugPrint('[STOCK_PROVIDER] ℹ️ Realtime subscription notice: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _stockRealtimeChannel?.unsubscribe();
+    super.dispose();
   }
 
   Future<void> _initCache() async {

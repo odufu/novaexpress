@@ -162,6 +162,8 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
     ];
   }
 
+  RealtimeChannel? _realtimeChannel;
+
   Future<void> _initCatalog() async {
     try {
       final cached = await _storageService.getCachedProductCatalog();
@@ -171,6 +173,33 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
     } catch (_) {}
 
     await reloadCatalog();
+    _subscribeToRealtimeProducts();
+  }
+
+  void _subscribeToRealtimeProducts() {
+    try {
+      final client = Supabase.instance.client;
+      _realtimeChannel = client.channel('public:products_catalog_channel')
+        ..onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'products',
+          callback: (payload) {
+            debugPrint('[CATALOG_PROVIDER] ⚡ Realtime change on products table (${payload.eventType}). Syncing...');
+            reloadCatalog();
+          },
+        )
+        ..subscribe();
+      debugPrint('[CATALOG_PROVIDER] 📡 Realtime channel active for product catalogue.');
+    } catch (e) {
+      debugPrint('[CATALOG_PROVIDER] ℹ️ Realtime subscription notice: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _realtimeChannel?.unsubscribe();
+    super.dispose();
   }
 
   /// Authoritatively fetches all active products from Supabase and decodes commercial packages
@@ -515,6 +544,46 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
     state = state.copyWith(products: updatedProductList);
     _persistCatalog();
     return updatedPkg;
+  }
+
+  /// Explicitly registers a new product and its default packages in the catalog
+  Future<CatalogProduct> registerNewProduct({
+    required String name,
+    required String sku,
+    required double baseUnitPrice,
+    String category = 'Health & Wellness',
+    String clientName = 'Novacare Limited',
+    List<ProductPackage>? packages,
+  }) async {
+    final cleanName = name.trim();
+    final cleanSku = sku.trim().toUpperCase();
+    final newId = 'prod-${DateTime.now().millisecondsSinceEpoch}';
+    final initialPackages = packages ??
+        buildDefaultPackagesForProduct(
+          productId: newId,
+          productName: cleanName,
+          productSku: cleanSku,
+          baseUnitPrice: baseUnitPrice,
+          clientName: clientName,
+        );
+
+    final newProduct = CatalogProduct(
+      id: newId,
+      name: cleanName,
+      sku: cleanSku,
+      clientName: clientName,
+      defaultUnitPrice: baseUnitPrice,
+      category: category,
+      packages: initialPackages,
+    );
+
+    final updated = [
+      ...state.products.where((p) => p.sku.toUpperCase() != cleanSku && p.name.toLowerCase() != cleanName.toLowerCase()),
+      newProduct
+    ];
+    state = state.copyWith(products: updated);
+    await _persistCatalog();
+    return newProduct;
   }
 }
 
