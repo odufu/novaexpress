@@ -1344,56 +1344,382 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                       final price = double.tryParse(priceCtrl.text.replaceAll(',', '')) ?? 0.0;
                       final qty = int.tryParse(initQtyCtrl.text) ?? 0;
                       final threshold = int.tryParse(lowThreshCtrl.text) ?? 3;
+                      final binTag = binCtrl.text.trim().isNotEmpty ? binCtrl.text.trim() : 'BIN-A1-01';
 
-                      final created = await ref.read(stockProvider.notifier).addNewProduct(
-                            name: name,
+                      try {
+                        final created = await showAppLoadingDialog<StockItemEntity>(
+                          context: ctx,
+                          message: 'Registering New Product...',
+                          subMessage: 'Syncing catalogue, SKU database & initial shelf inventory...',
+                          isDark: isDark,
+                          task: () async {
+                            // Check for duplicate SKU in existing stock catalogue
+                            final existingItem = ref.read(stockProvider).stockItems.where(
+                                  (i) => i.sku.trim().toLowerCase() == sku.toLowerCase(),
+                                ).firstOrNull;
+                            if (existingItem != null) {
+                              throw Exception("A product with SKU '$sku' already exists (${existingItem.name}). Please use a unique SKU code.");
+                            }
+
+                            final product = await ref.read(stockProvider.notifier).addNewProduct(
+                                  name: name,
+                                  sku: sku,
+                                  category: catCtrl.text.trim(),
+                                  price: price,
+                                  ownerName: clientCtrl.text.trim(),
+                                  initialQuantity: qty,
+                                  lowStockThreshold: threshold,
+                                  binLocation: binTag,
+                                  description: descCtrl.text.trim(),
+                                  imageAsset: selectedImageUrl,
+                                );
+
+                            // Also create corresponding warehouse batch
+                            ref.read(dcConsoleProvider.notifier).addBatch(
+                                  DCWarehouseBatch(
+                                    id: 'batch_${DateTime.now().millisecondsSinceEpoch}',
+                                    batchCode: 'LOT-${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}',
+                                    productName: product.name,
+                                    sku: product.sku,
+                                    clientName: product.ownerName,
+                                    waybillNumber: 'INIT-INTAKE',
+                                    initialQuantity: qty,
+                                    currentQuantity: qty,
+                                    allocatedQuantity: 0,
+                                    binLocation: binTag,
+                                    manufactureDate: DateTime.now(),
+                                    expiryDate: DateTime.now().add(const Duration(days: 365)),
+                                  ),
+                                );
+
+                            // Immediately sync newly created product into the product catalog
+                            ref.read(productCatalogProvider.notifier).syncFromStockItems([product]);
+
+                            return product;
+                          },
+                        );
+
+                        if (created != null) {
+                          // Close the creation modal
+                          if (ctx.mounted) {
+                            Navigator.of(ctx).pop();
+                          }
+                          // Show rich Success Modal
+                          if (context.mounted) {
+                            _showProductCreationSuccessModal(
+                              context: context,
+                              isDark: isDark,
+                              product: created,
+                              initialQty: qty,
+                              binTag: binTag,
+                            );
+                          }
+                        }
+                      } catch (e) {
+                        var reason = e.toString();
+                        if (reason.startsWith('Exception: ')) {
+                          reason = reason.substring(11);
+                        }
+                        if (reason.contains('SocketException') || reason.contains('Failed host lookup') || reason.contains('ClientException')) {
+                          reason = 'Network connection error: Unable to communicate with the database. Please verify your internet connection.';
+                        }
+
+                        if (ctx.mounted) {
+                          _showProductCreationFailureModal(
+                            context: ctx,
+                            isDark: isDark,
+                            reason: reason,
+                            productName: name,
                             sku: sku,
-                            category: catCtrl.text.trim(),
-                            price: price,
-                            ownerName: clientCtrl.text.trim(),
-                            initialQuantity: qty,
-                            lowStockThreshold: threshold,
-                            binLocation: binCtrl.text.trim(),
-                            description: descCtrl.text.trim(),
-                            imageAsset: selectedImageUrl,
                           );
-
-                      // Also create corresponding warehouse batch
-                      ref.read(dcConsoleProvider.notifier).addBatch(
-                            DCWarehouseBatch(
-                              id: 'batch_${DateTime.now().millisecondsSinceEpoch}',
-                              batchCode: 'LOT-${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}',
-                              productName: created.name,
-                              sku: created.sku,
-                              clientName: created.ownerName,
-                              waybillNumber: 'INIT-INTAKE',
-                              initialQuantity: qty,
-                              currentQuantity: qty,
-                              allocatedQuantity: 0,
-                              binLocation: binCtrl.text.trim().isNotEmpty ? binCtrl.text.trim() : 'BIN-A1-01',
-                              manufactureDate: DateTime.now(),
-                              expiryDate: DateTime.now().add(const Duration(days: 365)),
-                            ),
-                          );
-
-                      // Immediately sync newly created product into the product catalog
-                      ref.read(productCatalogProvider.notifier).syncFromStockItems([created]);
-
-                      if (ctx.mounted) {
-                        Navigator.of(ctx).pop();
+                        }
                       }
-                      messenger.showSnackBar(
-                        SnackBar(
-                          content: Text('✅ ${created.name} registered in DC catalogue with $qty shelf units.'),
-                          backgroundColor: const Color(0xFF10B981),
-                        ),
-                      );
                     },
               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
               child: const Text('Save & Register Product', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showProductCreationSuccessModal({
+    required BuildContext context,
+    required bool isDark,
+    required StockItemEntity product,
+    required int initialQty,
+    required String binTag,
+  }) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+        content: SizedBox(
+          width: 440,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Success Icon Badge
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.check_circle_rounded,
+                    color: Color(0xFF10B981),
+                    size: 38,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              Text(
+                'Product Registered Successfully!',
+                style: GoogleFonts.inter(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'The product has been enrolled in the master catalogue and assigned warehouse shelf inventory.',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  color: const Color(0xFF64748B),
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+
+              // Product Info Summary Card
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        ProductImageWidget(
+                          imageUrl: product.imageAsset,
+                          width: 48,
+                          height: 48,
+                          borderRadius: 8,
+                          fit: BoxFit.cover,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                product.name,
+                                style: GoogleFonts.inter(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                product.category.isNotEmpty ? product.category : 'Health & Wellness',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  color: const Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Divider(height: 20),
+                    _buildConfirmationRow('SKU / Code:', product.sku, isDark, isBold: true),
+                    const SizedBox(height: 6),
+                    _buildConfirmationRow('Selling Price:', CurrencyFormatter.formatNaira(product.price), isDark, valueColor: const Color(0xFFF37021)),
+                    const SizedBox(height: 6),
+                    _buildConfirmationRow('Initial Shelf Stock:', '+$initialQty Units', isDark, isBold: true, valueColor: const Color(0xFF10B981)),
+                    const SizedBox(height: 6),
+                    _buildConfirmationRow('Warehouse Storage Bin:', binTag, isDark),
+                    const SizedBox(height: 6),
+                    _buildConfirmationRow('Merchant Client:', product.ownerName, isDark),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => Navigator.of(dialogCtx).pop(),
+              icon: const Icon(Icons.check_rounded, size: 16, color: Colors.white),
+              label: const Text(
+                'Back to Product List',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF10B981),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showProductCreationFailureModal({
+    required BuildContext context,
+    required bool isDark,
+    required String reason,
+    required String productName,
+    required String sku,
+  }) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+        content: SizedBox(
+          width: 440,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Error Icon Badge
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEF4444).withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.error_outline_rounded,
+                    color: Color(0xFFEF4444),
+                    size: 38,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              Text(
+                'Product Registration Failed',
+                style: GoogleFonts.inter(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'We were unable to register "$productName" ($sku).',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  color: const Color(0xFF64748B),
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+
+              // Reason Callout Card
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEF4444).withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: const Color(0xFFEF4444).withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.warning_amber_rounded,
+                      color: Color(0xFFEF4444),
+                      size: 20,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Reason / Diagnosis:',
+                            style: GoogleFonts.inter(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFFEF4444),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            reason,
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: isDark ? Colors.white70 : const Color(0xFF334155),
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Your input fields are preserved. You can review your details and try again.',
+                style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => Navigator.of(dialogCtx).pop(),
+              icon: const Icon(Icons.edit_note_rounded, size: 16, color: Colors.white),
+              label: const Text(
+                'Back to Product Details',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2563EB),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
