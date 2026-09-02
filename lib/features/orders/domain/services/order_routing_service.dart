@@ -54,25 +54,53 @@ class OrderRoutingService {
     }).toList();
 
     if (lgaMatchingDcs.isNotEmpty) {
-      // Pick hub if available or first matching
+      // Pick specific hub or first matching LGA DC
       matchedDc = lgaMatchingDcs.firstWhere((dc) => dc.isHub, orElse: () => lgaMatchingDcs.first);
     } else {
-      // B. Priority 2: State-level match
-      final stateMatchingDcs = distributionCenters.where((dc) {
-        if (!dc.isActive) return false;
-        return dc.coversLocation(stateName: orderState, lgaName: '');
-      }).toList();
+      // B. Priority 2: State-level match if LGA was empty
+      if (orderLga.isEmpty) {
+        final stateMatchingDcs = distributionCenters.where((dc) {
+          if (!dc.isActive) return false;
+          return dc.coversLocation(stateName: orderState, lgaName: '');
+        }).toList();
 
-      if (stateMatchingDcs.isNotEmpty) {
-        matchedDc = stateMatchingDcs.firstWhere((dc) => dc.isHub, orElse: () => stateMatchingDcs.first);
+        if (stateMatchingDcs.isNotEmpty) {
+          matchedDc = stateMatchingDcs.firstWhere((dc) => dc.isHub, orElse: () => stateMatchingDcs.first);
+        }
       }
     }
 
+    // FALLBACK A: No DC matched -> Route to Grand DC HQ for manual triage
     if (matchedDc == null) {
+      DistributionCenter? grandDc;
+      try {
+        grandDc = distributionCenters.firstWhere(
+          (dc) => dc.isGrandDc && dc.isActive,
+          orElse: () => distributionCenters.firstWhere(
+            (dc) => dc.isHub && dc.isActive,
+            orElse: () => distributionCenters.first,
+          ),
+        );
+      } catch (_) {
+        grandDc = null;
+      }
+
+      final routedOrder = order.copyWith(
+        distributionCenterId: grandDc?.id,
+        deliveryAgentId: null,
+        deliveryAgentName: null,
+        deliveryAgentCode: null,
+        deliveryAgentPhone: null,
+        status: 'pending_dispatch',
+      );
+
       return OrderRoutingResult(
         status: RoutingStatus.unrouted,
-        dispatchDiagnosis: 'No distribution center found covering ${order.deliveryState} (LGA: ${order.lga ?? "N/A"}).',
-        routedOrder: order,
+        distributionCenter: grandDc,
+        dispatchDiagnosis: grandDc != null
+            ? '🚨 Escalated to Grand DC (${grandDc.name}). No regional DC configured for State: "$orderState", LGA: "$orderLga".'
+            : 'No distribution center found covering ${order.deliveryState} (LGA: ${order.lga ?? "N/A"}).',
+        routedOrder: routedOrder,
       );
     }
 
@@ -101,36 +129,42 @@ class OrderRoutingService {
       return OrderRoutingResult(
         status: RoutingStatus.routedToDcOnly,
         distributionCenter: matchedDc,
-        dispatchDiagnosis: 'Routed to ${matchedDc.name} (${matchedDc.code}). No active rider assigned to LGA "$orderLga".',
+        dispatchDiagnosis: '⚠️ Routed to ${matchedDc.name} (${matchedDc.code}). Awaiting manual rider assignment for LGA: "$orderLga".',
         routedOrder: routedOrder,
       );
     }
 
-    // 3. Strict Stock Check: Filter riders who have sufficient stock for the ordered product
+    // 3. Stock Check: Filter riders who have sufficient stock for the ordered product if stock records are supplied
     DCFleetDriver? bestDriver;
     int bestStockCount = 0;
 
-    for (final driver in eligibleDrivers) {
-      // Calculate rider's current custody count for the requested product
-      final driverAllocations = stockAllocations.where((a) {
-        if (a.riderId != driver.id && a.riderName.toLowerCase() != driver.name.toLowerCase()) {
-          return false;
-        }
+    if (stockAllocations.isEmpty) {
+      // Pure geographic State/LGA multi-zone routing
+      bestDriver = eligibleDrivers.first;
+      bestStockCount = 0;
+    } else {
+      for (final driver in eligibleDrivers) {
+        // Calculate rider's current custody count for the requested product
+        final driverAllocations = stockAllocations.where((a) {
+          if (a.riderId != driver.id && a.riderName.toLowerCase() != driver.name.toLowerCase()) {
+            return false;
+          }
 
-        final skuMatches = orderProductSku.isNotEmpty && a.sku.trim().toLowerCase() == orderProductSku;
-        final nameMatches = a.productName.trim().toLowerCase().contains(orderProductName) ||
-            orderProductName.contains(a.productName.trim().toLowerCase());
+          final skuMatches = orderProductSku.isNotEmpty && a.sku.trim().toLowerCase() == orderProductSku;
+          final nameMatches = a.productName.trim().toLowerCase().contains(orderProductName) ||
+              orderProductName.contains(a.productName.trim().toLowerCase());
 
-        return skuMatches || nameMatches;
-      }).toList();
+          return skuMatches || nameMatches;
+        }).toList();
 
-      final currentCustody = driverAllocations.fold<int>(0, (sum, a) => sum + a.inCustodyUnits);
+        final currentCustody = driverAllocations.fold<int>(0, (sum, a) => sum + a.inCustodyUnits);
 
-      // Strict enforcement: Rider must have >= order quantity
-      if (currentCustody >= requiredQty) {
-        if (bestDriver == null || currentCustody > bestStockCount) {
-          bestDriver = driver;
-          bestStockCount = currentCustody;
+        // Strict enforcement: Rider must have >= order quantity
+        if (currentCustody >= requiredQty) {
+          if (bestDriver == null || currentCustody > bestStockCount) {
+            bestDriver = driver;
+            bestStockCount = currentCustody;
+          }
         }
       }
     }

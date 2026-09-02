@@ -76,7 +76,7 @@ class _CashPageState extends ConsumerState<CashPage> {
         ? (user?.commissionRate ?? 1000.0)
         : 0.0;
     final double recentTransport = mostRecentOrder != null && mostRecentOrder.isCashPod
-        ? (user?.fuelAllowance ?? 1500.0)
+        ? (user?.isPda == true ? (user?.transportAllowance ?? 1500.0) : (user?.fuelAllowance ?? 800.0))
         : 0.0;
     final double recentToRemit = mostRecentOrder != null && mostRecentOrder.isCashPod && !mostRecentOrder.isRemitted
         ? (recentCollected - recentCommission - recentTransport).clamp(0.0, double.infinity)

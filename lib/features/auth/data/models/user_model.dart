@@ -31,6 +31,10 @@ class UserModel extends UserEntity {
     super.bankAccountNumber,
     super.bankAccountName,
     super.agentStatus,
+    super.clientId,
+    super.clientCompanyName,
+    super.closerId,
+    super.closerCode,
     super.avatarUrl,
   });
 
@@ -40,17 +44,20 @@ class UserModel extends UserEntity {
             ? (json['coverage_states'] as List).first.toString() 
             : 'Abuja (FCT)');
 
+    final isClientRole = json['role'] == 'client' || json['role'] == 'merchant';
+    final resolvedClientName = json['client_company_name'] ?? json['company_name'] ?? (isClientRole ? 'Novacale Limited' : null);
+
     return UserModel(
       id: json['id'] ?? '',
       authUserId: json['auth_user_id'],
       email: json['email'] ?? '',
-      firstName: json['first_name'] ?? 'Field',
-      lastName: json['last_name'] ?? 'Agent',
+      firstName: json['first_name'] ?? (isClientRole ? 'Chuka' : 'Field'),
+      lastName: json['last_name'] ?? (isClientRole ? 'Okafor (Novacale)' : 'Agent'),
       phone: json['phone'] ?? json['phone_number'] ?? '08031234567',
       role: json['role'] ?? 'delivery_agent',
       companyId: json['company_id'] ?? '11111111-1111-4111-8111-111111111111',
       deliveryAgentId: deliveryAgentId ?? json['delivery_agent_id'],
-      deliveryAgentCode: json['delivery_agent_code'] ?? json['agent_code'] ?? (json['role'] == 'dc_manager' ? 'DC-MGR' : 'PDA'),
+      deliveryAgentCode: json['delivery_agent_code'] ?? json['agent_code'] ?? (json['role'] == 'dc_manager' ? 'DC-MGR' : (isClientRole ? 'CLI-01' : 'PDA')),
       distributionCenterId: json['distribution_center_id'] ?? '22222222-2222-4222-8222-222222222222',
       distributionCenterName: json['distribution_center_name'] ?? json['dc_name'] ?? 'Wuse Distribution Center',
       lifetimeDeliveriesCount: (json['lifetime_deliveries_count'] as num?)?.toInt() ?? 0,
@@ -70,6 +77,10 @@ class UserModel extends UserEntity {
       bankAccountNumber: json['bank_account_number'] ?? '3081294821',
       bankAccountName: json['bank_account_name'] ?? (json['first_name'] != null ? '${json['first_name']} ${json['last_name'] ?? ""}'.trim() : 'Field Agent Logistics'),
       agentStatus: json['current_status'] ?? json['status'] ?? 'available',
+      clientId: json['client_id'] ?? (isClientRole ? (json['id'] ?? '33333333-3333-4333-8333-333333333333') : null),
+      clientCompanyName: resolvedClientName,
+      closerId: json['closer_id'] ?? (json['role'] == 'closer' ? json['id'] : null),
+      closerCode: json['closer_code'] ?? (json['role'] == 'closer' ? 'CLS-NOVA-001' : null),
       avatarUrl: json['avatar_url']?.toString() ??
           json['photo_url']?.toString() ??
           json['profile_photo_url']?.toString() ??
@@ -109,6 +120,10 @@ class UserModel extends UserEntity {
       'bank_account_number': bankAccountNumber,
       'bank_account_name': bankAccountName,
       'current_status': agentStatus,
+      'client_id': clientId,
+      'client_company_name': clientCompanyName,
+      'closer_id': closerId,
+      'closer_code': closerCode,
       'avatar_url': avatarUrl,
     };
   }

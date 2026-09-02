@@ -59,6 +59,10 @@ class OrderModel extends OrderEntity {
     super.productSku,
     super.binLocation,
     super.batchNumber,
+    super.closerId,
+    super.closerName,
+    super.closerCode,
+    super.leadId,
     required super.createdAt,
   });
 
@@ -240,6 +244,10 @@ class OrderModel extends OrderEntity {
       productSku: sku ?? 'SKU-RESP-01',
       binLocation: json['bin_location']?.toString() ?? 'BIN-A1-01',
       batchNumber: json['batch_number']?.toString() ?? 'LOT-2026-08',
+      closerId: json['closer_id']?.toString(),
+      closerName: json['closer_name']?.toString(),
+      closerCode: json['closer_code']?.toString(),
+      leadId: json['lead_id']?.toString(),
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])
           : DateTime.now(),
@@ -305,6 +313,10 @@ class OrderModel extends OrderEntity {
       productSku: entity.productSku,
       binLocation: entity.binLocation,
       batchNumber: entity.batchNumber,
+      closerId: entity.closerId,
+      closerName: entity.closerName,
+      closerCode: entity.closerCode,
+      leadId: entity.leadId,
       createdAt: entity.createdAt,
     );
   }
@@ -367,6 +379,10 @@ class OrderModel extends OrderEntity {
       'product_sku': productSku,
       'bin_location': binLocation,
       'batch_number': batchNumber,
+      'closer_id': closerId,
+      'closer_name': closerName,
+      'closer_code': closerCode,
+      'lead_id': leadId,
     };
   }
 }

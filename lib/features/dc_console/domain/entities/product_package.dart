@@ -135,6 +135,8 @@ class CatalogProduct {
   final String clientName;
   final double defaultUnitPrice;
   final String category;
+  final String? imageUrl;
+  final int totalStockAcrossHubs;
   final List<ProductPackage> packages;
 
   const CatalogProduct({
@@ -144,6 +146,8 @@ class CatalogProduct {
     required this.clientName,
     required this.defaultUnitPrice,
     this.category = 'Health & Wellness',
+    this.imageUrl,
+    this.totalStockAcrossHubs = 100,
     this.packages = const [],
   });
 
@@ -154,6 +158,8 @@ class CatalogProduct {
     String? clientName,
     double? defaultUnitPrice,
     String? category,
+    String? imageUrl,
+    int? totalStockAcrossHubs,
     List<ProductPackage>? packages,
   }) {
     return CatalogProduct(
@@ -163,6 +169,8 @@ class CatalogProduct {
       clientName: clientName ?? this.clientName,
       defaultUnitPrice: defaultUnitPrice ?? this.defaultUnitPrice,
       category: category ?? this.category,
+      imageUrl: imageUrl ?? this.imageUrl,
+      totalStockAcrossHubs: totalStockAcrossHubs ?? this.totalStockAcrossHubs,
       packages: packages ?? this.packages,
     );
   }
@@ -175,6 +183,8 @@ class CatalogProduct {
       'client_name': clientName,
       'default_unit_price': defaultUnitPrice,
       'category': category,
+      'image_url': imageUrl,
+      'total_stock': totalStockAcrossHubs,
       'packages': packages.map((p) => p.toJson()).toList(),
     };
   }
@@ -187,6 +197,8 @@ class CatalogProduct {
       clientName: json['client_name'] as String? ?? 'Novacare Limited',
       defaultUnitPrice: (json['default_unit_price'] as num?)?.toDouble() ?? 0.0,
       category: json['category'] as String? ?? 'Health & Wellness',
+      imageUrl: json['image_url'] as String?,
+      totalStockAcrossHubs: (json['total_stock'] as num?)?.toInt() ?? 100,
       packages: (json['packages'] as List<dynamic>?)
               ?.map((e) => ProductPackage.fromJson(e as Map<String, dynamic>))
               .toList() ??

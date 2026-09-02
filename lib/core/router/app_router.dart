@@ -26,6 +26,7 @@ import '../../features/stock/presentation/pages/stock_handover_page.dart';
 import '../../features/stock/presentation/pages/stock_history_page.dart';
 import '../../features/users/presentation/pages/user_profile_page.dart';
 import '../../features/dc_console/presentation/pages/dc_console_layout.dart';
+import '../../features/client_portal/presentation/pages/client_portal_layout.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final isAuthFromState = ref.watch(authProvider.select((s) => s.isAuthenticated));
@@ -52,9 +53,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
       if (isAuthenticated) {
         final authState = ref.read(authProvider);
+        final isClient = authState.user?.isClient == true;
         final isDc = authState.user?.isDcManager == true;
 
         if (isLoggingIn) {
+          if (isClient) {
+            debugPrint('[AUTH_ROUTER] 🛍️ Authenticated Merchant/Client -> Redirecting to /client');
+            return '/client';
+          }
           if (isDc) {
             debugPrint('[AUTH_ROUTER] 🏢 Authenticated DC Manager -> Redirecting to /dc');
             return '/dc';
@@ -63,13 +69,24 @@ final routerProvider = Provider<GoRouter>((ref) {
           return '/';
         }
 
-        if (state.matchedLocation == '/' && isDc) {
-          debugPrint('[AUTH_ROUTER] 🏢 Authenticated DC Manager on root path -> Redirecting to /dc');
-          return '/dc';
+        if (state.matchedLocation == '/') {
+          if (isClient) {
+            debugPrint('[AUTH_ROUTER] 🛍️ Authenticated Merchant on root path -> Redirecting to /client');
+            return '/client';
+          }
+          if (isDc) {
+            debugPrint('[AUTH_ROUTER] 🏢 Authenticated DC Manager on root path -> Redirecting to /dc');
+            return '/dc';
+          }
+        }
+
+        if (state.matchedLocation.startsWith('/client') && !isClient && authState.user != null) {
+          if (isDc) return '/dc';
+          return '/';
         }
 
         if (state.matchedLocation.startsWith('/dc') && !isDc && authState.user != null) {
-          debugPrint('[AUTH_ROUTER] 🚚 Delivery Rider on DC path -> Redirecting to /');
+          if (isClient) return '/client';
           return '/';
         }
       }
@@ -91,6 +108,15 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/',
         builder: (context, state) => const MainBottomNavShell(),
+      ),
+      GoRoute(
+        path: '/client',
+        builder: (context, state) => const ClientPortalLayout(),
+        routes: [
+          GoRoute(path: 'dashboard', builder: (context, state) => const ClientPortalLayout()),
+          GoRoute(path: 'orders', builder: (context, state) => const ClientPortalLayout()),
+          GoRoute(path: 'products', builder: (context, state) => const ClientPortalLayout()),
+        ],
       ),
       GoRoute(
         path: '/dc',

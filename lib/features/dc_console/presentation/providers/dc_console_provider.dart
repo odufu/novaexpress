@@ -7,6 +7,7 @@ import '../../../../core/constants/supabase_constants.dart';
 import '../../../../core/services/local_storage_service.dart';
 import '../../../auth/data/datasources/auth_remote_datasource.dart';
 import '../../../auth/data/models/user_model.dart';
+import '../../../client_portal/domain/entities/client_profile.dart';
 import '../../domain/entities/dc_finance_settings.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
 import '../../domain/entities/dc_payout_claim.dart';
@@ -19,15 +20,16 @@ final List<DistributionCenter> defaultDistributionCenters = [
     companyId: '11111111-1111-4111-8111-111111111111',
     name: 'Wuse Central Distribution Hub',
     code: 'DC-ABJ-01',
-    state: 'Abuja FCT',
+    state: 'Federal Capital Territory',
     city: 'Abuja',
     address: 'Plot 42, Cadastral Zone B03, Wuse II, Abuja',
     contactPhone: '+234 802 345 6789',
     contactEmail: 'wuse.dc@novaexpress.com',
     managerName: 'Adekunle Supervisor',
+    isGrandDc: true,
     isHub: true,
     isActive: true,
-    operatingZones: const ['Wuse I', 'Wuse II', 'Maitama', 'Garki', 'Jabi', 'Utako', 'Central Area', 'Guzape'],
+    operatingZones: const ['Abuja Municipal (AMAC)', 'AMAC', 'Wuse I', 'Wuse II', 'Maitama', 'Garki', 'Jabi', 'Utako', 'Central Area', 'Guzape'],
     storageCapacityUnits: 50000,
     totalAssignedRiders: 12,
     activeInventoryBatches: 8,
@@ -93,6 +95,94 @@ final List<DistributionCenter> defaultDistributionCenters = [
     activeInventoryBatches: 4,
     createdAt: DateTime(2026, 1, 1),
     updatedAt: DateTime(2026, 1, 1),
+  ),
+];
+
+final List<DCFleetDriver> defaultFleetDrivers = [
+  DCFleetDriver(
+    id: 'b1111111-1111-4111-8111-111111111111',
+    driverCode: 'PDA-7000',
+    name: 'Emeka Rider',
+    phone: '08012345678',
+    email: 'rider.emeka@novaexpress.com',
+    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+    distributionCenterId: '22222222-2222-4222-8222-222222222222',
+    status: 'active',
+    assignedZone: 'Abuja Municipal (AMAC)',
+    coveredLgas: const ['Abuja Municipal (AMAC)', 'AMAC', 'Wuse II', 'Maitama', 'Garki'],
+    vehicleType: 'Motorcycle',
+    vehiclePlate: 'ABJ-772-XY',
+    vehicleModel: 'Bajaj Boxer 150',
+    totalAssignedOrders: 15,
+    completedOrders: 12,
+    routeProgressPercent: 80.0,
+    efficiencyRating: 4.8,
+    cashInCustody: 75000.0,
+    itemsInCustody: 8,
+    commissionRate: 1000.0,
+    transportAllowance: 1500.0,
+    failedDeliveryAllowance: 500.0,
+    compensationType: 'commission',
+    personnelType: 'pda',
+  ),
+  DCFleetDriver(
+    id: 'b2222222-2222-4222-8222-222222222222',
+    driverCode: 'RDR-102',
+    name: 'Musa Garba',
+    phone: '08023456789',
+    email: 'musa.garba@novaexpress.com',
+    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+    distributionCenterId: '22222222-2222-4222-8222-222222222222',
+    status: 'active',
+    assignedZone: 'Bwari',
+    coveredLgas: const ['Bwari', 'Kubwa', 'Dutse'],
+    vehicleType: 'Motorcycle',
+    vehiclePlate: 'ABJ-102-KW',
+    vehicleModel: 'TVS HLX 125',
+    totalAssignedOrders: 10,
+    completedOrders: 9,
+    routeProgressPercent: 90.0,
+    efficiencyRating: 4.9,
+    cashInCustody: 42000.0,
+    itemsInCustody: 5,
+    commissionRate: 1000.0,
+    transportAllowance: 1500.0,
+    failedDeliveryAllowance: 500.0,
+    compensationType: 'commission',
+    personnelType: 'pda',
+  ),
+];
+
+final List<ClientProfile> defaultRegisteredClients = [
+  const ClientProfile(
+    id: '33333333-3333-4333-8333-333333333333',
+    companyName: 'Novacale Limited',
+    contactPerson: 'Dr. Chuka Okafor',
+    email: 'client.novacale@novaexpress.ng',
+    phone: '08034455667',
+    address: 'Plot 12, Commercial Avenue, Central Business District, Abuja',
+    city: 'Abuja',
+    state: 'Federal Capital Territory',
+    code: 'CLI-NOVACALE-01',
+    tier: 'enterprise',
+    closerLimit: 250,
+    isEnterprise: true,
+    totalClosersCount: 200,
+  ),
+  const ClientProfile(
+    id: '33333333-3333-4333-8333-333333333334',
+    companyName: 'Zenith Herbal Direct',
+    contactPerson: 'Madam Stella Balogun',
+    email: 'stella@zenithherbal.com',
+    phone: '08023344556',
+    address: '14 Allen Avenue, Ikeja, Lagos',
+    city: 'Ikeja',
+    state: 'Lagos State',
+    code: 'CLI-ZENITH-02',
+    tier: 'standard_merchant',
+    closerLimit: 0,
+    isEnterprise: false,
+    totalClosersCount: 0,
   ),
 ];
 
@@ -272,6 +362,8 @@ class DCConsoleState {
   final List<DCWarehouseBatch> warehouseBatches;
   final List<DCReturnItem> returnItems;
   final List<DCPayoutClaim> payoutClaims;
+  final List<ClientProfile> clients;
+  final String clientFilter; // 'all', 'enterprise', 'standard'
   final DCFinanceSettings financeSettings;
   final double avgDeliveryTimeMin;
   final double fuelEfficiencyKmPerL;
@@ -296,6 +388,8 @@ class DCConsoleState {
     this.warehouseBatches = const [],
     this.returnItems = const [],
     this.payoutClaims = const [],
+    this.clients = const [],
+    this.clientFilter = 'all',
     this.transactions = const [],
     this.transactionFilter = 'all',
     this.transactionStatusFilter = 'all',
@@ -328,6 +422,8 @@ class DCConsoleState {
     List<DCWarehouseBatch>? warehouseBatches,
     List<DCReturnItem>? returnItems,
     List<DCPayoutClaim>? payoutClaims,
+    List<ClientProfile>? clients,
+    String? clientFilter,
     List<DCTransactionRecord>? transactions,
     String? transactionFilter,
     String? transactionStatusFilter,
@@ -355,6 +451,8 @@ class DCConsoleState {
       warehouseBatches: warehouseBatches ?? this.warehouseBatches,
       returnItems: returnItems ?? this.returnItems,
       payoutClaims: payoutClaims ?? this.payoutClaims,
+      clients: clients ?? this.clients,
+      clientFilter: clientFilter ?? this.clientFilter,
       transactions: transactions ?? this.transactions,
       transactionFilter: transactionFilter ?? this.transactionFilter,
       transactionStatusFilter: transactionStatusFilter ?? this.transactionStatusFilter,
@@ -452,6 +550,29 @@ class DCConsoleState {
     }
     return list;
   }
+
+  List<ClientProfile> get filteredClients {
+    var list = clients.isNotEmpty ? clients : defaultRegisteredClients;
+    if (clientFilter != 'all') {
+      if (clientFilter == 'enterprise') {
+        list = list.where((c) => c.isEnterprise).toList();
+      } else if (clientFilter == 'standard') {
+        list = list.where((c) => !c.isEnterprise).toList();
+      }
+    }
+    if (searchQuery.trim().isNotEmpty) {
+      final q = searchQuery.toLowerCase().trim();
+      list = list.where((c) =>
+          c.companyName.toLowerCase().contains(q) ||
+          c.code.toLowerCase().contains(q) ||
+          c.contactPerson.toLowerCase().contains(q) ||
+          c.email.toLowerCase().contains(q) ||
+          c.phone.contains(q) ||
+          c.city.toLowerCase().contains(q) ||
+          c.state.toLowerCase().contains(q)).toList();
+    }
+    return list;
+  }
 }
 
 class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
@@ -474,7 +595,10 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
 
   DCConsoleNotifier([LocalStorageService? storageService])
       : _storageService = storageService ?? LocalStorageServiceImpl(),
-        super(DCConsoleState(distributionCenters: defaultDistributionCenters)) {
+        super(DCConsoleState(
+          distributionCenters: defaultDistributionCenters,
+          drivers: defaultFleetDrivers,
+        )) {
     if (!isTestEnvironment) {
       _initDrivers();
     }
@@ -484,6 +608,7 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     // 1. Instant hydration from persistent local cache
     final cachedDcs = await _storageService.getCachedDistributionCenters();
     final cached = await _storageService.getCachedFleetDrivers();
+    final cachedFinance = await _storageService.getCachedFinanceSettings();
     final cachedBatches = await _storageService.getCachedWarehouseBatches();
     final cachedReturns = await _storageService.getCachedReturnItems();
     final cachedPayouts = await _storageService.getCachedPayoutClaims();
@@ -496,17 +621,56 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     state = state.copyWith(
       distributionCenters: (cachedDcs != null && cachedDcs.isNotEmpty) ? cachedDcs : defaultDistributionCenters,
       drivers: cached ?? state.drivers,
+      financeSettings: cachedFinance ?? state.financeSettings,
       warehouseBatches: cachedBatches ?? state.warehouseBatches,
       returnItems: cachedReturns ?? state.returnItems,
       payoutClaims: cachedPayouts ?? state.payoutClaims,
       transactions: cachedTxns ?? state.transactions,
     );
 
+    // Register all cached drivers into AuthRemoteDataSource in-memory store
+    if (cached != null && cached.isNotEmpty) {
+      for (final d in cached) {
+        final nameParts = d.name.trim().split(' ');
+        final fName = nameParts.first;
+        final lName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+        AuthRemoteDataSourceImpl.registerUserInMemory(
+          UserModel(
+            id: d.id,
+            email: d.email,
+            firstName: fName,
+            lastName: lName,
+            phone: d.phone,
+            role: 'delivery_agent',
+            deliveryAgentId: d.id,
+            deliveryAgentCode: d.driverCode,
+            personnelType: d.personnelType,
+            compensationType: d.compensationType,
+            commissionRate: d.commissionRate,
+            transportAllowance: d.transportAllowance,
+            failedDeliveryAllowance: d.failedDeliveryAllowance,
+            baseSalary: d.baseSalary,
+            vehicleType: d.vehicleType,
+            vehiclePlateNumber: d.vehiclePlate,
+            bankName: d.bankName,
+            bankAccountNumber: d.bankAccountNumber,
+            bankAccountName: d.bankAccountName,
+            agentStatus: d.status,
+            operatingCity: d.assignedZone,
+            distributionCenterId: d.distributionCenterId,
+          ),
+        );
+      }
+    }
+
     if (cachedDcs != null && cachedDcs.isNotEmpty) {
       debugPrint('[DC_CONSOLE_PROVIDER] ⚡ Hydrated ${cachedDcs.length} distribution centers from local storage cache.');
     }
     if (cached != null && cached.isNotEmpty) {
       debugPrint('[DC_CONSOLE_PROVIDER] ⚡ Hydrated ${cached.length} drivers from local storage cache.');
+    }
+    if (cachedFinance != null) {
+      debugPrint('[DC_CONSOLE_PROVIDER] ⚡ Hydrated finance & POS settings from local storage cache.');
     }
     if (cachedPayouts != null && cachedPayouts.isNotEmpty) {
       debugPrint('[DC_CONSOLE_PROVIDER] ⚡ Hydrated ${cachedPayouts.length} payout claims from local storage cache.');
@@ -518,15 +682,33 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     // 2. Fetch fresh real data from live Supabase DB
     if (!isTestEnvironment) {
       await loadDistributionCentersFromDatabase();
+      await loadFinanceSettingsFromDatabase();
       await loadDriversFromDatabase();
       await loadPayoutClaimsFromDatabase();
       await loadTransactionsFromDatabase();
+      await loadClientsFromDatabase();
     }
   }
 
   List<DistributionCenter> get distributionCenters => state.distributionCenters.isNotEmpty ? state.distributionCenters : defaultDistributionCenters;
   List<DCFleetDriver> get drivers => state.drivers;
   List<DCWarehouseBatch> get warehouseBatches => state.warehouseBatches;
+  List<ClientProfile> get clients => state.clients.isNotEmpty ? state.clients : defaultRegisteredClients;
+
+  DistributionCenter? get grandDc => distributionCenters.firstWhere(
+        (dc) => dc.isGrandDc,
+        orElse: () => distributionCenters.firstWhere(
+          (dc) => dc.code == 'DC-ABJ-01' || dc.isHub,
+          orElse: () => distributionCenters.first,
+        ),
+      );
+
+  bool get isCurrentHubGrandDc =>
+      state.activeHubId == grandDc?.id ||
+      state.activeHubCode == grandDc?.code ||
+      state.activeHubCode == 'DC-ABJ-01' ||
+      state.activeHubName.toLowerCase().contains('wuse central') ||
+      state.activeHubName.toLowerCase().contains('grand dc');
 
   void setActiveTab(int index) {
     state = state.copyWith(activeTabIndex: index);
@@ -552,6 +734,10 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     state = state.copyWith(dcFilter: filter);
   }
 
+  void setClientFilter(String filter) {
+    state = state.copyWith(clientFilter: filter);
+  }
+
   void setSelectedStateFilter(String stateName) {
     state = state.copyWith(selectedStateFilter: stateName);
   }
@@ -564,20 +750,218 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     state = state.copyWith(selectedDcId: dcId);
   }
 
-  void updateFinanceSettings(DCFinanceSettings newSettings) {
+  Future<void> loadClientsFromDatabase() async {
+    bool isTest = false;
+    if (!kIsWeb) {
+      try {
+        isTest = Platform.environment.containsKey('FLUTTER_TEST');
+      } catch (_) {}
+    }
+    if (isTest) return;
+
+    try {
+      final dbClient = SupabaseClient(
+        SupabaseConstants.supabaseUrl,
+        SupabaseConstants.supabaseServiceRoleKey,
+        authOptions: const AuthClientOptions(autoRefreshToken: false),
+      );
+
+      final response = await dbClient
+          .from('clients')
+          .select()
+          .order('created_at', ascending: false);
+
+      if (response.isNotEmpty) {
+        final dbClients = response.map((c) => ClientProfile.fromJson(c)).toList();
+        state = state.copyWith(clients: dbClients);
+        debugPrint('[DC_CONSOLE] ⚡ Loaded ${dbClients.length} registered clients from Supabase DB.');
+      } else {
+        state = state.copyWith(clients: defaultRegisteredClients);
+      }
+    } catch (e) {
+      debugPrint('[DC_CONSOLE] ℹ️ Error loading clients from Supabase: $e');
+      if (state.clients.isEmpty) {
+        state = state.copyWith(clients: defaultRegisteredClients);
+      }
+    }
+  }
+
+  Future<ClientProfile> createClient({
+    required String companyName,
+    required String contactPerson,
+    required String email,
+    required String phone,
+    required String address,
+    required String city,
+    required String stateName,
+    required String tier,
+    int closerLimit = 250,
+  }) async {
+    state = state.copyWith(isLoading: true);
+    try {
+      final isEnt = tier == 'enterprise';
+      final clientId = _generateUuid();
+      final suffix = (state.clients.length + 1).toString().padLeft(2, '0');
+      final prefix = companyName.replaceAll(RegExp(r'[^a-zA-Z]'), '').toUpperCase();
+      final codePrefix = prefix.length >= 4 ? prefix.substring(0, 4) : 'CLI';
+      final clientCode = 'CLI-$codePrefix-$suffix';
+
+      final newClient = ClientProfile(
+        id: clientId,
+        companyName: companyName.trim(),
+        contactPerson: contactPerson.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        address: address.trim(),
+        city: city.trim(),
+        state: stateName.trim(),
+        code: clientCode,
+        tier: tier,
+        closerLimit: isEnt ? closerLimit : 0,
+        isEnterprise: isEnt,
+        totalClosersCount: 0,
+        createdAt: DateTime.now(),
+      );
+
+      // Async push to Supabase Cloud DB
+      Future.microtask(() async {
+        try {
+          final dbClient = SupabaseClient(
+            SupabaseConstants.supabaseUrl,
+            SupabaseConstants.supabaseServiceRoleKey,
+            authOptions: const AuthClientOptions(autoRefreshToken: false),
+          );
+
+          // 1. Insert into clients table
+          await dbClient.from('clients').insert({
+            'id': newClient.id,
+            'company_name': newClient.companyName,
+            'contact_person': newClient.contactPerson,
+            'email': newClient.email,
+            'phone': newClient.phone,
+            'address': newClient.address,
+            'city': newClient.city,
+            'state': newClient.state,
+            'code': newClient.code,
+            'tier': newClient.tier,
+            'closer_limit': newClient.closerLimit,
+            'is_enterprise': newClient.isEnterprise,
+            'is_active': true,
+          });
+
+          // 2. Insert client admin into users table
+          final nameParts = contactPerson.trim().split(' ');
+          await dbClient.from('users').insert({
+            'id': newClient.id,
+            'company_id': '11111111-1111-4111-8111-111111111111',
+            'client_id': newClient.id,
+            'email': newClient.email,
+            'phone_number': newClient.phone,
+            'first_name': nameParts.first,
+            'last_name': nameParts.length > 1 ? nameParts.sublist(1).join(' ') : 'Admin',
+            'role': 'client',
+            'is_active': true,
+          });
+          debugPrint('[DC_CONSOLE] ✅ Grand DC onboarded client ${newClient.companyName} (${newClient.tier}) in Supabase.');
+        } catch (dbErr) {
+          debugPrint('[DC_CONSOLE] ℹ️ Supabase client insert notice: $dbErr');
+        }
+      });
+
+      final updatedClients = [newClient, ...state.clients];
+      state = state.copyWith(clients: updatedClients, isLoading: false);
+      return newClient;
+    } catch (e) {
+      state = state.copyWith(isLoading: false);
+      rethrow;
+    }
+  }
+
+  Future<void> loadFinanceSettingsFromDatabase() async {
+    bool isTest = false;
+    if (!kIsWeb) {
+      try {
+        isTest = Platform.environment.containsKey('FLUTTER_TEST');
+      } catch (_) {}
+    }
+    if (isTest) return;
+
+    SupabaseClient? dbClient;
+    try {
+      dbClient = SupabaseClient(
+        SupabaseConstants.supabaseUrl,
+        SupabaseConstants.supabaseServiceRoleKey,
+        authOptions: const AuthClientOptions(autoRefreshToken: false),
+      );
+
+      final response = await dbClient
+          .from('dc_finance_settings')
+          .select()
+          .limit(1)
+          .maybeSingle();
+
+      if (response != null) {
+        final settings = DCFinanceSettings.fromJson(response);
+        state = state.copyWith(financeSettings: settings);
+        await _storageService.cacheFinanceSettings(settings);
+        debugPrint('[DC_CONSOLE_PROVIDER] 💳 Loaded DC finance & POS settings from Supabase (Mode: ${settings.posChargeMode}, Commission: ₦${settings.defaultCommissionRate}, Transport: ₦${settings.defaultTransportAllowance}).');
+      }
+    } catch (e) {
+      debugPrint('[DC_CONSOLE_PROVIDER] ℹ️ Supabase finance settings fetch notice: $e');
+    } finally {
+      dbClient?.dispose();
+    }
+  }
+
+  Future<void> updateFinanceSettings(DCFinanceSettings newSettings) async {
     state = state.copyWith(financeSettings: newSettings);
+    await _storageService.cacheFinanceSettings(newSettings);
+
+    bool isTest = false;
+    if (!kIsWeb) {
+      try {
+        isTest = Platform.environment.containsKey('FLUTTER_TEST');
+      } catch (_) {}
+    }
+    if (isTest) return;
+
+    SupabaseClient? dbClient;
+    try {
+      dbClient = SupabaseClient(
+        SupabaseConstants.supabaseUrl,
+        SupabaseConstants.supabaseServiceRoleKey,
+        authOptions: const AuthClientOptions(autoRefreshToken: false),
+      );
+
+      await dbClient.from('dc_finance_settings').upsert({
+        'id': 'global_finance_config',
+        'pos_charge_mode': newSettings.posChargeMode,
+        'pos_tier_amount': newSettings.posTierAmount,
+        'pos_tier_fee': newSettings.posTierFee,
+        'pos_flat_rate': newSettings.posFlatRate,
+        'pos_max_cap_fee': newSettings.posMaxCapFee,
+        'is_pos_fee_reimbursable': newSettings.isPosFeeReimbursable,
+        'default_commission_rate': newSettings.defaultCommissionRate,
+        'default_transport_allowance': newSettings.defaultTransportAllowance,
+        'default_failed_delivery_allowance': newSettings.defaultFailedDeliveryAllowance,
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+      debugPrint('[DC_CONSOLE_PROVIDER] 💾 DC Finance settings persisted to Supabase.');
+    } catch (e) {
+      debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ Supabase finance settings update error: $e');
+    } finally {
+      dbClient?.dispose();
+    }
   }
 
   void setPosChargeMode(String mode) {
-    state = state.copyWith(
-      financeSettings: state.financeSettings.copyWith(posChargeMode: mode),
-    );
+    final updated = state.financeSettings.copyWith(posChargeMode: mode);
+    updateFinanceSettings(updated);
   }
 
   void setPosFlatRate(double rate) {
-    state = state.copyWith(
-      financeSettings: state.financeSettings.copyWith(posFlatRate: rate),
-    );
+    final updated = state.financeSettings.copyWith(posFlatRate: rate);
+    updateFinanceSettings(updated);
   }
 
   void switchHub(String hubName, String hubCode, String hubId) {
@@ -610,35 +994,22 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
           .select()
           .order('name', ascending: true);
 
-      if (response.isNotEmpty) {
-        final fetchedList = <DistributionCenter>[];
-        for (final raw in response) {
-          try {
-            fetchedList.add(DistributionCenter.fromJson(raw));
-          } catch (e) {
-            debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ Error parsing live DC ($e)');
-          }
+      final List<DistributionCenter> dcs = [];
+      for (final item in response as List) {
+        try {
+          dcs.add(DistributionCenter.fromJson(item as Map<String, dynamic>));
+        } catch (e) {
+          debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ Error parsing DC row: $e');
         }
+      }
 
-        // Merge with existing default distribution centers so seed hubs are preserved
-        final mergedMap = <String, DistributionCenter>{};
-        for (final def in defaultDistributionCenters) {
-          mergedMap[def.id] = def;
-        }
-        for (final loc in state.distributionCenters) {
-          mergedMap[loc.id] = loc;
-        }
-        for (final fetched in fetchedList) {
-          mergedMap[fetched.id] = fetched;
-        }
-
-        final combined = mergedMap.values.toList();
-        state = state.copyWith(distributionCenters: combined);
-        await _storageService.cacheDistributionCenters(combined);
-        debugPrint('[DC_CONSOLE_PROVIDER] 🏢 Loaded ${combined.length} distribution centers from Supabase.');
+      if (dcs.isNotEmpty) {
+        state = state.copyWith(distributionCenters: dcs);
+        await _storageService.cacheDistributionCenters(dcs);
+        debugPrint('[DC_CONSOLE_PROVIDER] 🏢 Loaded ${dcs.length} distribution centers from live Supabase DB.');
       }
     } catch (e) {
-      debugPrint('[DC_CONSOLE_PROVIDER] ℹ️ Error loading distribution centers from DB ($e).');
+      debugPrint('[DC_CONSOLE_PROVIDER] ℹ️ Supabase DC fetch notice ($e). Using local cached DCs.');
     } finally {
       dbClient?.dispose();
     }
@@ -653,12 +1024,12 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     String? contactPhone,
     String? contactEmail,
     String? managerName,
+    bool isHub = false,
+    int storageCapacityUnits = 25000,
+    List<String> operatingZones = const [],
     String? supervisorEmail,
     String? supervisorPassword,
-    bool isHub = false,
-    List<String> operatingZones = const [],
-    int storageCapacityUnits = 25000,
-    AuthRemoteDataSource? authDataSource,
+    dynamic authDataSource,
   }) async {
     final cleanCode = code.trim().toUpperCase();
     final cleanName = name.trim();
@@ -671,82 +1042,79 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
       throw Exception("A distribution center with code '$cleanCode' already exists (${existing.name}). Please choose a unique DC code.");
     }
 
-    final dcId = 'dc_${cleanCode.toLowerCase().replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_')}_${DateTime.now().millisecondsSinceEpoch}';
-
     final newDc = DistributionCenter(
-      id: dcId,
+      id: 'dc-${cleanCode.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '-')}',
       companyId: '11111111-1111-4111-8111-111111111111',
       name: cleanName,
       code: cleanCode,
       state: stateName.trim(),
       city: city.trim(),
       address: address.trim(),
+      managerName: managerName?.trim().isNotEmpty == true ? managerName!.trim() : 'Station Supervisor',
       contactPhone: contactPhone?.trim().isNotEmpty == true ? contactPhone!.trim() : '+234 800 000 0000',
-      contactEmail: contactEmail?.trim().isNotEmpty == true ? contactEmail!.trim() : '${cleanCode.toLowerCase()}@novaexpress.com',
-      managerName: managerName?.trim().isNotEmpty == true ? managerName!.trim() : 'Operations Supervisor',
+      contactEmail: contactEmail?.trim().isNotEmpty == true ? contactEmail!.trim() : (supervisorEmail?.trim() ?? ''),
       isHub: isHub,
       isActive: true,
-      operatingZones: operatingZones.isNotEmpty ? operatingZones : [city.trim()],
       storageCapacityUnits: storageCapacityUnits > 0 ? storageCapacityUnits : 25000,
+      operatingZones: operatingZones.isNotEmpty ? operatingZones : [city.trim()],
       totalAssignedRiders: 0,
       activeInventoryBatches: 0,
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );
 
-    // 1. Immediately update local state & cache
-    final updatedList = [newDc, ...state.distributionCenters];
+    // 1. Update in-memory state and local persistent cache
+    final updatedList = [
+      newDc,
+      ...state.distributionCenters.where((d) => d.code != newDc.code && d.id != newDc.id),
+    ];
     state = state.copyWith(distributionCenters: updatedList);
     await _storageService.cacheDistributionCenters(updatedList);
 
-    // 2. Provision supervisor auth credentials at the auth level
-    final effectiveSupEmail = (supervisorEmail != null && supervisorEmail.trim().isNotEmpty)
+    // 2. Provision Auth Account for DC Station Supervisor if provided
+    final supEmail = (supervisorEmail != null && supervisorEmail.trim().isNotEmpty)
         ? supervisorEmail.trim()
-        : (contactEmail != null && contactEmail.trim().isNotEmpty
-            ? contactEmail.trim()
-            : 'supervisor.${cleanCode.toLowerCase()}@novaexpress.ng');
-    final effectiveSupPass = (supervisorPassword != null && supervisorPassword.trim().isNotEmpty)
+        : (contactEmail?.trim().isNotEmpty == true ? contactEmail!.trim() : 'supervisor.${newDc.code.toLowerCase()}@novaexpress.ng');
+    final supPass = (supervisorPassword != null && supervisorPassword.trim().length >= 6)
         ? supervisorPassword.trim()
         : 'Password123!';
 
-    final nameParts = (managerName ?? 'Operations Supervisor').trim().split(' ');
-    final firstName = nameParts.isNotEmpty ? nameParts.first : 'Operations';
-    final lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : 'Supervisor';
-    final phone = contactPhone?.trim().isNotEmpty == true ? contactPhone!.trim() : '+234 800 000 0000';
+    final nameParts = (managerName ?? 'Station Supervisor').trim().split(' ');
+    final fName = nameParts.isNotEmpty ? nameParts.first : 'Station';
+    final lName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : 'Supervisor';
 
     try {
       if (authDataSource != null) {
         await authDataSource.registerDistributionCenterSupervisor(
-          email: effectiveSupEmail,
-          password: effectiveSupPass,
-          firstName: firstName,
-          lastName: lastName,
-          phone: phone,
+          email: supEmail,
+          password: supPass,
+          firstName: fName,
+          lastName: lName,
+          phone: contactPhone?.trim().isNotEmpty == true ? contactPhone!.trim() : '+234 800 000 0000',
           distributionCenterId: newDc.id,
           distributionCenterName: newDc.name,
-          operatingState: stateName,
-          operatingCity: city,
         );
       } else {
-        final registeredSupervisor = UserModel(
-          id: 'u-sup-${newDc.code.toLowerCase()}',
-          email: effectiveSupEmail.toLowerCase(),
-          firstName: firstName,
-          lastName: lastName,
-          phone: phone,
-          role: 'dc_manager',
-          deliveryAgentId: null,
-          deliveryAgentCode: 'DC-MGR',
+        final authDs = AuthRemoteDataSourceImpl(
+          SupabaseClient(
+            SupabaseConstants.supabaseUrl,
+            SupabaseConstants.supabaseServiceRoleKey,
+            authOptions: const AuthClientOptions(autoRefreshToken: false),
+          ),
+        );
+        await authDs.registerDistributionCenterSupervisor(
+          email: supEmail,
+          password: supPass,
+          firstName: fName,
+          lastName: lName,
+          phone: contactPhone?.trim().isNotEmpty == true ? contactPhone!.trim() : '+234 800 000 0000',
           distributionCenterId: newDc.id,
           distributionCenterName: newDc.name,
-          operatingState: stateName,
-          operatingCity: city,
         );
-        AuthRemoteDataSourceImpl.registerUserInMemory(registeredSupervisor, effectiveSupPass);
       }
-      debugPrint('[DC_CONSOLE_PROVIDER] 👤 DC Supervisor account provisioned for $effectiveSupEmail ($cleanName)');
+      debugPrint('[DC_CONSOLE_PROVIDER] 👤 DC Supervisor account provisioned for $supEmail (${newDc.name})');
     } catch (authErr) {
-      debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ Supervisor auth provisioning note: $authErr');
+      debugPrint('[DC_CONSOLE_PROVIDER] ℹ️ Supervisor auth provisioning notice: $authErr');
     }
 
     // 3. Persist to live Supabase DB
@@ -759,8 +1127,6 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
       );
 
       await dbClient.from('distribution_centers').upsert({
-        'id': newDc.id.startsWith('dc_') ? null : newDc.id,
-        'company_id': newDc.companyId,
         'name': newDc.name,
         'code': newDc.code,
         'state': newDc.state,
@@ -768,10 +1134,14 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
         'address': newDc.address,
         'contact_phone': newDc.contactPhone,
         'contact_email': newDc.contactEmail,
+        'manager_name': newDc.managerName,
         'is_hub': newDc.isHub,
         'is_active': newDc.isActive,
-      }, onConflict: 'code');
-      debugPrint('[DC_CONSOLE_PROVIDER] 💾 Created DC "${newDc.name}" ($cleanCode) in Supabase.');
+        'operating_zones': newDc.operatingZones,
+        'storage_capacity_units': newDc.storageCapacityUnits,
+        'company_id': newDc.companyId,
+      });
+      debugPrint('[DC_CONSOLE_PROVIDER] 🏢 Created Distribution Center "${newDc.name}" (${newDc.code}) in Supabase.');
     } catch (e) {
       debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ Supabase DC create note: $e');
     } finally {
@@ -781,11 +1151,8 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     return newDc;
   }
 
-  Future<void> updateDistributionCenter(DistributionCenter updatedDc) async {
-    final updatedList = state.distributionCenters.map((d) {
-      return d.id == updatedDc.id ? updatedDc : d;
-    }).toList();
-
+  Future<void> updateDistributionCenter(DistributionCenter dc) async {
+    final updatedList = state.distributionCenters.map((d) => d.id == dc.id ? dc : d).toList();
     state = state.copyWith(distributionCenters: updatedList);
     await _storageService.cacheDistributionCenters(updatedList);
 
@@ -797,17 +1164,40 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
         authOptions: const AuthClientOptions(autoRefreshToken: false),
       );
 
-      await dbClient.from('distribution_centers').update({
-        'name': updatedDc.name,
-        'state': updatedDc.state,
-        'city': updatedDc.city,
-        'address': updatedDc.address,
-        'contact_phone': updatedDc.contactPhone,
-        'contact_email': updatedDc.contactEmail,
-        'is_hub': updatedDc.isHub,
-        'is_active': updatedDc.isActive,
-      }).eq('id', updatedDc.id);
-      debugPrint('[DC_CONSOLE_PROVIDER] 💾 Updated DC "${updatedDc.name}" in Supabase.');
+      final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
+      if (uuidRegex.hasMatch(dc.id)) {
+        await dbClient.from('distribution_centers').update({
+          'name': dc.name,
+          'code': dc.code,
+          'state': dc.state,
+          'city': dc.city,
+          'address': dc.address,
+          'contact_phone': dc.contactPhone,
+          'contact_email': dc.contactEmail,
+          'manager_name': dc.managerName,
+          'is_hub': dc.isHub,
+          'is_active': dc.isActive,
+          'operating_zones': dc.operatingZones,
+          'storage_capacity_units': dc.storageCapacityUnits,
+          'updated_at': DateTime.now().toIso8601String(),
+        }).eq('id', dc.id);
+      } else {
+        await dbClient.from('distribution_centers').update({
+          'name': dc.name,
+          'state': dc.state,
+          'city': dc.city,
+          'address': dc.address,
+          'contact_phone': dc.contactPhone,
+          'contact_email': dc.contactEmail,
+          'manager_name': dc.managerName,
+          'is_hub': dc.isHub,
+          'is_active': dc.isActive,
+          'operating_zones': dc.operatingZones,
+          'storage_capacity_units': dc.storageCapacityUnits,
+          'updated_at': DateTime.now().toIso8601String(),
+        }).eq('code', dc.code);
+      }
+      debugPrint('[DC_CONSOLE_PROVIDER] 🏢 Updated Distribution Center "${dc.name}" (${dc.code}) in Supabase.');
     } catch (e) {
       debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ Supabase DC update note: $e');
     } finally {
@@ -817,12 +1207,9 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
 
   Future<void> toggleDistributionCenterStatus(String dcId, bool isActive) async {
     final updatedList = state.distributionCenters.map((d) {
-      if (d.id == dcId) {
-        return d.copyWith(isActive: isActive, updatedAt: DateTime.now());
-      }
+      if (d.id == dcId) return d.copyWith(isActive: isActive);
       return d;
     }).toList();
-
     state = state.copyWith(distributionCenters: updatedList);
     await _storageService.cacheDistributionCenters(updatedList);
 
@@ -834,10 +1221,11 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
         authOptions: const AuthClientOptions(autoRefreshToken: false),
       );
 
-      await dbClient.from('distribution_centers').update({
-        'is_active': isActive,
-      }).eq('id', dcId);
-      debugPrint('[DC_CONSOLE_PROVIDER] 💾 Toggled DC "$dcId" active=$isActive in Supabase.');
+      final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
+      if (uuidRegex.hasMatch(dcId)) {
+        await dbClient.from('distribution_centers').update({'is_active': isActive}).eq('id', dcId);
+      }
+      debugPrint('[DC_CONSOLE_PROVIDER] 🏢 Toggled DC "$dcId" active status to $isActive.');
     } catch (e) {
       debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ Supabase DC toggle note: $e');
     } finally {
@@ -847,14 +1235,30 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
 
   Future<void> updateOperatingZones(String dcId, List<String> zones) async {
     final updatedList = state.distributionCenters.map((d) {
-      if (d.id == dcId) {
-        return d.copyWith(operatingZones: zones, updatedAt: DateTime.now());
-      }
+      if (d.id == dcId) return d.copyWith(operatingZones: zones);
       return d;
     }).toList();
-
     state = state.copyWith(distributionCenters: updatedList);
     await _storageService.cacheDistributionCenters(updatedList);
+
+    SupabaseClient? dbClient;
+    try {
+      dbClient = SupabaseClient(
+        SupabaseConstants.supabaseUrl,
+        SupabaseConstants.supabaseServiceRoleKey,
+        authOptions: const AuthClientOptions(autoRefreshToken: false),
+      );
+
+      final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
+      if (uuidRegex.hasMatch(dcId)) {
+        await dbClient.from('distribution_centers').update({'operating_zones': zones}).eq('id', dcId);
+      }
+      debugPrint('[DC_CONSOLE_PROVIDER] 🏢 Updated operating zones for DC "$dcId".');
+    } catch (e) {
+      debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ Supabase DC zones note: $e');
+    } finally {
+      dbClient?.dispose();
+    }
   }
 
   Future<void> deleteDistributionCenter(String dcId) async {
@@ -892,6 +1296,13 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     ];
     state = state.copyWith(drivers: updated);
     _storageService.cacheFleetDrivers(updated);
+    _storageService.cacheDriverCompensationTerms(driver.driverCode, driver.toJson());
+    if (driver.email.isNotEmpty) {
+      _storageService.cacheDriverCompensationTerms(driver.email, driver.toJson());
+    }
+    if (driver.id.isNotEmpty) {
+      _storageService.cacheDriverCompensationTerms(driver.id, driver.toJson());
+    }
   }
 
   Future<void> updateDriverProfileAndTerms({
@@ -908,6 +1319,13 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
 
     state = state.copyWith(drivers: updatedList);
     await _storageService.cacheFleetDrivers(updatedList);
+    await _storageService.cacheDriverCompensationTerms(updatedDriver.driverCode, updatedDriver.toJson());
+    if (updatedDriver.email.isNotEmpty) {
+      await _storageService.cacheDriverCompensationTerms(updatedDriver.email, updatedDriver.toJson());
+    }
+    if (updatedDriver.id.isNotEmpty) {
+      await _storageService.cacheDriverCompensationTerms(updatedDriver.id, updatedDriver.toJson());
+    }
 
     // 2. Register in AuthRemoteDataSource memory so rider logins get custom terms
     final nameParts = updatedDriver.name.trim().split(' ');
@@ -937,6 +1355,7 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
         bankAccountName: updatedDriver.bankAccountName,
         agentStatus: updatedDriver.status,
         operatingCity: updatedDriver.assignedZone,
+        distributionCenterId: updatedDriver.distributionCenterId,
       ),
       newPassword,
     );
@@ -960,29 +1379,43 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
 
       final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
 
-      // Update delivery_agents table
-      if (uuidRegex.hasMatch(updatedDriver.id)) {
-        await dbClient.from(SupabaseConstants.deliveryAgentsTable).update({
-          'current_status': updatedDriver.status,
-          'vehicle_type': updatedDriver.vehicleType,
-          'vehicle_plate_number': updatedDriver.vehiclePlate,
-          'operating_city': updatedDriver.assignedZone,
-          'bank_name': updatedDriver.bankName,
-          'bank_account_number': updatedDriver.bankAccountNumber,
-          'bank_account_name': updatedDriver.bankAccountName,
-          'is_active': updatedDriver.status.toLowerCase() != 'inactive',
-        }).eq('id', updatedDriver.id);
-      } else {
-        await dbClient.from(SupabaseConstants.deliveryAgentsTable).update({
-          'current_status': updatedDriver.status,
-          'vehicle_type': updatedDriver.vehicleType,
-          'vehicle_plate_number': updatedDriver.vehiclePlate,
-          'operating_city': updatedDriver.assignedZone,
-          'bank_name': updatedDriver.bankName,
-          'bank_account_number': updatedDriver.bankAccountNumber,
-          'bank_account_name': updatedDriver.bankAccountName,
-          'is_active': updatedDriver.status.toLowerCase() != 'inactive',
-        }).eq('agent_code', updatedDriver.driverCode);
+      final baseAgentPayload = {
+        'current_status': updatedDriver.status,
+        'vehicle_type': updatedDriver.vehicleType,
+        'vehicle_plate_number': updatedDriver.vehiclePlate,
+        'operating_city': updatedDriver.assignedZone,
+        'bank_name': updatedDriver.bankName,
+        'bank_account_number': updatedDriver.bankAccountNumber,
+        'bank_account_name': updatedDriver.bankAccountName,
+        'is_active': updatedDriver.status.toLowerCase() != 'inactive',
+      };
+
+      final extendedAgentPayload = {
+        ...baseAgentPayload,
+        'commission_rate': updatedDriver.commissionRate,
+        'transport_allowance': updatedDriver.transportAllowance,
+        'failed_delivery_allowance': updatedDriver.failedDeliveryAllowance,
+        'base_salary': updatedDriver.baseSalary,
+        'personnel_type': updatedDriver.personnelType,
+        'compensation_type': updatedDriver.compensationType,
+        if (updatedDriver.distributionCenterId != null && updatedDriver.distributionCenterId!.isNotEmpty)
+          'distribution_center_id': updatedDriver.distributionCenterId,
+      };
+
+      // Update delivery_agents table (attempting full compensation terms first)
+      try {
+        if (uuidRegex.hasMatch(updatedDriver.id)) {
+          await dbClient.from(SupabaseConstants.deliveryAgentsTable).update(extendedAgentPayload).eq('id', updatedDriver.id);
+        } else {
+          await dbClient.from(SupabaseConstants.deliveryAgentsTable).update(extendedAgentPayload).eq('agent_code', updatedDriver.driverCode);
+        }
+      } catch (colErr) {
+        // Fallback to base columns if extended columns are not yet in Supabase schema
+        if (uuidRegex.hasMatch(updatedDriver.id)) {
+          await dbClient.from(SupabaseConstants.deliveryAgentsTable).update(baseAgentPayload).eq('id', updatedDriver.id);
+        } else {
+          await dbClient.from(SupabaseConstants.deliveryAgentsTable).update(baseAgentPayload).eq('agent_code', updatedDriver.driverCode);
+        }
       }
 
       // Update users table (name, phone)
@@ -1054,21 +1487,134 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
 
       if (dbDrivers.isNotEmpty) {
         final Map<String, DCFleetDriver> driverMap = {};
-        // 1. Keep any newly added local drivers that aren't yet loaded
+        // 1. Seed with in-memory / cached drivers (which already have custom terms)
         for (final d in state.drivers) {
-          final key = d.email.isNotEmpty ? d.email.toLowerCase() : d.driverCode;
-          driverMap[key] = d;
+          final emailKey = d.email.isNotEmpty ? d.email.toLowerCase() : '';
+          final codeKey = d.driverCode.isNotEmpty ? d.driverCode.toLowerCase() : '';
+          final idKey = d.id.isNotEmpty ? d.id.toLowerCase() : '';
+          if (emailKey.isNotEmpty) driverMap[emailKey] = d;
+          if (codeKey.isNotEmpty) driverMap[codeKey] = d;
+          if (idKey.isNotEmpty) driverMap[idKey] = d;
         }
-        // 2. Overlay / update with authoritative DB drivers
-        for (final d in dbDrivers) {
-          final key = d.email.isNotEmpty ? d.email.toLowerCase() : d.driverCode;
-          driverMap[key] = d;
-        }
-        final mergedList = driverMap.values.toList();
 
+        final cachedTerms = await _storageService.getCachedDriverCompensationTerms();
+
+        // 2. Intelligently merge DB driver with custom terms
+        final Map<String, DCFleetDriver> mergedByKey = {};
+
+        for (final dbD in dbDrivers) {
+          final emailKey = dbD.email.isNotEmpty ? dbD.email.toLowerCase() : '';
+          final codeKey = dbD.driverCode.isNotEmpty ? dbD.driverCode.toLowerCase() : '';
+          final idKey = dbD.id.isNotEmpty ? dbD.id.toLowerCase() : '';
+
+          final existing = (emailKey.isNotEmpty ? driverMap[emailKey] : null) ??
+              (codeKey.isNotEmpty ? driverMap[codeKey] : null) ??
+              (idKey.isNotEmpty ? driverMap[idKey] : null);
+
+          Map<String, dynamic>? termsMap;
+          if (cachedTerms != null) {
+            if (emailKey.isNotEmpty && cachedTerms.containsKey(emailKey)) {
+              termsMap = cachedTerms[emailKey];
+            } else if (codeKey.isNotEmpty && cachedTerms.containsKey(codeKey)) {
+              termsMap = cachedTerms[codeKey];
+            } else if (idKey.isNotEmpty && cachedTerms.containsKey(idKey)) {
+              termsMap = cachedTerms[idKey];
+            }
+          }
+
+          // Resolve custom compensation terms without defaulting
+          final comm = existing?.commissionRate ??
+              (termsMap?['commission_rate'] as num?)?.toDouble() ??
+              dbD.commissionRate;
+
+          final trans = existing?.transportAllowance ??
+              (termsMap?['transport_allowance'] as num?)?.toDouble() ??
+              dbD.transportAllowance;
+
+          final failed = existing?.failedDeliveryAllowance ??
+              (termsMap?['failed_delivery_allowance'] as num?)?.toDouble() ??
+              dbD.failedDeliveryAllowance;
+
+          final salary = existing?.baseSalary ??
+              (termsMap?['base_salary'] as num?)?.toDouble() ??
+              dbD.baseSalary;
+
+          final pType = existing?.personnelType ??
+              termsMap?['personnel_type'] as String? ??
+              dbD.personnelType;
+
+          final cType = existing?.compensationType ??
+              termsMap?['compensation_type'] as String? ??
+              dbD.compensationType;
+
+          final lgas = (existing != null && existing.coveredLgas.isNotEmpty)
+              ? existing.coveredLgas
+              : (termsMap?['covered_lgas'] as List?)?.map((e) => e.toString()).toList() ?? dbD.coveredLgas;
+
+          final dcId = existing?.distributionCenterId ??
+              termsMap?['distribution_center_id'] as String? ??
+              dbD.distributionCenterId;
+
+          final mergedDriver = dbD.copyWith(
+            commissionRate: comm,
+            transportAllowance: trans,
+            failedDeliveryAllowance: failed,
+            baseSalary: salary,
+            personnelType: pType,
+            compensationType: cType,
+            coveredLgas: lgas,
+            distributionCenterId: dcId,
+          );
+
+          final primaryKey = emailKey.isNotEmpty ? emailKey : codeKey;
+          mergedByKey[primaryKey] = mergedDriver;
+
+          // Also keep AuthRemoteDataSource in-memory registry updated for instant login
+          final nameParts = mergedDriver.name.trim().split(' ');
+          final fName = nameParts.first;
+          final lName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+          AuthRemoteDataSourceImpl.registerUserInMemory(
+            UserModel(
+              id: mergedDriver.id,
+              email: mergedDriver.email,
+              firstName: fName,
+              lastName: lName,
+              phone: mergedDriver.phone,
+              role: 'delivery_agent',
+              deliveryAgentId: mergedDriver.id,
+              deliveryAgentCode: mergedDriver.driverCode,
+              personnelType: pType,
+              compensationType: cType,
+              commissionRate: comm,
+              transportAllowance: trans,
+              failedDeliveryAllowance: failed,
+              baseSalary: salary,
+              vehicleType: mergedDriver.vehicleType,
+              vehiclePlateNumber: mergedDriver.vehiclePlate,
+              bankName: mergedDriver.bankName,
+              bankAccountNumber: mergedDriver.bankAccountNumber,
+              bankAccountName: mergedDriver.bankAccountName,
+              agentStatus: mergedDriver.status,
+              operatingCity: mergedDriver.assignedZone,
+              distributionCenterId: dcId,
+            ),
+          );
+        }
+
+        // Add any locally added drivers not in DB yet
+        for (final d in state.drivers) {
+          final emailKey = d.email.isNotEmpty ? d.email.toLowerCase() : '';
+          final codeKey = d.driverCode.isNotEmpty ? d.driverCode.toLowerCase() : '';
+          final primaryKey = emailKey.isNotEmpty ? emailKey : codeKey;
+          if (!mergedByKey.containsKey(primaryKey)) {
+            mergedByKey[primaryKey] = d;
+          }
+        }
+
+        final mergedList = mergedByKey.values.toList();
         state = state.copyWith(drivers: mergedList, isLoading: false);
         await _storageService.cacheFleetDrivers(mergedList);
-        debugPrint('[DC_CONSOLE_PROVIDER] 🚚 Loaded ${dbDrivers.length} active fleet drivers from live Supabase DB (Total active fleet: ${mergedList.length}) and updated local cache.');
+        debugPrint('[DC_CONSOLE_PROVIDER] 🚚 Loaded ${dbDrivers.length} active fleet drivers from live Supabase DB (Total active fleet: ${mergedList.length}) and merged custom compensation terms.');
       }
     } catch (e) {
       debugPrint('[DC_CONSOLE_PROVIDER] ℹ️ Supabase fleet fetch notice ($e). Local cached drivers retained.');
@@ -1426,6 +1972,11 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     }).toList();
     state = state.copyWith(returnItems: updated);
     _storageService.cacheReturnItems(updated);
+  }
+
+  String _generateUuid() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    return 'cli-gen-$now';
   }
 }
 

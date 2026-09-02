@@ -89,19 +89,21 @@ class DCFinanceSettings {
     );
   }
 
+  double get defaultFailedDeliveryAllowance => defaultFailedStipend;
+
   factory DCFinanceSettings.fromJson(Map<String, dynamic> json) {
     return DCFinanceSettings(
       posChargeMode: json['pos_charge_mode']?.toString() ?? json['posChargeMode'] ?? 'dynamic',
-      posFlatRate: (json['pos_flat_rate'] as num?)?.toDouble() ?? 350.0,
-      posTierAmount: (json['pos_tier_amount'] as num?)?.toDouble() ?? 5000.0,
-      posTierFee: (json['pos_tier_fee'] as num?)?.toDouble() ?? 100.0,
-      posMaxCapFee: (json['pos_max_cap_fee'] as num?)?.toDouble() ?? 1500.0,
+      posFlatRate: (json['pos_flat_rate'] as num?)?.toDouble() ?? (json['posFlatRate'] as num?)?.toDouble() ?? 350.0,
+      posTierAmount: (json['pos_tier_amount'] as num?)?.toDouble() ?? (json['posTierAmount'] as num?)?.toDouble() ?? 5000.0,
+      posTierFee: (json['pos_tier_fee'] as num?)?.toDouble() ?? (json['posTierFee'] as num?)?.toDouble() ?? 100.0,
+      posMaxCapFee: (json['pos_max_cap_fee'] as num?)?.toDouble() ?? (json['posMaxCapFee'] as num?)?.toDouble() ?? 1500.0,
       isPosFeeReimbursable: json['is_pos_fee_reimbursable'] ?? json['isPosFeeReimbursable'] ?? true,
       paystackDirectFeePercent: (json['paystack_direct_fee_percent'] as num?)?.toDouble() ?? 1.5,
       paystackFeeCap: (json['paystack_fee_cap'] as num?)?.toDouble() ?? 2000.0,
-      defaultCommissionRate: (json['default_commission_rate'] as num?)?.toDouble() ?? 1000.0,
-      defaultTransportAllowance: (json['default_transport_allowance'] as num?)?.toDouble() ?? 1500.0,
-      defaultFailedStipend: (json['default_failed_stipend'] as num?)?.toDouble() ?? 500.0,
+      defaultCommissionRate: (json['default_commission_rate'] as num?)?.toDouble() ?? (json['defaultCommissionRate'] as num?)?.toDouble() ?? 1000.0,
+      defaultTransportAllowance: (json['default_transport_allowance'] as num?)?.toDouble() ?? (json['defaultTransportAllowance'] as num?)?.toDouble() ?? 1500.0,
+      defaultFailedStipend: (json['default_failed_delivery_allowance'] as num?)?.toDouble() ?? (json['default_failed_stipend'] as num?)?.toDouble() ?? (json['defaultFailedStipend'] as num?)?.toDouble() ?? 500.0,
       settlementBankName: json['settlement_bank_name']?.toString() ?? 'Titan Trust Bank',
       settlementAccountNumber: json['settlement_account_number']?.toString() ?? '0098234123',
       settlementAccountName: json['settlement_account_name']?.toString() ?? 'NovaExpress Logistics Limited',
@@ -121,6 +123,7 @@ class DCFinanceSettings {
       'paystack_fee_cap': paystackFeeCap,
       'default_commission_rate': defaultCommissionRate,
       'default_transport_allowance': defaultTransportAllowance,
+      'default_failed_delivery_allowance': defaultFailedStipend,
       'default_failed_stipend': defaultFailedStipend,
       'settlement_bank_name': settlementBankName,
       'settlement_account_number': settlementAccountNumber,

@@ -29,8 +29,10 @@ class _LoginFormState extends ConsumerState<LoginForm> {
 
   void _onAgentIdChanged() {
     final text = _agentIdController.text.trim().toLowerCase();
-    final isDc = text.contains('dc.') || text.contains('supervisor') || text.contains('dc-mgr') || text.contains('dc.wuse');
-    final expectedRole = isDc ? 'dc_manager' : 'rider';
+    final isCloser = text.startsWith('closer.') || text.contains('amaka') || text.startsWith('cls-');
+    final isClient = !isCloser && (text.startsWith('client.') || text.contains('novacale') || text.contains('merchant'));
+    final isDc = !isClient && !isCloser && (text.contains('dc.') || text.contains('supervisor') || text.contains('dc-mgr') || text.contains('dc.wuse'));
+    final expectedRole = isCloser ? 'closer' : (isClient ? 'client' : (isDc ? 'dc_manager' : 'rider'));
     final currentRole = ref.read(loginSelectedRoleProvider);
     if (currentRole != expectedRole && mounted) {
       ref.read(loginSelectedRoleProvider.notifier).state = expectedRole;
@@ -50,6 +52,12 @@ class _LoginFormState extends ConsumerState<LoginForm> {
     if (role == 'rider') {
       _agentIdController.text = 'emeka.rider@novaexpress.ng';
       _passwordController.text = 'Password123!';
+    } else if (role == 'client') {
+      _agentIdController.text = 'client.novacale@novaexpress.ng';
+      _passwordController.text = 'ClientPass123!';
+    } else if (role == 'closer') {
+      _agentIdController.text = 'closer.amaka@novacale.ng';
+      _passwordController.text = 'CloserPass123!';
     } else {
       _agentIdController.text = 'dc.supervisor@novaexpress.ng';
       _passwordController.text = 'Password123!';
@@ -70,7 +78,10 @@ class _LoginFormState extends ConsumerState<LoginForm> {
       if (success && mounted) {
         final authState = ref.read(authProvider);
         try {
-          if (authState.user?.isDcManager == true) {
+          if (authState.user?.isClient == true) {
+            debugPrint('[AUTH_UI] 🛍️ Navigating Merchant/Client to Client Portal (/client)...');
+            context.go('/client');
+          } else if (authState.user?.isDcManager == true) {
             debugPrint('[AUTH_UI] 🏢 Navigating DC Manager to DC Operations Console (/dc)...');
             context.go('/dc');
           } else {
@@ -167,6 +178,34 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                   activeColor: const Color(0xFF0B192C),
                   isSelected: selectedRole == 'dc_manager',
                   onTap: () => _selectRole('dc_manager'),
+                ),
+
+                const SizedBox(height: 8),
+
+                // Card 3: E-Commerce Merchant Admin
+                _buildRoleCard(
+                  roleKey: 'client',
+                  title: 'E-Commerce Merchant Admin',
+                  subtitle: 'Client: Novacale Limited (Executive Console)',
+                  tag: 'Client Admin',
+                  icon: Icons.storefront_rounded,
+                  activeColor: const Color(0xFF0D9488),
+                  isSelected: selectedRole == 'client',
+                  onTap: () => _selectRole('client'),
+                ),
+
+                const SizedBox(height: 8),
+
+                // Card 4: Enterprise Telesales Closer
+                _buildRoleCard(
+                  roleKey: 'closer',
+                  title: 'Enterprise Telesales Closer',
+                  subtitle: 'Amaka Chioma • Novacale Limited (CLS-NOVA-001)',
+                  tag: 'Lead Dialer & Orders',
+                  icon: Icons.headset_mic_rounded,
+                  activeColor: const Color(0xFF6366F1),
+                  isSelected: selectedRole == 'closer',
+                  onTap: () => _selectRole('closer'),
                 ),
               ],
             ),
@@ -347,7 +386,9 @@ class _LoginFormState extends ConsumerState<LoginForm> {
             height: 50,
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: selectedRole == 'dc_manager' ? const Color(0xFF0B192C) : AppColors.orange,
+                backgroundColor: selectedRole == 'dc_manager'
+                    ? const Color(0xFF0B192C)
+                    : (selectedRole == 'client' ? const Color(0xFF0D9488) : AppColors.orange),
                 foregroundColor: Colors.white,
                 elevation: 1,
                 shape: RoundedRectangleBorder(
@@ -365,14 +406,21 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          selectedRole == 'dc_manager' ? 'Sign In to DC Console' : 'Sign In to PDA App',
+                          selectedRole == 'dc_manager'
+                              ? 'Sign In to DC Console'
+                              : (selectedRole == 'client' ? 'Sign In to Client Portal' : 'Sign In to PDA App'),
                           style: const TextStyle(
-                            fontSize: 15,
+                            fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         const SizedBox(width: 8),
-                        const Icon(Icons.arrow_forward_rounded, size: 18),
+                        Icon(
+                          selectedRole == 'dc_manager'
+                              ? Icons.dashboard_rounded
+                              : (selectedRole == 'client' ? Icons.storefront_rounded : Icons.arrow_forward_rounded),
+                          size: 18,
+                        ),
                       ],
                     ),
             ),

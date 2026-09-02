@@ -10,6 +10,7 @@ import '../../../stock/presentation/providers/stock_provider.dart';
 import '../../../users/presentation/widgets/edit_profile_modal.dart';
 import '../../domain/entities/distribution_center.dart';
 import '../providers/dc_console_provider.dart';
+import 'dc_clients_page.dart';
 import 'dc_dashboard_page.dart';
 import 'dc_distribution_centers_page.dart';
 import 'dc_finance_page.dart';
@@ -118,6 +119,8 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
         return const DCDistributionCentersPage();
       case 10:
         return const DCSettingsPage();
+      case 11:
+        return const DCClientsPage();
       default:
         return const DCDashboardPage();
     }
@@ -223,6 +226,7 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
                 _buildNavItem(7, 'Rider Payouts', Icons.payments_rounded, state.activeTabIndex == 7, isCollapsed, isDrawer),
                 _buildNavItem(8, 'Riders & Fleet', Icons.badge_rounded, state.activeTabIndex == 8, isCollapsed, isDrawer),
                 _buildNavItem(9, 'Distribution Centers', Icons.apartment_rounded, state.activeTabIndex == 9, isCollapsed, isDrawer),
+                _buildNavItem(11, 'Clients & Merchants', Icons.storefront_rounded, state.activeTabIndex == 11, isCollapsed, isDrawer),
                 _buildNavItem(10, 'Policy & Settings', Icons.tune_rounded, state.activeTabIndex == 10, isCollapsed, isDrawer),
               ],
             ),

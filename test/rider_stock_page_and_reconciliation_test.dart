@@ -28,11 +28,73 @@ class MockAuthNotifier extends StateNotifier<AuthState> implements AuthNotifier 
 }
 
 class FakeStockRepository implements StockRepository {
+  List<StockItemEntity> stockItems;
+  List<RiderStockAllocation> allocations;
+
+  FakeStockRepository({
+    List<StockItemEntity>? stockItems,
+    List<RiderStockAllocation>? allocations,
+  })  : stockItems = stockItems ?? [mockStockItem],
+        allocations = allocations ?? [mockAllocation];
+
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 
   @override
-  Future<List<StockItemEntity>> getVehicleStockItems([String? agentId]) async => [];
+  Future<List<StockItemEntity>> getVehicleStockItems([String? agentId]) async => stockItems;
+
+  @override
+  Future<List<RiderStockAllocation>> getRiderStockAllocations([String? riderId]) async => allocations;
+
+  @override
+  Future<void> updateRiderStockCustody({
+    required String riderId,
+    required String productId,
+    int deliveredDelta = 0,
+    int returnedDelta = 0,
+    int inCustodyDelta = 0,
+  }) async {
+    allocations = allocations.map((a) {
+      if (a.riderId == riderId && (a.productId == productId || a.productName == productId)) {
+        return a.copyWith(
+          inCustodyUnits: a.inCustodyUnits + inCustodyDelta,
+          deliveredUnits: a.deliveredUnits + deliveredDelta,
+          returnedUnits: a.returnedUnits + returnedDelta,
+        );
+      }
+      return a;
+    }).toList();
+
+    stockItems = stockItems.map((s) {
+      if (s.id == productId || s.name == productId) {
+        return s.copyWith(
+          availableCount: s.availableCount + inCustodyDelta,
+          deliveredCount: s.deliveredCount + deliveredDelta,
+          returnedCount: s.returnedCount + returnedDelta,
+        );
+      }
+      return s;
+    }).toList();
+  }
+
+  @override
+  Future<Map<String, dynamic>> processStockReturn({
+    required String returnNumber,
+    required String orderId,
+    required String deliveryAgentId,
+    required String productId,
+    required int quantity,
+    required String reason,
+    String? notes,
+  }) async {
+    await updateRiderStockCustody(
+      riderId: deliveryAgentId,
+      productId: productId,
+      inCustodyDelta: -quantity,
+      returnedDelta: quantity,
+    );
+    return {'success': true, 'remainingInVehicle': allocations.first.inCustodyUnits};
+  }
 }
 
 class MockOrdersNotifier extends StateNotifier<OrdersState> implements OrdersNotifier {
@@ -65,6 +127,57 @@ class MockFinanceNotifier extends StateNotifier<FinanceState> implements Finance
   Future<void> loadRemittances([String? agentId]) async {}
 }
 
+const mockUser = UserEntity(
+  id: 'user_1',
+  firstName: 'Emeka',
+  lastName: 'Rider',
+  email: 'emeka@example.com',
+  phone: '08031112222',
+  role: 'delivery_agent',
+  deliveryAgentId: 'drv_emeka_1',
+  deliveryAgentCode: 'PDA-7000',
+  operatingState: 'Lagos',
+  operatingCity: 'Lekki Phase 1',
+  rating: 4.9,
+  commissionRate: 1000.0,
+  transportAllowance: 1500.0,
+);
+
+const mockStockItem = StockItemEntity(
+  id: 'prod_grazer_02',
+  sku: 'SKU-GRAZ-02',
+  name: 'Grazer Herbal Tea',
+  description: 'Weight loss metabolic enhancement organic tea',
+  price: 22000.0,
+  ownerName: 'Novacare Limited',
+  inventoryType: InventoryType.distributedInventory,
+  totalInCustody: 20,
+  assignedCount: 20,
+  deliveredCount: 8,
+  availableCount: 12,
+  returnedCount: 0,
+  complaintCount: 0,
+  lowStockThreshold: 3,
+  category: 'Health & Wellness',
+  binLocation: 'BIN-A1-02',
+  batchNumber: 'LOT-2026-08',
+);
+
+final mockAllocation = RiderStockAllocation(
+  id: 'alloc_grazer_1',
+  riderId: 'drv_emeka_1',
+  riderName: 'Emeka Rider',
+  riderCode: 'PDA-7000',
+  productId: 'prod_grazer_02',
+  productName: 'Grazer Herbal Tea',
+  sku: 'SKU-GRAZ-02',
+  allocatedUnits: 20,
+  deliveredUnits: 8,
+  inCustodyUnits: 12,
+  unitPrice: 22000.0,
+  allocatedAt: DateTime(2026, 8, 27),
+);
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -75,57 +188,6 @@ void main() {
   setUpAll(() {
     GoogleFonts.config.allowRuntimeFetching = false;
   });
-
-  const mockUser = UserEntity(
-    id: 'user_1',
-    firstName: 'Emeka',
-    lastName: 'Rider',
-    email: 'emeka@example.com',
-    phone: '08031112222',
-    role: 'delivery_agent',
-    deliveryAgentId: 'drv_emeka_1',
-    deliveryAgentCode: 'PDA-7000',
-    operatingState: 'Lagos',
-    operatingCity: 'Lekki Phase 1',
-    rating: 4.9,
-    commissionRate: 1000.0,
-    transportAllowance: 1500.0,
-  );
-
-  const mockStockItem = StockItemEntity(
-    id: 'prod_grazer_02',
-    sku: 'SKU-GRAZ-02',
-    name: 'Grazer Herbal Tea',
-    description: 'Weight loss metabolic enhancement organic tea',
-    price: 22000.0,
-    ownerName: 'Novacare Limited',
-    inventoryType: InventoryType.distributedInventory,
-    totalInCustody: 20,
-    assignedCount: 20,
-    deliveredCount: 8,
-    availableCount: 12,
-    returnedCount: 0,
-    complaintCount: 0,
-    lowStockThreshold: 3,
-    category: 'Health & Wellness',
-    binLocation: 'BIN-A1-02',
-    batchNumber: 'LOT-2026-08',
-  );
-
-  final mockAllocation = RiderStockAllocation(
-    id: 'alloc_grazer_1',
-    riderId: 'drv_emeka_1',
-    riderName: 'Emeka Rider',
-    riderCode: 'PDA-7000',
-    productId: 'prod_grazer_02',
-    productName: 'Grazer Herbal Tea',
-    sku: 'SKU-GRAZ-02',
-    allocatedUnits: 20,
-    deliveredUnits: 8,
-    inCustodyUnits: 12,
-    unitPrice: 22000.0,
-    allocatedAt: DateTime(2026, 8, 27),
-  );
 
   final mockTiedOrder = OrderEntity(
     id: 'ord_tied_1',
@@ -366,12 +428,8 @@ void main() {
     });
 
     test('5. StockNotifier.recordDeliveredOrderStock automatically deducts vehicle custody and increments delivered count', () async {
-      final container = ProviderContainer(
-        overrides: [
-          stockRepositoryProvider.overrideWithValue(FakeStockRepository()),
-        ],
-      );
-      final notifier = container.read(stockProvider.notifier);
+      final fakeRepo = FakeStockRepository();
+      final notifier = StockNotifier(repository: fakeRepo);
 
       notifier.state = StockState(
         stockItems: [mockStockItem],
@@ -400,12 +458,8 @@ void main() {
     });
 
     test('6. StockNotifier.returnStockToDC returns physical stock to host DC and reconciles custody', () async {
-      final container = ProviderContainer(
-        overrides: [
-          stockRepositoryProvider.overrideWithValue(FakeStockRepository()),
-        ],
-      );
-      final notifier = container.read(stockProvider.notifier);
+      final fakeRepo = FakeStockRepository();
+      final notifier = StockNotifier(repository: fakeRepo);
 
       notifier.state = StockState(
         stockItems: [mockStockItem],

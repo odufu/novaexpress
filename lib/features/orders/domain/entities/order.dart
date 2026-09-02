@@ -56,6 +56,11 @@ class OrderEntity {
   final String? binLocation;
   final String? batchNumber;
   final String? deliveryAgentPhone;
+  final String? distributionCenterName;
+  final String? closerId;
+  final String? closerName;
+  final String? closerCode;
+  final String? leadId;
   final DateTime createdAt;
 
   const OrderEntity({
@@ -96,6 +101,7 @@ class OrderEntity {
     this.deliveryAgentCode,
     this.deliveryAgentPhone,
     this.distributionCenterId,
+    this.distributionCenterName,
     this.latitude,
     this.longitude,
     this.geocodingStatus,
@@ -116,8 +122,20 @@ class OrderEntity {
     this.productSku,
     this.binLocation,
     this.batchNumber,
+    this.closerId,
+    this.closerName,
+    this.closerCode,
+    this.leadId,
     required this.createdAt,
   });
+
+  String? get deliveryLga => lga ?? deliveryCity;
+  String? get assignedAgentId => deliveryAgentId;
+  String? get assignedAgentName => deliveryAgentName;
+  String? get assignedAgentPhone => deliveryAgentPhone;
+  String? get packageName => packageDealName;
+  String? get packageId => packageDealId;
+  DateTime? get updatedAt => remittedAt ?? deliveredAt ?? assignedAt ?? createdAt;
 
   bool get isDirectTransfer {
     final pt = paymentType.toLowerCase();
@@ -414,6 +432,10 @@ Kindly tap the "📎" attach button below and share your *Current Location / Liv
     String? productSku,
     String? binLocation,
     String? batchNumber,
+    String? closerId,
+    String? closerName,
+    String? closerCode,
+    String? leadId,
     DateTime? createdAt,
   }) {
     return OrderEntity(
@@ -474,6 +496,10 @@ Kindly tap the "📎" attach button below and share your *Current Location / Liv
       productSku: productSku ?? this.productSku,
       binLocation: binLocation ?? this.binLocation,
       batchNumber: batchNumber ?? this.batchNumber,
+      closerId: closerId ?? this.closerId,
+      closerName: closerName ?? this.closerName,
+      closerCode: closerCode ?? this.closerCode,
+      leadId: leadId ?? this.leadId,
       createdAt: createdAt ?? this.createdAt,
     );
   }

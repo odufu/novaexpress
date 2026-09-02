@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -335,10 +336,10 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
               return SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: ConstrainedBox(
-                  constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                  constraints: BoxConstraints(minWidth: math.max(constraints.maxWidth, 1180.0)),
                   child: DataTable(
-                    columnSpacing: 18,
-                    horizontalMargin: 16,
+                    columnSpacing: 14,
+                    horizontalMargin: 14,
                     dataRowMinHeight: 64,
                     dataRowMaxHeight: 74,
                     headingRowHeight: 46,
@@ -408,36 +409,44 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
                           // Rider Name & Contact
                           DataCell(
                             onTap: () => widget.onDriverTap?.call(driver),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                UserAvatarWidget(
-                                  avatarUrl: driver.avatarUrl,
-                                  fullName: driver.name,
-                                  radius: 15,
-                                ),
-                                const SizedBox(width: 8),
-                                Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      driver.name,
-                                      style: GoogleFonts.inter(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                      ),
+                            SizedBox(
+                              width: 140,
+                              child: Row(
+                                children: [
+                                  UserAvatarWidget(
+                                    avatarUrl: driver.avatarUrl,
+                                    fullName: driver.name,
+                                    radius: 14,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          driver.name,
+                                          style: GoogleFonts.inter(
+                                            fontSize: 12.5,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        Text(
+                                          driver.phone,
+                                          style: GoogleFonts.inter(
+                                            fontSize: 11,
+                                            color: const Color(0xFF64748B),
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
                                     ),
-                                    Text(
-                                      driver.phone,
-                                      style: GoogleFonts.inter(
-                                        fontSize: 11,
-                                        color: const Color(0xFF64748B),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
 
@@ -496,23 +505,34 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
                           // Zone & Vehicle
                           DataCell(
                             onTap: () => widget.onDriverTap?.call(driver),
-                            Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(Icons.location_on_outlined, size: 12, color: Color(0xFF64748B)),
-                                    const SizedBox(width: 2),
-                                    Text(driver.assignedZone, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
-                                  ],
-                                ),
-                                Text(
-                                  '${driver.vehicleModel} • ${driver.vehiclePlate}',
-                                  style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
-                                ),
-                              ],
+                            SizedBox(
+                              width: 150,
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.location_on_outlined, size: 12, color: Color(0xFF64748B)),
+                                      const SizedBox(width: 2),
+                                      Expanded(
+                                        child: Text(
+                                          driver.assignedZone,
+                                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Text(
+                                    '${driver.vehicleModel} • ${driver.vehiclePlate}',
+                                    style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
 
@@ -526,7 +546,7 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
                           DataCell(
                             onTap: () => widget.onDriverTap?.call(driver),
                             SizedBox(
-                              width: 120,
+                              width: 110,
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 crossAxisAlignment: CrossAxisAlignment.start,

@@ -125,6 +125,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     // 1. Instantly restore from Local Storage cache so UI (and avatar) loads without flashing
     try {
       final cachedJson = await localStorageService?.getCachedUserProfile();
+      if (!mounted) return;
       if (cachedJson != null) {
         final cachedUser = UserModel.fromJson(cachedJson);
         debugPrint('[AUTH_PROVIDER] 📦 Restored active user from local storage: ${cachedUser.email} (Avatar: ${cachedUser.avatarUrl})');
@@ -134,9 +135,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
       debugPrint('[AUTH_PROVIDER] ℹ️ Cache restore notice: $cacheErr');
     }
 
+    if (!mounted) return;
     state = state.copyWith(isLoading: true);
     try {
       final user = await getCurrentUserUseCase.execute();
+      if (!mounted) return;
       if (user != null) {
         debugPrint('[AUTH_PROVIDER] 👤 Current active session found: ${user.email} (Agent: ${user.firstName} ${user.lastName}, Role: ${user.role}, Avatar: ${user.avatarUrl})');
         if (user is UserModel) {
@@ -145,10 +148,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
       } else {
         debugPrint('[AUTH_PROVIDER] ℹ️ No active user session found from remote.');
       }
+      if (!mounted) return;
       state = state.copyWith(isLoading: false, user: user ?? state.user);
     } catch (e) {
       debugPrint('[AUTH_PROVIDER] ⚠️ checkCurrentUser() error: $e');
-      state = state.copyWith(isLoading: false);
+      if (mounted) {
+        state = state.copyWith(isLoading: false);
+      }
     }
   }
 

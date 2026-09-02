@@ -1145,6 +1145,15 @@ class StockNotifier extends StateNotifier<StockState> {
 
     await _storageService.cacheStockItems(updatedItems);
     await _storageService.cacheRiderStockAllocations(updatedAllocations);
+
+    try {
+      await repository.updateRiderStockCustody(
+        riderId: riderId,
+        productId: productNameOrSku,
+        deliveredDelta: q,
+        inCustodyDelta: -q,
+      );
+    } catch (_) {}
   }
 
   /// Reconcile a single product in rider vehicle custody directly

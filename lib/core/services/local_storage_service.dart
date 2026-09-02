@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../features/dc_console/domain/entities/distribution_center.dart';
 import '../../features/dc_console/domain/entities/dc_fleet_driver.dart';
+import '../../features/dc_console/domain/entities/dc_finance_settings.dart';
 import '../../features/dc_console/domain/entities/dc_payout_claim.dart';
 import '../../features/dc_console/domain/entities/dc_transaction_record.dart';
 import '../../features/dc_console/domain/entities/product_package.dart';
@@ -33,6 +34,12 @@ abstract class LocalStorageService {
   Future<List<DistributionCenter>?> getCachedDistributionCenters();
   Future<void> cacheFleetDrivers(List<DCFleetDriver> drivers);
   Future<List<DCFleetDriver>?> getCachedFleetDrivers();
+
+  Future<void> cacheDriverCompensationTerms(String driverKey, Map<String, dynamic> terms);
+  Future<Map<String, Map<String, dynamic>>?> getCachedDriverCompensationTerms();
+
+  Future<void> cacheFinanceSettings(DCFinanceSettings settings);
+  Future<DCFinanceSettings?> getCachedFinanceSettings();
 
   Future<void> cachePayoutClaims(List<DCPayoutClaim> claims);
   Future<List<DCPayoutClaim>?> getCachedPayoutClaims();
@@ -78,6 +85,8 @@ abstract class LocalStorageService {
 class LocalStorageServiceImpl implements LocalStorageService {
   static const String _distributionCentersKey = 'novexps_cache_distribution_centers';
   static const String _fleetDriversKey = 'novexps_cache_fleet_drivers';
+  static const String _driverTermsKey = 'novexps_cache_driver_terms_registry';
+  static const String _financeSettingsKey = 'novexps_cache_dc_finance_settings';
   static const String _payoutClaimsKey = 'novexps_cache_payout_claims';
   static const String _ordersKey = 'novexps_cache_orders';
   static const String _batchesKey = 'novexps_cache_warehouse_batches';
@@ -222,6 +231,65 @@ class LocalStorageServiceImpl implements LocalStorageService {
       }
     }
     return drivers.isNotEmpty ? drivers : null;
+  }
+
+  // --- Driver Compensation Terms Registry Caching ---
+
+  @override
+  Future<void> cacheDriverCompensationTerms(String driverKey, Map<String, dynamic> terms) async {
+    final cleanKey = driverKey.trim().toLowerCase();
+    final existing = await getCachedDriverCompensationTerms() ?? {};
+    existing[cleanKey] = terms;
+    if (terms['driver_code'] != null) {
+      existing[terms['driver_code'].toString().toLowerCase()] = terms;
+    }
+    if (terms['id'] != null) {
+      existing[terms['id'].toString().toLowerCase()] = terms;
+    }
+    if (terms['email'] != null && terms['email'].toString().isNotEmpty) {
+      existing[terms['email'].toString().toLowerCase()] = terms;
+    }
+
+    final rawMap = <String, dynamic>{};
+    existing.forEach((k, v) => rawMap[k] = v);
+    await saveJsonObject(_driverTermsKey, rawMap);
+    debugPrint('[LOCAL_STORAGE] 💾 Cached custom compensation terms for driver "$driverKey".');
+  }
+
+  @override
+  Future<Map<String, Map<String, dynamic>>?> getCachedDriverCompensationTerms() async {
+    final raw = await getJsonObject(_driverTermsKey);
+    if (raw == null || raw.isEmpty) return null;
+
+    final result = <String, Map<String, dynamic>>{};
+    raw.forEach((k, v) {
+      if (v is Map<String, dynamic>) {
+        result[k] = v;
+      } else if (v is Map) {
+        result[k] = Map<String, dynamic>.from(v);
+      }
+    });
+    return result.isNotEmpty ? result : null;
+  }
+
+  // --- DC Finance Settings Caching ---
+
+  @override
+  Future<void> cacheFinanceSettings(DCFinanceSettings settings) async {
+    await saveJsonObject(_financeSettingsKey, settings.toJson());
+    debugPrint('[LOCAL_STORAGE] 💾 Cached DC finance & POS settings to local storage.');
+  }
+
+  @override
+  Future<DCFinanceSettings?> getCachedFinanceSettings() async {
+    final raw = await getJsonObject(_financeSettingsKey);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      return DCFinanceSettings.fromJson(raw);
+    } catch (e) {
+      debugPrint('[LOCAL_STORAGE] ⚠️ Error parsing cached finance settings: $e');
+      return null;
+    }
   }
 
   // --- Payout Claims Caching ---

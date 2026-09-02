@@ -12,6 +12,7 @@ class DistributionCenter {
   final String? contactPhone;
   final String? contactEmail;
   final String? managerName;
+  final bool isGrandDc;
   final bool isHub;
   final bool isActive;
   final List<String> operatingZones;
@@ -32,6 +33,7 @@ class DistributionCenter {
     this.contactPhone,
     this.contactEmail,
     this.managerName,
+    this.isGrandDc = false,
     this.isHub = false,
     this.isActive = true,
     this.operatingZones = const [],
@@ -42,25 +44,26 @@ class DistributionCenter {
     this.updatedAt,
   });
 
-  bool get isPrimaryHub => isHub;
+  bool get isPrimaryHub => isHub || isGrandDc;
+  bool get isGrandHeadquarters => isGrandDc;
   String get fullLocation => '$city, $state';
   List<String> get coveredLgas => operatingZones;
   String get displayCapacity => '${storageCapacityUnits.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')} Units';
 
   bool coversLga(String rawLga) {
     if (operatingZones.isEmpty) return true;
-    final target = rawLga.trim().toLowerCase();
+    final target = rawLga.trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
     if (target.isEmpty) return true;
     return operatingZones.any((zone) {
-      final z = zone.trim().toLowerCase();
+      final z = zone.trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
       return z == target || target.contains(z) || z.contains(target);
     });
   }
 
   bool coversLocation({required String stateName, required String lgaName}) {
     // Canonical State normalization
-    final normSelf = LocationLookupService.normalizeStateName(state).trim().toLowerCase();
-    final normTarget = LocationLookupService.normalizeStateName(stateName).trim().toLowerCase();
+    final normSelf = LocationLookupService.normalizeStateName(state).trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+    final normTarget = LocationLookupService.normalizeStateName(stateName).trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
 
     final stateMatches = normSelf == normTarget ||
         normSelf.contains(normTarget) ||
@@ -82,6 +85,7 @@ class DistributionCenter {
     String? contactPhone,
     String? contactEmail,
     String? managerName,
+    bool? isGrandDc,
     bool? isHub,
     bool? isActive,
     List<String>? operatingZones,
@@ -102,6 +106,7 @@ class DistributionCenter {
       contactPhone: contactPhone ?? this.contactPhone,
       contactEmail: contactEmail ?? this.contactEmail,
       managerName: managerName ?? this.managerName,
+      isGrandDc: isGrandDc ?? this.isGrandDc,
       isHub: isHub ?? this.isHub,
       isActive: isActive ?? this.isActive,
       operatingZones: operatingZones ?? this.operatingZones,
@@ -133,20 +138,27 @@ class DistributionCenter {
       return [];
     }
 
+    final codeStr = json['code']?.toString() ?? 'DC-001';
+    final isGrand = json['is_grand_dc'] == true ||
+        json['isGrandDc'] == true ||
+        codeStr == 'DC-ABJ-01' ||
+        json['id'] == '22222222-2222-4222-8222-222222222222';
+
     return DistributionCenter(
       id: json['id']?.toString() ?? '',
       companyId: json['company_id']?.toString() ?? json['companyId']?.toString() ?? '11111111-1111-4111-8111-111111111111',
       name: json['name']?.toString() ?? 'Distribution Center',
-      code: json['code']?.toString() ?? 'DC-001',
+      code: codeStr,
       state: json['state']?.toString() ?? 'Abuja FCT',
       city: json['city']?.toString() ?? 'Abuja',
       address: json['address']?.toString() ?? 'Warehouse Address',
       contactPhone: json['contact_phone']?.toString() ?? json['contactPhone']?.toString(),
       contactEmail: json['contact_email']?.toString() ?? json['contactEmail']?.toString(),
       managerName: json['manager_name']?.toString() ?? json['managerName']?.toString(),
+      isGrandDc: isGrand,
       isHub: json['is_hub'] == true || json['isHub'] == true,
       isActive: json['is_active'] != false && json['isActive'] != false,
-      operatingZones: parseZones(json['operating_zones'] ?? json['operatingZones'] ?? json['zones']),
+      operatingZones: parseZones(json['operating_zones'] ?? json['operatingZones'] ?? json['zones'] ?? json['covered_lgas']),
       storageCapacityUnits: (json['storage_capacity_units'] as num?)?.toInt() ?? (json['storageCapacityUnits'] as num?)?.toInt() ?? 25000,
       totalAssignedRiders: (json['total_assigned_riders'] as num?)?.toInt() ?? (json['totalAssignedRiders'] as num?)?.toInt() ?? 0,
       activeInventoryBatches: (json['active_inventory_batches'] as num?)?.toInt() ?? (json['activeInventoryBatches'] as num?)?.toInt() ?? 0,
@@ -167,6 +179,7 @@ class DistributionCenter {
       'contact_phone': contactPhone,
       'contact_email': contactEmail,
       'manager_name': managerName,
+      'is_grand_dc': isGrandDc,
       'is_hub': isHub,
       'is_active': isActive,
       'operating_zones': operatingZones,

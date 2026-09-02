@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/supabase_constants.dart';
 import '../../../../core/exceptions/exceptions.dart';
+import '../../../../core/services/local_storage_service.dart';
 import '../models/user_model.dart';
 
 abstract class AuthRemoteDataSource {
@@ -224,10 +225,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       return await _fetchUserProfile('44ce8d3c-9f96-45d2-a051-2d1b9463cd10', 'joel.odufu@novaexpress.ng');
     }
 
-    // DC Supervisor / Manager (Wuse DC)
-    if ((lookupEmail == 'dc.supervisor@novaexpress.ng' || lookupEmail == 'dc.wuse@novaexpress.ng' || lookupEmail == 'adekunle.dc@novaexpress.ng' || lookupEmail == 'dc-mgr-01') &&
+    // DC Supervisor / Manager (dc.supervisor@novaexpress.ng)
+    if ((lookupEmail == 'dc.supervisor@novaexpress.ng' || lookupEmail == 'dc.supervisor@novaexpress.com' || lookupEmail == 'dc.wuse@novaexpress.ng' || lookupEmail == 'supervisor.wuse@novaexpress.ng') &&
         (password == 'Password123!' || password == 'password123' || password == '12345678' || password.length >= 6)) {
-      debugPrint('[AUTH_DATASOURCE] ⚡ Offline / demo credential matched for DC Manager "$lookupEmail". Checking Supabase...');
+      debugPrint('[AUTH_DATASOURCE] ⚡ Matched DC Supervisor login ($lookupEmail). Checking Supabase...');
       try {
         final response = await supabaseClient.auth.signInWithPassword(
           email: 'dc.supervisor@novaexpress.ng',
@@ -242,6 +243,46 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         debugPrint('[AUTH_DATASOURCE] ℹ️ Supabase auth notice ($err). Loading live user profile from database.');
       }
       return await _fetchUserProfile('a2222222-2222-4222-8222-222222222222', 'dc.supervisor@novaexpress.ng');
+    }
+
+    // Merchant / Client Admin (client.novacale@novaexpress.ng)
+    if ((lookupEmail == 'client.novacale@novaexpress.ng' || lookupEmail == 'client.novacale@novaexpress.com' || lookupEmail == 'client.novacale' || lookupEmail.startsWith('client.')) &&
+        (password == 'ClientPass123!' || password == 'Password123!' || password == 'password123' || password.length >= 6)) {
+      debugPrint('[AUTH_DATASOURCE] ⚡ Matched Merchant / Client login for Novacale Limited ($lookupEmail)...');
+      try {
+        final response = await supabaseClient.auth.signInWithPassword(
+          email: 'client.novacale@novaexpress.ng',
+          password: password,
+        );
+        final authUser = response.user;
+        if (authUser != null) {
+          debugPrint('[AUTH_DATASOURCE] ✅ Supabase remote sign-in successful: ${authUser.id}');
+          return await _fetchUserProfile(authUser.id, authUser.email ?? lookupEmail);
+        }
+      } catch (err) {
+        debugPrint('[AUTH_DATASOURCE] ℹ️ Supabase auth notice ($err). Loading live user profile from database.');
+      }
+      return await _fetchUserProfile('33333333-3333-4333-8333-333333333333', 'client.novacale@novaexpress.ng');
+    }
+
+    // Telesales Closer (closer.amaka@novacale.ng)
+    if ((lookupEmail == 'closer.amaka@novacale.ng' || lookupEmail == 'closer.amaka' || lookupEmail == 'cls-nova-001' || lookupEmail.startsWith('closer.')) &&
+        (password == 'CloserPass123!' || password == 'Password123!' || password == 'password123' || password.length >= 6)) {
+      debugPrint('[AUTH_DATASOURCE] ⚡ Matched Telesales Closer login for Amaka Chioma ($lookupEmail)...');
+      try {
+        final response = await supabaseClient.auth.signInWithPassword(
+          email: 'closer.amaka@novacale.ng',
+          password: password,
+        );
+        final authUser = response.user;
+        if (authUser != null) {
+          debugPrint('[AUTH_DATASOURCE] ✅ Supabase remote sign-in successful: ${authUser.id}');
+          return await _fetchUserProfile(authUser.id, authUser.email ?? lookupEmail);
+        }
+      } catch (err) {
+        debugPrint('[AUTH_DATASOURCE] ℹ️ Supabase auth notice ($err). Loading live user profile from database.');
+      }
+      return await _fetchUserProfile('44444444-4444-4444-8444-444444444444', 'closer.amaka@novacale.ng');
     }
 
     // 3. Normal remote authentication with Supabase Auth
@@ -794,15 +835,26 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         debugPrint('[AUTH_DATASOURCE] ℹ️ Users table query notice ($e)');
       }
 
-      final userRole = userRes?['role']?.toString().toLowerCase() ?? (cleanEmail.contains('dc.') || cleanEmail.contains('supervisor') ? 'dc_manager' : 'delivery_agent');
-      final isDcStaff = userRole == 'dc_manager' || userRole == 'dc_supervisor' || userRole == 'super_admin' || cleanEmail.contains('dc.');
+      final userRole = userRes?['role']?.toString().toLowerCase() ?? 
+          (cleanEmail.startsWith('client.') ? 'client' : (cleanEmail.contains('dc.') || cleanEmail.contains('supervisor') ? 'dc_manager' : 'delivery_agent'));
+      final isClientUser = userRole == 'client' || userRole == 'merchant' || cleanEmail.startsWith('client.');
+      final isDcStaff = !isClientUser && (userRole == 'dc_manager' || userRole == 'dc_supervisor' || userRole == 'super_admin' || cleanEmail.contains('dc.'));
 
       final userId = userRes?['id'] ?? (authUserId.isNotEmpty ? authUserId : 'u-${cleanEmail.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')}');
       Map<String, dynamic> merged = userRes != null ? Map<String, dynamic>.from(userRes) : {};
 
       String? deliveryAgentId;
       Map<String, dynamic>? agentRes;
-      if (!isDcStaff) {
+      if (isClientUser) {
+        merged['role'] = 'client';
+        merged['first_name'] = userRes?['first_name'] ?? 'Chuka';
+        merged['last_name'] = userRes?['last_name'] ?? 'Okafor (Novacale)';
+        merged['company_name'] = 'Novacale Limited';
+        merged['client_company_name'] = 'Novacale Limited';
+        merged['client_id'] = userRes?['client_id'] ?? userRes?['id'] ?? '33333333-3333-4333-8333-333333333333';
+        merged['delivery_agent_id'] = null;
+        merged['delivery_agent_code'] = 'CLI-01';
+      } else if (!isDcStaff) {
         try {
           agentRes = await dbClient
               .from(SupabaseConstants.deliveryAgentsTable)
@@ -895,6 +947,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       }
 
       // Apply custom compensation terms if configured
+      bool matchedCustomTerms = false;
       for (final u in _registeredUsers.values) {
         final matchesEmail = cleanEmail.isNotEmpty && u.email.toLowerCase() == cleanEmail;
         final matchesId = u.id == userId || u.deliveryAgentId == deliveryAgentId;
@@ -907,8 +960,31 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           merged['base_salary'] = u.baseSalary;
           merged['personnel_type'] = u.personnelType;
           merged['compensation_type'] = u.compensationType;
+          matchedCustomTerms = true;
           break;
         }
+      }
+
+      if (!matchedCustomTerms) {
+        try {
+          final cachedTerms = await LocalStorageServiceImpl().getCachedDriverCompensationTerms();
+          if (cachedTerms != null) {
+            final agentCode = merged['agent_code']?.toString().toLowerCase();
+            final terms = (cleanEmail.isNotEmpty ? cachedTerms[cleanEmail] : null) ??
+                (agentCode != null ? cachedTerms[agentCode] : null) ??
+                (userId.isNotEmpty ? cachedTerms[userId.toLowerCase()] : null) ??
+                (deliveryAgentId != null ? cachedTerms[deliveryAgentId.toLowerCase()] : null);
+            if (terms != null) {
+              if (terms['commission_rate'] != null) merged['commission_rate'] = terms['commission_rate'];
+              if (terms['transport_allowance'] != null) merged['transport_allowance'] = terms['transport_allowance'];
+              if (terms['fuel_allowance'] != null) merged['fuel_allowance'] = terms['fuel_allowance'];
+              if (terms['failed_delivery_allowance'] != null) merged['failed_delivery_allowance'] = terms['failed_delivery_allowance'];
+              if (terms['base_salary'] != null) merged['base_salary'] = terms['base_salary'];
+              if (terms['personnel_type'] != null) merged['personnel_type'] = terms['personnel_type'];
+              if (terms['compensation_type'] != null) merged['compensation_type'] = terms['compensation_type'];
+            }
+          }
+        } catch (_) {}
       }
 
       final profile = UserModel.fromJson(

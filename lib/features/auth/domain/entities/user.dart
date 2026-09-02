@@ -28,6 +28,10 @@ class UserEntity {
   final String bankAccountNumber;
   final String bankAccountName;
   final String agentStatus; // 'available' | 'on_delivery' | 'offline'
+  final String? clientId;
+  final String? clientCompanyName;
+  final String? closerId;
+  final String? closerCode;
   final String? avatarUrl;
 
   const UserEntity({
@@ -60,6 +64,10 @@ class UserEntity {
     this.bankAccountNumber = '',
     this.bankAccountName = '',
     this.agentStatus = 'available',
+    this.clientId,
+    this.clientCompanyName,
+    this.closerId,
+    this.closerCode,
     this.avatarUrl,
   });
 
@@ -68,4 +76,7 @@ class UserEntity {
   bool get isPda => (role == 'delivery_agent' || role == 'pda') && personnelType == 'pda';
   bool get isInHouseRider => role == 'delivery_agent' && personnelType == 'in_house_rider';
   bool get isDcManager => role == 'dc_manager' || role == 'dc_supervisor' || role == 'super_admin';
+  bool get isCloser => role == 'closer' || role == 'client_closer';
+  bool get isClientAdmin => role == 'client' || role == 'merchant' || role == 'seller';
+  bool get isClient => isClientAdmin || isCloser;
 }
