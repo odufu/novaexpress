@@ -2,11 +2,60 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:novexps/features/auth/data/datasources/auth_remote_datasource.dart';
+import 'package:novexps/features/client_portal/domain/entities/client_profile.dart';
 import 'package:novexps/features/client_portal/presentation/pages/client_portal_layout.dart';
 import 'package:novexps/features/client_portal/presentation/providers/client_portal_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import 'package:novexps/core/constants/supabase_constants.dart';
+import 'package:novexps/features/notifications/domain/entities/app_notification.dart';
+import 'package:novexps/features/notifications/domain/repositories/notifications_repository.dart';
+import 'package:novexps/features/notifications/presentation/providers/notifications_provider.dart';
+
+import 'package:novexps/features/auth/data/models/user_model.dart';
+import 'package:novexps/features/auth/data/repositories/auth_repository_impl.dart';
+import 'package:novexps/features/auth/domain/entities/user.dart';
+import 'package:novexps/features/auth/domain/usecases/get_current_user.dart';
+import 'package:novexps/features/auth/domain/usecases/login.dart';
+import 'package:novexps/features/auth/domain/usecases/logout.dart';
+import 'package:novexps/features/auth/presentation/providers/auth_provider.dart';
+
+import 'package:novexps/features/orders/data/datasources/orders_remote_datasource.dart';
+import 'package:novexps/features/orders/data/models/order_model.dart';
+import 'package:novexps/features/orders/data/repositories/orders_repository_impl.dart';
+import 'package:novexps/features/orders/presentation/providers/orders_provider.dart';
+import 'package:novexps/features/stock/data/datasources/stock_remote_datasource.dart';
+import 'package:novexps/features/stock/data/models/stock_item_model.dart';
+import 'package:novexps/features/stock/data/repositories/stock_repository_impl.dart';
+import 'package:novexps/features/stock/presentation/providers/stock_provider.dart';
+
+class _MockAuthRemoteDS implements AuthRemoteDataSource {
+  @override
+  Future<UserModel?> getCurrentUser() async => null;
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _MockOrdersRemoteDS implements OrdersRemoteDataSource {
+  @override
+  Future<List<OrderModel>> getAssignedOrders(String deliveryAgentId) async => [];
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _MockStockRemoteDS implements StockRemoteDataSource {
+  @override
+  Future<List<StockItemModel>> getVehicleStockItems([String? agentId]) async => [];
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _MockNotificationsRepo implements NotificationsRepository {
+  @override
+  Future<List<AppNotificationEntity>> getNotifications([String? agentId]) async => [];
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -17,9 +66,12 @@ void main() {
 
   group('Client Portal & E-Commerce Merchant Workflow Suite', () {
     test('1. Client Demo Authentication loads scoped UserModel with role client and Novacale Limited', () async {
-      final authDataSource = AuthRemoteDataSourceImpl(
-        SupabaseClient(SupabaseConstants.supabaseUrl, SupabaseConstants.supabaseAnonKey),
+      final dbClient = SupabaseClient(
+        SupabaseConstants.supabaseUrl,
+        SupabaseConstants.supabaseAnonKey,
+        authOptions: const AuthClientOptions(autoRefreshToken: false),
       );
+      final authDataSource = AuthRemoteDataSourceImpl(dbClient);
 
       final user = await authDataSource.login('client.novacale@novaexpress.ng', 'ClientPass123!');
 
@@ -28,6 +80,7 @@ void main() {
       expect(user.isClient, isTrue);
       expect(user.clientCompanyName, equals('Novacale Limited'));
       expect(user.email, equals('client.novacale@novaexpress.ng'));
+      dbClient.dispose();
     });
 
     test('2. Client creates commercial package deal on Grazer Tea product', () async {
@@ -166,20 +219,86 @@ void main() {
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
 
+      const mockClientUser = UserEntity(
+        id: 'cli-admin-01',
+        email: 'client.novacale@novaexpress.ng',
+        firstName: 'Chuka',
+        lastName: 'Okafor',
+        phone: '08034455667',
+        role: 'client',
+        clientCompanyName: 'Novacale Limited',
+      );
+
       await tester.pumpWidget(
-        const ProviderScope(
-          child: MaterialApp(
+        ProviderScope(
+          overrides: [
+            authRemoteDataSourceProvider.overrideWithValue(_MockAuthRemoteDS()),
+            authProvider.overrideWith((ref) {
+              final notifier = AuthNotifier(
+                loginUseCase: LoginUseCase(AuthRepositoryImpl(_MockAuthRemoteDS())),
+                logoutUseCase: LogoutUseCase(AuthRepositoryImpl(_MockAuthRemoteDS())),
+                getCurrentUserUseCase: GetCurrentUserUseCase(AuthRepositoryImpl(_MockAuthRemoteDS())),
+              );
+              notifier.state = const AuthState(user: mockClientUser);
+              return notifier;
+            }),
+            clientPortalProvider.overrideWith((ref) {
+              final notifier = ClientPortalNotifier(ref);
+              notifier.state = notifier.state.copyWith(
+                clientProfile: const ClientProfile(
+                  id: '33333333-3333-4333-8333-333333333333',
+                  companyName: 'Novacale Limited',
+                  contactPerson: 'Dr. Chuka Okafor',
+                  email: 'client.novacale@novaexpress.ng',
+                  phone: '08034455667',
+                  address: 'Plot 12, Commercial Avenue, Central Business District, Abuja',
+                  city: 'Abuja',
+                  state: 'Federal Capital Territory',
+                  code: 'CLI-NOVACALE-01',
+                  tier: 'enterprise',
+                  closerLimit: 250,
+                  isEnterprise: true,
+                  totalClosersCount: 3,
+                ),
+              );
+              return notifier;
+            }),
+            ordersRemoteDataSourceProvider.overrideWithValue(_MockOrdersRemoteDS()),
+            ordersProvider.overrideWith((ref) {
+              final notifier = OrdersNotifier(OrdersRepositoryImpl(_MockOrdersRemoteDS()));
+              notifier.state = OrdersState(orders: const [], isLoading: false);
+              return notifier;
+            }),
+            stockRemoteDataSourceProvider.overrideWithValue(_MockStockRemoteDS()),
+            stockProvider.overrideWith((ref) {
+              final notifier = StockNotifier(repository: StockRepositoryImpl(remoteDataSource: _MockStockRemoteDS()));
+              notifier.state = const StockState(stockItems: [], isLoading: false);
+              return notifier;
+            }),
+            notificationsRepositoryProvider.overrideWithValue(_MockNotificationsRepo()),
+            notificationsProvider.overrideWith((ref) {
+              final notifier = NotificationsNotifier(
+                repository: _MockNotificationsRepo(),
+                ref: ref,
+              );
+              notifier.state = const NotificationsState(notifications: []);
+              return notifier;
+            }),
+          ],
+          child: const MaterialApp(
             home: ClientPortalLayout(),
           ),
         ),
       );
 
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text('Novacale Limited'), findsWidgets);
       expect(find.text('Dashboard & KPIs'), findsOneWidget);
-      expect(find.text('Customer Orders'), findsOneWidget);
+      expect(find.text('Deliveries & Orders'), findsOneWidget);
       expect(find.text('Products & Deals'), findsOneWidget);
+      expect(find.text('Closers & Team'), findsOneWidget);
       expect(find.text('Create New Order'), findsWidgets);
     });
   });

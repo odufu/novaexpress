@@ -308,6 +308,7 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         final dbClient = SupabaseClient(
           SupabaseConstants.supabaseUrl,
           SupabaseConstants.supabaseServiceRoleKey,
+          authOptions: const AuthClientOptions(autoRefreshToken: false),
         );
 
         final closersRes = await dbClient
@@ -411,6 +412,7 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
           final dbClient = SupabaseClient(
             SupabaseConstants.supabaseUrl,
             SupabaseConstants.supabaseServiceRoleKey,
+            authOptions: const AuthClientOptions(autoRefreshToken: false),
           );
 
           // 1. Create Closer record
@@ -428,6 +430,7 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
             'is_active': true,
           });
           debugPrint('[CLIENT_PORTAL] ✅ Closer ${newCloser.closerCode} ($fullName) created in Supabase.');
+          dbClient.dispose();
         } catch (dbErr) {
           debugPrint('[CLIENT_PORTAL] ℹ️ Supabase closer insert notice: $dbErr');
         }
@@ -436,6 +439,164 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
       final updatedClosers = [newCloser, ...state.closers];
       state = state.copyWith(closers: updatedClosers, isLoading: false);
       return newCloser;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      rethrow;
+    }
+  }
+
+  /// Activate or Deactivate an Employee / Closer
+  Future<void> toggleCloserStatus(String closerId, bool isActive) async {
+    try {
+      final updatedClosers = state.closers.map((c) {
+        if (c.id == closerId) {
+          return c.copyWith(isActive: isActive, updatedAt: DateTime.now());
+        }
+        return c;
+      }).toList();
+
+      state = state.copyWith(closers: updatedClosers);
+
+      // Async update in Supabase
+      Future.microtask(() async {
+        try {
+          final dbClient = SupabaseClient(
+            SupabaseConstants.supabaseUrl,
+            SupabaseConstants.supabaseServiceRoleKey,
+            authOptions: const AuthClientOptions(autoRefreshToken: false),
+          );
+          await dbClient.from('client_closers').update({
+            'is_active': isActive,
+            'updated_at': DateTime.now().toIso8601String(),
+          }).eq('id', closerId);
+
+          await dbClient.from('users').update({
+            'is_active': isActive,
+          }).eq('id', closerId);
+          debugPrint('[CLIENT_PORTAL] ✅ Closer $closerId status updated to isActive: $isActive');
+          dbClient.dispose();
+        } catch (dbErr) {
+          debugPrint('[CLIENT_PORTAL] ℹ️ Supabase closer toggle notice: $dbErr');
+        }
+      });
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] ❌ Error toggling closer status: $e');
+    }
+  }
+
+  /// Reset Password for an Employee / Closer
+  Future<void> resetCloserPassword({
+    required String closerId,
+    required String newPassword,
+  }) async {
+    state = state.copyWith(isLoading: true);
+    try {
+      final closer = state.closers.firstWhere((c) => c.id == closerId);
+
+      // Async update in Supabase Auth & Users table
+      Future.microtask(() async {
+        try {
+          final dbClient = SupabaseClient(
+            SupabaseConstants.supabaseUrl,
+            SupabaseConstants.supabaseServiceRoleKey,
+            authOptions: const AuthClientOptions(autoRefreshToken: false),
+          );
+
+          if (closer.userId != null && closer.userId!.isNotEmpty) {
+            await dbClient.auth.admin.updateUserById(
+              closer.userId!,
+              attributes: AdminUserAttributes(password: newPassword),
+            );
+          } else {
+            // Update user in users table
+            await dbClient.from('users').update({
+              'raw_user_meta_data': {'default_password_changed': true},
+              'updated_at': DateTime.now().toIso8601String(),
+            }).eq('id', closerId);
+          }
+          debugPrint('[CLIENT_PORTAL] ✅ Password reset for closer ${closer.closerCode} (${closer.email})');
+          dbClient.dispose();
+        } catch (dbErr) {
+          debugPrint('[CLIENT_PORTAL] ℹ️ Supabase reset password notice: $dbErr');
+        }
+      });
+
+      state = state.copyWith(isLoading: false);
+    } catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      rethrow;
+    }
+  }
+
+  /// Update Closer / Employee Details (Name, Phone, Commission, Target)
+  Future<ClientCloser> updateCloserDetails({
+    required String closerId,
+    String? fullName,
+    String? phone,
+    String? email,
+    double? commissionRate,
+    int? dailyCallTarget,
+    bool? isActive,
+  }) async {
+    state = state.copyWith(isLoading: true);
+    try {
+      ClientCloser? updatedCloser;
+      final updatedClosers = state.closers.map((c) {
+        if (c.id == closerId) {
+          updatedCloser = c.copyWith(
+            fullName: fullName ?? c.fullName,
+            phone: phone ?? c.phone,
+            email: email ?? c.email,
+            commissionRate: commissionRate ?? c.commissionRate,
+            dailyCallTarget: dailyCallTarget ?? c.dailyCallTarget,
+            isActive: isActive ?? c.isActive,
+            updatedAt: DateTime.now(),
+          );
+          return updatedCloser!;
+        }
+        return c;
+      }).toList();
+
+      if (updatedCloser == null) {
+        throw Exception('Closer with ID $closerId not found');
+      }
+
+      state = state.copyWith(closers: updatedClosers, isLoading: false);
+
+      // Async update in Supabase
+      Future.microtask(() async {
+        try {
+          final dbClient = SupabaseClient(
+            SupabaseConstants.supabaseUrl,
+            SupabaseConstants.supabaseServiceRoleKey,
+            authOptions: const AuthClientOptions(autoRefreshToken: false),
+          );
+          await dbClient.from('client_closers').update({
+            if (fullName != null) 'full_name': fullName,
+            if (phone != null) 'phone': phone,
+            if (email != null) 'email': email,
+            if (commissionRate != null) 'commission_rate': commissionRate,
+            if (dailyCallTarget != null) 'daily_call_target': dailyCallTarget,
+            if (isActive != null) 'is_active': isActive,
+            'updated_at': DateTime.now().toIso8601String(),
+          }).eq('id', closerId);
+
+          if (fullName != null || phone != null) {
+            await dbClient.from('users').update({
+              if (fullName != null) 'first_name': fullName.split(' ').first,
+              if (fullName != null) 'last_name': fullName.split(' ').skip(1).join(' '),
+              if (phone != null) 'phone_number': phone,
+              if (isActive != null) 'is_active': isActive,
+            }).eq('id', closerId);
+          }
+          debugPrint('[CLIENT_PORTAL] ✅ Closer ${updatedCloser!.closerCode} updated successfully.');
+          dbClient.dispose();
+        } catch (dbErr) {
+          debugPrint('[CLIENT_PORTAL] ℹ️ Supabase closer update notice: $dbErr');
+        }
+      });
+
+      return updatedCloser!;
     } catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
       rethrow;

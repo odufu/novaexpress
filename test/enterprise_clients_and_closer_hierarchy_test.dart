@@ -242,5 +242,69 @@ void main() {
       expect(clientAdmin.isCloser, isFalse);
       expect(clientAdmin.isClient, isTrue);
     });
+
+    test('7. Enterprise Client can activate/deactivate an employee', () async {
+      final clientNotifier = container.read(clientPortalProvider.notifier);
+
+      // Onboard a closer
+      final closer = await clientNotifier.createCloser(
+        fullName: 'Emeka Nwachukwu',
+        email: 'emeka.n@novacale.ng',
+        phone: '08098765432',
+        dailyCallTarget: 40,
+        commissionRate: 750.0,
+      );
+
+      expect(closer.isActive, isTrue);
+
+      // Deactivate closer
+      await clientNotifier.toggleCloserStatus(closer.id, false);
+      var state = container.read(clientPortalProvider);
+      var updated = state.closers.firstWhere((c) => c.id == closer.id);
+      expect(updated.isActive, isFalse);
+
+      // Re-activate closer
+      await clientNotifier.toggleCloserStatus(closer.id, true);
+      state = container.read(clientPortalProvider);
+      updated = state.closers.firstWhere((c) => c.id == closer.id);
+      expect(updated.isActive, isTrue);
+    });
+
+    test('8. Enterprise Client can reset employee password and update profile', () async {
+      final clientNotifier = container.read(clientPortalProvider.notifier);
+
+      final closer = await clientNotifier.createCloser(
+        fullName: 'Zainab Ahmed',
+        email: 'zainab.ahmed@novacale.ng',
+        phone: '08012344321',
+        dailyCallTarget: 45,
+        commissionRate: 500.0,
+      );
+
+      // Reset password
+      await clientNotifier.resetCloserPassword(
+        closerId: closer.id,
+        newPassword: 'NovaSecurePassword2026!',
+      );
+
+      // Update employee profile
+      final updatedProfile = await clientNotifier.updateCloserDetails(
+        closerId: closer.id,
+        fullName: 'Zainab Ahmed-Bello',
+        phone: '08099881122',
+        commissionRate: 1000.0,
+        dailyCallTarget: 60,
+      );
+
+      expect(updatedProfile.fullName, equals('Zainab Ahmed-Bello'));
+      expect(updatedProfile.phone, equals('08099881122'));
+      expect(updatedProfile.commissionRate, equals(1000.0));
+      expect(updatedProfile.dailyCallTarget, equals(60));
+
+      final state = container.read(clientPortalProvider);
+      final storedCloser = state.closers.firstWhere((c) => c.id == closer.id);
+      expect(storedCloser.fullName, equals('Zainab Ahmed-Bello'));
+      expect(storedCloser.commissionRate, equals(1000.0));
+    });
   });
 }

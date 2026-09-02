@@ -6,6 +6,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../domain/entities/client_closer.dart';
 import '../providers/client_portal_provider.dart';
+import '../widgets/client_closer_detail_modal.dart';
 import '../widgets/client_onboard_closer_modal.dart';
 
 class ClientClosersPage extends ConsumerWidget {
@@ -228,13 +229,16 @@ class ClientClosersPage extends ConsumerWidget {
                     // Closers Roster List
                     if (state.topClosersLeaderboard.isEmpty)
                       Padding(
-                        padding: const EdgeInsets.all(40),
+                        padding: const EdgeInsets.symmetric(vertical: 40),
                         child: Center(
                           child: Column(
                             children: [
-                              Icon(Icons.people_outline_rounded, size: 44, color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
+                              const Icon(Icons.people_outline_rounded, size: 40, color: Color(0xFF94A3B8)),
                               const SizedBox(height: 10),
-                              Text('No closers onboarded yet.', style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: isDark ? Colors.white : const Color(0xFF64748B))),
+                              Text(
+                                'No closer accounts found',
+                                style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: const Color(0xFF94A3B8)),
+                              ),
                             ],
                           ),
                         ),
@@ -248,7 +252,7 @@ class ClientClosersPage extends ConsumerWidget {
                         separatorBuilder: (_, __) => Divider(height: 1, color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFF1F5F9)),
                         itemBuilder: (context, index) {
                           final closer = state.topClosersLeaderboard[index];
-                          return _buildCloserTableRow(closer, index + 1, currencyFormatter, isDark);
+                          return _buildCloserTableRow(context, closer, index + 1, currencyFormatter, isDark);
                         },
                       )
                     else
@@ -260,7 +264,7 @@ class ClientClosersPage extends ConsumerWidget {
                         separatorBuilder: (_, __) => Divider(height: 1, color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFF1F5F9)),
                         itemBuilder: (context, index) {
                           final closer = state.topClosersLeaderboard[index];
-                          return _buildCloserMobileCard(closer, index + 1, currencyFormatter, isDark);
+                          return _buildCloserMobileCard(context, closer, index + 1, currencyFormatter, isDark);
                         },
                       ),
                   ],
@@ -300,6 +304,7 @@ class ClientClosersPage extends ConsumerWidget {
   }
 
   Widget _buildCloserTableRow(
+    BuildContext context,
     ClientCloser closer,
     int rank,
     NumberFormat currencyFormatter,
@@ -307,160 +312,175 @@ class ClientClosersPage extends ConsumerWidget {
   ) {
     final isTop = rank == 1;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: Row(
-        children: [
-          // Rank
-          Container(
-            width: 30,
-            height: 30,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: isTop ? const Color(0xFFF37021) : (isDark ? const Color(0xFF0B1021) : const Color(0xFFF1F5F9)),
-              shape: BoxShape.circle,
-            ),
-            child: Text(
-              '#$rank',
-              style: GoogleFonts.inter(
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                color: isTop ? Colors.white : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
+    return InkWell(
+      onTap: () => ClientCloserDetailModal.show(context, closer: closer),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            // Rank
+            Container(
+              width: 30,
+              height: 30,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: isTop ? const Color(0xFFF37021) : (isDark ? const Color(0xFF0B1021) : const Color(0xFFF1F5F9)),
+                shape: BoxShape.circle,
+              ),
+              child: Text(
+                '#$rank',
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: isTop ? Colors.white : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 12),
+            const SizedBox(width: 12),
 
-          // Closer Name & Code
-          Expanded(
-            flex: 3,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        closer.fullName,
-                        style: GoogleFonts.inter(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: isDark ? Colors.white : const Color(0xFF0F172A),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF37021).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        closer.closerCode,
-                        style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: const Color(0xFFF37021)),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '${closer.email} • ${closer.phone}',
-                  style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-
-          // Assigned Leads
-          Expanded(
-            flex: 2,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Leads Assigned', style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8))),
-                const SizedBox(height: 2),
-                Text(
-                  '${closer.totalLeadsAssigned} Leads',
-                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? Colors.white : const Color(0xFF334155)),
-                ),
-              ],
-            ),
-          ),
-
-          // Booked Orders
-          Expanded(
-            flex: 2,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Orders Booked', style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8))),
-                const SizedBox(height: 2),
-                Text(
-                  '${closer.totalOrdersBooked} Booked',
-                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: const Color(0xFF10B981)),
-                ),
-              ],
-            ),
-          ),
-
-          // Conversion Rate
-          Expanded(
-            flex: 2,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Conversion', style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8))),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
-                          value: closer.conversionRate / 100,
-                          backgroundColor: isDark ? const Color(0xFF0B1021) : const Color(0xFFE2E8F0),
-                          valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFF37021)),
-                          minHeight: 5,
+            // Closer Name & Code
+            Expanded(
+              flex: 3,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          closer.fullName,
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '${closer.conversionRate.toStringAsFixed(0)}%',
-                      style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFFF37021)),
-                    ),
-                  ],
-                ),
-              ],
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF37021).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          closer.closerCode,
+                          style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: const Color(0xFFF37021)),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: BoxDecoration(
+                          color: closer.isActive ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${closer.email} • ${closer.phone}',
+                    style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
             ),
-          ),
 
-          // Commission
-          Expanded(
-            flex: 2,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text('Commission', style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8))),
-                const SizedBox(height: 2),
-                Text(
-                  currencyFormatter.format(closer.totalEarnedCommission),
-                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF0F172A)),
-                ),
-              ],
+            // Assigned Leads
+            Expanded(
+              flex: 2,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Leads Assigned', style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8))),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${closer.totalLeadsAssigned} Leads',
+                    style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? Colors.white : const Color(0xFF334155)),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+
+            // Booked Orders
+            Expanded(
+              flex: 2,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Orders Booked', style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8))),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${closer.totalOrdersBooked} Booked',
+                    style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: const Color(0xFF10B981)),
+                  ),
+                ],
+              ),
+            ),
+
+            // Conversion Rate
+            Expanded(
+              flex: 2,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Conversion', style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8))),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: closer.conversionRate / 100,
+                            backgroundColor: isDark ? const Color(0xFF0B1021) : const Color(0xFFE2E8F0),
+                            valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFF37021)),
+                            minHeight: 5,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        '${closer.conversionRate.toStringAsFixed(0)}%',
+                        style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFFF37021)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            // Commission & Action
+            Expanded(
+              flex: 2,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text('Commission', style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8))),
+                  const SizedBox(height: 2),
+                  Text(
+                    currencyFormatter.format(closer.totalEarnedCommission),
+                    style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Icon(Icons.chevron_right_rounded, size: 18, color: Color(0xFF94A3B8)),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildCloserMobileCard(
+    BuildContext context,
     ClientCloser closer,
     int rank,
     NumberFormat currencyFormatter,
@@ -468,78 +488,90 @@ class ClientClosersPage extends ConsumerWidget {
   ) {
     final isTop = rank == 1;
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 26,
-                    height: 26,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: isTop ? const Color(0xFFF37021) : (isDark ? const Color(0xFF0B1021) : const Color(0xFFF1F5F9)),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Text(
-                      '#$rank',
-                      style: GoogleFonts.inter(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        color: isTop ? Colors.white : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
+    return InkWell(
+      onTap: () => ClientCloserDetailModal.show(context, closer: closer),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 26,
+                      height: 26,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: isTop ? const Color(0xFFF37021) : (isDark ? const Color(0xFF0B1021) : const Color(0xFFF1F5F9)),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(
+                        '#$rank',
+                        style: GoogleFonts.inter(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: isTop ? Colors.white : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    closer.fullName,
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    const SizedBox(width: 8),
+                    Text(
+                      closer.fullName,
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
                     ),
+                    const SizedBox(width: 6),
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: closer.isActive ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF37021).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(4),
                   ),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF37021).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(4),
+                  child: Text(
+                    closer.closerCode,
+                    style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: const Color(0xFFF37021)),
+                  ),
                 ),
-                child: Text(
-                  closer.closerCode,
-                  style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: const Color(0xFFF37021)),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
+              ],
+            ),
+            const SizedBox(height: 8),
 
-          // Stats Bar
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                '${closer.totalLeadsAssigned} Leads Assigned',
-                style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
-              ),
-              Text(
-                '${closer.totalOrdersBooked} Booked (${closer.conversionRate.toStringAsFixed(0)}%)',
-                style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF10B981)),
-              ),
-              Text(
-                currencyFormatter.format(closer.totalEarnedCommission),
-                style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFFF37021)),
-              ),
-            ],
-          ),
-        ],
+            // Stats Bar
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '${closer.totalLeadsAssigned} Leads Assigned',
+                  style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
+                ),
+                Text(
+                  '${closer.totalOrdersBooked} Booked (${closer.conversionRate.toStringAsFixed(0)}%)',
+                  style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF10B981)),
+                ),
+                Text(
+                  currencyFormatter.format(closer.totalEarnedCommission),
+                  style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFFF37021)),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
