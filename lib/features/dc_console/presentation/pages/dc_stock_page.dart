@@ -14,6 +14,7 @@ import '../../domain/entities/dc_fleet_driver.dart';
 import '../providers/dc_console_provider.dart';
 import '../providers/product_catalog_provider.dart';
 import '../../../../core/services/signature_storage_service.dart';
+import '../../../client_portal/domain/entities/client_profile.dart';
 import '../widgets/dc_product_detail_modal.dart';
 
 class DCStockPage extends ConsumerStatefulWidget {
@@ -1135,6 +1136,39 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
     final descCtrl = TextEditingController();
     final messenger = ScaffoldMessenger.of(context);
 
+    final dcState = ref.read(dcConsoleProvider);
+    final stockState = ref.read(stockProvider);
+
+    // Build registered companies list from DC Console & existing inventory
+    final List<ClientProfile> registeredClients = dcState.clients.isNotEmpty
+        ? dcState.clients
+        : defaultRegisteredClients;
+
+    final Map<String, ClientProfile?> companyMap = {};
+    for (final c in registeredClients) {
+      final cName = c.companyName.trim();
+      if (cName.isNotEmpty) {
+        companyMap[cName] = c;
+      }
+    }
+    for (final s in stockState.stockItems) {
+      final sName = s.ownerName.trim();
+      if (sName.isNotEmpty && !companyMap.containsKey(sName)) {
+        companyMap[sName] = null;
+      }
+    }
+    if (!companyMap.containsKey('Novacare Limited')) {
+      companyMap['Novacare Limited'] = null;
+    }
+
+    String selectedCompany = companyMap.containsKey('Novacare Limited')
+        ? 'Novacare Limited'
+        : (companyMap.keys.isNotEmpty ? companyMap.keys.first : 'Novacare Limited');
+    String? selectedClientId = companyMap[selectedCompany]?.id;
+    bool isCustomCompany = false;
+    final customCompanyCtrl = TextEditingController();
+    clientCtrl.text = selectedCompany;
+
     String? selectedImageUrl;
     bool isUploadingImage = false;
 
@@ -1306,9 +1340,126 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                     children: [
                       Expanded(child: TextField(controller: priceCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Selling Price (₦) *'))),
                       const SizedBox(width: 12),
-                      Expanded(child: TextField(controller: clientCtrl, decoration: const InputDecoration(labelText: 'Merchant Client'))),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: isCustomCompany
+                              ? '__custom__'
+                              : (companyMap.containsKey(selectedCompany) ? selectedCompany : companyMap.keys.first),
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Merchant Client *',
+                            prefixIcon: Icon(Icons.business_rounded, size: 18, color: Color(0xFF2563EB)),
+                          ),
+                          selectedItemBuilder: (BuildContext context) {
+                            return [
+                              ...companyMap.entries.map((entry) {
+                                return Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    entry.key,
+                                    style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600),
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
+                                );
+                              }),
+                              const Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  '+ Other / New Company',
+                                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF16A34A)),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                              ),
+                            ];
+                          },
+                          items: [
+                            ...companyMap.entries.map((entry) {
+                              final compName = entry.key;
+                              final profile = entry.value;
+                              return DropdownMenuItem<String>(
+                                value: compName,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        compName,
+                                        style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600),
+                                        overflow: TextOverflow.ellipsis,
+                                        maxLines: 1,
+                                      ),
+                                    ),
+                                    if (profile?.code != null && profile!.code.isNotEmpty) ...[
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.08),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          profile.code,
+                                          style: GoogleFonts.jetBrainsMono(fontSize: 9.5, fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              );
+                            }),
+                            const DropdownMenuItem<String>(
+                              value: '__custom__',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.add_circle_outline_rounded, size: 16, color: Color(0xFF16A34A)),
+                                  SizedBox(width: 6),
+                                  Flexible(
+                                    child: Text(
+                                      '+ Other / New Company',
+                                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF16A34A)),
+                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 1,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                          onChanged: (val) {
+                            if (val == null) return;
+                            setDialogState(() {
+                              if (val == '__custom__') {
+                                isCustomCompany = true;
+                                clientCtrl.text = customCompanyCtrl.text;
+                                selectedClientId = null;
+                              } else {
+                                isCustomCompany = false;
+                                selectedCompany = val;
+                                clientCtrl.text = val;
+                                selectedClientId = companyMap[val]?.id;
+                              }
+                            });
+                          },
+                        ),
+                      ),
                     ],
                   ),
+                  if (isCustomCompany) ...[
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: customCompanyCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Enter Custom Company Name *',
+                        hintText: 'e.g. Mama Organic Foods Limited',
+                        prefixIcon: Icon(Icons.edit_note_rounded, size: 18, color: Color(0xFF16A34A)),
+                      ),
+                      onChanged: (val) {
+                        clientCtrl.text = val.trim();
+                      },
+                    ),
+                  ],
                   const SizedBox(height: 12),
                   Row(
                     children: [
@@ -1333,9 +1484,16 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                   : () async {
                       final name = nameCtrl.text.trim();
                       final sku = skuCtrl.text.trim();
+                      final clientName = clientCtrl.text.trim();
                       if (name.isEmpty || sku.isEmpty) {
                         messenger.showSnackBar(
                           const SnackBar(content: Text('⚠️ Product Name and SKU are required.'), backgroundColor: Color(0xFFEF4444)),
+                        );
+                        return;
+                      }
+                      if (clientName.isEmpty) {
+                        messenger.showSnackBar(
+                          const SnackBar(content: Text('⚠️ Merchant Client / Company is required.'), backgroundColor: Color(0xFFEF4444)),
                         );
                         return;
                       }
@@ -1365,7 +1523,8 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                                   sku: sku,
                                   category: catCtrl.text.trim(),
                                   price: price,
-                                  ownerName: clientCtrl.text.trim(),
+                                  ownerName: clientName,
+                                  clientId: selectedClientId,
                                   initialQuantity: qty,
                                   lowStockThreshold: threshold,
                                   binLocation: binTag,

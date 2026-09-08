@@ -27,6 +27,7 @@ import '../../features/stock/presentation/pages/stock_history_page.dart';
 import '../../features/users/presentation/pages/user_profile_page.dart';
 import '../../features/dc_console/presentation/pages/dc_console_layout.dart';
 import '../../features/client_portal/presentation/pages/client_portal_layout.dart';
+import '../../presentation/presentation_root.dart';
 
 class RouterRefreshNotifier extends ChangeNotifier {
   final Ref _ref;
@@ -65,11 +66,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       } catch (_) {}
       final isAuthenticated = isAuthFromState || session != null;
       final isSplash = state.matchedLocation == '/splash';
+      final isPresentation = state.matchedLocation == '/presentation';
       final isLoggingIn = state.matchedLocation == '/login' || state.matchedLocation == '/forgot-password';
 
       debugPrint('[AUTH_ROUTER] 🚦 Route check: location="${state.matchedLocation}", isAuthenticated=$isAuthenticated (riverpod=$isAuthFromState, supabase=${session != null})');
 
-      if (isSplash) {
+      if (isSplash || isPresentation) {
         return null;
       }
       if (!isAuthenticated && !isLoggingIn) {
@@ -128,6 +130,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/forgot-password',
         builder: (context, state) => const ForgotPasswordPage(),
+      ),
+      GoRoute(
+        path: '/presentation',
+        builder: (context, state) => const PresentationRoot(),
       ),
       GoRoute(
         path: '/',

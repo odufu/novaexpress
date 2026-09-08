@@ -25,6 +25,7 @@ class StockRepositoryImpl implements StockRepository {
     int lowStockThreshold = 3,
     String? binLocation,
     String? companyId,
+    String? clientId,
     String? imageAsset,
     String? originDcId,
   }) async {
@@ -39,6 +40,7 @@ class StockRepositoryImpl implements StockRepository {
       lowStockThreshold: lowStockThreshold,
       binLocation: binLocation,
       companyId: companyId,
+      clientId: clientId,
       imageAsset: imageAsset,
       originDcId: originDcId,
     );

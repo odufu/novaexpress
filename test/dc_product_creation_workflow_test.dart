@@ -13,6 +13,8 @@ import 'package:novexps/features/stock/domain/repositories/stock_repository.dart
 import 'package:novexps/features/stock/presentation/providers/stock_provider.dart';
 
 class _MockStockRepository implements StockRepository {
+  String? lastCreatedClientId;
+  String? lastCreatedOwnerName;
   final List<StockItemModel> mockItems = [
     const StockItemModel(
       id: 'prod_existing_1',
@@ -54,12 +56,15 @@ class _MockStockRepository implements StockRepository {
     int lowStockThreshold = 3,
     String? binLocation,
     String? companyId,
+    String? clientId,
     String? imageAsset,
     String? originDcId,
   }) async {
     if (sku.toUpperCase() == 'SKU-FAIL') {
       throw Exception('Simulated database write timeout error.');
     }
+    lastCreatedClientId = clientId;
+    lastCreatedOwnerName = ownerName;
     final newItem = StockItemModel(
       id: 'prod_${DateTime.now().millisecondsSinceEpoch}',
       sku: sku,
@@ -264,6 +269,67 @@ void main() {
       expect(find.text('Register New Product'), findsOneWidget);
       expect(find.widgetWithText(TextField, 'Duplicate Vest'), findsOneWidget);
       expect(find.widgetWithText(TextField, 'SKU-EXISTING'), findsOneWidget);
+    });
+
+    testWidgets('3. Renders company dropdown with registered companies and attaches selected company to product', (tester) async {
+      tester.view.physicalSize = const Size(1280, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      final mockRepo = _MockStockRepository();
+      final storage = _MockLocalStorageService();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            stockRepositoryProvider.overrideWithValue(mockRepo),
+            localStorageServiceProvider.overrideWithValue(storage),
+            productCatalogProvider.overrideWith((ref) => ProductCatalogNotifier(storageService: storage)),
+          ],
+          child: const MaterialApp(
+            home: Scaffold(
+              body: DCStockPage(),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Open Add New Product modal
+      await tester.tap(find.text('Add New Product'));
+      await tester.pumpAndSettle();
+
+      // Verify company dropdown is present
+      expect(find.byType(DropdownButtonFormField<String>), findsOneWidget);
+      expect(find.text('Novacare Limited'), findsWidgets);
+
+      // Tap dropdown to view companies
+      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.pumpAndSettle();
+
+      // Novacale Limited and Custom Company should be options
+      expect(find.text('Novacale Limited').last, findsOneWidget);
+      expect(find.text('+ Other / New Company').last, findsOneWidget);
+
+      // Select Novacale Limited
+      await tester.tap(find.text('Novacale Limited').last);
+      await tester.pumpAndSettle();
+
+      // Fill in required fields
+      await tester.enterText(find.widgetWithText(TextField, 'Product Name *'), 'Health Supplement Pack');
+      await tester.enterText(find.widgetWithText(TextField, 'SKU / Barcode Code *'), 'SKU-HEALTH-999');
+
+      // Submit
+      await tester.tap(find.text('Save & Register Product'));
+      await tester.pumpAndSettle();
+
+      // Verify success modal
+      expect(find.text('Product Registered Successfully!'), findsOneWidget);
+
+      // Verify repo received the correct company name and clientId
+      expect(mockRepo.lastCreatedOwnerName, 'Novacale Limited');
+      expect(mockRepo.lastCreatedClientId, '33333333-3333-4333-8333-333333333333');
     });
   });
 }

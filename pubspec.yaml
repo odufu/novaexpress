@@ -37,3 +37,12 @@ flutter:
     - assets/images/
     - assets/images/logo/
     - assets/images/products/
+    - assets/branding/
+    - assets/backgrounds/
+    - assets/core/
+    - assets/platforms/
+    - assets/feature_icons/
+    - assets/hover/
+    - assets/heroes/
+    - assets/ui/
+    - assets/presentation_elements/

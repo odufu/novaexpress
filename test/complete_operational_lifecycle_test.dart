@@ -28,6 +28,7 @@ class MockLifecycleStockRepository implements StockRepository {
     int lowStockThreshold = 3,
     String? binLocation,
     String? companyId,
+    String? clientId,
     String? imageAsset,
     String? originDcId,
   }) async {

@@ -71,6 +71,21 @@ final List<DCFleetDriver> defaultFleetDrivers = [
 
 final List<ClientProfile> defaultRegisteredClients = [
   const ClientProfile(
+    id: 'c1111111-1111-4111-8111-111111111111',
+    companyName: 'Novacare Limited',
+    contactPerson: 'Dr. Kalu Okonkwo',
+    email: 'orders@novacare.ng',
+    phone: '+2348039998877',
+    address: 'Plot 102 Central Business District, Abuja',
+    city: 'Abuja',
+    state: 'Federal Capital Territory',
+    code: 'NOVACARE',
+    tier: 'enterprise',
+    closerLimit: 250,
+    isEnterprise: true,
+    totalClosersCount: 0,
+  ),
+  const ClientProfile(
     id: '33333333-3333-4333-8333-333333333333',
     companyName: 'Novacale Limited',
     contactPerson: 'Dr. Chuka Okafor',

@@ -27,6 +27,7 @@ abstract class StockRemoteDataSource {
     int lowStockThreshold = 3,
     String? binLocation,
     String? companyId,
+    String? clientId,
     String? imageAsset,
     String? originDcId,
   });
@@ -425,6 +426,7 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
     int lowStockThreshold = 3,
     String? binLocation,
     String? companyId,
+    String? clientId,
     String? imageAsset,
     String? originDcId,
   }) async {
@@ -458,6 +460,9 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
       'is_active': true,
       'created_at': DateTime.now().toIso8601String(),
     };
+    if (clientId != null && clientId.trim().isNotEmpty) {
+      cleanPayload['client_id'] = clientId.trim();
+    }
 
     Map<String, dynamic>? res;
 
