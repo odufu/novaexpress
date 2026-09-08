@@ -6,6 +6,7 @@ import '../../../../core/helpers/formatters.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/user_avatar_widget.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../dc_console/presentation/providers/dc_console_provider.dart';
 import '../../../notifications/presentation/providers/notifications_provider.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
 import '../../domain/entities/financial_summary.dart';
@@ -57,12 +58,22 @@ class _CashPageState extends ConsumerState<CashPage> {
         : 'Joel Odufu';
     final agentCode = user?.deliveryAgentCode ?? 'PDA-7182';
 
+    final dcFinanceSettings = ref.watch(dcConsoleProvider).financeSettings;
+    final unremittedCashOrders = ordersState.orders
+        .where((o) => o.isDelivered && o.isCashPod && !o.isRemitted)
+        .toList();
+    final double unremittedGrossCash = unremittedCashOrders.fold(0.0, (acc, o) => acc + o.totalAmount);
+    final double posFee = (unremittedGrossCash > 0 && dcFinanceSettings.isPosFeeReimbursable)
+        ? dcFinanceSettings.computePosFee(unremittedGrossCash)
+        : 0.0;
+
     final financialSummary = FinancialSummary.calculate(
       orders: ordersState.orders,
       remittances: financeState.remittances,
       user: user,
       manualEarnedBalance: financeState.totalEarnedBalance,
       transactions: financeState.transactions,
+      posFee: posFee,
     );
 
     final recentDeliveredOrders = ordersState.orders
@@ -78,8 +89,11 @@ class _CashPageState extends ConsumerState<CashPage> {
     final double recentTransport = mostRecentOrder != null && mostRecentOrder.isCashPod
         ? (user?.isPda == true ? (user?.transportAllowance ?? 1500.0) : (user?.fuelAllowance ?? 800.0))
         : 0.0;
+    final double recentPosFee = (recentCollected > 0 && dcFinanceSettings.isPosFeeReimbursable)
+        ? dcFinanceSettings.computePosFee(recentCollected)
+        : 0.0;
     final double recentToRemit = mostRecentOrder != null && mostRecentOrder.isCashPod && !mostRecentOrder.isRemitted
-        ? (recentCollected - recentCommission - recentTransport).clamp(0.0, double.infinity)
+        ? (recentCollected - recentCommission - recentTransport - recentPosFee).clamp(0.0, double.infinity)
         : 0.0;
 
     final approvedRemittances = financeState.remittances

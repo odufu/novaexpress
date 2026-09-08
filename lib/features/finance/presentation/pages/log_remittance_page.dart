@@ -71,11 +71,15 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
     final double batchGrossCash = unremittedCashOrders.fold(0.0, (acc, o) => acc + o.totalAmount);
     final double batchCommission = unremittedCashOrders.fold(
       0.0,
-      (acc, o) => acc + (o.agentEntitlement > 0 ? o.agentEntitlement : commissionRate),
+      (acc, o) => acc + ((user?.commissionRate != null && user!.commissionRate > 0)
+          ? user.commissionRate
+          : (o.agentEntitlement > 0 && o.agentEntitlement != 2500.0 ? o.agentEntitlement : commissionRate)),
     );
     final double batchTransport = unremittedCashOrders.fold(
       0.0,
-      (acc, o) => acc + (o.transportFee > 0 ? o.transportFee : transportPerOrder),
+      (acc, o) => acc + ((user?.transportAllowance != null && user!.transportAllowance > 0)
+          ? user.transportAllowance
+          : (o.transportFee > 0 && o.transportFee != 1500.0 ? o.transportFee : transportPerOrder)),
     );
     final double failedStipendsDeduction = failedOrders.length * failedStipendRate;
     final double posFeeDeduction = (batchGrossCash > 0 && dcFinanceSettings.isPosFeeReimbursable)
@@ -90,12 +94,19 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
     final int deliveredCount = unremittedDeliveredOrders.length;
     final int failedCount = failedOrders.length;
 
-    // Snapshot of orders contributing to this remittance with itemized breakdown (collections - commission - transport)
+    // Snapshot of orders contributing to this remittance with itemized breakdown (collections - commission - transport - POS fee)
     final List<RemittanceOrderItem> associatedOrderItems = [
       ...unremittedDeliveredOrders.map((o) {
         final cash = o.isCashPod ? o.totalAmount : 0.0;
-        final comm = o.agentEntitlement > 0 ? o.agentEntitlement : commissionRate;
-        final trans = o.transportFee > 0 ? o.transportFee : transportPerOrder;
+        final comm = (user?.commissionRate != null && user!.commissionRate > 0)
+            ? user.commissionRate
+            : (o.agentEntitlement > 0 && o.agentEntitlement != 2500.0 ? o.agentEntitlement : commissionRate);
+        final trans = (user?.transportAllowance != null && user!.transportAllowance > 0)
+            ? user.transportAllowance
+            : (o.transportFee > 0 && o.transportFee != 1500.0 ? o.transportFee : transportPerOrder);
+        final orderPosFee = (batchGrossCash > 0 && cash > 0)
+            ? (cash / batchGrossCash) * posFeeDeduction
+            : 0.0;
         return RemittanceOrderItem(
           orderId: o.id,
           orderNumber: o.orderNumber,
@@ -106,7 +117,7 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
           riderCommission: comm,
           transportAllowance: trans,
           failedStipend: 0.0,
-          posFee: 0.0,
+          posFee: orderPosFee,
           date: o.createdAt,
         );
       }),
@@ -536,9 +547,9 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
       return;
     }
 
-    final isPartial = finalAmount < expectedAmount;
+    final isPartial = finalAmount < (expectedAmount - 1.0);
     final remainingAfterPayment = (expectedAmount - finalAmount).clamp(0.0, double.infinity);
-    final hasDiscrepancy = (finalAmount - expectedAmount).abs() > 0.01 && expectedAmount > 0;
+    final hasDiscrepancy = (finalAmount - expectedAmount).abs() > 1.0 && expectedAmount > 0;
     final selectedDiscrepancyReason = ref.read(logRemittanceDiscrepancyReasonProvider);
 
     if (hasDiscrepancy && selectedDiscrepancyReason == null) {

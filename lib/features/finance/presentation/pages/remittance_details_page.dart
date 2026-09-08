@@ -175,11 +175,18 @@ class _RemittanceDetailsPageState extends ConsumerState<RemittanceDetailsPage> {
     final gross = effectiveOrders.isNotEmpty
         ? effectiveOrders.fold<double>(0.0, (acc, o) => acc + o.totalAmount)
         : 145000.0;
+    final defaultComm = currentUser?.commissionRate != null && currentUser!.commissionRate > 0
+        ? currentUser.commissionRate
+        : 1000.0;
+    final defaultTrans = currentUser?.transportAllowance != null && currentUser!.transportAllowance > 0
+        ? currentUser.transportAllowance
+        : 1500.0;
+
     final comm = effectiveOrders.isNotEmpty
-        ? effectiveOrders.fold<double>(0.0, (acc, o) => acc + (o.agentEntitlement > 0 ? o.agentEntitlement : 1000.0))
+        ? effectiveOrders.fold<double>(0.0, (acc, o) => acc + (o.agentEntitlement > 0 && o.agentEntitlement != 2500.0 ? o.agentEntitlement : defaultComm))
         : 3000.0;
     final trans = effectiveOrders.isNotEmpty
-        ? effectiveOrders.fold<double>(0.0, (acc, o) => acc + (o.transportFee > 0 ? o.transportFee : 1500.0))
+        ? effectiveOrders.fold<double>(0.0, (acc, o) => acc + (o.transportFee > 0 && o.transportFee != 1500.0 ? o.transportFee : defaultTrans))
         : 4500.0;
     final netDue = (gross - comm - trans).clamp(0.0, double.infinity);
 
@@ -196,8 +203,8 @@ class _RemittanceDetailsPageState extends ConsumerState<RemittanceDetailsPage> {
         status: o.status,
         paymentType: o.paymentType,
         cashCollected: o.totalAmount,
-        riderCommission: o.agentEntitlement > 0 ? o.agentEntitlement : 1000.0,
-        transportAllowance: o.transportFee > 0 ? o.transportFee : 1500.0,
+        riderCommission: o.agentEntitlement > 0 && o.agentEntitlement != 2500.0 ? o.agentEntitlement : defaultComm,
+        transportAllowance: o.transportFee > 0 && o.transportFee != 1500.0 ? o.transportFee : defaultTrans,
         failedStipend: 0.0,
         date: o.deliveredAt ?? o.createdAt,
       );

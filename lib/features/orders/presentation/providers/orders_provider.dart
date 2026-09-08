@@ -584,17 +584,23 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     required String remittanceStatus,
   }) async {
     try {
+      final effectivePaymentStatus = remittanceStatus == 'remitted' ? 'remitted' : paymentStatus;
       await _repository.updateOrderStatus(
         orderId,
         'delivered',
-        paymentStatus: remittanceStatus == 'remitted' ? 'remitted' : paymentStatus,
+        paymentStatus: effectivePaymentStatus,
         notes: remittanceStatus == 'remitted' ? '[REMITTED & VERIFIED INTO DC TREASURY]' : null,
       );
       final updatedList = state.orders.map((o) {
         if (o.id == orderId || o.orderNumber == orderId) {
+          final existingNotes = o.deliveryNotes ?? '';
+          final newNotes = remittanceStatus == 'remitted' && !existingNotes.contains('[REMITTED')
+              ? (existingNotes.isNotEmpty ? '$existingNotes [REMITTED & VERIFIED INTO DC TREASURY]' : '[REMITTED & VERIFIED INTO DC TREASURY]')
+              : o.deliveryNotes;
           return OrderModel.fromEntity(o).copyWith(
-            paymentStatus: paymentStatus,
+            paymentStatus: effectivePaymentStatus,
             remittanceStatus: remittanceStatus,
+            deliveryNotes: newNotes,
             financialSettlementStatus: remittanceStatus == 'remitted' ? 'cash_remitted_verified' : o.financialSettlementStatus,
             remittedAt: remittanceStatus == 'remitted' ? DateTime.now() : o.remittedAt,
           );

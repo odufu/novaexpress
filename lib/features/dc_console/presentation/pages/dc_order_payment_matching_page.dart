@@ -158,8 +158,12 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
     for (final order in allOrders) {
       if (order.isDirectTransfer) continue;
       if (order.status == 'delivered') {
-        final isRemitted = order.remittanceStatus.toLowerCase() == 'remitted' ||
+        final isRemitted = order.isRemitted ||
+            order.remittanceStatus.toLowerCase() == 'remitted' ||
             order.remittanceStatus.toLowerCase() == 'cleared' ||
+            order.paymentStatus.toLowerCase() == 'remitted' ||
+            order.financialSettlementStatus.toLowerCase() == 'cash_remitted_verified' ||
+            (order.deliveryNotes?.contains('[REMITTED') == true) ||
             verifiedOrderNumbers.contains(order.id) ||
             verifiedOrderNumbers.contains(order.orderNumber);
 

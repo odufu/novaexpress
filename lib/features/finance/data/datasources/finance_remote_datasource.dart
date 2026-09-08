@@ -149,7 +149,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
               ? 'dc_handover'
               : (paymentMethod == 'pos_deposit' ? 'pos_settlement' : 'bank_transfer'));
 
-      // Construct payload containing only valid columns in cash_remittances table
+      // Construct payload containing all valid columns in cash_remittances table
       final insertData = <String, dynamic>{
         'company_id': validCompanyUuid,
         'delivery_agent_id': validAgentUuid,
@@ -157,6 +157,10 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
         'gross_collections': grossCollections > 0 ? grossCollections : amount,
         'commission_deducted': commissionDeducted,
         'transport_allowance_deducted': transportAllowanceDeducted,
+        'pos_fee': posFee,
+        'expected_amount': (expectedAmount != null && expectedAmount > 0) ? expectedAmount : amount,
+        'discrepancy_amount': actualDiscrepancy ?? 0.0,
+        'is_partial': actualIsPartial,
         'deposit_receipt_url': depositReceiptUrl,
         'reference_number': ref,
         'status': isPaystack ? 'verified' : initialStatus,
@@ -177,21 +181,24 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       final remId = response['id']?.toString() ?? 'rem-${DateTime.now().millisecondsSinceEpoch}';
       debugPrint('[FINANCE_DATASOURCE] ✅ Successfully created cash_remittance in Supabase: $remId (Ref: $ref)');
 
-      // Update associated orders in Supabase using existing columns only
+      // Update associated orders in Supabase using proper remittance statuses
       final orderIds = associatedOrders.map((o) => o.orderId).where((id) => id.isNotEmpty).toList();
       for (final oId in orderIds) {
         try {
           final oRes = await dbClient.from('orders').select('delivery_notes').eq('id', oId).limit(1);
           final existingNotes = (oRes as List).isNotEmpty ? (oRes.first['delivery_notes']?.toString() ?? '') : '';
+          final tag = actualIsPartial
+              ? '[PARTIAL REMITTANCE: $ref | Paid: ₦$amount]'
+              : '[REMITTED: $ref | Amount: ₦$amount]';
           final updatedNotes = existingNotes.contains(ref)
               ? existingNotes
-              : '$existingNotes [REMITTED: $ref | Amount: ₦$amount]'.trim();
+              : '$existingNotes $tag'.trim();
           await dbClient.from('orders').update({
-            'payment_status': 'collected',
+            'payment_status': actualIsPartial ? 'collected' : 'remitted',
             'delivery_notes': updatedNotes,
             'updated_at': DateTime.now().toIso8601String(),
           }).eq('id', oId);
-          debugPrint('[FINANCE_DATASOURCE] 📋 Marked order $oId as remitted in Supabase DB.');
+          debugPrint('[FINANCE_DATASOURCE] 📋 Marked order $oId payment_status as ${actualIsPartial ? "collected" : "remitted"} in Supabase DB.');
         } catch (ordErr) {
           debugPrint('[FINANCE_DATASOURCE] ℹ️ order update notice: $ordErr');
         }

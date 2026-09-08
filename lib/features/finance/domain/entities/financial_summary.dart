@@ -121,14 +121,15 @@ class FinancialSummary {
       final double unremittedTotalEarnings = unremittedCommission + unremittedTransport + unremittedFailedStipend;
 
       final netCashPayable = isSalaried
-          ? unremittedCash
-          : (unremittedCash - unremittedTotalEarnings);
+          ? (unremittedCash - posFee).clamp(0.0, double.infinity)
+          : (unremittedCash - unremittedTotalEarnings - posFee).clamp(0.0, double.infinity);
 
       // Check for remittances that apply specifically to current unremitted orders
       final unremittedOrderIds = unremittedDeliveredCashOrders.map((o) => o.id).toSet();
+      final unremittedOrderNumbers = unremittedDeliveredCashOrders.map((o) => o.orderNumber).toSet();
       final batchAssociatedRemitted = remittances.where((r) {
         if (r.associatedOrders.isEmpty) return false;
-        return r.associatedOrders.any((ao) => unremittedOrderIds.contains(ao.orderId));
+        return r.associatedOrders.any((ao) => unremittedOrderIds.contains(ao.orderId) || unremittedOrderNumbers.contains(ao.orderNumber));
       }).fold(0.0, (acc, r) => acc + r.amount);
 
       // For general/bulk remittances or tests where remittances don't have individual associatedOrders attached
@@ -140,7 +141,8 @@ class FinancialSummary {
           ? batchAssociatedRemitted
           : unassociatedRemitted;
 
-      pendingRemittanceToDC = (netCashPayable - totalRemittedForThisBatch).clamp(0.0, double.infinity);
+      final diff = netCashPayable - totalRemittedForThisBatch;
+      pendingRemittanceToDC = diff > 1.0 ? diff : 0.0;
     } else {
       pendingRemittanceToDC = 0.0;
     }

@@ -118,15 +118,23 @@ class OrderModel extends OrderEntity {
 
     // Determine smart remittance status
     String rStatus = json['remittance_status']?.toString() ?? '';
-    if (rStatus.isEmpty) {
-      if (notes.contains('[REMITTED') || pStatus == 'remitted' || pStatus == 'cleared' || pStatus == 'verified') {
-        rStatus = 'remitted';
-      } else if (orderStatus == 'delivered' || orderStatus == 'completed') {
-        if (pType == 'paystack' || pType == 'direct_transfer' || pType == 'prepaid' || pStatus == 'transfer_verified') {
-          rStatus = 'direct_transfer';
-        } else {
-          rStatus = 'unremitted';
-        }
+    final fsStatus = (json['financial_settlement_status']?.toString() ?? '').toLowerCase();
+    final lowerNotes = notes.toLowerCase();
+    final isDirectTransferNotes = lowerNotes.contains('paystack direct transfer') ||
+        lowerNotes.contains('0 cash held') ||
+        lowerNotes.contains('₦0 cash held') ||
+        lowerNotes.contains('transfer verified');
+
+    if (notes.contains('[REMITTED') ||
+        pStatus == 'remitted' ||
+        pStatus == 'cleared' ||
+        fsStatus == 'cash_remitted_verified') {
+      rStatus = 'remitted';
+    } else if (isDirectTransferNotes || pType == 'paystack' || pType == 'direct_transfer' || pType == 'prepaid' || pStatus == 'transfer_verified') {
+      rStatus = 'direct_transfer';
+    } else if (rStatus.isEmpty) {
+      if (orderStatus == 'delivered' || orderStatus == 'completed') {
+        rStatus = 'unremitted';
       } else {
         rStatus = 'unremitted';
       }

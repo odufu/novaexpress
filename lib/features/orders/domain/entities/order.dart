@@ -138,6 +138,18 @@ class OrderEntity {
   DateTime? get updatedAt => remittedAt ?? deliveredAt ?? assignedAt ?? createdAt;
 
   bool get isDirectTransfer {
+    if (deliveryNotes != null) {
+      final n = deliveryNotes!.toLowerCase();
+      if (n.contains('paystack') ||
+          n.contains('direct transfer') ||
+          n.contains('monnify direct transfer') ||
+          n.contains('transfer verified') ||
+          n.contains('credited to my balance') ||
+          n.contains('0 cash held') ||
+          n.contains('₦0 cash held')) {
+        return true;
+      }
+    }
     final pt = paymentType.toLowerCase();
     if (pt == 'pay_on_delivery' ||
         pt == 'pod' ||
@@ -154,16 +166,6 @@ class OrderEntity {
         pt == 'prepaid' ||
         pt == 'monnify') {
       return true;
-    }
-    if (deliveryNotes != null) {
-      final n = deliveryNotes!.toLowerCase();
-      if (n.contains('paystack') ||
-          n.contains('direct transfer') ||
-          n.contains('monnify direct transfer') ||
-          n.contains('transfer verified') ||
-          n.contains('credited to my balance')) {
-        return true;
-      }
     }
     final ps = paymentStatus.toLowerCase();
     if (ps == 'transfer_verified' ||
@@ -200,17 +202,26 @@ class OrderEntity {
   bool get isRemitted {
     if (isDirectTransfer) return true;
     final rs = remittanceStatus.toLowerCase();
-    return rs == 'cleared' || rs == 'remitted';
+    final ps = paymentStatus.toLowerCase();
+    final fs = financialSettlementStatus.toLowerCase();
+    final notes = (deliveryNotes ?? '').toLowerCase();
+    return rs == 'cleared' ||
+        rs == 'remitted' ||
+        ps == 'remitted' ||
+        fs == 'cash_remitted_verified' ||
+        notes.contains('[remitted');
   }
 
   bool get isUnremitted {
     if (!isDelivered) return false;
     if (isDirectTransfer) return false;
+    if (isRemitted) return false;
     final rs = remittanceStatus.toLowerCase();
     return rs == 'unremitted' || rs == 'pending' || rs.isEmpty;
   }
 
   bool get isPendingVerification {
+    if (isRemitted) return false;
     return remittanceStatus.toLowerCase() == 'pending_verification';
   }
 

@@ -240,5 +240,49 @@ void main() {
       expect(cashRemittanceItem.orders.length, equals(2));
       expect(cashRemittanceItem.orders.map((o) => o.orderNumber), containsAll(['TRK-6562', 'TRK-6350']));
     });
+
+    test('FinancialSummary computes net cash payable factoring in POS fee correctly', () {
+      final summary = FinancialSummary.calculate(
+        orders: [order1],
+        remittances: [],
+        user: user,
+        posFee: 1100.0,
+      );
+
+      // Gross: 55,000, Commission: 1,000, Transport: 1,500, POS Fee: 1,100
+      // Net Cash Payable = 55,000 - 1,000 - 1,500 - 1,100 = 51,400
+      expect(summary.pendingRemittanceToDC, equals(51400.0));
+      expect(summary.totalTransferFeesRetained, equals(1100.0));
+    });
+
+    test('FinancialSummary clears completely when remittance covers net payable with POS fee', () {
+      final remittedOrder = order1.copyWith(
+        remittanceStatus: 'remitted',
+        deliveryNotes: '[POD Collected via Cash] [REMITTED: PSTK-RMT-PDA7454-384865 | Amount: ₦49900]',
+      );
+
+      final remittance = RemittanceEntity(
+        id: 'rem-live',
+        referenceNumber: 'PSTK-RMT-PDA7454-384865',
+        amount: 49900.0,
+        grossCollections: 55000.0,
+        commissionDeducted: 1000.0,
+        transportAllowanceDeducted: 1500.0,
+        paymentMethod: 'paystack',
+        status: 'verified',
+        createdAt: DateTime.now(),
+        verifiedAt: DateTime.now(),
+      );
+
+      final summary = FinancialSummary.calculate(
+        orders: [remittedOrder],
+        remittances: [remittance],
+        user: user,
+        posFee: 1100.0,
+      );
+
+      expect(summary.pendingRemittanceToDC, equals(0.0));
+      expect(summary.deliveredCashOrdersCount, equals(0));
+    });
   });
 }

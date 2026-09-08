@@ -36,7 +36,7 @@ class RemittanceOrderItem {
     if (isFailed) {
       return -failedStipend; // Failed delivery stipend credit
     }
-    return cashCollected - riderCommission - transportAllowance;
+    return cashCollected - riderCommission - transportAllowance - posFee;
   }
 
   double get netToDC => netContribution;
