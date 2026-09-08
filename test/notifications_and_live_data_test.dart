@@ -178,6 +178,12 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
         distributionCenterId: distributionCenterId,
         distributionCenterName: distributionCenterName,
       );
+
+  @override
+  Future<bool> checkEmailExists(String email) async => false;
+
+  @override
+  Future<bool> checkPhoneExists(String phone) async => false;
 }
 
 class MockAuthNotifier extends AuthNotifier {

@@ -1057,11 +1057,17 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
 
       try {
         final client = Supabase.instance.client;
-        await client.from(SupabaseConstants.ordersTable).update({
+        final isUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(_currentOrder.id);
+        final updatePayload = {
           'proof_of_delivery_url': result.signatureUrl,
           'delivery_notes': updatedOrder.deliveryNotes,
           'updated_at': DateTime.now().toIso8601String(),
-        }).eq('id', _currentOrder.id);
+        };
+        if (isUuid) {
+          await client.from(SupabaseConstants.ordersTable).update(updatePayload).eq('id', _currentOrder.id);
+        } else {
+          await client.from(SupabaseConstants.ordersTable).update(updatePayload).eq('order_number', _currentOrder.orderNumber);
+        }
       } catch (e) {
         debugPrint('[DC_ORDER_DETAIL] ℹ️ Supabase signature update notice: $e');
       }
@@ -1098,10 +1104,16 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
 
           try {
             final client = Supabase.instance.client;
-            await client.from(SupabaseConstants.ordersTable).update({
+            final isUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(_currentOrder.id);
+            final updatePayload = {
               'proof_photo_url': dataUrl,
               'updated_at': DateTime.now().toIso8601String(),
-            }).eq('id', _currentOrder.id);
+            };
+            if (isUuid) {
+              await client.from(SupabaseConstants.ordersTable).update(updatePayload).eq('id', _currentOrder.id);
+            } else {
+              await client.from(SupabaseConstants.ordersTable).update(updatePayload).eq('order_number', _currentOrder.orderNumber);
+            }
           } catch (e) {
             debugPrint('[DC_ORDER_DETAIL] ℹ️ Supabase photo update notice: $e');
           }

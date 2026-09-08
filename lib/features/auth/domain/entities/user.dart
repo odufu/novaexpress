@@ -73,10 +73,18 @@ class UserEntity {
 
   String get fullName => '$firstName $lastName'.trim();
   String get riderCode => deliveryAgentCode ?? 'PDA';
-  bool get isPda => (role == 'delivery_agent' || role == 'pda') && personnelType == 'pda';
-  bool get isInHouseRider => role == 'delivery_agent' && personnelType == 'in_house_rider';
+  bool get isRider => role == 'delivery_agent' || role == 'pda' || role == 'rider';
+  bool get isPda => isRider && personnelType == 'pda';
+  bool get isInHouseRider => isRider && personnelType == 'in_house_rider';
   bool get isDcManager => role == 'dc_manager' || role == 'dc_supervisor' || role == 'super_admin';
   bool get isCloser => role == 'closer' || role == 'client_closer';
   bool get isClientAdmin => role == 'client' || role == 'merchant' || role == 'seller';
   bool get isClient => isClientAdmin || isCloser;
+
+  String get roleDescription {
+    if (isDcManager) return 'DC Operations Supervisor';
+    if (isCloser) return 'Telesales Closer';
+    if (isClientAdmin) return 'E-Commerce Merchant Admin';
+    return 'Field Delivery Agent (PDA)';
+  }
 }

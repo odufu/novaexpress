@@ -131,9 +131,9 @@ class FinancialSummary {
         return r.associatedOrders.any((ao) => unremittedOrderIds.contains(ao.orderId));
       }).fold(0.0, (acc, r) => acc + r.amount);
 
-      // In tests/simulations where all passed orders are unremitted and mock remittances without associatedOrders are passed
+      // For general/bulk remittances or tests where remittances don't have individual associatedOrders attached
       final unassociatedRemitted = remittances
-          .where((r) => r.associatedOrders.isEmpty && orders.every((o) => !o.isRemitted))
+          .where((r) => r.associatedOrders.isEmpty)
           .fold(0.0, (acc, r) => acc + r.amount);
 
       final totalRemittedForThisBatch = batchAssociatedRemitted > 0

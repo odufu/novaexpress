@@ -1,8 +1,8 @@
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../../../core/constants/supabase_constants.dart';
+import '../../data/repositories/client_portal_repository_impl.dart';
+import '../../domain/repositories/client_portal_repository.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../dc_console/domain/entities/product_package.dart';
 import '../../../dc_console/presentation/providers/dc_console_provider.dart';
@@ -226,9 +226,11 @@ class ClientPortalState {
 
 class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
   final Ref _ref;
+  final ClientPortalRepository _repository;
 
-  ClientPortalNotifier(this._ref)
-      : super(
+  ClientPortalNotifier(this._ref, {ClientPortalRepository? repository})
+      : _repository = repository ?? ClientPortalRepositoryImpl(),
+        super(
           ClientPortalState(
             clientProfile: const ClientProfile(
               id: '33333333-3333-4333-8333-333333333333',
@@ -300,38 +302,22 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         clientOrders = _generateSeedOrders(clientId, companyName);
       }
 
-      // 3. Fetch Closers and Leads from Supabase Database
+      // 3. Fetch Closers and Leads via Repository
       List<ClientCloser> clientClosers = [];
       List<CustomerLead> clientLeads = [];
 
       try {
-        final dbClient = SupabaseClient(
-          SupabaseConstants.supabaseUrl,
-          SupabaseConstants.supabaseServiceRoleKey,
-          authOptions: const AuthClientOptions(autoRefreshToken: false),
-        );
-
-        final closersRes = await dbClient
-            .from('client_closers')
-            .select()
-            .eq('client_id', clientId)
-            .order('created_at', ascending: false);
-
+        final closersRes = await _repository.getClosers(clientId);
         if (closersRes.isNotEmpty) {
-          clientClosers = closersRes.map((c) => ClientCloser.fromJson(c)).toList();
+          clientClosers = closersRes;
         }
 
-        final leadsRes = await dbClient
-            .from('customer_leads')
-            .select('*, client_closers(full_name)')
-            .eq('client_id', clientId)
-            .order('created_at', ascending: false);
-
+        final leadsRes = await _repository.getLeads(clientId);
         if (leadsRes.isNotEmpty) {
-          clientLeads = leadsRes.map((l) => CustomerLead.fromJson(l)).toList();
+          clientLeads = leadsRes;
         }
       } catch (dbErr) {
-        debugPrint('[CLIENT_PORTAL] ℹ️ Supabase closers/leads sync notice: $dbErr');
+        debugPrint('[CLIENT_PORTAL] ℹ️ Closers/leads sync notice: $dbErr');
       }
 
       // Fallback seed data if offline or freshly initialised
@@ -384,57 +370,38 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
   }) async {
     state = state.copyWith(isLoading: true);
     try {
-      // Check closer capacity limit
-      if (state.clientProfile.isEnterprise && state.closers.length >= state.clientProfile.closerLimit) {
-        throw Exception('Closer limit of ${state.clientProfile.closerLimit} reached for this client tier.');
-      }
-
-      final closerId = _generateUuid();
       final suffix = (100 + state.closers.length + 1).toString().padLeft(3, '0');
       final closerCode = 'CLS-NOVA-$suffix';
+      final fallbackId = '00000000-0000-4000-8000-${DateTime.now().millisecondsSinceEpoch.toString().padLeft(12, '0')}';
 
-      final newCloser = ClientCloser(
-        id: closerId,
-        clientId: state.clientProfile.id,
-        closerCode: closerCode,
-        fullName: fullName.trim(),
-        email: email.trim(),
-        phone: phone.trim(),
-        dailyCallTarget: dailyCallTarget,
-        commissionRate: commissionRate,
-        isActive: true,
-        createdAt: DateTime.now(),
-      );
-
-      // Async push to Supabase Cloud DB
-      Future.microtask(() async {
-        try {
-          final dbClient = SupabaseClient(
-            SupabaseConstants.supabaseUrl,
-            SupabaseConstants.supabaseServiceRoleKey,
-            authOptions: const AuthClientOptions(autoRefreshToken: false),
-          );
-
-          // 1. Create Closer record
-          await dbClient.from('client_closers').insert(newCloser.toJson());
-
-          // 2. Create User account for closer login
-          await dbClient.from('users').insert({
-            'id': closerId,
-            'company_id': '11111111-1111-4111-8111-111111111111',
-            'email': newCloser.email,
-            'phone_number': newCloser.phone,
-            'first_name': fullName.split(' ').first,
-            'last_name': fullName.split(' ').skip(1).join(' '),
-            'role': 'closer',
-            'is_active': true,
-          });
-          debugPrint('[CLIENT_PORTAL] ✅ Closer ${newCloser.closerCode} ($fullName) created in Supabase.');
-          dbClient.dispose();
-        } catch (dbErr) {
-          debugPrint('[CLIENT_PORTAL] ℹ️ Supabase closer insert notice: $dbErr');
+      ClientCloser newCloser;
+      try {
+        newCloser = await _repository.createCloser(
+          clientId: state.clientProfile.id,
+          fullName: fullName.trim(),
+          email: email.trim(),
+          phone: phone.trim(),
+          dailyCallTarget: dailyCallTarget,
+          commissionRate: commissionRate,
+        );
+      } catch (dbErr) {
+        if (dbErr.toString().contains('already exists')) {
+          rethrow;
         }
-      });
+        debugPrint('[CLIENT_PORTAL] ℹ️ Remote createCloser notice: $dbErr. Utilizing resilient local fallback.');
+        newCloser = ClientCloser(
+          id: fallbackId,
+          clientId: state.clientProfile.id,
+          closerCode: closerCode,
+          fullName: fullName.trim(),
+          email: email.trim(),
+          phone: phone.trim(),
+          dailyCallTarget: dailyCallTarget,
+          commissionRate: commissionRate,
+          isActive: true,
+          createdAt: DateTime.now(),
+        );
+      }
 
       final updatedClosers = [newCloser, ...state.closers];
       state = state.copyWith(closers: updatedClosers, isLoading: false);
@@ -457,26 +424,13 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
 
       state = state.copyWith(closers: updatedClosers);
 
-      // Async update in Supabase
+      // Async update in Repository
       Future.microtask(() async {
         try {
-          final dbClient = SupabaseClient(
-            SupabaseConstants.supabaseUrl,
-            SupabaseConstants.supabaseServiceRoleKey,
-            authOptions: const AuthClientOptions(autoRefreshToken: false),
-          );
-          await dbClient.from('client_closers').update({
-            'is_active': isActive,
-            'updated_at': DateTime.now().toIso8601String(),
-          }).eq('id', closerId);
-
-          await dbClient.from('users').update({
-            'is_active': isActive,
-          }).eq('id', closerId);
+          await _repository.toggleCloserStatus(closerId: closerId, isActive: isActive);
           debugPrint('[CLIENT_PORTAL] ✅ Closer $closerId status updated to isActive: $isActive');
-          dbClient.dispose();
         } catch (dbErr) {
-          debugPrint('[CLIENT_PORTAL] ℹ️ Supabase closer toggle notice: $dbErr');
+          debugPrint('[CLIENT_PORTAL] ℹ️ Closer toggle notice: $dbErr');
         }
       });
     } catch (e) {
@@ -493,31 +447,17 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
     try {
       final closer = state.closers.firstWhere((c) => c.id == closerId);
 
-      // Async update in Supabase Auth & Users table
+      // Async update in Repository
       Future.microtask(() async {
         try {
-          final dbClient = SupabaseClient(
-            SupabaseConstants.supabaseUrl,
-            SupabaseConstants.supabaseServiceRoleKey,
-            authOptions: const AuthClientOptions(autoRefreshToken: false),
+          await _repository.resetCloserPassword(
+            closerId: closerId,
+            userId: closer.userId,
+            newPassword: newPassword,
           );
-
-          if (closer.userId != null && closer.userId!.isNotEmpty) {
-            await dbClient.auth.admin.updateUserById(
-              closer.userId!,
-              attributes: AdminUserAttributes(password: newPassword),
-            );
-          } else {
-            // Update user in users table
-            await dbClient.from('users').update({
-              'raw_user_meta_data': {'default_password_changed': true},
-              'updated_at': DateTime.now().toIso8601String(),
-            }).eq('id', closerId);
-          }
           debugPrint('[CLIENT_PORTAL] ✅ Password reset for closer ${closer.closerCode} (${closer.email})');
-          dbClient.dispose();
         } catch (dbErr) {
-          debugPrint('[CLIENT_PORTAL] ℹ️ Supabase reset password notice: $dbErr');
+          debugPrint('[CLIENT_PORTAL] ℹ️ Reset password notice: $dbErr');
         }
       });
 
@@ -563,36 +503,21 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
 
       state = state.copyWith(closers: updatedClosers, isLoading: false);
 
-      // Async update in Supabase
+      // Async update in Repository
       Future.microtask(() async {
         try {
-          final dbClient = SupabaseClient(
-            SupabaseConstants.supabaseUrl,
-            SupabaseConstants.supabaseServiceRoleKey,
-            authOptions: const AuthClientOptions(autoRefreshToken: false),
+          await _repository.updateCloserDetails(
+            closerId: closerId,
+            fullName: fullName,
+            phone: phone,
+            email: email,
+            commissionRate: commissionRate,
+            dailyCallTarget: dailyCallTarget,
+            isActive: isActive,
           );
-          await dbClient.from('client_closers').update({
-            if (fullName != null) 'full_name': fullName,
-            if (phone != null) 'phone': phone,
-            if (email != null) 'email': email,
-            if (commissionRate != null) 'commission_rate': commissionRate,
-            if (dailyCallTarget != null) 'daily_call_target': dailyCallTarget,
-            if (isActive != null) 'is_active': isActive,
-            'updated_at': DateTime.now().toIso8601String(),
-          }).eq('id', closerId);
-
-          if (fullName != null || phone != null) {
-            await dbClient.from('users').update({
-              if (fullName != null) 'first_name': fullName.split(' ').first,
-              if (fullName != null) 'last_name': fullName.split(' ').skip(1).join(' '),
-              if (phone != null) 'phone_number': phone,
-              if (isActive != null) 'is_active': isActive,
-            }).eq('id', closerId);
-          }
           debugPrint('[CLIENT_PORTAL] ✅ Closer ${updatedCloser!.closerCode} updated successfully.');
-          dbClient.dispose();
         } catch (dbErr) {
-          debugPrint('[CLIENT_PORTAL] ℹ️ Supabase closer update notice: $dbErr');
+          debugPrint('[CLIENT_PORTAL] ℹ️ Closer update notice: $dbErr');
         }
       });
 
@@ -640,17 +565,13 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         createdAt: DateTime.now(),
       );
 
-      // Push to Supabase Cloud DB
+      // Push to Database via Repository
       Future.microtask(() async {
         try {
-          final dbClient = SupabaseClient(
-            SupabaseConstants.supabaseUrl,
-            SupabaseConstants.supabaseServiceRoleKey,
-          );
-          await dbClient.from('customer_leads').insert(newLead.toJson());
-          debugPrint('[CLIENT_PORTAL] ✅ Customer lead for ${newLead.customerName} pushed to Supabase.');
+          await _repository.createLead(newLead);
+          debugPrint('[CLIENT_PORTAL] ✅ Customer lead for ${newLead.customerName} pushed to repository.');
         } catch (dbErr) {
-          debugPrint('[CLIENT_PORTAL] ℹ️ Supabase lead insert notice: $dbErr');
+          debugPrint('[CLIENT_PORTAL] ℹ️ Lead insert notice: $dbErr');
         }
       });
 
@@ -679,20 +600,16 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
 
       state = state.copyWith(leads: updatedLeads);
 
-      // Async update in Supabase
+      // Async update via Repository
       Future.microtask(() async {
         try {
-          final dbClient = SupabaseClient(
-            SupabaseConstants.supabaseUrl,
-            SupabaseConstants.supabaseServiceRoleKey,
+          await _repository.updateLeadStatus(
+            leadId: leadId,
+            newStatus: newStatus,
+            notes: notes,
           );
-          await dbClient.from('customer_leads').update({
-            'status': newStatus,
-            if (notes != null) 'call_notes': notes,
-            'last_called_at': DateTime.now().toIso8601String(),
-          }).eq('id', leadId);
         } catch (dbErr) {
-          debugPrint('[CLIENT_PORTAL] ℹ️ Supabase lead update notice: $dbErr');
+          debugPrint('[CLIENT_PORTAL] ℹ️ Lead update notice: $dbErr');
         }
       });
     } catch (e) {
@@ -741,7 +658,7 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
       notes: notes ?? lead.callNotes,
     );
 
-    // 2. Update Lead record status to 'order_created' and link convertedOrderId
+    // 2. Update lead status in local state
     final updatedLeads = state.leads.map((l) {
       if (l.id == lead.id) {
         return l.copyWith(
@@ -753,7 +670,7 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
       return l;
     }).toList();
 
-    // 3. Increment Closer stats
+    // 3. Update closer performance counts
     final updatedClosers = state.closers.map((c) {
       if (c.id == closer.id) {
         return c.copyWith(
@@ -766,27 +683,18 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
 
     state = state.copyWith(leads: updatedLeads, closers: updatedClosers);
 
-    // Async push to Supabase
+    // Async push via Repository
     Future.microtask(() async {
       try {
-        final dbClient = SupabaseClient(
-          SupabaseConstants.supabaseUrl,
-          SupabaseConstants.supabaseServiceRoleKey,
+        await _repository.recordLeadConversion(
+          leadId: lead.id,
+          orderId: createdOrder.id,
+          closerId: closer.id.isNotEmpty ? closer.id : null,
+          totalLeadsConfirmed: closer.id.isNotEmpty ? closer.totalLeadsConfirmed + 1 : null,
+          totalOrdersBooked: closer.id.isNotEmpty ? closer.totalOrdersBooked + 1 : null,
         );
-        await dbClient.from('customer_leads').update({
-          'status': 'order_created',
-          'converted_order_id': createdOrder.id,
-          'last_called_at': DateTime.now().toIso8601String(),
-        }).eq('id', lead.id);
-
-        if (closer.id.isNotEmpty) {
-          await dbClient.from('client_closers').update({
-            'total_leads_confirmed': closer.totalLeadsConfirmed + 1,
-            'total_orders_booked': closer.totalOrdersBooked + 1,
-          }).eq('id', closer.id);
-        }
       } catch (dbErr) {
-        debugPrint('[CLIENT_PORTAL] ℹ️ Supabase lead conversion sync notice: $dbErr');
+        debugPrint('[CLIENT_PORTAL] ℹ️ Lead conversion sync notice: $dbErr');
       }
     });
 
@@ -915,14 +823,10 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         createdAt: DateTime.now(),
       );
 
-      // 3. Persist asynchronously to Supabase Database
+      // 3. Persist order via OrdersProvider
       Future.microtask(() async {
         try {
-          final dbClient = SupabaseClient(
-            SupabaseConstants.supabaseUrl,
-            SupabaseConstants.supabaseServiceRoleKey,
-          );
-          await dbClient.from(SupabaseConstants.ordersTable).insert({
+          await _ref.read(ordersProvider.notifier).createOrder({
             'id': newOrder.id,
             'order_number': newOrder.orderNumber,
             'customer_name': newOrder.customerName,
@@ -951,9 +855,9 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
             'payment_status': 'pending',
             'created_at': DateTime.now().toIso8601String(),
           });
-          debugPrint('[CLIENT_PORTAL] ✅ Order ${newOrder.orderNumber} (Closer: ${newOrder.closerName ?? "N/A"}) pushed to Supabase Cloud DB.');
+          debugPrint('[CLIENT_PORTAL] ✅ Order ${newOrder.orderNumber} (Closer: ${newOrder.closerName ?? "N/A"}) delegated to OrdersProvider.');
         } catch (dbErr) {
-          debugPrint('[CLIENT_PORTAL] ℹ️ Supabase order insert notice: $dbErr');
+          debugPrint('[CLIENT_PORTAL] ℹ️ Order creation sync notice: $dbErr');
         }
       });
 
@@ -1319,6 +1223,11 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
   }
 }
 
+final clientPortalRepositoryProvider = Provider<ClientPortalRepository>((ref) {
+  return ClientPortalRepositoryImpl();
+});
+
 final clientPortalProvider = StateNotifierProvider<ClientPortalNotifier, ClientPortalState>((ref) {
-  return ClientPortalNotifier(ref);
+  final repository = ref.watch(clientPortalRepositoryProvider);
+  return ClientPortalNotifier(ref, repository: repository);
 });

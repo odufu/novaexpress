@@ -1,0 +1,97 @@
+we shall be using flutter feature first clean architecture with bloc state management, having the file structure as this:
+lib/
+│
+├── main.dart
+│
+├── app/
+│   ├── app.dart
+│   ├── bootstrap.dart
+│   └── dependencies.dart
+│
+├── core/
+│   ├── constants/
+│   ├── errors/
+│   ├── exceptions/
+│   ├── extensions/
+│   ├── helpers/
+│   ├── network/
+│   ├── router/
+│   ├── services/
+│   ├── storage/
+│   ├── theme/
+│   ├── utils/
+│   └── widgets/
+│
+└── features/
+    │
+    ├── auth/
+    │   ├── data/
+    │   │   ├── datasources/
+    │   │   │   ├── auth_local_datasource.dart
+    │   │   │   └── auth_remote_datasource.dart
+    │   │   │
+    │   │   ├── models/
+    │   │   │   └── user_model.dart
+    │   │   │
+    │   │   └── repositories/
+    │   │       └── auth_repository_impl.dart
+    │   │
+    │   ├── domain/
+    │   │   ├── entities/
+    │   │   │   └── user.dart
+    │   │   │
+    │   │   ├── repositories/
+    │   │   │   └── auth_repository.dart
+    │   │   │
+    │   │   └── usecases/
+    │   │       ├── login.dart
+    │   │       ├── logout.dart
+    │   │       └── get_current_user.dart
+    │   │
+    │   └── presentation/
+    │       ├── pages/
+    │       │   ├── login_page.dart
+    │       │   └── forgot_password_page.dart
+    │       │
+    │       ├── widgets/
+    │       │   └── login_form.dart
+    │       │
+    │       └── providers/
+    │           └── auth_provider.dart
+    │
+    ├── dashboard/
+    │   ├── data/
+    │   ├── domain/
+    │   └── presentation/
+    │
+    ├── products/
+    │   ├── data/
+    │   ├── domain/
+    │   └── presentation/
+    │
+    ├── cart/
+    │   ├── data/
+    │   ├── domain/
+    │   └── presentation/
+    │
+    ├── orders/
+    │   ├── data/
+    │   ├── domain/
+    │   └── presentation/
+    │
+    ├── payments/
+    │   ├── data/
+    │   ├── domain/
+    │   └── presentation/
+    │
+    └── profile/
+        ├── data/
+        ├── domain/
+        └── presentation/
+
+
+we dont use useState for any reason in the project, every single state is managed properly by the state management 
+
+we follow performance
+and we use supabase as our backend 
+well decoupled that there is a big seperation of backend from frontend, because we can always change the backend to any design, platform... as we wished

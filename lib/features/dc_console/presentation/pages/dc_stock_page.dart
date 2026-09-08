@@ -1,19 +1,19 @@
-import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/helpers/formatters.dart';
 import '../../../../core/widgets/app_loading_overlay.dart';
 import '../../../../core/widgets/app_skeleton_loader.dart';
 import '../../../../core/widgets/product_image_widget.dart';
+import '../../../../core/widgets/user_avatar_widget.dart';
 import '../../../stock/domain/entities/stock_item.dart';
 import '../../../stock/domain/entities/rider_stock_allocation.dart';
 import '../../../stock/presentation/providers/stock_provider.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
 import '../providers/dc_console_provider.dart';
 import '../providers/product_catalog_provider.dart';
+import '../../../../core/services/signature_storage_service.dart';
 import '../widgets/dc_product_detail_modal.dart';
 
 class DCStockPage extends ConsumerStatefulWidget {
@@ -33,7 +33,8 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
     super.initState();
     _tabController = TabController(length: 5, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(stockProvider.notifier).fetchStockItems();
+      final activeHub = ref.read(dcConsoleProvider).activeHubId;
+      ref.read(stockProvider.notifier).fetchStockItems(null, activeHub);
       ref.read(productCatalogProvider.notifier).reloadCatalog();
     });
   }
@@ -52,6 +53,12 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
     final isDark = theme.brightness == Brightness.dark;
     final dcState = ref.watch(dcConsoleProvider);
     final stockState = ref.watch(stockProvider);
+
+    ref.listen<DCConsoleState>(dcConsoleProvider, (previous, next) {
+      if (previous?.activeHubId != next.activeHubId) {
+        ref.read(stockProvider.notifier).fetchStockItems(null, next.activeHubId);
+      }
+    });
 
     return Column(
       children: [
@@ -976,6 +983,7 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
       allocations: allAllocations,
       onReceiveMoreStock: () => _showReceiveStockDialog(context, isDark, stockState, preselectedItem: item),
       onAssignToRider: () => _showAssignToRiderDialog(context, isDark, item, drivers),
+      onTransferToDc: () => _showTransferStockToDcDialog(context, isDark, item),
       onReportDamage: () => _showRecordDamageModal(context, isDark, item, drivers),
     );
   }
@@ -1021,10 +1029,22 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                     items: driverList.map((d) {
                       return DropdownMenuItem(
                         value: d.id,
-                        child: Text(
-                          '${d.name} (${d.driverCode})',
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
+                        child: Row(
+                          children: [
+                            UserAvatarWidget(
+                              avatarUrl: d.avatarUrl,
+                              fullName: d.name,
+                              radius: 11,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                '${d.name} (${d.driverCode})',
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            ),
+                          ],
                         ),
                       );
                     }).toList(),
@@ -1214,31 +1234,10 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
 
                                                 if (bytes.isNotEmpty) {
                                                   final ext = file.extension?.toLowerCase() ?? 'jpg';
-                                                  final mimeType = ext == 'png' ? 'image/png' : (ext == 'webp' ? 'image/webp' : 'image/jpeg');
-                                                  final fileName = 'product_${DateTime.now().millisecondsSinceEpoch}.$ext';
-                                                  String? uploadedUrl;
-
-                                                  try {
-                                                    final supa = Supabase.instance.client;
-                                                    await supa.storage.from('products').uploadBinary(
-                                                          fileName,
-                                                          bytes,
-                                                          fileOptions: FileOptions(contentType: mimeType, upsert: true),
-                                                        );
-                                                    uploadedUrl = supa.storage.from('products').getPublicUrl(fileName);
-                                                  } catch (_) {
-                                                    try {
-                                                      final supa = Supabase.instance.client;
-                                                      await supa.storage.from('avatars').uploadBinary(
-                                                            fileName,
-                                                            bytes,
-                                                            fileOptions: FileOptions(contentType: mimeType, upsert: true),
-                                                          );
-                                                      uploadedUrl = supa.storage.from('avatars').getPublicUrl(fileName);
-                                                    } catch (_) {
-                                                      uploadedUrl = 'data:$mimeType;base64,${base64Encode(bytes)}';
-                                                    }
-                                                  }
+                                                  final uploadedUrl = await SignatureStorageService.uploadProductImage(
+                                                    bytes: bytes,
+                                                    extension: ext,
+                                                  );
 
                                                   setDialogState(() {
                                                     selectedImageUrl = uploadedUrl;
@@ -1372,6 +1371,7 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                                   binLocation: binTag,
                                   description: descCtrl.text.trim(),
                                   imageAsset: selectedImageUrl,
+                                  originDcId: ref.read(dcConsoleProvider).activeHubId,
                                 );
 
                             // Also create corresponding warehouse batch
@@ -1924,6 +1924,7 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                                               quantity: qty,
                                               waybillNumber: waybillCtrl.text.trim(),
                                               binLocation: binCtrl.text.trim(),
+                                              distributionCenterId: ref.read(dcConsoleProvider).activeHubId,
                                             );
                                         if (ok) {
                                           ref.read(dcConsoleProvider.notifier).addBatch(
@@ -2063,10 +2064,22 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                     items: driverList.map((d) {
                       return DropdownMenuItem(
                         value: d.id,
-                        child: Text(
-                          '${d.name} (${d.driverCode}) • ${d.assignedZone}',
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
+                        child: Row(
+                          children: [
+                            UserAvatarWidget(
+                              avatarUrl: d.avatarUrl,
+                              fullName: d.name,
+                              radius: 11,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                '${d.name} (${d.driverCode}) • ${d.assignedZone}',
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            ),
+                          ],
                         ),
                       );
                     }).toList(),
@@ -2225,6 +2238,9 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                                             riderName: targetDriver.name,
                                             riderCode: targetDriver.driverCode,
                                             quantity: qty,
+                                            distributionCenterId: targetDriver.distributionCenterId ??
+                                                ref.read(dcConsoleProvider).selectedDcId ??
+                                                ref.read(dcConsoleProvider).activeHubId,
                                           ),
                                     );
 
@@ -2275,6 +2291,368 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showTransferStockToDcDialog(BuildContext context, bool isDark, StockItemEntity item) {
+    final dcState = ref.read(dcConsoleProvider);
+    final allDcs = dcState.distributionCenters.isNotEmpty ? dcState.distributionCenters : defaultDistributionCenters;
+    final currentHubId = dcState.activeHubId;
+    final currentHubName = dcState.activeHubName;
+    final currentHubCode = dcState.activeHubCode;
+
+    final otherDcs = allDcs.where((d) => d.id != currentHubId && d.code != currentHubCode).toList();
+
+    if (otherDcs.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ No other distribution centers registered in the network to transfer stock to.'),
+          backgroundColor: Color(0xFFEF4444),
+        ),
+      );
+      return;
+    }
+
+    String selectedDestDcId = otherDcs.first.id;
+    final qtyCtrl = TextEditingController(text: item.availableCount > 0 ? (item.availableCount >= 10 ? '10' : '1') : '0');
+    final notesCtrl = TextEditingController();
+    final messenger = ScaffoldMessenger.of(context);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          final targetDestDc = otherDcs.firstWhere((d) => d.id == selectedDestDcId, orElse: () => otherDcs.first);
+
+          return AlertDialog(
+            backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF37021).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.swap_horiz_rounded, color: Color(0xFFF37021), size: 22),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Inter-DC Stock Transfer', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
+                      Text('Transfer inventory across NovaXpress hubs', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 500,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Product Summary Banner
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF37021).withValues(alpha: isDark ? 0.12 : 0.08),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFF37021).withValues(alpha: 0.25)),
+                      ),
+                      child: Row(
+                        children: [
+                          ProductImageWidget(imageUrl: item.imageAsset, width: 44, height: 44, borderRadius: 8),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(item.name, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'SKU: ${item.sku} • In DC Possession: ${item.availableCount} Units',
+                                  style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Origin DC info pill
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.outbox_rounded, size: 16, color: Color(0xFF64748B)),
+                          const SizedBox(width: 8),
+                          Text('Source Hub (Origin): ', style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B))),
+                          Text(
+                            '$currentHubName ($currentHubCode)',
+                            style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Destination DC Dropdown
+                    DropdownButtonFormField<String>(
+                      value: selectedDestDcId,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Destination Distribution Center *',
+                        prefixIcon: Icon(Icons.move_to_inbox_rounded, size: 18),
+                      ),
+                      items: otherDcs.map((d) {
+                        return DropdownMenuItem(
+                          value: d.id,
+                          child: Text(
+                            '${d.name} (${d.code}) • ${d.city}, ${d.state}',
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                            style: GoogleFonts.inter(fontSize: 12.5),
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          setDialogState(() => selectedDestDcId = val);
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Quantity TextField
+                    TextField(
+                      controller: qtyCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: 'Quantity to Transfer (Units) *',
+                        prefixIcon: const Icon(Icons.format_list_numbered_rounded, size: 18),
+                        helperText: 'Max available in current hub: ${item.availableCount} units',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Quick Quantity Shortcut Buttons
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        _buildQuickQtyButton('+5', () => qtyCtrl.text = '5'),
+                        _buildQuickQtyButton('+10', () => qtyCtrl.text = '10'),
+                        _buildQuickQtyButton('+25', () => qtyCtrl.text = '25'),
+                        _buildQuickQtyButton('+50', () => qtyCtrl.text = '50'),
+                        _buildQuickQtyButton('All (${item.availableCount})', () => qtyCtrl.text = '${item.availableCount}'),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Transfer notes / reason
+                    TextField(
+                      controller: notesCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Waybill & Transfer Notes (Optional)',
+                        hintText: 'e.g. Weekly replenishment for regional demand rebalance',
+                        prefixIcon: Icon(Icons.note_alt_outlined, size: 18),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  final qty = int.tryParse(qtyCtrl.text.trim()) ?? 0;
+                  if (qty <= 0) {
+                    messenger.showSnackBar(
+                      const SnackBar(content: Text('⚠️ Please enter a quantity greater than 0.'), backgroundColor: Color(0xFFEF4444)),
+                    );
+                    return;
+                  }
+
+                  if (qty > item.availableCount) {
+                    messenger.showSnackBar(
+                      SnackBar(
+                        content: Text('⚠️ Cannot transfer $qty units. Only ${item.availableCount} units available in current hub.'),
+                        backgroundColor: const Color(0xFFEF4444),
+                      ),
+                    );
+                    return;
+                  }
+
+                  // Secondary confirmation dialog with double-tap protection
+                  showDialog<void>(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (confirmCtx) {
+                      bool isSubmitting = false;
+
+                      return StatefulBuilder(
+                        builder: (confirmCtx, setConfirmState) => AlertDialog(
+                          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                          title: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF37021).withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(Icons.local_shipping_outlined, color: Color(0xFFF37021), size: 20),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text('Confirm Inter-DC Dispatch', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold)),
+                              ),
+                            ],
+                          ),
+                          content: SizedBox(
+                            width: 420,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Review and confirm warehouse stock dispatch to destination distribution center:',
+                                  style: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF64748B)),
+                                ),
+                                const SizedBox(height: 12),
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      _buildConfirmationRow('Product:', item.name, isDark),
+                                      const SizedBox(height: 6),
+                                      _buildConfirmationRow('From Origin:', '$currentHubName ($currentHubCode)', isDark),
+                                      const SizedBox(height: 6),
+                                      _buildConfirmationRow('To Destination:', '${targetDestDc.name} (${targetDestDc.code})', isDark),
+                                      const Divider(height: 16),
+                                      _buildConfirmationRow(
+                                        'Units to Dispatch:',
+                                        '$qty Units',
+                                        isDark,
+                                        isBold: true,
+                                        valueColor: const Color(0xFFF37021),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      _buildConfirmationRow(
+                                        'Remaining Shelf Stock:',
+                                        '${item.availableCount - qty} Units',
+                                        isDark,
+                                        valueColor: const Color(0xFF10B981),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  '⚠️ This will immediately deduct $qty units from $currentHubCode and record an in-transit waybill.',
+                                  style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
+                                ),
+                              ],
+                            ),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: isSubmitting ? null : () => Navigator.of(confirmCtx).pop(),
+                              child: const Text('Go Back / Edit'),
+                            ),
+                            ElevatedButton.icon(
+                              onPressed: isSubmitting
+                                  ? null
+                                  : () async {
+                                      setConfirmState(() => isSubmitting = true);
+                                      final res = await showAppLoadingDialog(
+                                        context: confirmCtx,
+                                        message: 'Dispatching Inter-DC Transfer...',
+                                        subMessage: 'Routing $qty units to ${targetDestDc.name}...',
+                                        isDark: isDark,
+                                        task: () => ref.read(stockProvider.notifier).transferStockBetweenDCs(
+                                              productIdOrSku: item.id,
+                                              sourceDcId: currentHubId,
+                                              sourceDcName: currentHubName,
+                                              destinationDcId: targetDestDc.id,
+                                              destinationDcName: targetDestDc.name,
+                                              quantity: qty,
+                                              notes: notesCtrl.text.trim(),
+                                            ),
+                                      );
+
+                                      if (res?['success'] == true) {
+                                        if (confirmCtx.mounted) Navigator.of(confirmCtx).pop();
+                                        if (ctx.mounted) Navigator.of(ctx).pop();
+                                        messenger.showSnackBar(
+                                          SnackBar(
+                                            content: Text(res?['message']?.toString() ?? '✅ Stock transfer waybill generated!'),
+                                            backgroundColor: const Color(0xFF10B981),
+                                            duration: const Duration(seconds: 4),
+                                          ),
+                                        );
+                                      } else {
+                                        setConfirmState(() => isSubmitting = false);
+                                        messenger.showSnackBar(
+                                          SnackBar(
+                                            content: Text(res?['message']?.toString() ?? '❌ Failed to transfer stock.'),
+                                            backgroundColor: const Color(0xFFEF4444),
+                                          ),
+                                        );
+                                      }
+                                    },
+                              icon: isSubmitting
+                                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                  : const Icon(Icons.check_circle_rounded, size: 16, color: Colors.white),
+                              label: Text(
+                                isSubmitting ? 'Transferring...' : 'Yes, Dispatch $qty Units',
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFF37021),
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                },
+                icon: const Icon(Icons.swap_horiz_rounded, size: 16, color: Colors.white),
+                label: const Text('Proceed to Dispatch', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFF37021),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

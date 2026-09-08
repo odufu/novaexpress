@@ -87,7 +87,10 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isCompact = screenWidth < 800;
 
-    final allRemittances = financeState.remittances;
+    final dcRiderIds = dcState.drivers.map((d) => d.id).toSet();
+    final allRemittances = dcState.isCurrentHubGrandDc
+        ? financeState.remittances
+        : financeState.remittances.where((r) => dcRiderIds.contains(r.deliveryAgentId)).toList();
     final filteredList = _getFilteredRemittances(allRemittances, selectedFilter, searchQuery);
 
     final totalReconciled = allRemittances.fold(0.0, (sum, r) => sum + r.amount);
@@ -161,7 +164,7 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
                     width: cardWidth,
                     child: _buildMetricTile(
                       'Total Reconciled Volume',
-                      CurrencyFormatter.formatNaira(totalReconciled > 0 ? totalReconciled : 1500500.0),
+                      CurrencyFormatter.formatNaira(totalReconciled),
                       '100% Verified Fleet Settlements',
                       Icons.account_balance_wallet_rounded,
                       const Color(0xFF10B981),

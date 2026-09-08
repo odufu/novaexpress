@@ -95,7 +95,6 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
 
   String? _lastAgentId;
   RealtimeChannel? _realtimeChannel;
-  Timer? _heartbeatTimer;
 
   FinanceNotifier(this._repository, {LocalStorageService? storageService, Ref? ref})
       : _storageService = storageService ?? LocalStorageServiceImpl(),
@@ -103,7 +102,6 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
         super(FinanceState()) {
     _initCache();
     _initRealtimeSubscription();
-    _startHeartbeatTimer();
     if (_ref != null) {
       _ref.listen<AuthState>(authProvider, (previous, next) {
         final nextAgentId = next.user?.deliveryAgentId ?? next.user?.distributionCenterId ?? next.user?.id;
@@ -155,27 +153,6 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
     } catch (e) {
       debugPrint('[FINANCE_PROVIDER] ℹ️ Realtime channel notice: $e');
     }
-  }
-
-  void _startHeartbeatTimer() {
-    try {
-      if (WidgetsBinding.instance.runtimeType.toString().toLowerCase().contains('test')) {
-        return;
-      }
-    } catch (_) {}
-    if (!kIsWeb) {
-      try {
-        if (Platform.environment.containsKey('FLUTTER_TEST') ||
-            Platform.environment.containsKey('TEST_PLATFORM')) {
-          return;
-        }
-      } catch (_) {}
-    }
-    _heartbeatTimer?.cancel();
-    _heartbeatTimer = Timer.periodic(const Duration(seconds: 4), (_) {
-      if (!mounted) return;
-      _silentSyncRemittances();
-    });
   }
 
   Future<void> _silentSyncRemittances() async {
@@ -248,10 +225,10 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
       state = state.copyWith(
         isLoading: false,
         remittances: finalItems,
-        transactions: txns.isNotEmpty ? txns : state.transactions,
+        transactions: txns,
       );
       _storageService.cacheRemittances(finalItems);
-      if (txns.isNotEmpty) _storageService.cacheTransactions(txns);
+      _storageService.cacheTransactions(txns);
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
@@ -438,7 +415,6 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
 
   @override
   void dispose() {
-    _heartbeatTimer?.cancel();
     try {
       _realtimeChannel?.unsubscribe();
     } catch (_) {}

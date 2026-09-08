@@ -41,8 +41,14 @@ class _DCTransactionsPageState extends ConsumerState<DCTransactionsPage> {
     final isDesktop = screenWidth >= 1000;
     final isCompact = screenWidth < 700;
 
-    final txns = dcState.transactions;
-    final filteredTxns = dcState.filteredTransactions;
+    final dcRiderIds = dcState.drivers.map((d) => d.id).toSet();
+    final dcRiderCodes = dcState.drivers.map((d) => d.driverCode.toLowerCase()).toSet();
+    final txns = dcState.isCurrentHubGrandDc
+        ? dcState.transactions
+        : dcState.transactions.where((t) => dcRiderIds.contains(t.riderId) || dcRiderCodes.contains(t.riderCode.toLowerCase())).toList();
+    final filteredTxns = dcState.isCurrentHubGrandDc
+        ? dcState.filteredTransactions
+        : dcState.filteredTransactions.where((t) => dcRiderIds.contains(t.riderId) || dcRiderCodes.contains(t.riderCode.toLowerCase())).toList();
 
     // Metrics calculations
     final totalVolume = txns.fold<double>(0.0, (sum, t) => sum + t.amount);
@@ -142,7 +148,7 @@ class _DCTransactionsPageState extends ConsumerState<DCTransactionsPage> {
                       width: cardWidth,
                       child: _buildMetricTile(
                         title: 'Total Gross Volume',
-                        value: CurrencyFormatter.formatNaira(totalVolume > 0 ? totalVolume : 1250000.0),
+                        value: CurrencyFormatter.formatNaira(totalVolume),
                         subtitle: '${txns.length} Recorded Transactions',
                         icon: Icons.account_balance_wallet_rounded,
                         color: const Color(0xFF2563EB),
@@ -153,7 +159,7 @@ class _DCTransactionsPageState extends ConsumerState<DCTransactionsPage> {
                       width: cardWidth,
                       child: _buildMetricTile(
                         title: 'Paystack Direct Transfers',
-                        value: CurrencyFormatter.formatNaira(paystackVolume > 0 ? paystackVolume : 840000.0),
+                        value: CurrencyFormatter.formatNaira(paystackVolume),
                         subtitle: '$paystackCount Instant Settlements ⚡',
                         icon: Icons.bolt_rounded,
                         color: const Color(0xFF00A2D3),
@@ -164,7 +170,7 @@ class _DCTransactionsPageState extends ConsumerState<DCTransactionsPage> {
                       width: cardWidth,
                       child: _buildMetricTile(
                         title: 'Cash POD Handled',
-                        value: CurrencyFormatter.formatNaira(cashVolume > 0 ? cashVolume : 410000.0),
+                        value: CurrencyFormatter.formatNaira(cashVolume),
                         subtitle: '$cashCount Handover Orders 💵',
                         icon: Icons.payments_rounded,
                         color: const Color(0xFF10B981),
@@ -175,7 +181,7 @@ class _DCTransactionsPageState extends ConsumerState<DCTransactionsPage> {
                       width: cardWidth,
                       child: _buildMetricTile(
                         title: 'Rider Entitlements',
-                        value: CurrencyFormatter.formatNaira(totalRiderEntitlements > 0 ? totalRiderEntitlements : 320000.0),
+                        value: CurrencyFormatter.formatNaira(totalRiderEntitlements),
                         subtitle: 'Commissions & Allowances 🛵',
                         icon: Icons.two_wheeler_rounded,
                         color: const Color(0xFFF37021),

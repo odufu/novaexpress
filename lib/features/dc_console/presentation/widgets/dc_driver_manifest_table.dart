@@ -320,7 +320,9 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
                         const Icon(Icons.person_search_rounded, size: 36, color: Color(0xFF94A3B8)),
                         const SizedBox(height: 8),
                         Text(
-                          'No delivery personnel found matching "$searchQuery".',
+                          searchQuery.trim().isEmpty
+                              ? 'No delivery personnel onboarded to this distribution center yet.'
+                              : 'No delivery personnel found matching "$searchQuery".',
                           style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B)),
                         ),
                       ],

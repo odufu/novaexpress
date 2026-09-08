@@ -16,10 +16,11 @@ class DCRidersPage extends ConsumerWidget {
     final dcState = ref.watch(dcConsoleProvider);
     final dcNotifier = ref.read(dcConsoleProvider.notifier);
 
-    final allCount = dcState.drivers.length;
-    final pdaCount = dcState.drivers.where((d) => d.isPda).length;
-    final inHouseCount = dcState.drivers.where((d) => d.isInHouseRider).length;
-    final activeCount = dcState.drivers.where((d) => d.isActive).length;
+    final dcDrivers = dcState.dcDrivers;
+    final allCount = dcDrivers.length;
+    final pdaCount = dcDrivers.where((d) => d.isPda).length;
+    final inHouseCount = dcDrivers.where((d) => d.isInHouseRider).length;
+    final activeCount = dcDrivers.where((d) => d.isActive).length;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),

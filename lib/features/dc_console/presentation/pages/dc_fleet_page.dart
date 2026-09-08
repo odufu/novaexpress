@@ -16,10 +16,11 @@ class DCFleetPage extends ConsumerWidget {
     final dcState = ref.watch(dcConsoleProvider);
     final dcNotifier = ref.read(dcConsoleProvider.notifier);
 
-    final allCount = dcState.drivers.length;
-    final activeCount = dcState.drivers.where((d) => d.isActive).length;
-    final atRestCount = dcState.drivers.where((d) => d.isAtRest).length;
-    final delayedCount = dcState.drivers.where((d) => d.isDelayed).length;
+    final dcDrivers = dcState.dcDrivers;
+    final allCount = dcDrivers.length;
+    final activeCount = dcDrivers.where((d) => d.isActive).length;
+    final atRestCount = dcDrivers.where((d) => d.isAtRest).length;
+    final delayedCount = dcDrivers.where((d) => d.isDelayed).length;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),

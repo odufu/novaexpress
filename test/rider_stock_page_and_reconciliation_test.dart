@@ -41,10 +41,10 @@ class FakeStockRepository implements StockRepository {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 
   @override
-  Future<List<StockItemEntity>> getVehicleStockItems([String? agentId]) async => stockItems;
+  Future<List<StockItemEntity>> getVehicleStockItems([String? agentId, String? dcId]) async => stockItems;
 
   @override
-  Future<List<RiderStockAllocation>> getRiderStockAllocations([String? riderId]) async => allocations;
+  Future<List<RiderStockAllocation>> getRiderStockAllocations([String? riderId, String? dcId]) async => allocations;
 
   @override
   Future<void> updateRiderStockCustody({

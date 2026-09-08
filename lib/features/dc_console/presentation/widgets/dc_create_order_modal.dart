@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/helpers/formatters.dart';
+import '../../../../core/helpers/uuid_helper.dart';
 import '../../../../core/services/location_lookup_service.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../../../orders/domain/services/order_routing_service.dart';
@@ -281,7 +282,7 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
     final drivers = dcState.drivers;
 
     final provisionalOrder = OrderEntity(
-      id: 'ord-${DateTime.now().millisecondsSinceEpoch}',
+      id: UuidHelper.generate(),
       orderNumber: orderNumber,
       customerName: _nameController.text.trim(),
       customerPhone: _phoneController.text.trim(),
@@ -1339,7 +1340,7 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                         Builder(
                           builder: (context) {
                             final provOrder = OrderEntity(
-                              id: 'ord-provisional',
+                              id: UuidHelper.generate(),
                               orderNumber: 'TRK-PREVIEW',
                               customerName: _nameController.text.trim(),
                               customerPhone: _phoneController.text.trim(),

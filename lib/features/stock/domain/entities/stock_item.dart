@@ -137,6 +137,16 @@ class StockItemEntity {
       desc = desc.replaceAll(RegExp(r'\[IMAGE_URL:\s*[^\]]+\]'), '').trim();
     }
 
+    // Remove [ORIGIN_DC: ...] tag
+    if (desc.contains('[ORIGIN_DC:')) {
+      desc = desc.replaceAll(RegExp(r'\[ORIGIN_DC:\s*[^\]]+\]'), '').trim();
+    }
+
+    // Remove [DC_STOCKS: ...] tag (including nested JSON brackets)
+    if (desc.contains('[DC_STOCKS:')) {
+      desc = desc.replaceAll(RegExp(r'\[DC_STOCKS:\s*\{.*?\}\]'), '').trim();
+    }
+
     // Remove [PACKAGES: ...] tag (including nested JSON brackets)
     if (desc.contains('[PACKAGES:')) {
       final start = desc.indexOf('[PACKAGES:');

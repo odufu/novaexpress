@@ -1,0 +1,165 @@
+/* ==========================================================================
+   NoveXPS Master Interactive Presentation — Design System & Styles
+   Aesthetics: Premium Clean Light Theme, NovaExpress Forest Green (#006C4C),
+   Vibrant Brand Orange (#F37021), Glassmorphism, and Crisp Typography
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+:root {
+  /* Brand Theme Colors */
+  --brand-primary: #006C4C;         /* Deep Nova Forest Green */
+  --brand-primary-light: #00875A;   /* Vivid Emerald Green */
+  --brand-primary-subtle: #E6F4EA;  /* Soft Green Tint */
+  --brand-primary-glow: rgba(0, 108, 76, 0.18);
+
+  --brand-orange: #F37021;          /* Nova Express Orange Accent */
+  --brand-orange-light: #FF8A3D;
+  --brand-orange-subtle: #FFF4EB;
+
+  /* Surfaces & Backgrounds (Light Theme) */
+  --bg-primary: #F8FAFC;            /* Clean Slate 50 Background */
+  --bg-secondary: #FFFFFF;          /* Pure White */
+  --bg-card: #FFFFFF;
+  --bg-card-hover: #F1F5F9;
+  --bg-subtle: #F1F5F9;
+  --bg-muted: #E2E8F0;
+
+  /* Text Hierarchy */
+  --text-primary: #0F172A;          /* Slate 900 */
+  --text-secondary: #475569;        /* Slate 600 */
+  --text-muted: #64748B;            /* Slate 500 */
+  --text-inverse: #FFFFFF;
+
+  /* Borders & Dividers */
+  --border-subtle: #E2E8F0;
+  --border-active: #006C4C;
+  --border-orange: #F37021;
+  --border-strong: #CBD5E1;
+
+  /* Accents */
+  --accent-emerald: #00875A;
+  --accent-cyan: #0284C7;
+  --accent-amber: #D97706;
+  --accent-purple: #7C3AED;
+  --accent-rose: #E11D48;
+
+  /* Gradients */
+  --grad-primary: linear-gradient(135deg, #006C4C 0%, #00875A 60%, #0284C7 100%);
+  --grad-brand: linear-gradient(135deg, #006C4C 0%, #F37021 100%);
+  --grad-surface: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%);
+  --grad-hero: radial-gradient(circle at 50% -10%, rgba(0, 108, 76, 0.08), transparent 65%),
+               radial-gradient(circle at 90% 15%, rgba(243, 112, 33, 0.06), transparent 50%),
+               radial-gradient(circle at 10% 75%, rgba(2, 132, 199, 0.05), transparent 55%);
+
+  /* Typography */
+  --font-heading: 'Outfit', sans-serif;
+  --font-body: 'Plus Jakarta Sans', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  --shadow-lg: 0 10px 25px -3px rgba(0, 108, 76, 0.08), 0 4px 10px -2px rgba(0, 0, 0, 0.04);
+  --shadow-xl: 0 20px 35px -5px rgba(0, 108, 76, 0.12), 0 10px 15px -5px rgba(0, 0, 0, 0.04);
+  --shadow-glow: 0 0 25px -3px var(--brand-primary-glow);
+
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--bg-primary);
+  background-image: var(--grad-hero);
+  background-attachment: fixed;
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+button {
+  font-family: inherit;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+@keyframes pulseGlow {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.6; }
+}
+
+.pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brand-primary-light);
+  box-shadow: 0 0 8px var(--brand-primary-light);
+  animation: pulseGlow 2s infinite;
+}
+
+/* Mermaid SVG overrides for light theme readability */
+.mermaid svg {
+  max-width: 100% !important;
+  height: auto !important;
+}
+
+.mermaid .node rect,
+.mermaid .node circle,
+.mermaid .node ellipse,
+.mermaid .node polygon {
+  fill: #FFFFFF !important;
+  stroke: #006C4C !important;
+  stroke-width: 2px !important;
+}
+
+.mermaid .node .label {
+  color: #0F172A !important;
+  font-family: var(--font-heading) !important;
+  font-weight: 600 !important;
+}
+
+.mermaid .edgePath .path {
+  stroke: #006C4C !important;
+  stroke-width: 2px !important;
+}
+
+.mermaid .edgeLabel {
+  background-color: #FFFFFF !important;
+  color: #475569 !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+}

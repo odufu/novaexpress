@@ -22,6 +22,7 @@ import 'package:novexps/features/orders/presentation/providers/orders_provider.d
 import 'package:novexps/features/stock/data/datasources/stock_remote_datasource.dart';
 import 'package:novexps/features/stock/data/models/stock_item_model.dart';
 import 'package:novexps/features/stock/data/repositories/stock_repository_impl.dart';
+import 'package:novexps/features/stock/domain/entities/rider_stock_allocation.dart';
 import 'package:novexps/features/stock/presentation/providers/stock_provider.dart';
 
 import 'package:novexps/features/finance/data/datasources/finance_remote_datasource.dart';
@@ -109,6 +110,12 @@ class _MockAuthRemoteDS implements AuthRemoteDataSource {
     String? operatingCity,
   }) async =>
       dcUser;
+
+  @override
+  Future<bool> checkEmailExists(String email) async => false;
+
+  @override
+  Future<bool> checkPhoneExists(String phone) async => false;
 }
 
 class _MockOrdersRemoteDS implements OrdersRemoteDataSource {
@@ -127,7 +134,11 @@ class _MockFinanceRemoteDS implements FinanceRemoteDataSource {
 
 class _MockStockRemoteDS implements StockRemoteDataSource {
   @override
-  Future<List<StockItemModel>> getVehicleStockItems([String? agentId]) async => [];
+  Future<List<StockItemModel>> getVehicleStockItems([String? agentId, String? dcId]) async => [];
+
+  @override
+  Future<List<RiderStockAllocation>> getRiderStockAllocations([String? riderId, String? dcId]) async => [];
+
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

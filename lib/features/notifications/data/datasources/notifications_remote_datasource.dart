@@ -27,8 +27,6 @@ class NotificationsRemoteDataSourceImpl implements NotificationsRemoteDataSource
     }
 
     try {
-      debugPrint('[NOTIF_DATASOURCE] 📥 Fetching notifications for agent_id: "$agentId"...');
-
       // 1. Resolve agentId if it matches user_id or delivery_agent_id
       String resolvedAgentId = agentId;
       try {
@@ -53,7 +51,6 @@ class NotificationsRemoteDataSourceImpl implements NotificationsRemoteDataSource
           .map((json) => AppNotificationEntity.fromJson(json as Map<String, dynamic>))
           .toList();
 
-      debugPrint('[NOTIF_DATASOURCE] ✅ Fetched ${list.length} live notifications for agent: "$resolvedAgentId"');
       return list;
     } catch (e) {
       debugPrint('[NOTIF_DATASOURCE] ⚠️ Error fetching notifications ($e)');

@@ -213,7 +213,7 @@ class StockStateNotifierMock extends StateNotifier<StockState> implements StockN
   StockStateNotifierMock(List<StockItemEntity> items) : super(StockState(isLoading: false, stockItems: items));
 
   @override
-  Future<void> fetchStockItems([String? agentId]) async {}
+  Future<void> fetchStockItems([String? agentId, String? dcId]) async {}
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);

@@ -1921,6 +1921,9 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
                                               riderName: driver.name,
                                               riderCode: driver.driverCode,
                                               quantity: qty,
+                                              distributionCenterId: driver.distributionCenterId ??
+                                                  ref.read(dcConsoleProvider).selectedDcId ??
+                                                  ref.read(dcConsoleProvider).activeHubId,
                                             ),
                                       );
 

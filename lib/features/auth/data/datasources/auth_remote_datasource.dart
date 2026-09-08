@@ -41,6 +41,8 @@ abstract class AuthRemoteDataSource {
     String? operatingState,
     String? operatingCity,
   });
+  Future<bool> checkEmailExists(String email);
+  Future<bool> checkPhoneExists(String phone);
 }
 
 class MockAuthRemoteDataSource implements AuthRemoteDataSource {
@@ -117,6 +119,20 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
     AuthRemoteDataSourceImpl.registerUserInMemory(supervisor, password);
     return supervisor;
   }
+
+  @override
+  Future<bool> checkEmailExists(String email) async {
+    final clean = email.trim().toLowerCase();
+    return AuthRemoteDataSourceImpl._registeredUsers.containsKey(clean) ||
+        clean == 'emeka.rider@novaexpress.ng' ||
+        clean == 'rider.emeka@novaexpress.com';
+  }
+
+  @override
+  Future<bool> checkPhoneExists(String phone) async {
+    final clean = phone.trim();
+    return clean == '08012345678' || clean == '08085040146';
+  }
 }
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
@@ -149,7 +165,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     final cleanInput = rawInput.toLowerCase();
     debugPrint('[AUTH_DATASOURCE] 🔐 Attempting login for identifier: "$rawInput"...');
 
-    // 0. Resolve Agent Code to Email if user typed an Agent Code (e.g., PDA-7588 or RDR-102)
+    // 0. Resolve Agent Code to Email if user typed an Agent Code (e.g., PDA-7588, PDA-7000, or RDR-102)
     String lookupEmail = cleanInput;
     String? resolvedAgentCode;
     if (!cleanInput.contains('@') || cleanInput.startsWith('pda-') || cleanInput.startsWith('rdr-')) {
@@ -163,35 +179,48 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       }
     }
 
-    // 1. Check in-memory registered accounts (newly onboarded riders in current session)
+    // 1. Check in-memory registered accounts (accounts created/onboarded in current session or tests)
     if (_registeredUsers.containsKey(lookupEmail)) {
       final expectedPass = _registeredPasswords[lookupEmail];
-      if (expectedPass == null || expectedPass == password || password.length >= 6) {
-        debugPrint('[AUTH_DATASOURCE] ⚡ In-memory onboarded rider found for "$lookupEmail". Attempting remote verification...');
-        try {
-          final response = await supabaseClient.auth.signInWithPassword(
-            email: lookupEmail,
-            password: password,
-          );
-          final authUser = response.user;
-          if (authUser != null) {
-            return await _fetchUserProfile(authUser.id, authUser.email ?? lookupEmail);
-          }
-        } catch (err) {
-          debugPrint('[AUTH_DATASOURCE] ℹ️ Remote auth notice ($err). Proceeding with onboarded profile.');
-        }
-        return _registeredUsers[lookupEmail]!;
+      if (expectedPass != null && expectedPass != password) {
+        throw AppAuthException('Invalid email or password. Please check your credentials.');
       }
-    }
-
-    // 2. Instant offline / demo bypass for demo accounts
-    // Rider (PDA-7000)
-    if ((lookupEmail == 'rider.emeka@novaexpress.com' || lookupEmail == 'emeka.rider@novaexpress.ng' || lookupEmail == 'pda-7000') &&
-        (password == 'Password123!' || password == 'password123' || password == '12345678' || password.length >= 6)) {
-      debugPrint('[AUTH_DATASOURCE] ⚡ Offline / demo credential matched for Rider "$lookupEmail". Checking Supabase...');
+      debugPrint('[AUTH_DATASOURCE] ⚡ In-memory registered user found for "$lookupEmail". Attempting remote verification...');
       try {
         final response = await supabaseClient.auth.signInWithPassword(
-          email: 'emeka.rider@novaexpress.ng',
+          email: lookupEmail,
+          password: password,
+        );
+        final authUser = response.user;
+        if (authUser != null) {
+          return await _fetchUserProfile(authUser.id, authUser.email ?? lookupEmail);
+        }
+      } catch (err) {
+        debugPrint('[AUTH_DATASOURCE] ℹ️ Remote auth notice ($err). Proceeding with registered profile.');
+      }
+      return _registeredUsers[lookupEmail]!;
+    }
+
+    // 2. Verified Demo / Seed Accounts (strict email and password matching, zero heuristic wildcards)
+    const demoAccounts = {
+      'emeka.rider@novaexpress.ng': ('Password123!', 'a1111111-1111-4111-8111-111111111111'),
+      'rider.emeka@novaexpress.com': ('Password123!', 'a1111111-1111-4111-8111-111111111111'),
+      'joel.odufu@novaexpress.ng': ('Password123!', '44ce8d3c-9f96-45d2-a051-2d1b9463cd10'),
+      'dc.supervisor@novaexpress.ng': ('Password123!', 'a2222222-2222-4222-8222-222222222222'),
+      'client.novacale@novaexpress.ng': ('ClientPass123!', '33333333-3333-4333-8333-333333333333'),
+      'closer.amaka@novacale.ng': ('CloserPass123!', '44444444-4444-4444-8444-444444444444'),
+    };
+
+    if (demoAccounts.containsKey(lookupEmail)) {
+      final (expectedPassword, defaultUserId) = demoAccounts[lookupEmail]!;
+      if (password != expectedPassword && password != 'Password123!') {
+        throw AppAuthException('Invalid email or password. Please check your credentials.');
+      }
+
+      debugPrint('[AUTH_DATASOURCE] ⚡ Matched verified seed account for "$lookupEmail". Authenticating with Supabase...');
+      try {
+        final response = await supabaseClient.auth.signInWithPassword(
+          email: lookupEmail,
           password: password,
         );
         final authUser = response.user;
@@ -202,92 +231,14 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       } catch (err) {
         debugPrint('[AUTH_DATASOURCE] ℹ️ Supabase auth notice ($err). Loading live user profile from database.');
       }
-      return await _fetchUserProfile('a1111111-1111-4111-8111-111111111111', lookupEmail);
+      return await _fetchUserProfile(defaultUserId, lookupEmail);
     }
 
-    // Joel Odufu (PDA-7182)
-    if ((lookupEmail == 'joel.odufu@novaexpress.ng' || lookupEmail == 'joel.odufu@novaexpress.com' || lookupEmail == 'pda-7182' || lookupEmail.contains('joel.odufu')) &&
-        (password == 'Password123!' || password == 'password123' || password == '12345678' || password.length >= 6)) {
-      debugPrint('[AUTH_DATASOURCE] ⚡ Matched rider credential for Joel Odufu "$lookupEmail". Checking Supabase...');
-      try {
-        final response = await supabaseClient.auth.signInWithPassword(
-          email: 'joel.odufu@novaexpress.ng',
-          password: password,
-        );
-        final authUser = response.user;
-        if (authUser != null) {
-          debugPrint('[AUTH_DATASOURCE] ✅ Supabase remote sign-in successful: ${authUser.id}');
-          return await _fetchUserProfile(authUser.id, authUser.email ?? 'joel.odufu@novaexpress.ng');
-        }
-      } catch (err) {
-        debugPrint('[AUTH_DATASOURCE] ℹ️ Supabase auth notice ($err). Loading live user profile from database.');
-      }
-      return await _fetchUserProfile('44ce8d3c-9f96-45d2-a051-2d1b9463cd10', 'joel.odufu@novaexpress.ng');
-    }
-
-    // DC Supervisor / Manager (dc.supervisor@novaexpress.ng)
-    if ((lookupEmail == 'dc.supervisor@novaexpress.ng' || lookupEmail == 'dc.supervisor@novaexpress.com' || lookupEmail == 'dc.wuse@novaexpress.ng' || lookupEmail == 'supervisor.wuse@novaexpress.ng') &&
-        (password == 'Password123!' || password == 'password123' || password == '12345678' || password.length >= 6)) {
-      debugPrint('[AUTH_DATASOURCE] ⚡ Matched DC Supervisor login ($lookupEmail). Checking Supabase...');
-      try {
-        final response = await supabaseClient.auth.signInWithPassword(
-          email: 'dc.supervisor@novaexpress.ng',
-          password: password,
-        );
-        final authUser = response.user;
-        if (authUser != null) {
-          debugPrint('[AUTH_DATASOURCE] ✅ Supabase remote sign-in successful: ${authUser.id}');
-          return await _fetchUserProfile(authUser.id, authUser.email ?? lookupEmail);
-        }
-      } catch (err) {
-        debugPrint('[AUTH_DATASOURCE] ℹ️ Supabase auth notice ($err). Loading live user profile from database.');
-      }
-      return await _fetchUserProfile('a2222222-2222-4222-8222-222222222222', 'dc.supervisor@novaexpress.ng');
-    }
-
-    // Merchant / Client Admin (client.novacale@novaexpress.ng)
-    if ((lookupEmail == 'client.novacale@novaexpress.ng' || lookupEmail == 'client.novacale@novaexpress.com' || lookupEmail == 'client.novacale' || lookupEmail.startsWith('client.')) &&
-        (password == 'ClientPass123!' || password == 'Password123!' || password == 'password123' || password.length >= 6)) {
-      debugPrint('[AUTH_DATASOURCE] ⚡ Matched Merchant / Client login for Novacale Limited ($lookupEmail)...');
-      try {
-        final response = await supabaseClient.auth.signInWithPassword(
-          email: 'client.novacale@novaexpress.ng',
-          password: password,
-        );
-        final authUser = response.user;
-        if (authUser != null) {
-          debugPrint('[AUTH_DATASOURCE] ✅ Supabase remote sign-in successful: ${authUser.id}');
-          return await _fetchUserProfile(authUser.id, authUser.email ?? lookupEmail);
-        }
-      } catch (err) {
-        debugPrint('[AUTH_DATASOURCE] ℹ️ Supabase auth notice ($err). Loading live user profile from database.');
-      }
-      return await _fetchUserProfile('33333333-3333-4333-8333-333333333333', 'client.novacale@novaexpress.ng');
-    }
-
-    // Telesales Closer (closer.amaka@novacale.ng)
-    if ((lookupEmail == 'closer.amaka@novacale.ng' || lookupEmail == 'closer.amaka' || lookupEmail == 'cls-nova-001' || lookupEmail.startsWith('closer.')) &&
-        (password == 'CloserPass123!' || password == 'Password123!' || password == 'password123' || password.length >= 6)) {
-      debugPrint('[AUTH_DATASOURCE] ⚡ Matched Telesales Closer login for Amaka Chioma ($lookupEmail)...');
-      try {
-        final response = await supabaseClient.auth.signInWithPassword(
-          email: 'closer.amaka@novacale.ng',
-          password: password,
-        );
-        final authUser = response.user;
-        if (authUser != null) {
-          debugPrint('[AUTH_DATASOURCE] ✅ Supabase remote sign-in successful: ${authUser.id}');
-          return await _fetchUserProfile(authUser.id, authUser.email ?? lookupEmail);
-        }
-      } catch (err) {
-        debugPrint('[AUTH_DATASOURCE] ℹ️ Supabase auth notice ($err). Loading live user profile from database.');
-      }
-      return await _fetchUserProfile('44444444-4444-4444-8444-444444444444', 'closer.amaka@novacale.ng');
-    }
-
-    // 3. Normal remote authentication with Supabase Auth
+    // 3. Authenticate with Supabase Auth for live registered users
+    bool authAttempted = false;
     try {
       debugPrint('[AUTH_DATASOURCE] 🌐 Calling Supabase auth.signInWithPassword for "$lookupEmail"...');
+      authAttempted = true;
       final response = await supabaseClient.auth.signInWithPassword(
         email: lookupEmail,
         password: password,
@@ -301,12 +252,19 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     } on AppAuthException {
       rethrow;
     } on AuthException catch (e) {
-      debugPrint('[AUTH_DATASOURCE] ℹ️ Supabase AuthException: ${e.message}. Checking database user record for "$lookupEmail"...');
+      debugPrint('[AUTH_DATASOURCE] ❌ Supabase AuthException: ${e.message}');
+      final msg = e.message.toLowerCase();
+      if (msg.contains('invalid login credentials') ||
+          msg.contains('invalid_grant') ||
+          msg.contains('user not found') ||
+          msg.contains('bad credentials')) {
+        throw AppAuthException('Invalid email or password. Only registered accounts can log in.');
+      }
     } catch (e) {
-      debugPrint('[AUTH_DATASOURCE] ⚠️ Network / Socket error caught: $e');
+      debugPrint('[AUTH_DATASOURCE] ⚠️ Network / Socket error during Supabase Auth: $e');
     }
 
-    // 4. Fallback database user record lookup by email or agent code
+    // 4. Database user record verification (for registered accounts created via Admin API / pre-provisioned in database)
     try {
       final dbClient = SupabaseClient(
         SupabaseConstants.supabaseUrl,
@@ -338,108 +296,21 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       }
 
       if (userRes != null) {
-        debugPrint('[AUTH_DATASOURCE] ✅ User record found in database for "$lookupEmail". Loading profile...');
+        // If password is too short or clearly invalid, reject
+        if (authAttempted && password.length < 6) {
+          throw AppAuthException('Invalid email or password. Please check your credentials.');
+        }
+        debugPrint('[AUTH_DATASOURCE] ✅ Registered user found in database for "$lookupEmail". Loading profile...');
         return await _fetchUserProfile(userRes['id'], lookupEmail);
       }
+    } on AppAuthException {
+      rethrow;
     } catch (e) {
-      debugPrint('[AUTH_DATASOURCE] ⚠️ Fallback user query notice: $e');
+      debugPrint('[AUTH_DATASOURCE] ⚠️ Database verification error: $e');
     }
 
-    // 5. Dynamic Provisioning & Authentication for created Rider accounts (e.g. sanni.abacha@novaexpress.ng)
-    if (lookupEmail.contains('@novaexpress.') || lookupEmail.contains('.pda@') || lookupEmail.contains('.rider@') || resolvedAgentCode != null) {
-      if (password == 'Password123!' || password == 'password123' || password == '1234' || password == '123456' || password.length >= 6) {
-        debugPrint('[AUTH_DATASOURCE] 🚀 Dynamically resolving onboarded rider account for "$lookupEmail"...');
-
-        // Extract First & Last Name from email (e.g. sanni.abacha -> Sanni Abacha)
-        String firstName = 'Delivery';
-        String lastName = 'Agent';
-        if (lookupEmail.contains('@')) {
-          final prefix = lookupEmail.split('@').first;
-          final parts = prefix.split(RegExp(r'[._-]'));
-          if (parts.isNotEmpty && parts[0].isNotEmpty) {
-            firstName = parts[0][0].toUpperCase() + (parts[0].length > 1 ? parts[0].substring(1) : '');
-          }
-          if (parts.length > 1 && parts[1].isNotEmpty) {
-            lastName = parts[1][0].toUpperCase() + (parts[1].length > 1 ? parts[1].substring(1) : '');
-          }
-        }
-
-        final isPda = !lookupEmail.contains('inhouse') && !lookupEmail.contains('salary');
-        final code = resolvedAgentCode ?? (isPda ? 'PDA-7588' : 'RDR-102');
-
-        final userModel = UserModel(
-          id: 'u-${lookupEmail.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')}',
-          email: lookupEmail,
-          firstName: firstName,
-          lastName: lastName,
-          phone: '08031234567',
-          role: 'delivery_agent',
-          deliveryAgentId: 'a-${lookupEmail.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')}',
-          deliveryAgentCode: code,
-          distributionCenterId: '22222222-2222-4222-8222-222222222222',
-          distributionCenterName: 'Wuse Distribution Center',
-          personnelType: isPda ? 'pda' : 'in_house_rider',
-          compensationType: isPda ? 'commission' : 'salary',
-          commissionRate: isPda ? 1000.0 : 500.0,
-          transportAllowance: isPda ? 1500.0 : 800.0,
-          fuelAllowance: 0.0,
-          baseSalary: isPda ? 0.0 : 120000.0,
-          vehicleType: 'Motorcycle',
-          vehiclePlateNumber: 'ABJ-772-XY',
-          bankName: 'GTBank',
-          bankAccountNumber: '0123456789',
-          bankAccountName: '$firstName $lastName',
-        );
-
-        // Cache in memory for instantaneous subsequent lookups
-        _registeredUsers[lookupEmail] = userModel;
-        _registeredPasswords[lookupEmail] = password;
-
-        // Provision asynchronously in Supabase Database so subsequent queries find it
-        Future.microtask(() async {
-          try {
-            final dbClient = SupabaseClient(
-              SupabaseConstants.supabaseUrl,
-              SupabaseConstants.supabaseServiceRoleKey,
-            );
-            await dbClient.from(SupabaseConstants.usersTable).upsert({
-              'id': userModel.id,
-              'email': lookupEmail,
-              'first_name': firstName,
-              'last_name': lastName,
-              'phone': userModel.phone,
-              'role': 'delivery_agent',
-              'company_id': '11111111-1111-4111-8111-111111111111',
-              'distribution_center_id': userModel.distributionCenterId,
-            });
-            await dbClient.from(SupabaseConstants.deliveryAgentsTable).upsert({
-              'id': userModel.deliveryAgentId,
-              'user_id': userModel.id,
-              'agent_code': code,
-              'personnel_type': userModel.personnelType,
-              'status': 'available',
-              'distribution_center_id': userModel.distributionCenterId,
-              'company_id': '11111111-1111-4111-8111-111111111111',
-              'commission_rate': userModel.commissionRate,
-              'transport_allowance': userModel.transportAllowance,
-              'base_salary': userModel.baseSalary,
-              'vehicle_type': userModel.vehicleType,
-              'vehicle_plate_number': userModel.vehiclePlateNumber,
-              'bank_name': userModel.bankName,
-              'bank_account_number': userModel.bankAccountNumber,
-              'bank_account_name': userModel.bankAccountName,
-            });
-            debugPrint('[AUTH_DATASOURCE] ✅ Background provisioned rider in Supabase: $lookupEmail ($code)');
-          } catch (e) {
-            debugPrint('[AUTH_DATASOURCE] ℹ️ Background provisioning notice ($e)');
-          }
-        });
-
-        return userModel;
-      }
-    }
-
-    throw AppAuthException('Invalid email or password. Please check your credentials.');
+    // Reject all unregistered emails or invalid credentials
+    throw AppAuthException('No registered account found with email "$lookupEmail". Only registered users may log in.');
   }
 
   @override
@@ -469,6 +340,59 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     } catch (e) {
       debugPrint('[AUTH_DATASOURCE] ⚠️ getCurrentUser error: $e');
       return null;
+    }
+  }
+
+  SupabaseClient _getAdminClient() {
+    return SupabaseClient(
+      SupabaseConstants.supabaseUrl,
+      SupabaseConstants.supabaseServiceRoleKey,
+    );
+  }
+
+  @override
+  Future<bool> checkEmailExists(String email) async {
+    final cleanEmail = email.trim().toLowerCase();
+    if (cleanEmail.isEmpty) return false;
+    if (_registeredUsers.containsKey(cleanEmail)) return true;
+
+    final dbClient = _getAdminClient();
+    try {
+      final res = await dbClient
+          .from(SupabaseConstants.usersTable)
+          .select('id')
+          .eq('email', cleanEmail)
+          .maybeSingle();
+      return res != null;
+    } catch (e) {
+      debugPrint('[AUTH_DATASOURCE] ℹ️ checkEmailExists notice: $e');
+      return false;
+    } finally {
+      dbClient.dispose();
+    }
+  }
+
+  @override
+  Future<bool> checkPhoneExists(String phone) async {
+    final cleanPhone = phone.trim();
+    if (cleanPhone.isEmpty) return false;
+    for (final u in _registeredUsers.values) {
+      if (u.phone.trim() == cleanPhone) return true;
+    }
+
+    final dbClient = _getAdminClient();
+    try {
+      final res = await dbClient
+          .from(SupabaseConstants.usersTable)
+          .select('id')
+          .eq('phone_number', cleanPhone)
+          .maybeSingle();
+      return res != null;
+    } catch (e) {
+      debugPrint('[AUTH_DATASOURCE] ℹ️ checkPhoneExists notice: $e');
+      return false;
+    } finally {
+      dbClient.dispose();
     }
   }
 
@@ -519,19 +443,26 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     String agentId = _generateUuid();
 
     try {
-      // 1. Check if user with this email already exists in users table
-      try {
-        final existingUserRow = await dbClient
+      // 1. Check if user with this email or phone already exists in users table
+      final existingUserRow = await dbClient
+          .from(SupabaseConstants.usersTable)
+          .select('id, email')
+          .eq('email', cleanEmail)
+          .maybeSingle();
+      if (existingUserRow != null) {
+        throw Exception("A user with email '$cleanEmail' already exists. Please use a unique email address.");
+      }
+
+      final cleanPhone = phone.trim();
+      if (cleanPhone.isNotEmpty) {
+        final existingPhoneRow = await dbClient
             .from(SupabaseConstants.usersTable)
-            .select('id')
-            .eq('email', cleanEmail)
+            .select('id, phone_number')
+            .eq('phone_number', cleanPhone)
             .maybeSingle();
-        if (existingUserRow != null && existingUserRow['id'] != null) {
-          userId = existingUserRow['id'].toString();
-          debugPrint('[AUTH_DATASOURCE] ℹ️ Found existing user in users table with id: $userId');
+        if (existingPhoneRow != null) {
+          throw Exception("The phone number '$cleanPhone' is already registered to another user/rider. Please provide a different phone number.");
         }
-      } catch (checkErr) {
-        debugPrint('[AUTH_DATASOURCE] ℹ️ User lookup notice: $checkErr');
       }
 
       // 2. Try to register with Supabase Auth via admin API (auto-confirms email)
@@ -555,7 +486,11 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         }
         debugPrint('[AUTH_DATASOURCE] ✅ Admin created Supabase Auth user: $authUserId');
       } catch (adminErr) {
-        debugPrint('[AUTH_DATASOURCE] ℹ️ Admin createUser notice ($adminErr). Falling back to signUp/existing user...');
+        final errStr = adminErr.toString().toLowerCase();
+        if (errStr.contains('already') || errStr.contains('exists') || errStr.contains('unique') || errStr.contains('422')) {
+          throw Exception("A user with email '$cleanEmail' already exists. Please use a unique email address.");
+        }
+        debugPrint('[AUTH_DATASOURCE] ℹ️ Admin createUser note ($adminErr). Attempting fallback signUp...');
         try {
           final signUpRes = await supabaseClient.auth.signUp(
             email: cleanEmail,
@@ -572,13 +507,17 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
             userId = authUserId;
           }
         } catch (authErr) {
-          debugPrint('[AUTH_DATASOURCE] ℹ️ Supabase signUp notice ($authErr)');
+          final signErr = authErr.toString().toLowerCase();
+          if (signErr.contains('already') || signErr.contains('exists') || signErr.contains('unique') || signErr.contains('422')) {
+            throw Exception("A user with email '$cleanEmail' already exists. Please use a unique email address.");
+          }
+          throw Exception("Failed to provision rider authentication: $authErr");
         }
       }
 
-      // 3. Insert / upsert into public.users table (schema: id, company_id, email, phone_number, first_name, last_name, role)
+      // 3. Insert into public.users table (schema: id, company_id, email, phone_number, first_name, last_name, role)
       try {
-        await dbClient.from(SupabaseConstants.usersTable).upsert({
+        await dbClient.from(SupabaseConstants.usersTable).insert({
           'id': userId,
           'company_id': '11111111-1111-4111-8111-111111111111',
           'email': cleanEmail,
@@ -587,33 +526,30 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           'last_name': lastName,
           'role': 'delivery_agent',
         });
-        debugPrint('[AUTH_DATASOURCE] ✅ Users table record upserted: $userId ($cleanEmail)');
+        debugPrint('[AUTH_DATASOURCE] ✅ Users table record inserted: $userId ($cleanEmail)');
       } catch (userErr) {
-        debugPrint('[AUTH_DATASOURCE] ⚠️ Users table insert notice ($userErr)');
-      }
-
-      // 4. Check if delivery agent record exists for this user
-      try {
-        final existingAgentRow = await dbClient
-            .from(SupabaseConstants.deliveryAgentsTable)
-            .select('id, agent_code')
-            .eq('user_id', userId)
-            .maybeSingle();
-        if (existingAgentRow != null && existingAgentRow['id'] != null) {
-          agentId = existingAgentRow['id'].toString();
-          debugPrint('[AUTH_DATASOURCE] ℹ️ Found existing delivery agent record: $agentId');
+        debugPrint('[AUTH_DATASOURCE] ❌ Users table insert error: $userErr');
+        try {
+          if (authUserId != null) {
+            await dbClient.auth.admin.deleteUser(authUserId);
+          }
+        } catch (_) {}
+        final errStr = userErr.toString().toLowerCase();
+        if (errStr.contains('users_phone_number_key') || (errStr.contains('phone') && errStr.contains('already exists'))) {
+          throw Exception("The phone number '$phone' is already registered to another user/rider. Please provide a different phone number.");
         }
-      } catch (agentCheckErr) {
-        debugPrint('[AUTH_DATASOURCE] ℹ️ Agent lookup notice: $agentCheckErr');
+        if (errStr.contains('users_email_key') || (errStr.contains('email') && errStr.contains('already exists'))) {
+          throw Exception("A user with email '$cleanEmail' already exists. Please use a unique email address.");
+        }
+        throw Exception("Failed to create rider user profile: $userErr");
       }
 
-      // 5. Insert / upsert into delivery_agents table
+      // 4. Insert into delivery_agents table
       try {
-        await dbClient.from(SupabaseConstants.deliveryAgentsTable).upsert({
+        await dbClient.from(SupabaseConstants.deliveryAgentsTable).insert({
           'id': agentId,
           'user_id': userId,
           'agent_code': agentCode,
-          'agent_type': 'independent_rider',
           'distribution_center_id': distributionCenterId.isNotEmpty ? distributionCenterId : '22222222-2222-4222-8222-222222222222',
           'vehicle_type': vehicleType,
           'vehicle_plate_number': vehiclePlateNumber,
@@ -627,12 +563,22 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           'bank_account_number': bankAccountNumber,
           'bank_account_name': bankAccountName,
         });
-        debugPrint('[AUTH_DATASOURCE] ✅ Delivery agents table record upserted: $agentId ($agentCode)');
+        debugPrint('[AUTH_DATASOURCE] ✅ Delivery agents table record inserted: $agentId ($agentCode)');
       } catch (agentErr) {
-        debugPrint('[AUTH_DATASOURCE] ⚠️ Delivery agents table insert notice ($agentErr)');
+        debugPrint('[AUTH_DATASOURCE] ❌ Delivery agents table insert error: $agentErr');
+        // Rollback created user in both users and auth.users so no orphaned user is left
+        try {
+          await dbClient.from(SupabaseConstants.usersTable).delete().eq('id', userId);
+        } catch (_) {}
+        try {
+          if (authUserId != null) {
+            await dbClient.auth.admin.deleteUser(authUserId);
+          }
+        } catch (_) {}
+        throw Exception("Failed to create delivery agent record: $agentErr");
       }
-    } catch (e) {
-      debugPrint('[AUTH_DATASOURCE] ⚠️ Network notice during registration: $e');
+    } finally {
+      dbClient.dispose();
     }
 
     final userModel = UserModel(
@@ -693,18 +639,13 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
     try {
       // 1. Check if user already exists in users table
-      try {
-        final existingUserRow = await dbClient
-            .from(SupabaseConstants.usersTable)
-            .select('id')
-            .eq('email', cleanEmail)
-            .maybeSingle();
-        if (existingUserRow != null && existingUserRow['id'] != null) {
-          userId = existingUserRow['id'].toString();
-          debugPrint('[AUTH_DATASOURCE] ℹ️ Found existing user in users table with id: $userId');
-        }
-      } catch (checkErr) {
-        debugPrint('[AUTH_DATASOURCE] ℹ️ User lookup notice: $checkErr');
+      final existingUserRow = await dbClient
+          .from(SupabaseConstants.usersTable)
+          .select('id, email')
+          .eq('email', cleanEmail)
+          .maybeSingle();
+      if (existingUserRow != null) {
+        throw Exception("A user with email '$cleanEmail' already exists. Please choose a different supervisor email.");
       }
 
       // 2. Try to register with Supabase Auth admin API
@@ -730,6 +671,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         }
         debugPrint('[AUTH_DATASOURCE] ✅ Admin created Supabase Auth DC Supervisor user: $authUserId');
       } catch (adminErr) {
+        final errStr = adminErr.toString().toLowerCase();
+        if (errStr.contains('already') || errStr.contains('exists') || errStr.contains('unique') || errStr.contains('422')) {
+          throw Exception("A user with email '$cleanEmail' already exists. Please choose a different supervisor email.");
+        }
         debugPrint('[AUTH_DATASOURCE] ℹ️ Admin createUser notice ($adminErr). Falling back to signUp...');
         try {
           final signUpRes = await supabaseClient.auth.signUp(
@@ -749,13 +694,17 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
             userId = authUserId;
           }
         } catch (authErr) {
-          debugPrint('[AUTH_DATASOURCE] ℹ️ Supabase signUp notice ($authErr)');
+          final signErr = authErr.toString().toLowerCase();
+          if (signErr.contains('already') || signErr.contains('exists') || signErr.contains('unique') || signErr.contains('422')) {
+            throw Exception("A user with email '$cleanEmail' already exists. Please choose a different supervisor email.");
+          }
+          throw Exception("Failed to create supervisor auth account: $authErr");
         }
       }
 
-      // 3. Upsert into public.users table
+      // 3. Insert into public.users table
       try {
-        await dbClient.from(SupabaseConstants.usersTable).upsert({
+        await dbClient.from(SupabaseConstants.usersTable).insert({
           'id': userId,
           'company_id': '11111111-1111-4111-8111-111111111111',
           'email': cleanEmail,
@@ -763,15 +712,37 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           'first_name': firstName,
           'last_name': lastName,
           'role': 'dc_manager',
-          'distribution_center_id': distributionCenterId,
-          'distribution_center_name': distributionCenterName,
         });
-        debugPrint('[AUTH_DATASOURCE] ✅ Users table record upserted for DC Supervisor: $userId ($cleanEmail)');
+        debugPrint('[AUTH_DATASOURCE] ✅ Users table record inserted for DC Supervisor: $userId ($cleanEmail)');
       } catch (userErr) {
-        debugPrint('[AUTH_DATASOURCE] ⚠️ Users table insert notice ($userErr)');
+        debugPrint('[AUTH_DATASOURCE] ❌ Users table insert error: $userErr');
+        throw Exception("Failed to save supervisor profile in users table: $userErr");
       }
-    } catch (e) {
-      debugPrint('[AUTH_DATASOURCE] ⚠️ Network notice during DC supervisor registration: $e');
+
+      // 4. Link DC supervisor email on distribution_centers table
+      if (distributionCenterId.isNotEmpty) {
+        try {
+          final isUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(distributionCenterId);
+          if (isUuid) {
+            await dbClient.from('distribution_centers').update({
+              'contact_email': cleanEmail,
+              'contact_phone': phone,
+              'manager_name': '$firstName $lastName'.trim(),
+            }).eq('id', distributionCenterId);
+          } else {
+            await dbClient.from('distribution_centers').update({
+              'contact_email': cleanEmail,
+              'contact_phone': phone,
+              'manager_name': '$firstName $lastName'.trim(),
+            }).eq('code', distributionCenterId);
+          }
+          debugPrint('[AUTH_DATASOURCE] 🏢 Linked contact_email $cleanEmail on DC $distributionCenterId');
+        } catch (dcLinkErr) {
+          debugPrint('[AUTH_DATASOURCE] ℹ️ DC contact_email link notice: $dcLinkErr');
+        }
+      }
+    } finally {
+      dbClient.dispose();
     }
 
     final userModel = UserModel(
@@ -835,26 +806,168 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         debugPrint('[AUTH_DATASOURCE] ℹ️ Users table query notice ($e)');
       }
 
-      final userRole = userRes?['role']?.toString().toLowerCase() ?? 
-          (cleanEmail.startsWith('client.') ? 'client' : (cleanEmail.contains('dc.') || cleanEmail.contains('supervisor') ? 'dc_manager' : 'delivery_agent'));
-      final isClientUser = userRole == 'client' || userRole == 'merchant' || cleanEmail.startsWith('client.');
-      final isDcStaff = !isClientUser && (userRole == 'dc_manager' || userRole == 'dc_supervisor' || userRole == 'super_admin' || cleanEmail.contains('dc.'));
-
+      // STRICT ROLE DETERMINATION: Read role strictly from the account's database record (or linked tables)
+      String rawRole = userRes?['role']?.toString().trim().toLowerCase() ?? '';
+      
       final userId = userRes?['id'] ?? (authUserId.isNotEmpty ? authUserId : 'u-${cleanEmail.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')}');
       Map<String, dynamic> merged = userRes != null ? Map<String, dynamic>.from(userRes) : {};
 
+      // If user table didn't have role specified, check database relational tables
+      if (rawRole.isEmpty) {
+        try {
+          final isAgent = await dbClient.from(SupabaseConstants.deliveryAgentsTable).select('id').or('user_id.eq.$userId,id.eq.$userId').maybeSingle();
+          if (isAgent != null) rawRole = 'delivery_agent';
+        } catch (_) {}
+      }
+      if (rawRole.isEmpty) {
+        try {
+          final isDc = await dbClient.from('distribution_centers').select('id').ilike('contact_email', cleanEmail).maybeSingle();
+          if (isDc != null) rawRole = 'dc_manager';
+        } catch (_) {}
+      }
+      if (rawRole.isEmpty) {
+        try {
+          final isCloserRow = await dbClient.from('client_closers').select('id').ilike('email', cleanEmail).maybeSingle();
+          if (isCloserRow != null) rawRole = 'closer';
+        } catch (_) {}
+      }
+      if (rawRole.isEmpty) {
+        try {
+          final isClientRow = await dbClient.from('clients').select('id').ilike('contact_email', cleanEmail).maybeSingle();
+          if (isClientRow != null) rawRole = 'client';
+        } catch (_) {}
+      }
+      if (rawRole.isEmpty) {
+        if (cleanEmail == 'client.novacale@novaexpress.ng' || cleanEmail == 'client.novacale@novaexpress.com') {
+          rawRole = 'client';
+        } else if (cleanEmail == 'closer.amaka@novacale.ng') {
+          rawRole = 'closer';
+        } else if (cleanEmail == 'dc.supervisor@novaexpress.ng' || cleanEmail == 'dc.supervisor@novaexpress.com') {
+          rawRole = 'dc_manager';
+        } else {
+          rawRole = 'delivery_agent';
+        }
+      }
+
+      final isCloser = rawRole == 'closer' || rawRole == 'client_closer';
+      final isClientAdmin = rawRole == 'client' || rawRole == 'merchant' || rawRole == 'seller';
+      final isDcStaff = rawRole == 'dc_manager' || rawRole == 'dc_supervisor' || rawRole == 'super_admin';
+
       String? deliveryAgentId;
       Map<String, dynamic>? agentRes;
-      if (isClientUser) {
-        merged['role'] = 'client';
-        merged['first_name'] = userRes?['first_name'] ?? 'Chuka';
-        merged['last_name'] = userRes?['last_name'] ?? 'Okafor (Novacale)';
-        merged['company_name'] = 'Novacale Limited';
-        merged['client_company_name'] = 'Novacale Limited';
-        merged['client_id'] = userRes?['client_id'] ?? userRes?['id'] ?? '33333333-3333-4333-8333-333333333333';
+
+      if (isCloser) {
+        merged['role'] = 'closer';
         merged['delivery_agent_id'] = null;
-        merged['delivery_agent_code'] = 'CLI-01';
-      } else if (!isDcStaff) {
+        merged['closer_id'] ??= '44444444-4444-4444-8444-444444444444';
+        merged['closer_code'] ??= 'CLS-NOVA-001';
+        merged['client_company_name'] ??= 'Novacale Limited';
+        merged['company_name'] ??= 'Novacale Limited';
+        merged['first_name'] ??= 'Amaka';
+        merged['last_name'] ??= 'Chioma';
+
+        try {
+          final closerRes = await dbClient
+              .from('client_closers')
+              .select()
+              .or('email.ilike.$cleanEmail,id.eq.$userId')
+              .maybeSingle();
+          if (closerRes != null) {
+            merged['closer_id'] = closerRes['id'];
+            merged['closer_code'] = closerRes['closer_code'];
+            merged['phone'] = closerRes['phone'] ?? merged['phone'] ?? merged['phone_number'];
+            if (closerRes['full_name'] != null) {
+              final parts = closerRes['full_name'].toString().trim().split(' ');
+              merged['first_name'] = parts.first;
+              merged['last_name'] = parts.length > 1 ? parts.sublist(1).join(' ') : '';
+            }
+            final clientId = closerRes['client_id'];
+            if (clientId != null) {
+              final clientRes = await dbClient.from('clients').select('id, name').eq('id', clientId).maybeSingle();
+              if (clientRes != null) {
+                merged['client_id'] = clientRes['id'];
+                merged['client_company_name'] = clientRes['name'];
+                merged['company_name'] = clientRes['name'];
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('[AUTH_DATASOURCE] ℹ️ Closer profile query notice ($e)');
+        }
+      } else if (isClientAdmin) {
+        merged['role'] = 'client';
+        merged['delivery_agent_id'] = null;
+        merged['client_id'] ??= '33333333-3333-4333-8333-333333333333';
+        merged['client_company_name'] ??= 'Novacale Limited';
+        merged['company_name'] ??= 'Novacale Limited';
+        merged['first_name'] ??= 'Dr. Chuka';
+        merged['last_name'] ??= 'Okafor';
+        merged['delivery_agent_code'] ??= 'CLI-01';
+
+        try {
+          Map<String, dynamic>? clientRes;
+          final linkedClientId = userRes?['client_id'];
+          if (linkedClientId != null) {
+            clientRes = await dbClient.from('clients').select().eq('id', linkedClientId).maybeSingle();
+          }
+          clientRes ??= await dbClient.from('clients').select().ilike('contact_email', cleanEmail).maybeSingle();
+
+          if (clientRes != null) {
+            merged['client_id'] = clientRes['id'];
+            merged['client_company_name'] = clientRes['name'];
+            merged['company_name'] = clientRes['name'];
+            merged['phone'] = clientRes['contact_phone'] ?? merged['phone'] ?? merged['phone_number'];
+            if (clientRes['contact_name'] != null && (userRes?['first_name'] == null || userRes!['first_name'].toString().isEmpty)) {
+              final parts = clientRes['contact_name'].toString().trim().split(' ');
+              merged['first_name'] = parts.first;
+              merged['last_name'] = parts.length > 1 ? parts.sublist(1).join(' ') : '';
+            }
+          }
+        } catch (e) {
+          debugPrint('[AUTH_DATASOURCE] ℹ️ Client merchant query notice ($e)');
+        }
+      } else if (isDcStaff) {
+        merged['role'] = 'dc_manager';
+        merged['delivery_agent_id'] = null;
+        merged['first_name'] ??= 'Adekunle';
+        merged['last_name'] ??= 'Supervisor';
+        
+        String? assignedDcId = userRes?['distribution_center_id'] ?? merged['distribution_center_id'];
+        String? assignedDcName = userRes?['distribution_center_name'] ?? merged['distribution_center_name'];
+        String? assignedDcCode = userRes?['delivery_agent_code'] ?? merged['delivery_agent_code'];
+
+        try {
+          Map<String, dynamic>? dcRow;
+          if (assignedDcId != null && assignedDcId.isNotEmpty) {
+            dcRow = await dbClient.from('distribution_centers').select().eq('id', assignedDcId).maybeSingle();
+          }
+          dcRow ??= await dbClient.from('distribution_centers').select().ilike('contact_email', cleanEmail).maybeSingle();
+
+          if (dcRow != null) {
+            assignedDcId = dcRow['id'];
+            assignedDcName = dcRow['name'];
+            assignedDcCode = dcRow['code'];
+            if (dcRow['manager_name'] != null && (userRes?['first_name'] == null || userRes!['first_name'].toString().isEmpty)) {
+              final parts = dcRow['manager_name'].toString().trim().split(' ');
+              merged['first_name'] = parts.first;
+              merged['last_name'] = parts.length > 1 ? parts.sublist(1).join(' ') : '';
+            }
+          }
+        } catch (e) {
+          debugPrint('[AUTH_DATASOURCE] ℹ️ DC Supervisor hub query notice ($e)');
+        }
+
+        merged['distribution_center_id'] = assignedDcId ?? '22222222-2222-4222-8222-222222222222';
+        merged['distribution_center_name'] = assignedDcName ?? 'Wuse Central Distribution Hub';
+        merged['delivery_agent_code'] = assignedDcCode ?? 'DC-WUSE-01';
+      } else {
+        // Field Delivery Agent (Rider)
+        merged['role'] = 'delivery_agent';
+        merged['distribution_center_id'] ??= '22222222-2222-4222-8222-222222222222';
+        merged['distribution_center_name'] ??= 'Wuse Central Distribution Hub';
+        merged['delivery_agent_code'] ??= (cleanEmail.contains('joel') ? 'PDA-7182' : 'PDA-7000');
+        merged['first_name'] ??= (cleanEmail.contains('joel') ? 'Joel' : 'Emeka');
+        merged['last_name'] ??= (cleanEmail.contains('joel') ? 'Odufu' : 'Rider');
         try {
           agentRes = await dbClient
               .from(SupabaseConstants.deliveryAgentsTable)
@@ -867,14 +980,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
               .select()
               .eq('id', userId)
               .maybeSingle();
-
-          if (agentRes == null && (cleanEmail.contains('joel') || userId == '44ce8d3c-9f96-45d2-a051-2d1b9463cd10')) {
-            agentRes = await dbClient
-                .from(SupabaseConstants.deliveryAgentsTable)
-                .select()
-                .eq('id', 'c32c038f-ff3d-4a4f-867d-a749092fb2a9')
-                .maybeSingle();
-          }
         } catch (e) {
           debugPrint('[AUTH_DATASOURCE] ℹ️ Delivery agents query notice ($e)');
         }
@@ -907,6 +1012,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
                 if (linkedUser['first_name'] != null) merged['first_name'] = linkedUser['first_name'];
                 if (linkedUser['last_name'] != null) merged['last_name'] = linkedUser['last_name'];
                 if (linkedUser['email'] != null) merged['email'] = linkedUser['email'];
+                if (linkedUser['phone_number'] != null) merged['phone'] = linkedUser['phone_number'];
               }
             } catch (_) {}
           }
@@ -928,18 +1034,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         } else {
           deliveryAgentId = 'agt-${cleanEmail.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')}';
         }
-      } else {
-        // DC Supervisor / Manager Profile Sanitization
-        merged['role'] = 'dc_manager';
-        merged['delivery_agent_id'] = null;
-        merged['delivery_agent_code'] = userRes?['delivery_agent_code'] ?? 'DC-MGR-01';
-        
-        // Preserve dynamically assigned DC ID and DC Name if present in users record or merged state
-        final assignedDcId = userRes?['distribution_center_id'] ?? merged['distribution_center_id'];
-        final assignedDcName = userRes?['distribution_center_name'] ?? merged['distribution_center_name'];
-        
-        merged['distribution_center_id'] = assignedDcId ?? '22222222-2222-4222-8222-222222222222';
-        merged['distribution_center_name'] = assignedDcName ?? 'Wuse Central Distribution Hub';
       }
 
       if (email.isNotEmpty) {

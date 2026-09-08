@@ -109,6 +109,12 @@ class _MockAuthRemoteDS implements AuthRemoteDataSource {
     String? operatingCity,
   }) async =>
       testUser;
+
+  @override
+  Future<bool> checkEmailExists(String email) async => false;
+
+  @override
+  Future<bool> checkPhoneExists(String phone) async => false;
 }
 
 class _MockOrdersRemoteDS implements OrdersRemoteDataSource {
@@ -159,9 +165,9 @@ class _MockFinanceRemoteDS implements FinanceRemoteDataSource {
 
 class _MockStockRemoteDS implements StockRemoteDataSource {
   @override
-  Future<List<StockItemModel>> getVehicleStockItems([String? agentId]) async => [];
+  Future<List<StockItemModel>> getVehicleStockItems([String? agentId, String? dcId]) async => [];
   @override
-  Future<List<RiderStockAllocation>> getRiderStockAllocations([String? riderId]) async => [];
+  Future<List<RiderStockAllocation>> getRiderStockAllocations([String? riderId, String? dcId]) async => [];
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

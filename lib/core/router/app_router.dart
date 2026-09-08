@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/splash_screen.dart';
@@ -28,12 +28,37 @@ import '../../features/users/presentation/pages/user_profile_page.dart';
 import '../../features/dc_console/presentation/pages/dc_console_layout.dart';
 import '../../features/client_portal/presentation/pages/client_portal_layout.dart';
 
+class RouterRefreshNotifier extends ChangeNotifier {
+  final Ref _ref;
+
+  RouterRefreshNotifier(this._ref) {
+    _ref.listen<AuthState>(
+      authProvider,
+      (previous, next) {
+        if (previous?.isAuthenticated != next.isAuthenticated ||
+            previous?.user?.role != next.user?.role ||
+            previous?.user?.isClient != next.user?.isClient ||
+            previous?.user?.isDcManager != next.user?.isDcManager) {
+          notifyListeners();
+        }
+      },
+    );
+  }
+}
+
+final routerRefreshNotifierProvider = Provider<RouterRefreshNotifier>((ref) {
+  return RouterRefreshNotifier(ref);
+});
+
 final routerProvider = Provider<GoRouter>((ref) {
-  final isAuthFromState = ref.watch(authProvider.select((s) => s.isAuthenticated));
+  final refreshNotifier = ref.watch(routerRefreshNotifierProvider);
 
   return GoRouter(
     initialLocation: '/splash',
+    refreshListenable: refreshNotifier,
     redirect: (BuildContext context, GoRouterState state) {
+      final authState = ref.read(authProvider);
+      final isAuthFromState = authState.isAuthenticated;
       Session? session;
       try {
         session = Supabase.instance.client.auth.currentSession;
@@ -52,7 +77,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         return '/login';
       }
       if (isAuthenticated) {
-        final authState = ref.read(authProvider);
         final isClient = authState.user?.isClient == true;
         final isDc = authState.user?.isDcManager == true;
 

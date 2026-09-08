@@ -234,14 +234,29 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
         // Check if packages JSON is embedded in description: e.g. [PACKAGES: [{"id": "...", ...}]]
         if (description.contains('[PACKAGES:')) {
           try {
-            final startIdx = description.indexOf('[PACKAGES:') + 10;
-            final endIdx = description.lastIndexOf(']');
-            if (endIdx > startIdx) {
-              final jsonStr = description.substring(startIdx, endIdx + 1).trim();
-              final decodedList = jsonDecode(jsonStr) as List;
-              parsedPackages = decodedList
-                  .map((item) => ProductPackage.fromJson(item as Map<String, dynamic>))
-                  .toList();
+            final pkgMarker = description.indexOf('[PACKAGES:');
+            final jsonStart = description.indexOf('[', pkgMarker + 10);
+            if (jsonStart != -1) {
+              int bracketCount = 0;
+              int jsonEnd = -1;
+              for (int i = jsonStart; i < description.length; i++) {
+                if (description[i] == '[') bracketCount++;
+                if (description[i] == ']') {
+                  bracketCount--;
+                  if (bracketCount == 0) {
+                    jsonEnd = i;
+                    break;
+                  }
+                }
+              }
+
+              if (jsonEnd != -1) {
+                final jsonStr = description.substring(jsonStart, jsonEnd + 1).trim();
+                final decodedList = jsonDecode(jsonStr) as List;
+                parsedPackages = decodedList
+                    .map((item) => ProductPackage.fromJson(item as Map<String, dynamic>))
+                    .toList();
+              }
             }
           } catch (e) {
             debugPrint('[CATALOG_PROVIDER] ⚠️ Could not parse embedded packages for $name: $e');
@@ -287,18 +302,9 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
         );
       }
 
-      // Preserve any locally cached / created products not yet in fetchedProducts
-      for (final localProd in state.products) {
-        if (!fetchedProducts.any((fp) => fp.id == localProd.id || fp.name.toLowerCase() == localProd.name.toLowerCase() || fp.sku.toUpperCase() == localProd.sku.toUpperCase())) {
-          fetchedProducts.add(localProd);
-        }
-      }
-
-      if (fetchedProducts.isNotEmpty) {
-        state = state.copyWith(products: fetchedProducts, isLoading: false);
-        await _storageService.cacheProductCatalog(fetchedProducts);
-        debugPrint('[CATALOG_PROVIDER] 📦 Loaded ${fetchedProducts.length} authoritative products and package configurations from Supabase.');
-      }
+      state = state.copyWith(products: fetchedProducts, isLoading: false);
+      await _storageService.cacheProductCatalog(fetchedProducts);
+      debugPrint('[CATALOG_PROVIDER] 📦 Loaded ${fetchedProducts.length} authoritative products and package configurations from Supabase.');
     } catch (e) {
       debugPrint('[CATALOG_PROVIDER] ℹ️ Supabase reloadCatalog notice: $e');
     } finally {

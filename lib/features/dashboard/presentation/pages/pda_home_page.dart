@@ -63,10 +63,12 @@ class _PdaHomePageState extends ConsumerState<PdaHomePage> {
 
     final user = authState.user;
     final bool isSalaried = user?.compensationType == 'salary' || user?.personnelType == 'inhouse';
-    final agentName = user != null && (user.firstName.isNotEmpty || user.lastName.isNotEmpty)
-        ? '${user.firstName} ${user.lastName}'.trim()
-        : (user?.fullName.isNotEmpty == true ? user!.fullName : 'Joel Odufu');
-    final agentId = user?.deliveryAgentCode ?? 'PDA-7182';
+    final agentName = user != null && user.fullName.isNotEmpty
+        ? user.fullName
+        : (user?.email.isNotEmpty == true ? user!.email.split('@').first : 'Field Agent');
+    final agentId = (user?.deliveryAgentCode != null && user!.deliveryAgentCode!.isNotEmpty)
+        ? user.deliveryAgentCode!
+        : 'PDA';
     final agentRole = isSalaried ? 'In-House Staff' : 'Freelance PDA';
 
     final orders = ordersState.orders;

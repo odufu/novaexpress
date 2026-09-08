@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../widgets/login_form.dart';
 
 class LoginPage extends StatelessWidget {
@@ -77,6 +78,29 @@ class LoginPage extends StatelessWidget {
                         ),
                         const SizedBox(height: 24),
                         const LoginForm(),
+                        const SizedBox(height: 20),
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            final uri = Uri.parse('presentation/index.html');
+                            if (await canLaunchUrl(uri)) {
+                              await launchUrl(uri);
+                            }
+                          },
+                          icon: const Icon(Icons.slideshow_rounded, size: 18, color: Color(0xFF006C4C)),
+                          label: const Text(
+                            'Open Interactive System Presentation',
+                            style: TextStyle(
+                              color: Color(0xFF006C4C),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            side: const BorderSide(color: Color(0xFF006C4C)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
                       ],
                     ),
                   ),

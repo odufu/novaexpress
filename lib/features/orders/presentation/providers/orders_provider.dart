@@ -66,7 +66,6 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
   final LocalStorageService _storageService;
   final Ref? _ref;
   RealtimeChannel? _realtimeChannel;
-  Timer? _heartbeatTimer;
 
   OrdersNotifier(
     this._repository, [
@@ -93,7 +92,6 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
 
     if (!isTest) {
       _setupRealtimeSubscription();
-      _startHeartbeatTimer();
     }
 
     if (_ref != null) {
@@ -210,32 +208,6 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     } catch (e) {
       debugPrint('[ORDERS_PROVIDER] ℹ️ Realtime channel notice: $e');
     }
-  }
-
-  void _startHeartbeatTimer() {
-    try {
-      if (WidgetsBinding.instance.runtimeType.toString().toLowerCase().contains('test')) {
-        return;
-      }
-    } catch (_) {}
-    if (!kIsWeb) {
-      try {
-        if (Platform.environment.containsKey('FLUTTER_TEST') ||
-            Platform.environment.containsKey('TEST_PLATFORM')) {
-          return;
-        }
-      } catch (_) {}
-    }
-    _heartbeatTimer?.cancel();
-    _heartbeatTimer = Timer.periodic(const Duration(seconds: 4), (_) {
-      if (!mounted) return;
-      final agentId = _getActiveAgentId();
-      if (agentId.isNotEmpty && _isRiderUser()) {
-        _silentSyncOrders(agentId);
-      } else {
-        _silentSyncOrders();
-      }
-    });
   }
 
   Future<void> _silentSyncOrders([String? agentId]) async {
@@ -1056,7 +1028,6 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
 
   @override
   void dispose() {
-    _heartbeatTimer?.cancel();
     try {
       _realtimeChannel?.unsubscribe();
     } catch (_) {}

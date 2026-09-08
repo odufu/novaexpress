@@ -15,6 +15,7 @@ class DistributionCenter {
   final bool isGrandDc;
   final bool isHub;
   final bool isActive;
+  final String? parentDcId;
   final List<String> operatingZones;
   final int storageCapacityUnits;
   final int totalAssignedRiders;
@@ -36,6 +37,7 @@ class DistributionCenter {
     this.isGrandDc = false,
     this.isHub = false,
     this.isActive = true,
+    this.parentDcId,
     this.operatingZones = const [],
     this.storageCapacityUnits = 25000,
     this.totalAssignedRiders = 0,
@@ -88,6 +90,7 @@ class DistributionCenter {
     bool? isGrandDc,
     bool? isHub,
     bool? isActive,
+    String? parentDcId,
     List<String>? operatingZones,
     int? storageCapacityUnits,
     int? totalAssignedRiders,
@@ -109,6 +112,7 @@ class DistributionCenter {
       isGrandDc: isGrandDc ?? this.isGrandDc,
       isHub: isHub ?? this.isHub,
       isActive: isActive ?? this.isActive,
+      parentDcId: parentDcId ?? this.parentDcId,
       operatingZones: operatingZones ?? this.operatingZones,
       storageCapacityUnits: storageCapacityUnits ?? this.storageCapacityUnits,
       totalAssignedRiders: totalAssignedRiders ?? this.totalAssignedRiders,
@@ -158,6 +162,7 @@ class DistributionCenter {
       isGrandDc: isGrand,
       isHub: json['is_hub'] == true || json['isHub'] == true,
       isActive: json['is_active'] != false && json['isActive'] != false,
+      parentDcId: json['parent_dc_id']?.toString() ?? json['parentDcId']?.toString(),
       operatingZones: parseZones(json['operating_zones'] ?? json['operatingZones'] ?? json['zones'] ?? json['covered_lgas']),
       storageCapacityUnits: (json['storage_capacity_units'] as num?)?.toInt() ?? (json['storageCapacityUnits'] as num?)?.toInt() ?? 25000,
       totalAssignedRiders: (json['total_assigned_riders'] as num?)?.toInt() ?? (json['totalAssignedRiders'] as num?)?.toInt() ?? 0,
@@ -182,6 +187,7 @@ class DistributionCenter {
       'is_grand_dc': isGrandDc,
       'is_hub': isHub,
       'is_active': isActive,
+      'parent_dc_id': parentDcId,
       'operating_zones': operatingZones,
       'storage_capacity_units': storageCapacityUnits,
       'total_assigned_riders': totalAssignedRiders,

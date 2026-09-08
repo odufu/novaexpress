@@ -33,10 +33,28 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
     final dcState = ref.watch(dcConsoleProvider);
     final notifier = ref.read(dcConsoleProvider.notifier);
 
-    final allDcs = dcState.distributionCenters.isNotEmpty
-        ? dcState.distributionCenters
-        : defaultDistributionCenters;
-    final filteredDcs = dcState.filteredDistributionCenters;
+    final authState = ref.watch(authProvider);
+    final user = authState.user;
+    final isSuperAdmin = user != null && (user.role == 'super_admin' || user.role == 'admin');
+
+    final currentHubId = dcState.activeHubId;
+    final List<DistributionCenter> allDcs;
+    final List<DistributionCenter> filteredDcs;
+
+    if (isSuperAdmin || dcState.isCurrentHubGrandDc) {
+      allDcs = dcState.distributionCenters.isNotEmpty
+          ? dcState.distributionCenters
+          : defaultDistributionCenters;
+      filteredDcs = dcState.filteredDistributionCenters;
+    } else {
+      // Primary Regional Hub manages satellite / sub-DCs created under this primary DC
+      allDcs = dcState.distributionCenters
+          .where((d) => d.id != currentHubId && (d.parentDcId == currentHubId || d.parentDcId == dcState.activeHubCode))
+          .toList();
+      filteredDcs = dcState.filteredDistributionCenters
+          .where((d) => d.id != currentHubId && (d.parentDcId == currentHubId || d.parentDcId == dcState.activeHubCode))
+          .toList();
+    }
 
     final totalDcs = allDcs.length;
     final totalHubs = allDcs.where((d) => d.isHub).length;
@@ -852,6 +870,9 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
     bool isActive = existingDc?.isActive ?? true;
 
     List<String> availableLgas = LocationLookupService.getLgasForState(selectedState);
+    if (cityCtrl.text.isEmpty && availableLgas.isNotEmpty) {
+      cityCtrl.text = availableLgas.first;
+    }
     List<String> selectedLgas = existingDc != null && existingDc.operatingZones.isNotEmpty
         ? List<String>.from(existingDc.operatingZones)
         : (availableLgas.isNotEmpty ? List<String>.from(availableLgas) : ['Abuja Municipal (AMAC)']);
@@ -951,12 +972,32 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
                     Row(
                       children: [
                         Expanded(
-                          child: TextField(
-                            controller: cityCtrl,
+                          child: DropdownButtonFormField<String>(
+                            isExpanded: true,
+                            value: availableLgas.contains(cityCtrl.text)
+                                ? cityCtrl.text
+                                : (availableLgas.isNotEmpty ? availableLgas.first : null),
                             decoration: const InputDecoration(
-                              labelText: 'City / Municipality *',
-                              hintText: 'e.g. Lekki',
+                              labelText: 'City / LGA *',
+                              prefixIcon: Icon(Icons.location_city_rounded, size: 16),
                             ),
+                            dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                            items: availableLgas.map((lga) {
+                              return DropdownMenuItem<String>(
+                                value: lga,
+                                child: Text(lga, style: const TextStyle(fontSize: 13), overflow: TextOverflow.ellipsis),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              if (val != null) {
+                                setState(() {
+                                  cityCtrl.text = val;
+                                  if (!selectedLgas.contains(val)) {
+                                    selectedLgas.add(val);
+                                  }
+                                });
+                              }
+                            },
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -1359,6 +1400,7 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
                                 supervisorEmail: supEmail,
                                 supervisorPassword: supPass,
                                 isHub: isHub,
+                                parentDcId: ref.read(dcConsoleProvider).activeHubId,
                                 operatingZones: zones,
                                 storageCapacityUnits: capacity,
                                 authDataSource: authDataSource,

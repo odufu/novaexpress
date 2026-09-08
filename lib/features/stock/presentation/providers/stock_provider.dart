@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import '../../../../core/constants/supabase_constants.dart';
 import '../../../../core/services/local_storage_service.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../dc_console/presentation/providers/dc_console_provider.dart';
 import '../../data/datasources/stock_remote_datasource.dart';
 import '../../data/repositories/stock_repository_impl.dart';
 import '../../domain/entities/rider_stock_allocation.dart';
@@ -194,9 +195,21 @@ class StockNotifier extends StateNotifier<StockState> {
     _subscribeToRealtimeStock();
     if (_ref != null) {
       _ref.listen<AuthState>(authProvider, (previous, next) {
-        final nextAgentId = next.user?.deliveryAgentId ?? next.user?.id;
-        if (nextAgentId != null && nextAgentId.isNotEmpty && nextAgentId != _lastAgentId) {
-          fetchStockItems(nextAgentId);
+        final user = next.user;
+        final role = user?.role.toLowerCase() ?? '';
+        final isRiderOrAgent = role.contains('rider') ||
+            role.contains('agent') ||
+            role.contains('driver') ||
+            user?.isPda == true;
+        if (isRiderOrAgent) {
+          final nextAgentId = user?.deliveryAgentId ?? user?.id;
+          if (nextAgentId != null && nextAgentId.isNotEmpty && nextAgentId != _lastAgentId) {
+            fetchStockItems(nextAgentId);
+          }
+        } else {
+          // For DC manager, supervisor, admin, etc.: reset agent target and fetch master inventory
+          _lastAgentId = null;
+          fetchStockItems(null);
         }
       });
     }
@@ -255,26 +268,50 @@ class StockNotifier extends StateNotifier<StockState> {
     state = state.copyWith(isLoading: false);
   }
 
-  Future<void> fetchStockItems([String? agentId]) async {
+  Future<void> fetchStockItems([String? agentId, String? dcId]) async {
     state = state.copyWith(isLoading: state.stockItems.isEmpty, errorMessage: null);
     try {
-      String? targetAgentId = (agentId != null && agentId.isNotEmpty) ? agentId : _lastAgentId;
-      if ((targetAgentId == null || targetAgentId.isEmpty) && _ref != null) {
-        final user = _ref.read(authProvider).user;
-        final role = user?.role.toLowerCase() ?? '';
-        if (role.contains('rider') || role.contains('agent') || role.contains('driver') || user?.isPda == true) {
-          targetAgentId = user?.deliveryAgentId ?? user?.id;
+      final user = _ref?.read(authProvider).user;
+      final role = user?.role.toLowerCase() ?? '';
+      final isRiderOrAgent = role.contains('rider') ||
+          role.contains('agent') ||
+          role.contains('driver') ||
+          user?.isPda == true;
+
+      String? targetAgentId;
+      if (isRiderOrAgent) {
+        targetAgentId = (agentId != null && agentId.isNotEmpty)
+            ? agentId
+            : (_lastAgentId ?? user?.deliveryAgentId ?? user?.id);
+        if (targetAgentId != null && targetAgentId.isNotEmpty) {
+          _lastAgentId = targetAgentId;
+        }
+      } else {
+        // Warehouse manager / DC supervisor / Admin:
+        // Only target a specific agent if explicitly provided in this call
+        if (agentId != null && agentId.isNotEmpty) {
+          targetAgentId = agentId;
+        } else {
+          targetAgentId = null;
+          _lastAgentId = null;
         }
       }
-      if (targetAgentId != null && targetAgentId.isNotEmpty) {
-        _lastAgentId = targetAgentId;
+
+      String? targetDcId = (dcId != null && dcId.isNotEmpty) ? dcId : null;
+      if (targetDcId == null) {
+        try {
+          targetDcId = _ref?.read(dcConsoleProvider).activeHubId;
+        } catch (_) {}
+      }
+      if (targetDcId == null || targetDcId.isEmpty) {
+        targetDcId = user?.distributionCenterId;
       }
 
       if (targetAgentId != null && targetAgentId.isNotEmpty) {
         final resolvedAgentId = targetAgentId;
         // Fetch real stock and active allocations assigned to this specific rider from Supabase
-        final items = await repository.getVehicleStockItems(resolvedAgentId);
-        final allocations = await repository.getRiderStockAllocations(resolvedAgentId);
+        final items = await repository.getVehicleStockItems(resolvedAgentId, targetDcId);
+        final allocations = await repository.getRiderStockAllocations(resolvedAgentId, targetDcId);
 
         final Map<String, StockItemEntity> itemMap = {
           for (final it in items) it.name.toLowerCase(): it,
@@ -330,26 +367,17 @@ class StockNotifier extends StateNotifier<StockState> {
           _storageService.cacheRiderStockAllocations(allocations);
         }
       } else {
-        // DC Master Overview
-        final items = await repository.getVehicleStockItems();
-        final allocations = await repository.getRiderStockAllocations();
-
-        final List<StockItemEntity> mergedItems = List.from(items);
-        for (final localItem in state.stockItems) {
-          if (!mergedItems.any((i) => i.id == localItem.id || i.sku.toLowerCase() == localItem.sku.toLowerCase() || i.name.toLowerCase() == localItem.name.toLowerCase())) {
-            mergedItems.add(localItem);
-          }
-        }
+        // DC Master Overview: Scoped strictly to active DC
+        final items = await repository.getVehicleStockItems(null, targetDcId);
+        final allocations = await repository.getRiderStockAllocations(null, targetDcId);
 
         state = state.copyWith(
           isLoading: false,
-          stockItems: mergedItems,
-          riderAllocations: allocations.isNotEmpty ? allocations : state.riderAllocations,
+          stockItems: items,
+          riderAllocations: allocations,
         );
-        _storageService.cacheStockItems(mergedItems);
-        if (allocations.isNotEmpty) {
-          _storageService.cacheRiderStockAllocations(allocations);
-        }
+        _storageService.cacheStockItems(items);
+        _storageService.cacheRiderStockAllocations(allocations);
       }
     } catch (e) {
       debugPrint('[STOCK_PROVIDER] ❌ fetchStockItems error: $e');
@@ -359,6 +387,7 @@ class StockNotifier extends StateNotifier<StockState> {
       final fallbackItems = (cached != null && cached.isNotEmpty) ? cached : state.stockItems;
       final fallbackAlloc = (cachedAllocations != null && cachedAllocations.isNotEmpty) ? cachedAllocations : state.riderAllocations;
 
+      if (!mounted) return;
       state = state.copyWith(
         isLoading: false,
         stockItems: fallbackItems,
@@ -485,7 +514,18 @@ class StockNotifier extends StateNotifier<StockState> {
     String description = '',
     String? binLocation,
     String? imageAsset,
+    String? originDcId,
   }) async {
+    String? resolvedOriginDcId = (originDcId != null && originDcId.isNotEmpty) ? originDcId : null;
+    if (resolvedOriginDcId == null) {
+      try {
+        resolvedOriginDcId = _ref?.read(dcConsoleProvider).activeHubId;
+      } catch (_) {}
+    }
+    if (resolvedOriginDcId == null || resolvedOriginDcId.isEmpty) {
+      resolvedOriginDcId = _ref?.read(authProvider).user?.distributionCenterId;
+    }
+
     // 1. Create on remote backend via repository
     StockItemEntity newItem;
     try {
@@ -500,6 +540,7 @@ class StockNotifier extends StateNotifier<StockState> {
         description: description,
         binLocation: binLocation,
         imageAsset: imageAsset,
+        originDcId: resolvedOriginDcId,
       );
     } catch (_) {
       final newId = 'prod_${DateTime.now().millisecondsSinceEpoch}';
@@ -538,8 +579,19 @@ class StockNotifier extends StateNotifier<StockState> {
     String? waybillNumber,
     String? supplierName,
     String? binLocation,
+    String? distributionCenterId,
   }) async {
     if (quantity <= 0) return false;
+
+    String? resolvedDcId = (distributionCenterId != null && distributionCenterId.isNotEmpty) ? distributionCenterId : null;
+    if (resolvedDcId == null) {
+      try {
+        resolvedDcId = _ref?.read(dcConsoleProvider).activeHubId;
+      } catch (_) {}
+    }
+    if (resolvedDcId == null || resolvedDcId.isEmpty) {
+      resolvedDcId = _ref?.read(authProvider).user?.distributionCenterId;
+    }
 
     // 1. Update remote backend via repository
     try {
@@ -548,6 +600,7 @@ class StockNotifier extends StateNotifier<StockState> {
         quantity: quantity,
         waybillNumber: waybillNumber,
         supplierName: supplierName,
+        distributionCenterId: resolvedDcId,
       );
     } catch (_) {}
 
@@ -581,6 +634,7 @@ class StockNotifier extends StateNotifier<StockState> {
     required String riderName,
     required String riderCode,
     required int quantity,
+    String? distributionCenterId,
   }) async {
     if (quantity <= 0) {
       return {'success': false, 'message': 'Quantity must be greater than 0'};
@@ -655,6 +709,10 @@ class StockNotifier extends StateNotifier<StockState> {
     await _storageService.cacheRiderStockAllocations(updatedAllocations);
 
     // 3. Persist stock transfer to Supabase backend
+    final effectiveDcId = (distributionCenterId != null && distributionCenterId.isNotEmpty)
+        ? distributionCenterId
+        : _ref?.read(authProvider).user?.distributionCenterId;
+
     try {
       await repository.assignStockToRider(
         productIdOrSku: target.id,
@@ -662,6 +720,7 @@ class StockNotifier extends StateNotifier<StockState> {
         riderName: riderName,
         riderCode: riderCode,
         quantity: quantity,
+        distributionCenterId: effectiveDcId,
       );
     } catch (_) {}
 
@@ -670,6 +729,75 @@ class StockNotifier extends StateNotifier<StockState> {
       'message': 'Successfully assigned $quantity units of ${target.name} to $riderName. Remaining in warehouse: ${updatedTarget.availableCount} units.',
       'remainingWarehouseStock': updatedTarget.availableCount,
       'allocatedUnits': quantity,
+    };
+  }
+
+  /// Transfer stock units directly from current DC warehouse to another Distribution Center
+  Future<Map<String, dynamic>> transferStockBetweenDCs({
+    required String productIdOrSku,
+    required String sourceDcId,
+    required String sourceDcName,
+    required String destinationDcId,
+    required String destinationDcName,
+    required int quantity,
+    String? notes,
+  }) async {
+    if (quantity <= 0) {
+      return {'success': false, 'message': 'Transfer quantity must be greater than 0'};
+    }
+
+    final targetIdx = state.stockItems.indexWhere((i) =>
+        i.id == productIdOrSku ||
+        i.sku.toLowerCase() == productIdOrSku.toLowerCase() ||
+        i.name.toLowerCase() == productIdOrSku.toLowerCase());
+
+    if (targetIdx == -1) {
+      return {'success': false, 'message': 'Product not found in current DC warehouse'};
+    }
+
+    final target = state.stockItems[targetIdx];
+    if (target.availableCount < quantity) {
+      return {
+        'success': false,
+        'message': 'Insufficient warehouse stock. Available: ${target.availableCount} units, Requested transfer: $quantity units',
+      };
+    }
+
+    // 1. Deduct from local warehouse available stock
+    final updatedTarget = target.copyWith(
+      availableCount: target.availableCount - quantity,
+      totalInCustody: (target.totalInCustody - quantity).clamp(0, 999999),
+    );
+    final updatedItems = List<StockItemEntity>.from(state.stockItems);
+    updatedItems[targetIdx] = updatedTarget;
+
+    state = state.copyWith(stockItems: updatedItems);
+    await _storageService.cacheStockItems(updatedItems);
+
+    // 2. Persist to Supabase backend
+    Map<String, dynamic> remoteRes = {'success': true};
+    try {
+      remoteRes = await repository.transferStockBetweenDCs(
+        productIdOrSku: target.id,
+        sourceDcId: sourceDcId,
+        sourceDcName: sourceDcName,
+        destinationDcId: destinationDcId,
+        destinationDcName: destinationDcName,
+        quantity: quantity,
+        notes: notes,
+      );
+    } catch (e) {
+      debugPrint('[STOCK_PROVIDER] ℹ️ Remote transfer notice: $e');
+    }
+
+    final waybill = remoteRes['waybillNumber'] ?? 'WB-DC-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+
+    return {
+      'success': true,
+      'waybillNumber': waybill,
+      'remainingWarehouseStock': updatedTarget.availableCount,
+      'transferredUnits': quantity,
+      'message': 'Successfully dispatched $quantity units of ${target.name} to $destinationDcName ($waybill). Remaining stock: ${updatedTarget.availableCount} units.',
     };
   }
 

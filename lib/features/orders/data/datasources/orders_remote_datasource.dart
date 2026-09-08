@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/supabase_constants.dart';
+import '../../../../core/helpers/uuid_helper.dart';
 import '../models/order_model.dart';
 
 abstract class OrdersRemoteDataSource {
@@ -229,8 +230,14 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
 
       final orderNumber = insertPayload['order_number']?.toString() ?? 'TRK-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
 
+      final clientProvidedId = insertPayload['id']?.toString() ?? '';
+      final validOrderUuid = uuidRegex.hasMatch(clientProvidedId)
+          ? clientProvidedId
+          : UuidHelper.generate();
+
       // 5. Construct strictly-typed database payload with only valid columns
       final sanitizedDbPayload = <String, dynamic>{
+        'id': validOrderUuid,
         'order_number': orderNumber,
         'company_id': companyId,
         'distribution_center_id': dcId,
@@ -260,6 +267,7 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
         'client_delivery_fee': (insertPayload['client_delivery_fee'] as num?)?.toDouble() ?? 5000.0,
         'agent_entitlement': (insertPayload['agent_entitlement'] as num?)?.toDouble() ?? 2500.0,
         'delivery_agent_id': validRiderId,
+        'assigned_agent_id': validRiderId,
         'delivery_notes': insertPayload['delivery_notes']?.toString(),
         'created_at': DateTime.now().toIso8601String(),
       };
@@ -278,7 +286,7 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
         debugPrint('[ORDERS_DATASOURCE] ℹ️ Supabase remote insert notice ($dbErr). Creating standard operational model.');
         createdModel = OrderModel.fromJson({
           ...sanitizedDbPayload,
-          'id': 'ord-${DateTime.now().millisecondsSinceEpoch}',
+          'id': validOrderUuid,
         });
       }
 
@@ -352,7 +360,7 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
       }
 
       // Map assigned riders from in-memory cache without overwriting terminal states or stripping fields
-      final syncedList = list.map((model) {
+      final syncedList = list.map<OrderModel>((model) {
         if (_assignedRidersByOrderId.containsKey(model.id)) {
           final isFinished = model.status == 'delivered' ||
               model.status == 'completed' ||
@@ -404,25 +412,9 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
       );
 
       final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
+      final isUuid = uuidRegex.hasMatch(orderId.trim());
 
-      // 1. Fetch order summary details for instant notification
-      String orderNum = orderId.length > 8 ? 'ORD-${orderId.substring(0, 8)}' : orderId;
-      String custName = 'Customer';
-      String city = 'Abuja';
-      try {
-        final orderRow = await dbClient
-            .from(SupabaseConstants.ordersTable)
-            .select('order_number, customer_name, delivery_city')
-            .eq('id', orderId)
-            .maybeSingle();
-        if (orderRow != null) {
-          orderNum = orderRow['order_number']?.toString() ?? orderNum;
-          custName = orderRow['customer_name']?.toString() ?? custName;
-          city = orderRow['delivery_city']?.toString() ?? city;
-        }
-      } catch (_) {}
-
-      // 2. Resolve authoritative delivery_agent_id UUID from delivery_agents table
+      // 1. Resolve authoritative delivery_agent_id UUID from delivery_agents table
       String? validRiderUuid;
       if (uuidRegex.hasMatch(riderId)) {
         validRiderUuid = riderId;
@@ -444,16 +436,95 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
         validRiderUuid = riderId.isNotEmpty && uuidRegex.hasMatch(riderId) ? riderId : null;
       }
 
+      // 2. Resolve order details safely without triggering 22P02 invalid UUID syntax
+      String orderNum = orderId.length > 8 ? 'ORD-${orderId.substring(0, 8)}' : orderId;
+      String custName = 'Customer';
+      String city = 'Abuja';
+      String? matchedOrderUuid = isUuid ? orderId.trim() : null;
+      String? resolvedOrderNumber;
+
+      OrderModel? localOrderMatch;
+      for (final o in _createdOrders) {
+        if (o.id == orderId || o.orderNumber == orderId) {
+          localOrderMatch = o;
+          resolvedOrderNumber = o.orderNumber;
+          break;
+        }
+      }
+
+      if (isUuid) {
+        try {
+          final orderRow = await dbClient
+              .from(SupabaseConstants.ordersTable)
+              .select('id, order_number, customer_name, delivery_city')
+              .eq('id', orderId.trim())
+              .maybeSingle();
+          if (orderRow != null) {
+            orderNum = orderRow['order_number']?.toString() ?? orderNum;
+            custName = orderRow['customer_name']?.toString() ?? custName;
+            city = orderRow['delivery_city']?.toString() ?? city;
+            matchedOrderUuid = orderRow['id']?.toString() ?? matchedOrderUuid;
+          }
+        } catch (_) {}
+      } else {
+        // Query by order_number if known
+        final lookupNumber = resolvedOrderNumber ?? (orderId.startsWith('TRK-') ? orderId : null);
+        if (lookupNumber != null) {
+          try {
+            final orderRow = await dbClient
+                .from(SupabaseConstants.ordersTable)
+                .select('id, order_number, customer_name, delivery_city')
+                .eq('order_number', lookupNumber)
+                .maybeSingle();
+            if (orderRow != null) {
+              orderNum = orderRow['order_number']?.toString() ?? orderNum;
+              custName = orderRow['customer_name']?.toString() ?? custName;
+              city = orderRow['delivery_city']?.toString() ?? city;
+              matchedOrderUuid = orderRow['id']?.toString();
+            }
+          } catch (_) {}
+        }
+      }
+
+      // 3. Update orders table in Supabase (status MUST be 'in_transit' for active assignment check constraint)
       if (validRiderUuid != null) {
-        // 3. Update orders table in Supabase (status MUST be 'in_transit' for active assignment check constraint)
-        await dbClient
-            .from(SupabaseConstants.ordersTable)
-            .update({
-              'delivery_agent_id': validRiderUuid,
-              'status': 'in_transit',
-              'updated_at': DateTime.now().toIso8601String(),
-            })
-            .eq('id', orderId);
+        final updatePayload = {
+          'delivery_agent_id': validRiderUuid,
+          'assigned_agent_id': validRiderUuid,
+          'status': 'in_transit',
+          'updated_at': DateTime.now().toIso8601String(),
+        };
+
+        if (matchedOrderUuid != null) {
+          await dbClient
+              .from(SupabaseConstants.ordersTable)
+              .update(updatePayload)
+              .eq('id', matchedOrderUuid);
+        } else if (resolvedOrderNumber != null) {
+          await dbClient
+              .from(SupabaseConstants.ordersTable)
+              .update(updatePayload)
+              .eq('order_number', resolvedOrderNumber);
+        } else if (localOrderMatch != null) {
+          // Self-heal: order was created offline or prior to trigger fix. Insert into Supabase now!
+          final newUuid = UuidHelper.generate();
+          try {
+            final insertPayload = Map<String, dynamic>.from(localOrderMatch.toJson());
+            insertPayload['id'] = newUuid;
+            insertPayload['delivery_agent_id'] = validRiderUuid;
+            insertPayload['assigned_agent_id'] = validRiderUuid;
+            insertPayload['status'] = 'in_transit';
+            insertPayload.remove('products');
+            await dbClient.from(SupabaseConstants.ordersTable).insert(insertPayload);
+            matchedOrderUuid = newUuid;
+
+            _createdOrders.removeWhere((o) => o.id == localOrderMatch!.id);
+            _createdOrders.insert(0, OrderModel.fromEntity(localOrderMatch.copyWith(id: newUuid, status: 'in_transit')));
+            _assignedRidersByOrderId[newUuid] = validRiderUuid;
+          } catch (insertErr) {
+            debugPrint('[ORDERS_DATASOURCE] ℹ️ Auto-persist local order notice: $insertErr');
+          }
+        }
       }
 
       // 4. Immediately insert real notification in database for rider
@@ -464,7 +535,7 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
           'category': 'delivery',
           'title': 'New Order Assigned! 📦',
           'message': 'Order $orderNum for $custName in $city has been assigned to your route.',
-          'action_route': '/orders/$orderId',
+          'action_route': '/orders/${matchedOrderUuid ?? orderId}',
           'is_read': false,
           'created_at': DateTime.now().toIso8601String(),
         });
@@ -484,17 +555,29 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
   @override
   Future<OrderModel> getOrderById(String orderId) async {
     try {
-      final response = await supabaseClient
-          .from(SupabaseConstants.ordersTable)
-          .select()
-          .eq('id', orderId)
-          .maybeSingle();
+      final isUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(orderId.trim());
+      var query = supabaseClient.from(SupabaseConstants.ordersTable).select();
+      final response = isUuid
+          ? await query.eq('id', orderId.trim()).maybeSingle()
+          : await query.eq('order_number', orderId.trim()).maybeSingle();
 
       if (response != null) {
         return OrderModel.fromJson(response);
       }
+
+      for (final o in _createdOrders) {
+        if (o.id == orderId || o.orderNumber == orderId) {
+          return o;
+        }
+      }
+
       throw Exception('Order "$orderId" not found in Supabase database.');
     } catch (e) {
+      for (final o in _createdOrders) {
+        if (o.id == orderId || o.orderNumber == orderId) {
+          return o;
+        }
+      }
       rethrow;
     }
   }
@@ -558,11 +641,20 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
       updateData['is_location_verified'] = isLocationVerified;
     }
 
+    final isUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(orderId.trim());
+
     try {
-      await supabaseClient
-          .from(SupabaseConstants.ordersTable)
-          .update(updateData)
-          .eq('id', orderId);
+      if (isUuid) {
+        await supabaseClient
+            .from(SupabaseConstants.ordersTable)
+            .update(updateData)
+            .eq('id', orderId.trim());
+      } else {
+        await supabaseClient
+            .from(SupabaseConstants.ordersTable)
+            .update(updateData)
+            .eq('order_number', orderId.trim());
+      }
     } catch (e) {
       SupabaseClient? dbClient;
       try {
@@ -571,10 +663,17 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
           SupabaseConstants.supabaseServiceRoleKey,
           authOptions: const AuthClientOptions(autoRefreshToken: false),
         );
-        await dbClient
-            .from(SupabaseConstants.ordersTable)
-            .update(updateData)
-            .eq('id', orderId);
+        if (isUuid) {
+          await dbClient
+              .from(SupabaseConstants.ordersTable)
+              .update(updateData)
+              .eq('id', orderId.trim());
+        } else {
+          await dbClient
+              .from(SupabaseConstants.ordersTable)
+              .update(updateData)
+              .eq('order_number', orderId.trim());
+        }
       } catch (serviceErr) {
         debugPrint('[ORDERS_DATASOURCE] ℹ️ updateOrderStatus fallback notice: $serviceErr');
       } finally {
@@ -738,15 +837,21 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
         authOptions: const AuthClientOptions(autoRefreshToken: false),
       );
 
-      await dbClient.from(SupabaseConstants.ordersTable).update({
+      final isUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(orderId.trim());
+      final updateCoordinatesPayload = {
         'latitude': latitude,
         'longitude': longitude,
         'is_location_verified': isLocationVerified,
-        'location_confidence': isLocationVerified ? 'high' : 'medium',
+        'location_confidence': isLocationVerified ? 1.0 : 0.8,
         'geocoding_status': isLocationVerified ? 'exact_verified' : 'rooftop',
         if (geocodedAddress != null) 'geocoded_address': geocodedAddress,
         'updated_at': DateTime.now().toIso8601String(),
-      }).eq('id', orderId);
+      };
+      if (isUuid) {
+        await dbClient.from(SupabaseConstants.ordersTable).update(updateCoordinatesPayload).eq('id', orderId.trim());
+      } else {
+        await dbClient.from(SupabaseConstants.ordersTable).update(updateCoordinatesPayload).eq('order_number', orderId.trim());
+      }
     } catch (e) {
       debugPrint('[ORDERS_DATASOURCE] ℹ️ Supabase update coordinates notice ($e). In-memory state updated.');
     } finally {

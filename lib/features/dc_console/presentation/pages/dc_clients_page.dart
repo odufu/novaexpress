@@ -17,6 +17,7 @@ class DCClientsPage extends ConsumerWidget {
     final totalClients = state.clients.length;
     final enterpriseClients = state.clients.where((c) => c.isEnterprise).length;
     final standardClients = totalClients - enterpriseClients;
+    final totalActiveClosers = state.clients.fold(0, (sum, c) => sum + c.totalClosersCount);
     final totalClosersCapacity = state.clients.fold(0, (sum, c) => sum + (c.isEnterprise ? c.closerLimit : 0));
 
     return Scaffold(
@@ -51,7 +52,7 @@ class DCClientsPage extends ConsumerWidget {
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
-                            'Grand DC Directory',
+                            'Shared Network Directory',
                             style: GoogleFonts.inter(
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
@@ -63,7 +64,7 @@ class DCClientsPage extends ConsumerWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Manage enterprise accounts with 200+ telesales closers and single merchant partners',
+                      'Manage enterprise accounts and merchant partners shared across all regional distribution centers',
                       style: GoogleFonts.inter(
                         fontSize: 13,
                         color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
@@ -131,9 +132,9 @@ class DCClientsPage extends ConsumerWidget {
                       isDark: isDark,
                     ),
                     _buildKpiCard(
-                      title: 'Total Closer Capacity',
-                      value: '$totalClosersCapacity Closers',
-                      subtitle: 'Across Enterprise Clients',
+                      title: 'Active Telesales Closers',
+                      value: '$totalActiveClosers ${totalActiveClosers == 1 ? 'Closer' : 'Closers'}',
+                      subtitle: totalClosersCapacity > 0 ? '$totalActiveClosers Active / $totalClosersCapacity Capacity' : 'Active Telesales Personnel',
                       icon: Icons.headset_mic_rounded,
                       color: const Color(0xFFF59E0B),
                       isDark: isDark,
@@ -362,7 +363,9 @@ class DCClientsPage extends ConsumerWidget {
                 Text('Telesales Closers', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8))),
                 const SizedBox(height: 2),
                 Text(
-                  isEnterprise ? '${client.closerLimit} Closer Seats' : 'Direct Merchant',
+                  isEnterprise
+                      ? '${client.totalClosersCount} Active (${client.closerLimit} Max)'
+                      : 'Direct Merchant',
                   style: GoogleFonts.inter(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,

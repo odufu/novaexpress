@@ -1,9 +1,11 @@
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../../../core/constants/supabase_constants.dart';
+import '../../data/datasources/dc_console_remote_datasource.dart';
+import '../../data/repositories/dc_console_repository_impl.dart';
+import '../../domain/repositories/dc_console_repository.dart';
 import '../../../../core/services/local_storage_service.dart';
 import '../../../auth/data/datasources/auth_remote_datasource.dart';
 import '../../../auth/data/models/user_model.dart';
@@ -19,80 +21,20 @@ final List<DistributionCenter> defaultDistributionCenters = [
     id: '22222222-2222-4222-8222-222222222222',
     companyId: '11111111-1111-4111-8111-111111111111',
     name: 'Wuse Central Distribution Hub',
-    code: 'DC-ABJ-01',
+    code: 'DC-WUSE-01',
     state: 'Federal Capital Territory',
-    city: 'Abuja',
-    address: 'Plot 42, Cadastral Zone B03, Wuse II, Abuja',
+    city: 'Wuse 2',
+    address: 'Plot 402 Aminu Kano Crescent, Wuse 2, Abuja',
     contactPhone: '+234 802 345 6789',
-    contactEmail: 'wuse.dc@novaexpress.com',
+    contactEmail: 'dc.supervisor@novaexpress.ng',
     managerName: 'Adekunle Supervisor',
     isGrandDc: true,
     isHub: true,
     isActive: true,
     operatingZones: const ['Abuja Municipal (AMAC)', 'AMAC', 'Wuse I', 'Wuse II', 'Maitama', 'Garki', 'Jabi', 'Utako', 'Central Area', 'Guzape'],
     storageCapacityUnits: 50000,
-    totalAssignedRiders: 12,
-    activeInventoryBatches: 8,
-    createdAt: DateTime(2026, 1, 1),
-    updatedAt: DateTime(2026, 1, 1),
-  ),
-  DistributionCenter(
-    id: '33333333-3333-4333-8333-333333333333',
-    companyId: '11111111-1111-4111-8111-111111111111',
-    name: 'Ikeja Commercial Hub DC',
-    code: 'DC-LOS-01',
-    state: 'Lagos State',
-    city: 'Ikeja',
-    address: '12 Mobolaji Bank Anthony Way, Ikeja, Lagos',
-    contactPhone: '+234 803 111 2233',
-    contactEmail: 'ikeja.dc@novaexpress.com',
-    managerName: 'Babajide Olawale',
-    isHub: true,
-    isActive: true,
-    operatingZones: const ['Ikeja', 'Alausa', 'Opebi', 'Allen Avenue', 'Maryland', 'GRA Ikeja', 'Oregun'],
-    storageCapacityUnits: 75000,
-    totalAssignedRiders: 24,
-    activeInventoryBatches: 15,
-    createdAt: DateTime(2026, 1, 1),
-    updatedAt: DateTime(2026, 1, 1),
-  ),
-  DistributionCenter(
-    id: '44444444-4444-4444-8444-444444444444',
-    companyId: '11111111-1111-4111-8111-111111111111',
-    name: 'Port Harcourt Gateway DC',
-    code: 'DC-PHC-01',
-    state: 'Rivers State',
-    city: 'Port Harcourt',
-    address: '7 Trans-Amadi Industrial Layout, Port Harcourt',
-    contactPhone: '+234 805 777 8899',
-    contactEmail: 'phc.dc@novaexpress.com',
-    managerName: 'Chinedu Nnamdi',
-    isHub: false,
-    isActive: true,
-    operatingZones: const ['Trans-Amadi', 'GRA Phase 2', 'Old GRA', 'D/Line', 'Rumuokwuta', 'Peter Odili Road'],
-    storageCapacityUnits: 30000,
-    totalAssignedRiders: 8,
-    activeInventoryBatches: 5,
-    createdAt: DateTime(2026, 1, 1),
-    updatedAt: DateTime(2026, 1, 1),
-  ),
-  DistributionCenter(
-    id: '55555555-5555-4555-8555-555555555555',
-    companyId: '11111111-1111-4111-8111-111111111111',
-    name: 'Kano Northern Depot DC',
-    code: 'DC-KAN-01',
-    state: 'Kano State',
-    city: 'Kano',
-    address: '18 Bompai Road, Commercial District, Kano',
-    contactPhone: '+234 806 444 5566',
-    contactEmail: 'kano.dc@novaexpress.com',
-    managerName: 'Ibrahim Danladi',
-    isHub: false,
-    isActive: true,
-    operatingZones: const ['Bompai', 'Nassarawa', 'Sabon Gari', 'Fagge', 'Tarauni'],
-    storageCapacityUnits: 25000,
-    totalAssignedRiders: 6,
-    activeInventoryBatches: 4,
+    totalAssignedRiders: 1,
+    activeInventoryBatches: 0,
     createdAt: DateTime(2026, 1, 1),
     updatedAt: DateTime(2026, 1, 1),
   ),
@@ -104,47 +46,21 @@ final List<DCFleetDriver> defaultFleetDrivers = [
     driverCode: 'PDA-7000',
     name: 'Emeka Rider',
     phone: '08012345678',
-    email: 'rider.emeka@novaexpress.com',
+    email: 'emeka.rider@novaexpress.ng',
     avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
     distributionCenterId: '22222222-2222-4222-8222-222222222222',
     status: 'active',
     assignedZone: 'Abuja Municipal (AMAC)',
     coveredLgas: const ['Abuja Municipal (AMAC)', 'AMAC', 'Wuse II', 'Maitama', 'Garki'],
     vehicleType: 'Motorcycle',
-    vehiclePlate: 'ABJ-772-XY',
+    vehiclePlate: 'ABJ-894-XA',
     vehicleModel: 'Bajaj Boxer 150',
-    totalAssignedOrders: 15,
-    completedOrders: 12,
-    routeProgressPercent: 80.0,
-    efficiencyRating: 4.8,
-    cashInCustody: 75000.0,
-    itemsInCustody: 8,
-    commissionRate: 1000.0,
-    transportAllowance: 1500.0,
-    failedDeliveryAllowance: 500.0,
-    compensationType: 'commission',
-    personnelType: 'pda',
-  ),
-  DCFleetDriver(
-    id: 'b2222222-2222-4222-8222-222222222222',
-    driverCode: 'RDR-102',
-    name: 'Musa Garba',
-    phone: '08023456789',
-    email: 'musa.garba@novaexpress.com',
-    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-    distributionCenterId: '22222222-2222-4222-8222-222222222222',
-    status: 'active',
-    assignedZone: 'Bwari',
-    coveredLgas: const ['Bwari', 'Kubwa', 'Dutse'],
-    vehicleType: 'Motorcycle',
-    vehiclePlate: 'ABJ-102-KW',
-    vehicleModel: 'TVS HLX 125',
-    totalAssignedOrders: 10,
-    completedOrders: 9,
-    routeProgressPercent: 90.0,
-    efficiencyRating: 4.9,
-    cashInCustody: 42000.0,
-    itemsInCustody: 5,
+    totalAssignedOrders: 0,
+    completedOrders: 0,
+    routeProgressPercent: 0.0,
+    efficiencyRating: 5.0,
+    cashInCustody: 0.0,
+    itemsInCustody: 0,
     commissionRate: 1000.0,
     transportAllowance: 1500.0,
     failedDeliveryAllowance: 500.0,
@@ -167,22 +83,7 @@ final List<ClientProfile> defaultRegisteredClients = [
     tier: 'enterprise',
     closerLimit: 250,
     isEnterprise: true,
-    totalClosersCount: 200,
-  ),
-  const ClientProfile(
-    id: '33333333-3333-4333-8333-333333333334',
-    companyName: 'Zenith Herbal Direct',
-    contactPerson: 'Madam Stella Balogun',
-    email: 'stella@zenithherbal.com',
-    phone: '08023344556',
-    address: '14 Allen Avenue, Ikeja, Lagos',
-    city: 'Ikeja',
-    state: 'Lagos State',
-    code: 'CLI-ZENITH-02',
-    tier: 'standard_merchant',
-    closerLimit: 0,
-    isEnterprise: false,
-    totalClosersCount: 0,
+    totalClosersCount: 1,
   ),
 ];
 
@@ -535,8 +436,27 @@ class DCConsoleState {
     return list;
   }
 
+  bool get isCurrentHubGrandDc =>
+      activeHubCode == 'DC-ABJ-01' ||
+      activeHubId == '22222222-2222-4222-8222-222222222222' ||
+      activeHubName.toLowerCase().contains('wuse central') ||
+      activeHubName.toLowerCase().contains('grand dc');
+
+  List<DCFleetDriver> get dcDrivers {
+    return drivers.where((d) {
+      if (isCurrentHubGrandDc) {
+        return d.distributionCenterId == activeHubId ||
+               d.distributionCenterId == activeHubCode ||
+               d.distributionCenterId == '22222222-2222-4222-8222-222222222222' ||
+               d.distributionCenterId == null ||
+               d.distributionCenterId!.isEmpty;
+      }
+      return d.distributionCenterId == activeHubId || d.distributionCenterId == activeHubCode;
+    }).toList();
+  }
+
   List<DCFleetDriver> get filteredDrivers {
-    var list = drivers;
+    var list = dcDrivers;
     if (fleetFilter != 'all') {
       list = list.where((d) => d.status.toLowerCase() == fleetFilter.toLowerCase()).toList();
     }
@@ -577,6 +497,7 @@ class DCConsoleState {
 
 class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
   final LocalStorageService _storageService;
+  final DCConsoleRepository _repository;
 
   static bool get isTestEnvironment {
     try {
@@ -593,8 +514,21 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     }
   }
 
-  DCConsoleNotifier([LocalStorageService? storageService])
+  static bool get isWidgetTest {
+    try {
+      return WidgetsBinding.instance.runtimeType.toString().toLowerCase().contains('test');
+    } catch (_) {
+      return false;
+    }
+  }
+
+  DCConsoleNotifier([LocalStorageService? storageService, DCConsoleRepository? repository])
       : _storageService = storageService ?? LocalStorageServiceImpl(),
+        _repository = repository ??
+            DCConsoleRepositoryImpl(
+              remoteDataSource: DCConsoleRemoteDataSourceImpl(),
+              storageService: storageService ?? LocalStorageServiceImpl(),
+            ),
         super(DCConsoleState(
           distributionCenters: defaultDistributionCenters,
           drivers: defaultFleetDrivers,
@@ -751,35 +685,18 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
   }
 
   Future<void> loadClientsFromDatabase() async {
-    bool isTest = false;
-    if (!kIsWeb) {
-      try {
-        isTest = Platform.environment.containsKey('FLUTTER_TEST');
-      } catch (_) {}
-    }
-    if (isTest) return;
+    if (isTestEnvironment) return;
 
     try {
-      final dbClient = SupabaseClient(
-        SupabaseConstants.supabaseUrl,
-        SupabaseConstants.supabaseServiceRoleKey,
-        authOptions: const AuthClientOptions(autoRefreshToken: false),
-      );
-
-      final response = await dbClient
-          .from('clients')
-          .select()
-          .order('created_at', ascending: false);
-
-      if (response.isNotEmpty) {
-        final dbClients = response.map((c) => ClientProfile.fromJson(c)).toList();
+      final dbClients = await _repository.getClients();
+      if (dbClients.isNotEmpty) {
         state = state.copyWith(clients: dbClients);
-        debugPrint('[DC_CONSOLE] ⚡ Loaded ${dbClients.length} registered clients from Supabase DB.');
+        debugPrint('[DC_CONSOLE] ⚡ Loaded ${dbClients.length} registered clients via repository.');
       } else {
         state = state.copyWith(clients: defaultRegisteredClients);
       }
     } catch (e) {
-      debugPrint('[DC_CONSOLE] ℹ️ Error loading clients from Supabase: $e');
+      debugPrint('[DC_CONSOLE] ℹ️ Error loading clients via repository: $e');
       if (state.clients.isEmpty) {
         state = state.copyWith(clients: defaultRegisteredClients);
       }
@@ -798,75 +715,57 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     int closerLimit = 250,
   }) async {
     state = state.copyWith(isLoading: true);
+    final cleanEmail = email.trim().toLowerCase();
+    if (state.clients.any((c) => c.email.toLowerCase() == cleanEmail)) {
+      state = state.copyWith(isLoading: false);
+      throw Exception("A user with email '$cleanEmail' already exists. Please use a unique email address.");
+    }
+
     try {
-      final isEnt = tier == 'enterprise';
-      final clientId = _generateUuid();
-      final suffix = (state.clients.length + 1).toString().padLeft(2, '0');
-      final prefix = companyName.replaceAll(RegExp(r'[^a-zA-Z]'), '').toUpperCase();
-      final codePrefix = prefix.length >= 4 ? prefix.substring(0, 4) : 'CLI';
-      final clientCode = 'CLI-$codePrefix-$suffix';
-
-      final newClient = ClientProfile(
-        id: clientId,
-        companyName: companyName.trim(),
-        contactPerson: contactPerson.trim(),
-        email: email.trim(),
-        phone: phone.trim(),
-        address: address.trim(),
-        city: city.trim(),
-        state: stateName.trim(),
-        code: clientCode,
-        tier: tier,
-        closerLimit: isEnt ? closerLimit : 0,
-        isEnterprise: isEnt,
-        totalClosersCount: 0,
-        createdAt: DateTime.now(),
-      );
-
-      // Async push to Supabase Cloud DB
-      Future.microtask(() async {
-        try {
-          final dbClient = SupabaseClient(
-            SupabaseConstants.supabaseUrl,
-            SupabaseConstants.supabaseServiceRoleKey,
-            authOptions: const AuthClientOptions(autoRefreshToken: false),
-          );
-
-          // 1. Insert into clients table
-          await dbClient.from('clients').insert({
-            'id': newClient.id,
-            'company_name': newClient.companyName,
-            'contact_person': newClient.contactPerson,
-            'email': newClient.email,
-            'phone': newClient.phone,
-            'address': newClient.address,
-            'city': newClient.city,
-            'state': newClient.state,
-            'code': newClient.code,
-            'tier': newClient.tier,
-            'closer_limit': newClient.closerLimit,
-            'is_enterprise': newClient.isEnterprise,
-            'is_active': true,
-          });
-
-          // 2. Insert client admin into users table
-          final nameParts = contactPerson.trim().split(' ');
-          await dbClient.from('users').insert({
-            'id': newClient.id,
-            'company_id': '11111111-1111-4111-8111-111111111111',
-            'client_id': newClient.id,
-            'email': newClient.email,
-            'phone_number': newClient.phone,
-            'first_name': nameParts.first,
-            'last_name': nameParts.length > 1 ? nameParts.sublist(1).join(' ') : 'Admin',
-            'role': 'client',
-            'is_active': true,
-          });
-          debugPrint('[DC_CONSOLE] ✅ Grand DC onboarded client ${newClient.companyName} (${newClient.tier}) in Supabase.');
-        } catch (dbErr) {
-          debugPrint('[DC_CONSOLE] ℹ️ Supabase client insert notice: $dbErr');
+      ClientProfile newClient;
+      try {
+        newClient = await _repository.createClient(
+          companyName: companyName.trim(),
+          contactPerson: contactPerson.trim(),
+          email: cleanEmail,
+          phone: phone.trim(),
+          address: address.trim(),
+          city: city.trim(),
+          stateName: stateName.trim(),
+          tier: tier,
+          closerLimit: closerLimit,
+        );
+      } catch (dbErr) {
+        if (dbErr.toString().contains('already exists')) {
+          rethrow;
         }
-      });
+        debugPrint('[DC_CONSOLE] ℹ️ Remote createClient notice: $dbErr. Utilizing resilient local fallback.');
+        final isEnt = tier == 'enterprise';
+        final cleanName = companyName.trim();
+        final words = cleanName.split(RegExp(r'\s+'));
+        String prefix = words.take(2).map((w) => w.isNotEmpty ? w[0].toUpperCase() : '').join();
+        if (prefix.length < 2) prefix = cleanName.length >= 2 ? cleanName.substring(0, 2).toUpperCase() : 'CL';
+        final suffix = (100 + (DateTime.now().millisecondsSinceEpoch % 900) + 1).toString().padLeft(3, '0');
+        final clientCode = 'CLI-$prefix-$suffix';
+        final clientId = '00000000-0000-4000-8000-${DateTime.now().millisecondsSinceEpoch.toString().padLeft(12, '0')}';
+
+        newClient = ClientProfile(
+          id: clientId,
+          companyName: cleanName,
+          contactPerson: contactPerson.trim(),
+          email: cleanEmail,
+          phone: phone.trim(),
+          address: address.trim(),
+          city: city.trim(),
+          state: stateName.trim(),
+          code: clientCode,
+          tier: tier,
+          closerLimit: isEnt ? closerLimit : 0,
+          isEnterprise: isEnt,
+          totalClosersCount: 0,
+          createdAt: DateTime.now(),
+        );
+      }
 
       final updatedClients = [newClient, ...state.clients];
       state = state.copyWith(clients: updatedClients, isLoading: false);
@@ -878,38 +777,17 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
   }
 
   Future<void> loadFinanceSettingsFromDatabase() async {
-    bool isTest = false;
-    if (!kIsWeb) {
-      try {
-        isTest = Platform.environment.containsKey('FLUTTER_TEST');
-      } catch (_) {}
-    }
-    if (isTest) return;
+    if (isTestEnvironment) return;
 
-    SupabaseClient? dbClient;
     try {
-      dbClient = SupabaseClient(
-        SupabaseConstants.supabaseUrl,
-        SupabaseConstants.supabaseServiceRoleKey,
-        authOptions: const AuthClientOptions(autoRefreshToken: false),
-      );
-
-      final response = await dbClient
-          .from('dc_finance_settings')
-          .select()
-          .limit(1)
-          .maybeSingle();
-
-      if (response != null) {
-        final settings = DCFinanceSettings.fromJson(response);
+      final settings = await _repository.getFinanceSettings();
+      if (settings != null) {
         state = state.copyWith(financeSettings: settings);
         await _storageService.cacheFinanceSettings(settings);
-        debugPrint('[DC_CONSOLE_PROVIDER] 💳 Loaded DC finance & POS settings from Supabase (Mode: ${settings.posChargeMode}, Commission: ₦${settings.defaultCommissionRate}, Transport: ₦${settings.defaultTransportAllowance}).');
+        debugPrint('[DC_CONSOLE_PROVIDER] 💳 Loaded DC finance & POS settings via repository (Mode: ${settings.posChargeMode}, Commission: ₦${settings.defaultCommissionRate}, Transport: ₦${settings.defaultTransportAllowance}).');
       }
     } catch (e) {
-      debugPrint('[DC_CONSOLE_PROVIDER] ℹ️ Supabase finance settings fetch notice: $e');
-    } finally {
-      dbClient?.dispose();
+      debugPrint('[DC_CONSOLE_PROVIDER] ℹ️ Finance settings fetch notice: $e');
     }
   }
 
@@ -917,40 +795,13 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     state = state.copyWith(financeSettings: newSettings);
     await _storageService.cacheFinanceSettings(newSettings);
 
-    bool isTest = false;
-    if (!kIsWeb) {
-      try {
-        isTest = Platform.environment.containsKey('FLUTTER_TEST');
-      } catch (_) {}
-    }
-    if (isTest) return;
+    if (isTestEnvironment) return;
 
-    SupabaseClient? dbClient;
     try {
-      dbClient = SupabaseClient(
-        SupabaseConstants.supabaseUrl,
-        SupabaseConstants.supabaseServiceRoleKey,
-        authOptions: const AuthClientOptions(autoRefreshToken: false),
-      );
-
-      await dbClient.from('dc_finance_settings').upsert({
-        'id': 'global_finance_config',
-        'pos_charge_mode': newSettings.posChargeMode,
-        'pos_tier_amount': newSettings.posTierAmount,
-        'pos_tier_fee': newSettings.posTierFee,
-        'pos_flat_rate': newSettings.posFlatRate,
-        'pos_max_cap_fee': newSettings.posMaxCapFee,
-        'is_pos_fee_reimbursable': newSettings.isPosFeeReimbursable,
-        'default_commission_rate': newSettings.defaultCommissionRate,
-        'default_transport_allowance': newSettings.defaultTransportAllowance,
-        'default_failed_delivery_allowance': newSettings.defaultFailedDeliveryAllowance,
-        'updated_at': DateTime.now().toIso8601String(),
-      });
-      debugPrint('[DC_CONSOLE_PROVIDER] 💾 DC Finance settings persisted to Supabase.');
+      await _repository.updateFinanceSettings(newSettings);
+      debugPrint('[DC_CONSOLE_PROVIDER] 💾 DC Finance settings persisted via repository.');
     } catch (e) {
-      debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ Supabase finance settings update error: $e');
-    } finally {
-      dbClient?.dispose();
+      debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ Finance settings update error: $e');
     }
   }
 
@@ -980,39 +831,87 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     );
   }
 
-  Future<void> loadDistributionCentersFromDatabase() async {
-    SupabaseClient? dbClient;
-    try {
-      dbClient = SupabaseClient(
-        SupabaseConstants.supabaseUrl,
-        SupabaseConstants.supabaseServiceRoleKey,
-        authOptions: const AuthClientOptions(autoRefreshToken: false),
+  void syncWithUser(dynamic user) {
+    if (user == null) return;
+    final String? dcId = user.distributionCenterId;
+    if (dcId == null || dcId.isEmpty) return;
+
+    if (state.activeHubId == dcId) return;
+
+    final match = state.distributionCenters.where(
+      (d) => d.id == dcId || d.code.toLowerCase() == dcId.toLowerCase() || (user.deliveryAgentCode != null && user.deliveryAgentCode.toString().isNotEmpty && d.code.toLowerCase() == user.deliveryAgentCode.toString().toLowerCase()),
+    ).firstOrNull;
+
+    if (match != null) {
+      switchActiveHub(match);
+      debugPrint('[DC_CONSOLE_PROVIDER] 🏢 Switched active hub to user DC: ${match.name} (${match.code})');
+    } else {
+      final fallbackDc = DistributionCenter(
+        id: dcId,
+        name: (user.distributionCenterName != null && user.distributionCenterName.toString().isNotEmpty)
+            ? user.distributionCenterName.toString()
+            : 'Distribution Center',
+        code: (user.deliveryAgentCode != null && user.deliveryAgentCode.toString().isNotEmpty)
+            ? user.deliveryAgentCode.toString()
+            : 'DC',
+        state: (user.operatingState != null && user.operatingState.toString().isNotEmpty)
+            ? user.operatingState.toString()
+            : 'Nigeria',
+        city: (user.operatingCity != null && user.operatingCity.toString().isNotEmpty)
+            ? user.operatingCity.toString()
+            : 'Station Hub',
+        address: 'Station Depot',
+        managerName: (user.fullName != null && user.fullName.toString().isNotEmpty)
+            ? user.fullName.toString()
+            : 'DC Supervisor',
+        isGrandDc: false,
+        isHub: false,
       );
+      switchActiveHub(fallbackDc);
+      debugPrint('[DC_CONSOLE_PROVIDER] 🏢 Set fallback active hub to user DC: ${fallbackDc.name} (${fallbackDc.code})');
+    }
+  }
 
-      final response = await dbClient
-          .from('distribution_centers')
-          .select()
-          .order('name', ascending: true);
+  Future<void> loadDistributionCentersFromDatabase() async {
+    if (isTestEnvironment) return;
 
-      final List<DistributionCenter> dcs = [];
-      for (final item in response as List) {
-        try {
-          dcs.add(DistributionCenter.fromJson(item as Map<String, dynamic>));
-        } catch (e) {
-          debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ Error parsing DC row: $e');
+    try {
+      final dcs = await _repository.getDistributionCenters();
+      if (dcs.isNotEmpty) {
+        // Merge with existing local DCs so any locally created DC is never lost
+        final existingLocal = state.distributionCenters;
+        final mergedDcs = <DistributionCenter>[...dcs];
+        for (final local in existingLocal) {
+          if (!mergedDcs.any((d) => d.id == local.id || d.code.toUpperCase() == local.code.toUpperCase())) {
+            mergedDcs.add(local);
+          }
+        }
+        state = state.copyWith(distributionCenters: mergedDcs);
+        await _storageService.cacheDistributionCenters(mergedDcs);
+        debugPrint('[DC_CONSOLE_PROVIDER] 🏢 Loaded ${mergedDcs.length} distribution centers via repository (merged).');
+
+        // Refresh active hub details if it matches one of the loaded dcs
+        final activeMatch = mergedDcs.where((d) => d.id == state.activeHubId || d.code == state.activeHubCode).firstOrNull;
+        if (activeMatch != null) {
+          state = state.copyWith(
+            activeHubId: activeMatch.id,
+            activeHubName: activeMatch.name,
+            activeHubCode: activeMatch.code,
+          );
         }
       }
-
-      if (dcs.isNotEmpty) {
-        state = state.copyWith(distributionCenters: dcs);
-        await _storageService.cacheDistributionCenters(dcs);
-        debugPrint('[DC_CONSOLE_PROVIDER] 🏢 Loaded ${dcs.length} distribution centers from live Supabase DB.');
-      }
     } catch (e) {
-      debugPrint('[DC_CONSOLE_PROVIDER] ℹ️ Supabase DC fetch notice ($e). Using local cached DCs.');
-    } finally {
-      dbClient?.dispose();
+      debugPrint('[DC_CONSOLE_PROVIDER] ℹ️ DC fetch notice ($e). Using local cached DCs.');
     }
+  }
+
+  static String _generateUuid() {
+    final random = Random.secure();
+    final values = List<int>.generate(16, (i) => random.nextInt(256));
+    values[6] = (values[6] & 0x0f) | 0x40; // RFC4122 v4
+    values[8] = (values[8] & 0x3f) | 0x80; // RFC4122 variant
+    final hex = values.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20, 32)}';
   }
 
   Future<DistributionCenter> createDistributionCenter({
@@ -1025,6 +924,7 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     String? contactEmail,
     String? managerName,
     bool isHub = false,
+    String? parentDcId,
     int storageCapacityUnits = 25000,
     List<String> operatingZones = const [],
     String? supervisorEmail,
@@ -1034,119 +934,107 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     final cleanCode = code.trim().toUpperCase();
     final cleanName = name.trim();
 
-    // Check for duplicate code
-    final existing = state.distributionCenters.where(
-      (d) => d.code.toUpperCase() == cleanCode,
-    ).firstOrNull;
-    if (existing != null) {
-      throw Exception("A distribution center with code '$cleanCode' already exists (${existing.name}). Please choose a unique DC code.");
-    }
-
-    final newDc = DistributionCenter(
-      id: 'dc-${cleanCode.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '-')}',
-      companyId: '11111111-1111-4111-8111-111111111111',
-      name: cleanName,
-      code: cleanCode,
-      state: stateName.trim(),
-      city: city.trim(),
-      address: address.trim(),
-      managerName: managerName?.trim().isNotEmpty == true ? managerName!.trim() : 'Station Supervisor',
-      contactPhone: contactPhone?.trim().isNotEmpty == true ? contactPhone!.trim() : '+234 800 000 0000',
-      contactEmail: contactEmail?.trim().isNotEmpty == true ? contactEmail!.trim() : (supervisorEmail?.trim() ?? ''),
-      isHub: isHub,
-      isActive: true,
-      storageCapacityUnits: storageCapacityUnits > 0 ? storageCapacityUnits : 25000,
-      operatingZones: operatingZones.isNotEmpty ? operatingZones : [city.trim()],
-      totalAssignedRiders: 0,
-      activeInventoryBatches: 0,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-    );
-
-    // 1. Update in-memory state and local persistent cache
-    final updatedList = [
-      newDc,
-      ...state.distributionCenters.where((d) => d.code != newDc.code && d.id != newDc.id),
-    ];
-    state = state.copyWith(distributionCenters: updatedList);
-    await _storageService.cacheDistributionCenters(updatedList);
-
-    // 2. Provision Auth Account for DC Station Supervisor if provided
+    // 1. Resolve supervisor login email
     final supEmail = (supervisorEmail != null && supervisorEmail.trim().isNotEmpty)
-        ? supervisorEmail.trim()
-        : (contactEmail?.trim().isNotEmpty == true ? contactEmail!.trim() : 'supervisor.${newDc.code.toLowerCase()}@novaexpress.ng');
+        ? supervisorEmail.trim().toLowerCase()
+        : (contactEmail?.trim().isNotEmpty == true ? contactEmail!.trim().toLowerCase() : 'supervisor.${cleanCode.toLowerCase()}@novaexpress.ng');
     final supPass = (supervisorPassword != null && supervisorPassword.trim().length >= 6)
         ? supervisorPassword.trim()
         : 'Password123!';
 
-    final nameParts = (managerName ?? 'Station Supervisor').trim().split(' ');
-    final fName = nameParts.isNotEmpty ? nameParts.first : 'Station';
-    final lName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : 'Supervisor';
+    // 2. Check local in-memory state for duplicate code and duplicate email
+    final existingLocal = state.distributionCenters.where(
+      (d) => d.code.toUpperCase() == cleanCode,
+    ).firstOrNull;
+    if (existingLocal != null) {
+      throw Exception("A distribution center with code '$cleanCode' already exists (${existingLocal.name}). Please choose a unique DC code.");
+    }
 
-    try {
+    final existingEmail = state.distributionCenters.where(
+      (d) => d.contactEmail?.toLowerCase() == supEmail,
+    ).firstOrNull;
+    if (existingEmail != null) {
+      throw Exception("A user with email '$supEmail' already exists. Please choose a different supervisor email.");
+    }
+
+    final effectiveZones = operatingZones.isNotEmpty ? operatingZones : [city.trim()];
+    final effectiveManager = managerName?.trim().isNotEmpty == true ? managerName!.trim() : 'Station Supervisor';
+    final effectivePhone = contactPhone?.trim().isNotEmpty == true ? contactPhone!.trim() : '+234 800 000 0000';
+    final effectiveCapacity = storageCapacityUnits > 0 ? storageCapacityUnits : 25000;
+
+    final bool skipRemoteDb = isWidgetTest;
+
+    DistributionCenter newDc;
+    if (!skipRemoteDb) {
+      newDc = await _repository.createDistributionCenter(
+        name: cleanName,
+        code: cleanCode,
+        stateName: stateName.trim(),
+        city: city.trim(),
+        address: address.trim(),
+        contactPhone: effectivePhone,
+        contactEmail: supEmail,
+        managerName: effectiveManager,
+        isHub: isHub,
+        parentDcId: parentDcId,
+        storageCapacityUnits: effectiveCapacity,
+        operatingZones: effectiveZones,
+        supervisorEmail: supEmail,
+        supervisorPassword: supPass,
+        authDataSource: authDataSource,
+      );
+    } else {
+      final newDcId = _generateUuid();
+      newDc = DistributionCenter(
+        id: newDcId,
+        companyId: '11111111-1111-4111-8111-111111111111',
+        name: cleanName,
+        code: cleanCode,
+        state: stateName.trim(),
+        city: city.trim(),
+        address: address.trim(),
+        managerName: effectiveManager,
+        contactPhone: effectivePhone,
+        contactEmail: supEmail,
+        isHub: isHub,
+        isActive: true,
+        parentDcId: parentDcId,
+        storageCapacityUnits: effectiveCapacity,
+        operatingZones: effectiveZones,
+        totalAssignedRiders: 0,
+        activeInventoryBatches: 0,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
       if (authDataSource != null) {
+        final nameParts = effectiveManager.split(' ');
+        final fName = nameParts.isNotEmpty ? nameParts.first : 'Station';
+        final lName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : 'Supervisor';
         await authDataSource.registerDistributionCenterSupervisor(
           email: supEmail,
           password: supPass,
           firstName: fName,
           lastName: lName,
-          phone: contactPhone?.trim().isNotEmpty == true ? contactPhone!.trim() : '+234 800 000 0000',
-          distributionCenterId: newDc.id,
-          distributionCenterName: newDc.name,
-        );
-      } else {
-        final authDs = AuthRemoteDataSourceImpl(
-          SupabaseClient(
-            SupabaseConstants.supabaseUrl,
-            SupabaseConstants.supabaseServiceRoleKey,
-            authOptions: const AuthClientOptions(autoRefreshToken: false),
-          ),
-        );
-        await authDs.registerDistributionCenterSupervisor(
-          email: supEmail,
-          password: supPass,
-          firstName: fName,
-          lastName: lName,
-          phone: contactPhone?.trim().isNotEmpty == true ? contactPhone!.trim() : '+234 800 000 0000',
+          phone: effectivePhone,
           distributionCenterId: newDc.id,
           distributionCenterName: newDc.name,
         );
       }
-      debugPrint('[DC_CONSOLE_PROVIDER] 👤 DC Supervisor account provisioned for $supEmail (${newDc.name})');
-    } catch (authErr) {
-      debugPrint('[DC_CONSOLE_PROVIDER] ℹ️ Supervisor auth provisioning notice: $authErr');
     }
 
-    // 3. Persist to live Supabase DB
-    SupabaseClient? dbClient;
-    try {
-      dbClient = SupabaseClient(
-        SupabaseConstants.supabaseUrl,
-        SupabaseConstants.supabaseServiceRoleKey,
-        authOptions: const AuthClientOptions(autoRefreshToken: false),
-      );
-
-      await dbClient.from('distribution_centers').upsert({
-        'name': newDc.name,
-        'code': newDc.code,
-        'state': newDc.state,
-        'city': newDc.city,
-        'address': newDc.address,
-        'contact_phone': newDc.contactPhone,
-        'contact_email': newDc.contactEmail,
-        'manager_name': newDc.managerName,
-        'is_hub': newDc.isHub,
-        'is_active': newDc.isActive,
-        'operating_zones': newDc.operatingZones,
-        'storage_capacity_units': newDc.storageCapacityUnits,
-        'company_id': newDc.companyId,
-      });
-      debugPrint('[DC_CONSOLE_PROVIDER] 🏢 Created Distribution Center "${newDc.name}" (${newDc.code}) in Supabase.');
-    } catch (e) {
-      debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ Supabase DC create note: $e');
-    } finally {
-      dbClient?.dispose();
-    }
+    // Update in-memory state and local persistent cache
+    final updatedList = [
+      newDc,
+      ...state.distributionCenters.where((d) => d.code != newDc.code && d.id != newDc.id),
+    ];
+    state = state.copyWith(
+      distributionCenters: updatedList,
+      activeHubId: isHub ? newDc.id : state.activeHubId,
+      activeHubName: isHub ? newDc.name : state.activeHubName,
+      activeHubCode: isHub ? newDc.code : state.activeHubCode,
+    );
+    await _storageService.cacheDistributionCenters(updatedList);
 
     return newDc;
   }
@@ -1156,52 +1044,13 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     state = state.copyWith(distributionCenters: updatedList);
     await _storageService.cacheDistributionCenters(updatedList);
 
-    SupabaseClient? dbClient;
-    try {
-      dbClient = SupabaseClient(
-        SupabaseConstants.supabaseUrl,
-        SupabaseConstants.supabaseServiceRoleKey,
-        authOptions: const AuthClientOptions(autoRefreshToken: false),
-      );
+    if (isTestEnvironment) return;
 
-      final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
-      if (uuidRegex.hasMatch(dc.id)) {
-        await dbClient.from('distribution_centers').update({
-          'name': dc.name,
-          'code': dc.code,
-          'state': dc.state,
-          'city': dc.city,
-          'address': dc.address,
-          'contact_phone': dc.contactPhone,
-          'contact_email': dc.contactEmail,
-          'manager_name': dc.managerName,
-          'is_hub': dc.isHub,
-          'is_active': dc.isActive,
-          'operating_zones': dc.operatingZones,
-          'storage_capacity_units': dc.storageCapacityUnits,
-          'updated_at': DateTime.now().toIso8601String(),
-        }).eq('id', dc.id);
-      } else {
-        await dbClient.from('distribution_centers').update({
-          'name': dc.name,
-          'state': dc.state,
-          'city': dc.city,
-          'address': dc.address,
-          'contact_phone': dc.contactPhone,
-          'contact_email': dc.contactEmail,
-          'manager_name': dc.managerName,
-          'is_hub': dc.isHub,
-          'is_active': dc.isActive,
-          'operating_zones': dc.operatingZones,
-          'storage_capacity_units': dc.storageCapacityUnits,
-          'updated_at': DateTime.now().toIso8601String(),
-        }).eq('code', dc.code);
-      }
-      debugPrint('[DC_CONSOLE_PROVIDER] 🏢 Updated Distribution Center "${dc.name}" (${dc.code}) in Supabase.');
+    try {
+      await _repository.updateDistributionCenter(dc);
+      debugPrint('[DC_CONSOLE_PROVIDER] 🏢 Updated Distribution Center "${dc.name}" (${dc.code}) via repository.');
     } catch (e) {
-      debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ Supabase DC update note: $e');
-    } finally {
-      dbClient?.dispose();
+      debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ DC update note: $e');
     }
   }
 
@@ -1213,23 +1062,13 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     state = state.copyWith(distributionCenters: updatedList);
     await _storageService.cacheDistributionCenters(updatedList);
 
-    SupabaseClient? dbClient;
-    try {
-      dbClient = SupabaseClient(
-        SupabaseConstants.supabaseUrl,
-        SupabaseConstants.supabaseServiceRoleKey,
-        authOptions: const AuthClientOptions(autoRefreshToken: false),
-      );
+    if (isTestEnvironment) return;
 
-      final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
-      if (uuidRegex.hasMatch(dcId)) {
-        await dbClient.from('distribution_centers').update({'is_active': isActive}).eq('id', dcId);
-      }
-      debugPrint('[DC_CONSOLE_PROVIDER] 🏢 Toggled DC "$dcId" active status to $isActive.');
+    try {
+      await _repository.toggleDistributionCenterStatus(dcId, isActive);
+      debugPrint('[DC_CONSOLE_PROVIDER] 🏢 Toggled DC "$dcId" active status to $isActive via repository.');
     } catch (e) {
-      debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ Supabase DC toggle note: $e');
-    } finally {
-      dbClient?.dispose();
+      debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ DC toggle note: $e');
     }
   }
 
@@ -1241,23 +1080,13 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     state = state.copyWith(distributionCenters: updatedList);
     await _storageService.cacheDistributionCenters(updatedList);
 
-    SupabaseClient? dbClient;
-    try {
-      dbClient = SupabaseClient(
-        SupabaseConstants.supabaseUrl,
-        SupabaseConstants.supabaseServiceRoleKey,
-        authOptions: const AuthClientOptions(autoRefreshToken: false),
-      );
+    if (isTestEnvironment) return;
 
-      final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
-      if (uuidRegex.hasMatch(dcId)) {
-        await dbClient.from('distribution_centers').update({'operating_zones': zones}).eq('id', dcId);
-      }
-      debugPrint('[DC_CONSOLE_PROVIDER] 🏢 Updated operating zones for DC "$dcId".');
+    try {
+      await _repository.updateOperatingZones(dcId, zones);
+      debugPrint('[DC_CONSOLE_PROVIDER] 🏢 Updated operating zones for DC "$dcId" via repository.');
     } catch (e) {
-      debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ Supabase DC zones note: $e');
-    } finally {
-      dbClient?.dispose();
+      debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ DC zones note: $e');
     }
   }
 
@@ -1266,20 +1095,13 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     state = state.copyWith(distributionCenters: updatedList);
     await _storageService.cacheDistributionCenters(updatedList);
 
-    SupabaseClient? dbClient;
-    try {
-      dbClient = SupabaseClient(
-        SupabaseConstants.supabaseUrl,
-        SupabaseConstants.supabaseServiceRoleKey,
-        authOptions: const AuthClientOptions(autoRefreshToken: false),
-      );
+    if (isTestEnvironment) return;
 
-      await dbClient.from('distribution_centers').delete().eq('id', dcId);
-      debugPrint('[DC_CONSOLE_PROVIDER] 🗑️ Deleted DC "$dcId" from Supabase.');
+    try {
+      await _repository.deleteDistributionCenter(dcId);
+      debugPrint('[DC_CONSOLE_PROVIDER] 🗑️ Deleted DC "$dcId" via repository.');
     } catch (e) {
-      debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ Supabase DC delete note: $e');
-    } finally {
-      dbClient?.dispose();
+      debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ DC delete note: $e');
     }
   }
 
@@ -1360,131 +1182,22 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
       newPassword,
     );
 
-    // 3. Persist to live Supabase DB
-    bool isTest = false;
-    if (!kIsWeb) {
-      try {
-        isTest = Platform.environment.containsKey('FLUTTER_TEST');
-      } catch (_) {}
-    }
-    if (isTest) return;
+    // 3. Persist via repository
+    if (isTestEnvironment) return;
 
-    SupabaseClient? dbClient;
     try {
-      dbClient = SupabaseClient(
-        SupabaseConstants.supabaseUrl,
-        SupabaseConstants.supabaseServiceRoleKey,
-        authOptions: const AuthClientOptions(autoRefreshToken: false),
-      );
-
-      final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
-
-      final baseAgentPayload = {
-        'current_status': updatedDriver.status,
-        'vehicle_type': updatedDriver.vehicleType,
-        'vehicle_plate_number': updatedDriver.vehiclePlate,
-        'operating_city': updatedDriver.assignedZone,
-        'bank_name': updatedDriver.bankName,
-        'bank_account_number': updatedDriver.bankAccountNumber,
-        'bank_account_name': updatedDriver.bankAccountName,
-        'is_active': updatedDriver.status.toLowerCase() != 'inactive',
-      };
-
-      final extendedAgentPayload = {
-        ...baseAgentPayload,
-        'commission_rate': updatedDriver.commissionRate,
-        'transport_allowance': updatedDriver.transportAllowance,
-        'failed_delivery_allowance': updatedDriver.failedDeliveryAllowance,
-        'base_salary': updatedDriver.baseSalary,
-        'personnel_type': updatedDriver.personnelType,
-        'compensation_type': updatedDriver.compensationType,
-        if (updatedDriver.distributionCenterId != null && updatedDriver.distributionCenterId!.isNotEmpty)
-          'distribution_center_id': updatedDriver.distributionCenterId,
-      };
-
-      // Update delivery_agents table (attempting full compensation terms first)
-      try {
-        if (uuidRegex.hasMatch(updatedDriver.id)) {
-          await dbClient.from(SupabaseConstants.deliveryAgentsTable).update(extendedAgentPayload).eq('id', updatedDriver.id);
-        } else {
-          await dbClient.from(SupabaseConstants.deliveryAgentsTable).update(extendedAgentPayload).eq('agent_code', updatedDriver.driverCode);
-        }
-      } catch (colErr) {
-        // Fallback to base columns if extended columns are not yet in Supabase schema
-        if (uuidRegex.hasMatch(updatedDriver.id)) {
-          await dbClient.from(SupabaseConstants.deliveryAgentsTable).update(baseAgentPayload).eq('id', updatedDriver.id);
-        } else {
-          await dbClient.from(SupabaseConstants.deliveryAgentsTable).update(baseAgentPayload).eq('agent_code', updatedDriver.driverCode);
-        }
-      }
-
-      // Update users table (name, phone)
-      if (updatedDriver.email.isNotEmpty) {
-        await dbClient.from(SupabaseConstants.usersTable).update({
-          'first_name': fName,
-          'last_name': lName,
-          'phone_number': updatedDriver.phone,
-        }).eq('email', updatedDriver.email.toLowerCase().trim());
-      }
-
-      // If new password provided, update Supabase auth user
-      if (newPassword != null && newPassword.length >= 6 && updatedDriver.email.isNotEmpty) {
-        try {
-          final usersRes = await dbClient.auth.admin.listUsers();
-          final targetUser = usersRes.firstWhere(
-            (u) => u.email?.toLowerCase() == updatedDriver.email.toLowerCase(),
-            orElse: () => throw Exception('User not found in auth'),
-          );
-          await dbClient.auth.admin.updateUserById(
-            targetUser.id,
-            attributes: AdminUserAttributes(password: newPassword),
-          );
-          debugPrint('[DC_CONSOLE_PROVIDER] 🔑 Password updated in Supabase Auth for ${updatedDriver.email}');
-        } catch (pwErr) {
-          debugPrint('[DC_CONSOLE_PROVIDER] ℹ️ Password update notice ($pwErr)');
-        }
-      }
-
-      debugPrint('[DC_CONSOLE_PROVIDER] ✅ Driver ${updatedDriver.name} (${updatedDriver.driverCode}) terms & profile updated (Commission: ₦${updatedDriver.commissionRate}, Transport: ₦${updatedDriver.transportAllowance}).');
+      await _repository.updateDriverCompensationTerms(updatedDriver);
+      debugPrint('[DC_CONSOLE_PROVIDER] ✅ Driver ${updatedDriver.name} (${updatedDriver.driverCode}) terms & profile updated via repository.');
     } catch (e) {
       debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ updateDriverProfile notice: $e');
-    } finally {
-      dbClient?.dispose();
     }
   }
 
   Future<void> loadDriversFromDatabase() async {
-    bool isTest = false;
-    if (!kIsWeb) {
-      try {
-        isTest = Platform.environment.containsKey('FLUTTER_TEST');
-      } catch (_) {}
-    }
-    if (isTest) return;
+    if (isTestEnvironment) return;
 
-    SupabaseClient? dbClient;
     try {
-      dbClient = SupabaseClient(
-        SupabaseConstants.supabaseUrl,
-        SupabaseConstants.supabaseServiceRoleKey,
-        authOptions: const AuthClientOptions(autoRefreshToken: false),
-      );
-
-      final response = await dbClient
-          .from(SupabaseConstants.deliveryAgentsTable)
-          .select('*, users(first_name, last_name, email, phone_number, avatar_url)')
-          .order('created_at', ascending: false);
-
-      final List<DCFleetDriver> dbDrivers = [];
-      for (final item in response as List) {
-        try {
-          final driver = DCFleetDriver.fromJson(item as Map<String, dynamic>);
-          dbDrivers.add(driver);
-        } catch (parseErr) {
-          debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ Parse notice for driver row: $parseErr');
-        }
-      }
-
+      final dbDrivers = await _repository.getDrivers();
       if (dbDrivers.isNotEmpty) {
         final Map<String, DCFleetDriver> driverMap = {};
         // 1. Seed with in-memory / cached drivers (which already have custom terms)
@@ -1555,7 +1268,26 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
               termsMap?['distribution_center_id'] as String? ??
               dbD.distributionCenterId;
 
+          final resolvedName = (dbD.name.isNotEmpty && dbD.name.toLowerCase() != 'delivery agent')
+              ? dbD.name
+              : ((existing?.name != null && existing!.name.isNotEmpty && existing.name.toLowerCase() != 'delivery agent')
+                  ? existing.name
+                  : dbD.name);
+
+          final resolvedPhone = (dbD.phone.isNotEmpty && dbD.phone != '08031234567')
+              ? dbD.phone
+              : ((existing?.phone != null && existing!.phone.isNotEmpty && existing.phone != '08031234567')
+                  ? existing.phone
+                  : dbD.phone);
+
+          final resolvedAvatar = dbD.avatarUrl.isNotEmpty
+              ? dbD.avatarUrl
+              : (existing?.avatarUrl ?? '');
+
           final mergedDriver = dbD.copyWith(
+            name: resolvedName,
+            phone: resolvedPhone,
+            avatarUrl: resolvedAvatar,
             commissionRate: comm,
             transportAllowance: trans,
             failedDeliveryAllowance: failed,
@@ -1583,6 +1315,7 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
               role: 'delivery_agent',
               deliveryAgentId: mergedDriver.id,
               deliveryAgentCode: mergedDriver.driverCode,
+              avatarUrl: mergedDriver.avatarUrl,
               personnelType: pType,
               compensationType: cType,
               commissionRate: comm,
@@ -1601,69 +1334,29 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
           );
         }
 
-        // Add any locally added drivers not in DB yet
-        for (final d in state.drivers) {
-          final emailKey = d.email.isNotEmpty ? d.email.toLowerCase() : '';
-          final codeKey = d.driverCode.isNotEmpty ? d.driverCode.toLowerCase() : '';
-          final primaryKey = emailKey.isNotEmpty ? emailKey : codeKey;
-          if (!mergedByKey.containsKey(primaryKey)) {
-            mergedByKey[primaryKey] = d;
-          }
-        }
-
         final mergedList = mergedByKey.values.toList();
         state = state.copyWith(drivers: mergedList, isLoading: false);
         await _storageService.cacheFleetDrivers(mergedList);
-        debugPrint('[DC_CONSOLE_PROVIDER] 🚚 Loaded ${dbDrivers.length} active fleet drivers from live Supabase DB (Total active fleet: ${mergedList.length}) and merged custom compensation terms.');
+        debugPrint('[DC_CONSOLE_PROVIDER] 🚚 Loaded ${dbDrivers.length} active fleet drivers via repository (Total active fleet: ${mergedList.length}) and merged custom compensation terms.');
+      } else {
+        state = state.copyWith(drivers: defaultFleetDrivers, isLoading: false);
+        await _storageService.cacheFleetDrivers(defaultFleetDrivers);
       }
     } catch (e) {
-      debugPrint('[DC_CONSOLE_PROVIDER] ℹ️ Supabase fleet fetch notice ($e). Local cached drivers retained.');
-    } finally {
-      dbClient?.dispose();
+      debugPrint('[DC_CONSOLE_PROVIDER] ℹ️ Fleet fetch notice ($e). Local cached drivers retained.');
     }
   }
 
   Future<void> loadPayoutClaimsFromDatabase() async {
-    bool isTest = false;
-    if (!kIsWeb) {
-      try {
-        isTest = Platform.environment.containsKey('FLUTTER_TEST');
-      } catch (_) {}
-    }
-    if (isTest) return;
+    if (isTestEnvironment) return;
 
-    SupabaseClient? dbClient;
     try {
-      dbClient = SupabaseClient(
-        SupabaseConstants.supabaseUrl,
-        SupabaseConstants.supabaseServiceRoleKey,
-        authOptions: const AuthClientOptions(autoRefreshToken: false),
-      );
-
-      final response = await dbClient
-          .from('payout_requests')
-          .select('*, delivery_agents(agent_code, current_cod_balance, direct_transfer_balance, users(first_name, last_name, email, phone))')
-          .order('created_at', ascending: false);
-
-      final List<DCPayoutClaim> dbClaims = [];
-      for (final item in response as List) {
-        try {
-          final claim = DCPayoutClaim.fromJson(item as Map<String, dynamic>);
-          dbClaims.add(claim);
-        } catch (parseErr) {
-          debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ Parse notice for payout claim: $parseErr');
-        }
-      }
-
-      if (dbClaims.isNotEmpty) {
-        state = state.copyWith(payoutClaims: dbClaims);
-        await _storageService.cachePayoutClaims(dbClaims);
-        debugPrint('[DC_CONSOLE_PROVIDER] 💰 Loaded ${dbClaims.length} live payout claims from Supabase DB.');
-      }
+      final dbClaims = await _repository.getPayoutClaims();
+      state = state.copyWith(payoutClaims: dbClaims);
+      await _storageService.cachePayoutClaims(dbClaims);
+      debugPrint('[DC_CONSOLE_PROVIDER] 💰 Loaded ${dbClaims.length} live payout claims via repository.');
     } catch (e) {
-      debugPrint('[DC_CONSOLE_PROVIDER] ℹ️ Supabase payout claims fetch notice ($e).');
-    } finally {
-      dbClient?.dispose();
+      debugPrint('[DC_CONSOLE_PROVIDER] ℹ️ Payout claims fetch notice ($e).');
     }
   }
 
@@ -1680,45 +1373,18 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     state = state.copyWith(payoutClaims: updated);
     await _storageService.cachePayoutClaims(updated);
 
-    // 2. Persist to live Supabase DB
-    SupabaseClient? dbClient;
+    if (isTestEnvironment) return;
+
     try {
-      dbClient = SupabaseClient(
-        SupabaseConstants.supabaseUrl,
-        SupabaseConstants.supabaseServiceRoleKey,
-        authOptions: const AuthClientOptions(autoRefreshToken: false),
-      );
-
-      await dbClient
-          .from('payout_requests')
-          .update({
-            'status': 'approved',
-            'disbursement_ref': ref,
-          })
-          .eq('id', claimId);
-
-      // Find claim to notify rider
       final claim = state.payoutClaims.firstWhere((c) => c.id == claimId, orElse: () => updated.first);
-      if (claim.riderId.isNotEmpty) {
-        try {
-          await dbClient.from('notifications').insert({
-            'company_id': '11111111-1111-4111-8111-111111111111',
-            'delivery_agent_id': claim.riderId,
-            'title': 'Payout Claim Approved ✓',
-            'message': 'Your withdrawal request of ₦${claim.requestedAmount.toStringAsFixed(0)} (Ref: $ref) has been approved for transfer to ${claim.bankName}.',
-            'category': 'finance',
-            'action_route': '/cash/history',
-            'is_read': false,
-            'created_at': DateTime.now().toIso8601String(),
-          });
-        } catch (_) {}
-      }
-
-      debugPrint('[DC_CONSOLE_PROVIDER] ✅ Payout claim $claimId approved in live Supabase DB (Ref: $ref).');
+      await _repository.approvePayoutClaim(
+        claimId: claimId,
+        amount: claim.requestedAmount,
+        driverId: claim.riderId,
+      );
+      debugPrint('[DC_CONSOLE_PROVIDER] ✅ Payout claim $claimId approved via repository (Ref: $ref).');
     } catch (e) {
       debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ Payout approval notice ($e).');
-    } finally {
-      dbClient?.dispose();
     }
   }
 
@@ -1735,44 +1401,16 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     state = state.copyWith(payoutClaims: updated);
     await _storageService.cachePayoutClaims(updated);
 
-    // 2. Persist to live Supabase DB
-    SupabaseClient? dbClient;
+    if (isTestEnvironment) return;
+
     try {
-      dbClient = SupabaseClient(
-        SupabaseConstants.supabaseUrl,
-        SupabaseConstants.supabaseServiceRoleKey,
-        authOptions: const AuthClientOptions(autoRefreshToken: false),
+      await _repository.rejectPayoutClaim(
+        claimId: claimId,
+        reason: note,
       );
-
-      await dbClient
-          .from('payout_requests')
-          .update({
-            'status': 'rejected',
-            'dc_notes': note,
-          })
-          .eq('id', claimId);
-
-      final claim = state.payoutClaims.firstWhere((c) => c.id == claimId, orElse: () => updated.first);
-      if (claim.riderId.isNotEmpty) {
-        try {
-          await dbClient.from('notifications').insert({
-            'company_id': '11111111-1111-4111-8111-111111111111',
-            'delivery_agent_id': claim.riderId,
-            'title': 'Payout Claim Returned ⚠️',
-            'message': 'Your withdrawal request of ₦${claim.requestedAmount.toStringAsFixed(0)} requires attention: $note',
-            'category': 'finance',
-            'action_route': '/cash/history',
-            'is_read': false,
-            'created_at': DateTime.now().toIso8601String(),
-          });
-        } catch (_) {}
-      }
-
-      debugPrint('[DC_CONSOLE_PROVIDER] ✅ Payout claim $claimId marked rejected in Supabase DB.');
+      debugPrint('[DC_CONSOLE_PROVIDER] ✅ Payout claim $claimId marked rejected via repository.');
     } catch (e) {
       debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ Payout rejection notice ($e).');
-    } finally {
-      dbClient?.dispose();
     }
   }
 
@@ -1785,181 +1423,15 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
   }
 
   Future<void> loadTransactionsFromDatabase() async {
-    bool isTest = false;
-    if (!kIsWeb) {
-      try {
-        isTest = Platform.environment.containsKey('FLUTTER_TEST');
-      } catch (_) {}
-    }
-    if (isTest) return;
+    if (isTestEnvironment) return;
 
-    SupabaseClient? dbClient;
     try {
-      dbClient = SupabaseClient(
-        SupabaseConstants.supabaseUrl,
-        SupabaseConstants.supabaseServiceRoleKey,
-        authOptions: const AuthClientOptions(autoRefreshToken: false),
-      );
-
-      final List<DCTransactionRecord> allTxns = [];
-
-      // 1. Fetch Paystack Transactions
-      try {
-        final pstkRes = await dbClient
-            .from(SupabaseConstants.paystackTransactionsTable)
-            .select('*, delivery_agents(agent_code, current_cod_balance, users(first_name, last_name)), orders(order_number, customer_name, customer_phone, delivery_city, delivery_state, products(name))')
-            .order('created_at', ascending: false)
-            .limit(50);
-
-        for (final row in (pstkRes as List)) {
-          try {
-            allTxns.add(DCTransactionRecord.fromJson(row));
-          } catch (_) {}
-        }
-      } catch (_) {}
-
-      // 2. Fetch Rider General Transactions
-      try {
-        final riderTxnRes = await dbClient
-            .from('rider_transactions')
-            .select('*, delivery_agents(agent_code, current_cod_balance, users(first_name, last_name))')
-            .order('created_at', ascending: false)
-            .limit(50);
-
-        for (final row in (riderTxnRes as List)) {
-          try {
-            allTxns.add(DCTransactionRecord.fromJson(row));
-          } catch (_) {}
-        }
-      } catch (_) {}
-
-      // 3. Fetch Cash Remittances (Automated Paystack Virtual Account & POS Handover)
-      try {
-        final remRes = await dbClient
-            .from(SupabaseConstants.cashRemittancesTable)
-            .select('*, delivery_agents(agent_code, current_cod_balance, users(first_name, last_name))')
-            .order('created_at', ascending: false)
-            .limit(50);
-
-        for (final row in (remRes as List)) {
-          try {
-            final isVerified = row['is_verified'] == true ||
-                row['status'] == 'verified' ||
-                row['status'] == 'settled' ||
-                row['status'] == 'approved' ||
-                row['status'] == 'remitted' ||
-                row['status'] == 'success' ||
-                row['status'] == 'completed';
-            final bool isPartial = row['is_partial'] == true ||
-                row['status'] == 'partial' ||
-                row['status'] == 'partial_remittance' ||
-                (row['discrepancy_amount'] != null && (row['discrepancy_amount'] as num) < -0.01) ||
-                (row['expected_amount'] != null && (row['expected_amount'] as num) > (row['amount'] as num? ?? 0));
-            final double? expectedAmt = (row['expected_amount'] as num?)?.toDouble();
-            final double? discrepancyAmt = (row['discrepancy_amount'] as num?)?.toDouble();
-            final String? discrepancyRsn = row['discrepancy_reason']?.toString();
-            final amt = (row['amount'] as num?)?.toDouble() ?? 0.0;
-            final dynamic rawPosFee = row['pos_fee'] ?? row['transaction_fee'];
-            final double posFee = (rawPosFee is num) ? rawPosFee.toDouble() : (amt > 0 ? (amt / 5000.0).ceil() * 100.0 : 350.0);
-
-            allTxns.add(DCTransactionRecord(
-              id: row['id']?.toString() ?? '',
-              transactionCode: row['remittance_number']?.toString() ?? 'REM-${row['id']?.toString().substring(0, 5)}',
-              riderId: row['delivery_agent_id']?.toString() ?? '',
-              riderName: (row['delivery_agents'] is Map && row['delivery_agents']['users'] is Map)
-                  ? '${row['delivery_agents']['users']['first_name'] ?? ''} ${row['delivery_agents']['users']['last_name'] ?? ''}'.trim()
-                  : 'Delivery Agent',
-              riderCode: (row['delivery_agents'] is Map) ? row['delivery_agents']['agent_code']?.toString() ?? 'PDA-7000' : 'PDA-7000',
-              amount: amt,
-              transactionFee: posFee,
-              feeType: 'pos_agent',
-              category: 'remittance',
-              paymentMethod: row['payment_method']?.toString() ?? 'bank_transfer',
-              gatewayReference: row['reference_number']?.toString(),
-              channel: row['payment_method']?.toString() == 'paystack' ? 'Titan Trust / Paystack' : 'POS Agent Handover',
-              status: isPartial ? 'partial' : (isVerified ? 'remitted' : (row['status']?.toString() ?? 'pending')),
-              isCredit: false,
-              isPartial: isPartial,
-              expectedAmount: expectedAmt,
-              discrepancyAmount: discrepancyAmt,
-              discrepancyReason: discrepancyRsn,
-              notes: row['notes']?.toString(),
-              createdAt: row['created_at'] != null ? DateTime.tryParse(row['created_at'].toString()) ?? DateTime.now() : DateTime.now(),
-            ));
-          } catch (_) {}
-        }
-      } catch (_) {}
-
-      // 4. Fetch Delivered / Prepaid Orders (Paystack Direct & Cash POD)
-      try {
-        final ordersRes = await dbClient
-            .from(SupabaseConstants.ordersTable)
-            .select('*, products(name), delivery_agents(agent_code, users(first_name, last_name))')
-            .or('status.eq.delivered,payment_status.eq.paid')
-            .order('updated_at', ascending: false)
-            .limit(50);
-
-        for (final ord in (ordersRes as List)) {
-          final isPstk = (ord['payment_type']?.toString().contains('direct') == true) ||
-              (ord['delivery_notes']?.toString().contains('Paystack') == true) ||
-              (ord['delivery_notes']?.toString().contains('Monnify') == true);
-          final pMethod = isPstk ? 'paystack' : (ord['payment_type']?.toString() ?? 'cash');
-          final totalAmt = (ord['total_amount'] as num?)?.toDouble() ?? 0.0;
-          final pstkFee = isPstk ? (totalAmt * 0.015).clamp(100.0, 2000.0) : 0.0;
-
-          allTxns.add(DCTransactionRecord(
-            id: 'ord-txn-${ord['id']}',
-            transactionCode: 'ORD-${ord['order_number']}',
-            orderNumber: ord['order_number']?.toString(),
-            orderId: ord['id']?.toString(),
-            productName: (ord['products'] is Map) ? ord['products']['name']?.toString() : 'Respira Health Formula',
-            customerName: ord['customer_name']?.toString(),
-            customerPhone: ord['customer_phone']?.toString(),
-            deliveryLocation: '${ord['delivery_city'] ?? ''}, ${ord['delivery_state'] ?? ''}'.trim(),
-            riderId: ord['delivery_agent_id']?.toString() ?? '',
-            riderName: (ord['delivery_agents'] is Map && ord['delivery_agents']['users'] is Map)
-                ? '${ord['delivery_agents']['users']['first_name'] ?? ''} ${ord['delivery_agents']['users']['last_name'] ?? ''}'.trim()
-                : 'Joel Rider',
-            riderCode: (ord['delivery_agents'] is Map) ? ord['delivery_agents']['agent_code']?.toString() ?? 'PDA-7000' : 'PDA-7000',
-            amount: totalAmt,
-            commission: (ord['agent_commission'] as num?)?.toDouble() ?? 1000.0,
-            transportAllowance: (ord['agent_transport_allowance'] as num?)?.toDouble() ?? 1500.0,
-            transactionFee: pstkFee,
-            feeType: isPstk ? 'paystack' : 'none',
-            category: isPstk ? 'paystack_direct' : 'cash_pod',
-            paymentMethod: pMethod,
-            gatewayReference: 'PSTK-${ord['order_number']}',
-            channel: isPstk ? 'Titan Trust / Paystack' : 'Cash in Hand (COD)',
-            status: isPstk
-                ? (ord['payment_status']?.toString() == 'paid' || ord['status']?.toString() == 'delivered' ? 'settled' : 'pending')
-                : (ord['status']?.toString() == 'delivered' ? 'remitted' : 'pending'),
-            isCredit: true,
-            notes: ord['delivery_notes']?.toString(),
-            createdAt: ord['updated_at'] != null ? DateTime.tryParse(ord['updated_at'].toString()) ?? DateTime.now() : DateTime.now(),
-          ));
-        }
-      } catch (_) {}
-
-      // Deduplicate by transactionCode & sort chronologically descending
-      final seenCodes = <String>{};
-      final uniqueTxns = <DCTransactionRecord>[];
-      for (final txn in allTxns) {
-        if (!seenCodes.contains(txn.transactionCode)) {
-          seenCodes.add(txn.transactionCode);
-          uniqueTxns.add(txn);
-        }
-      }
-      uniqueTxns.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-
-      if (uniqueTxns.isNotEmpty) {
-        state = state.copyWith(transactions: uniqueTxns);
-        await _storageService.cacheDcTransactions(uniqueTxns);
-        debugPrint('[DC_CONSOLE_PROVIDER] ✅ Loaded ${uniqueTxns.length} consolidated DC transactions from live DB.');
-      }
+      final txns = await _repository.getDcTransactions();
+      state = state.copyWith(transactions: txns);
+      await _storageService.cacheDcTransactions(txns);
+      debugPrint('[DC_CONSOLE_PROVIDER] ✅ Loaded ${txns.length} consolidated DC transactions via repository.');
     } catch (e) {
       debugPrint('[DC_CONSOLE_PROVIDER] ℹ️ Error loading DC transactions ($e).');
-    } finally {
-      dbClient?.dispose();
     }
   }
 
@@ -1973,14 +1445,23 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     state = state.copyWith(returnItems: updated);
     _storageService.cacheReturnItems(updated);
   }
-
-  String _generateUuid() {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    return 'cli-gen-$now';
-  }
 }
+
+final dcConsoleRemoteDataSourceProvider = Provider<DCConsoleRemoteDataSource>((ref) {
+  return DCConsoleRemoteDataSourceImpl();
+});
+
+final dcConsoleRepositoryProvider = Provider<DCConsoleRepository>((ref) {
+  final remoteDataSource = ref.watch(dcConsoleRemoteDataSourceProvider);
+  final storage = ref.watch(localStorageServiceProvider);
+  return DCConsoleRepositoryImpl(
+    remoteDataSource: remoteDataSource,
+    storageService: storage,
+  );
+});
 
 final dcConsoleProvider = StateNotifierProvider<DCConsoleNotifier, DCConsoleState>((ref) {
   final storage = ref.watch(localStorageServiceProvider);
-  return DCConsoleNotifier(storage);
+  final repository = ref.watch(dcConsoleRepositoryProvider);
+  return DCConsoleNotifier(storage, repository);
 });

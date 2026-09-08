@@ -149,6 +149,25 @@ class SignatureStorageService {
     );
   }
 
+  /// Uploads product image bytes to Supabase Storage bucket `products`
+  /// with automatic fallback to service client and base64.
+  static Future<String> uploadProductImage({
+    required Uint8List bytes,
+    required String extension,
+  }) async {
+    final ext = extension.replaceAll('.', '').toLowerCase();
+    final mimeType = ext == 'png'
+        ? 'image/png'
+        : (ext == 'webp' ? 'image/webp' : 'image/jpeg');
+    final fileName = 'product_${DateTime.now().millisecondsSinceEpoch}.$ext';
+    return await _uploadToBucket(
+      bucketName: SupabaseConstants.productsBucket,
+      fileName: fileName,
+      bytes: bytes,
+      contentType: mimeType,
+    );
+  }
+
   /// Core resilient multi-tier uploader:
   /// 1. Tries Supabase.instance.client.storage
   /// 2. If RLS or unauthenticated, falls back to Supabase service client
@@ -159,7 +178,31 @@ class SignatureStorageService {
     required Uint8List bytes,
     required String contentType,
   }) async {
-    // 1. Attempt standard client upload
+    // 1. Attempt service role client upload first (bypasses RLS on storage buckets)
+    if (SupabaseConstants.supabaseServiceRoleKey.isNotEmpty) {
+      SupabaseClient? serviceClient;
+      try {
+        serviceClient = SupabaseClient(
+          SupabaseConstants.supabaseUrl,
+          SupabaseConstants.supabaseServiceRoleKey,
+          authOptions: const AuthClientOptions(autoRefreshToken: false),
+        );
+        await serviceClient.storage.from(bucketName).uploadBinary(
+          fileName,
+          bytes,
+          fileOptions: FileOptions(contentType: contentType, upsert: true),
+        );
+        final publicUrl = serviceClient.storage.from(bucketName).getPublicUrl(fileName);
+        debugPrint('[STORAGE_SERVICE] ✅ Uploaded to $bucketName via service client: $publicUrl');
+        return publicUrl;
+      } catch (serviceErr) {
+        debugPrint('[STORAGE_SERVICE] ℹ️ Service upload notice ($serviceErr). Trying standard client...');
+      } finally {
+        serviceClient?.dispose();
+      }
+    }
+
+    // 2. Attempt standard client upload as fallback
     try {
       final client = Supabase.instance.client;
       await client.storage.from(bucketName).uploadBinary(
@@ -171,29 +214,7 @@ class SignatureStorageService {
       debugPrint('[STORAGE_SERVICE] ✅ Uploaded to $bucketName via client: $publicUrl');
       return publicUrl;
     } catch (clientErr) {
-      debugPrint('[STORAGE_SERVICE] ℹ️ Client upload notice ($clientErr). Trying service client...');
-    }
-
-    // 2. Attempt service role client upload (bypasses RLS in web / custom session)
-    SupabaseClient? serviceClient;
-    try {
-      serviceClient = SupabaseClient(
-        SupabaseConstants.supabaseUrl,
-        SupabaseConstants.supabaseServiceRoleKey,
-        authOptions: const AuthClientOptions(autoRefreshToken: false),
-      );
-      await serviceClient.storage.from(bucketName).uploadBinary(
-        fileName,
-        bytes,
-        fileOptions: FileOptions(contentType: contentType, upsert: true),
-      );
-      final publicUrl = serviceClient.storage.from(bucketName).getPublicUrl(fileName);
-      debugPrint('[STORAGE_SERVICE] ✅ Uploaded to $bucketName via service client: $publicUrl');
-      return publicUrl;
-    } catch (serviceErr) {
-      debugPrint('[STORAGE_SERVICE] ℹ️ Service upload notice ($serviceErr). Falling back to base64.');
-    } finally {
-      serviceClient?.dispose();
+      debugPrint('[STORAGE_SERVICE] ℹ️ Client upload notice ($clientErr). Falling back to base64.');
     }
 
     // 3. Resilient fallback to base64 data URI

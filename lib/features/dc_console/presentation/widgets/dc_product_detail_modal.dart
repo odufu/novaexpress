@@ -17,6 +17,7 @@ class DCProductDetailModal extends ConsumerStatefulWidget {
   final List<RiderStockAllocation> allocations;
   final VoidCallback? onReceiveMoreStock;
   final VoidCallback? onAssignToRider;
+  final VoidCallback? onTransferToDc;
   final VoidCallback? onReportDamage;
 
   const DCProductDetailModal({
@@ -26,6 +27,7 @@ class DCProductDetailModal extends ConsumerStatefulWidget {
     required this.allocations,
     this.onReceiveMoreStock,
     this.onAssignToRider,
+    this.onTransferToDc,
     this.onReportDamage,
   });
 
@@ -36,6 +38,7 @@ class DCProductDetailModal extends ConsumerStatefulWidget {
     required List<RiderStockAllocation> allocations,
     VoidCallback? onReceiveMoreStock,
     VoidCallback? onAssignToRider,
+    VoidCallback? onTransferToDc,
     VoidCallback? onReportDamage,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -69,6 +72,7 @@ class DCProductDetailModal extends ConsumerStatefulWidget {
             allocations: allocations,
             onReceiveMoreStock: onReceiveMoreStock,
             onAssignToRider: onAssignToRider,
+            onTransferToDc: onTransferToDc,
             onReportDamage: onReportDamage,
           ),
         ),
@@ -809,6 +813,23 @@ class _DCProductDetailModalState extends ConsumerState<DCProductDetailModal> {
                           label: const Text('Receive Stock', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF10B981),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            elevation: 1,
+                          ),
+                        ),
+                      if (widget.onTransferToDc != null)
+                        ElevatedButton.icon(
+                          onPressed: item.availableCount > 0
+                              ? () {
+                                  Navigator.of(context).pop();
+                                  widget.onTransferToDc!();
+                                }
+                              : null,
+                          icon: const Icon(Icons.swap_horiz_rounded, size: 16, color: Colors.white),
+                          label: const Text('Transfer to DC', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFF37021),
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             elevation: 1,

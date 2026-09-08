@@ -415,4 +415,10 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
     String? operatingCity,
   }) async =>
       throw UnimplementedError();
+
+  @override
+  Future<bool> checkEmailExists(String email) async => false;
+
+  @override
+  Future<bool> checkPhoneExists(String phone) async => false;
 }

@@ -174,11 +174,32 @@ class DCFleetDriver {
       user = (json['users'] as List).first as Map<String, dynamic>;
     }
 
-    final firstName = user?['first_name'] as String? ?? json['first_name'] as String? ?? 'Delivery';
-    final lastName = user?['last_name'] as String? ?? json['last_name'] as String? ?? 'Agent';
-    final fullName = json['name'] as String? ?? '$firstName $lastName';
-    final email = user?['email'] as String? ?? json['email'] as String? ?? '';
-    final phone = user?['phone_number'] as String? ?? user?['phone'] as String? ?? json['phone'] as String? ?? '08031234567';
+    final rawName = json['name'] as String?;
+    final firstName = user?['first_name'] as String? ?? json['first_name'] as String?;
+    final lastName = user?['last_name'] as String? ?? json['last_name'] as String?;
+    final resolvedFullName = (firstName != null || lastName != null)
+        ? '${firstName ?? ''} ${lastName ?? ''}'.trim()
+        : null;
+
+    final bankAccName = json['bank_account_name'] as String?;
+    final rawEmail = user?['email'] as String? ?? json['email'] as String? ?? '';
+    
+    final fullName = (rawName != null && rawName.trim().isNotEmpty && rawName.trim().toLowerCase() != 'delivery agent')
+        ? rawName.trim()
+        : (resolvedFullName != null && resolvedFullName.isNotEmpty && resolvedFullName.toLowerCase() != 'delivery agent'
+            ? resolvedFullName
+            : (bankAccName != null && bankAccName.trim().isNotEmpty
+                ? bankAccName.trim()
+                : (rawEmail.isNotEmpty
+                    ? rawEmail.split('@').first.replaceAll('.', ' ').split(' ').map((s) => s.isNotEmpty ? '${s[0].toUpperCase()}${s.substring(1)}' : '').join(' ')
+                    : 'Delivery Agent')));
+
+    final email = rawEmail;
+    final phone = user?['phone_number'] as String? ??
+        user?['phone'] as String? ??
+        json['phone_number'] as String? ??
+        json['phone'] as String? ??
+        '08031234567';
     
     final avatar = (user?['avatar_url'] as String?)?.trim().isNotEmpty == true
         ? (user!['avatar_url'] as String).trim()

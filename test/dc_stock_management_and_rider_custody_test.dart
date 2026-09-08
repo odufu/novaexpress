@@ -84,7 +84,7 @@ class MockStockRepository implements StockRepository {
   ];
 
   @override
-  Future<List<RiderStockAllocation>> getRiderStockAllocations([String? riderId]) async => testAllocations;
+  Future<List<RiderStockAllocation>> getRiderStockAllocations([String? riderId, String? dcId]) async => testAllocations;
 
   @override
   Future<void> updateRiderStockCustody({
@@ -96,7 +96,7 @@ class MockStockRepository implements StockRepository {
   }) async {}
 
   @override
-  Future<List<StockItemEntity>> getVehicleStockItems([String? agentId]) async {
+  Future<List<StockItemEntity>> getVehicleStockItems([String? agentId, String? dcId]) async {
     return items;
   }
 

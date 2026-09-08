@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>NoveXPS — Interactive Master Presentation Launcher</title>
+  <style>
+    body {
+      background: #06080D;
+      color: #F8FAFC;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      text-align: center;
+    }
+    .card {
+      background: rgba(16, 22, 36, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      padding: 2.5rem;
+      max-width: 540px;
+      box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.8);
+    }
+    .btn {
+      display: inline-block;
+      background: linear-gradient(135deg, #10B981 0%, #06B6D4 100%);
+      color: #06080D;
+      font-weight: 800;
+      padding: 0.9rem 2rem;
+      border-radius: 12px;
+      text-decoration: none;
+      font-size: 1.05rem;
+      margin-top: 1.5rem;
+      transition: transform 0.2s;
+    }
+    .btn:hover {
+      transform: translateY(-2px);
+    }
+    .links {
+      margin-top: 1.25rem;
+      font-size: 0.85rem;
+      color: #94A3B8;
+    }
+    .links a {
+      color: #06B6D4;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div style="font-size: 2.5rem; margin-bottom: 0.75rem;">🚀</div>
+    <h1 style="margin: 0 0 0.5rem 0; font-size: 1.6rem;">NoveXPS Interactive Presentation</h1>
+    <p style="color: #94A3B8; font-size: 0.95rem; margin: 0 0 1rem 0;">
+      Built with React + Vite in <code>presentations/</code>. Covers full system architecture, operational matrix, business rules (BR 1-24), payments, costing, and live ROI calculator.
+    </p>
+
+    <a href="http://localhost:5173" class="btn" target="_blank">Launch React Presentation (Port 5173)</a>
+
+    <div class="links">
+      Fallback: <a href="./web/presentation/index.html">Static Web Build (Port 54011)</a>
+    </div>
+  </div>
+
+  <script>
+    // Auto-redirect to live Vite server if available
+    window.location.href = 'http://localhost:5173';
+  </script>
+</body>
+</html>

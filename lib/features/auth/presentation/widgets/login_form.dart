@@ -20,34 +20,38 @@ class _LoginFormState extends ConsumerState<LoginForm> {
   final _formKey = GlobalKey<FormState>();
   final _agentIdController = TextEditingController(text: 'emeka.rider@novaexpress.ng');
   final _passwordController = TextEditingController(text: 'Password123!');
+  String? _roleMismatchError;
 
   @override
   void initState() {
     super.initState();
-    _agentIdController.addListener(_onAgentIdChanged);
+    _agentIdController.addListener(_onFieldEdited);
+    _passwordController.addListener(_onFieldEdited);
   }
 
-  void _onAgentIdChanged() {
-    final text = _agentIdController.text.trim().toLowerCase();
-    final isCloser = text.startsWith('closer.') || text.contains('amaka') || text.startsWith('cls-');
-    final isClient = !isCloser && (text.startsWith('client.') || text.contains('novacale') || text.contains('merchant'));
-    final isDc = !isClient && !isCloser && (text.contains('dc.') || text.contains('supervisor') || text.contains('dc-mgr') || text.contains('dc.wuse'));
-    final expectedRole = isCloser ? 'closer' : (isClient ? 'client' : (isDc ? 'dc_manager' : 'rider'));
-    final currentRole = ref.read(loginSelectedRoleProvider);
-    if (currentRole != expectedRole && mounted) {
-      ref.read(loginSelectedRoleProvider.notifier).state = expectedRole;
+  void _onFieldEdited() {
+    if (_roleMismatchError != null && mounted) {
+      setState(() {
+        _roleMismatchError = null;
+      });
     }
   }
 
   @override
   void dispose() {
-    _agentIdController.removeListener(_onAgentIdChanged);
+    _agentIdController.removeListener(_onFieldEdited);
+    _passwordController.removeListener(_onFieldEdited);
     _agentIdController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
   void _selectRole(String role) {
+    if (mounted) {
+      setState(() {
+        _roleMismatchError = null;
+      });
+    }
     ref.read(loginSelectedRoleProvider.notifier).state = role;
     if (role == 'rider') {
       _agentIdController.text = 'emeka.rider@novaexpress.ng';
@@ -67,25 +71,61 @@ class _LoginFormState extends ConsumerState<LoginForm> {
   void _submit() async {
     debugPrint('[AUTH_UI] 🚀 "Sign In" button tapped. Running form validation...');
     if (_formKey.currentState!.validate()) {
+      if (mounted) {
+        setState(() {
+          _roleMismatchError = null;
+        });
+      }
       final email = _agentIdController.text.trim();
       final password = _passwordController.text;
       final rememberMe = ref.read(loginRememberMeProvider);
-      debugPrint('[AUTH_UI] 📝 Form valid. Dispatching login request for: "$email", PasswordLength=${password.length}, RememberMe=$rememberMe');
+      final selectedRole = ref.read(loginSelectedRoleProvider);
+      debugPrint('[AUTH_UI] 📝 Form valid. Dispatching login request for: "$email", SelectedPortal=$selectedRole, RememberMe=$rememberMe');
 
       final success = await ref.read(authProvider.notifier).login(email, password);
 
       debugPrint('[AUTH_UI] 🎯 authProvider.login() completed -> success: $success');
+      if (!success && mounted) {
+        return;
+      }
+
       if (success && mounted) {
-        final authState = ref.read(authProvider);
+        final authUser = ref.read(authProvider).user;
+        if (authUser == null) return;
+
+        // Verify that the account's assigned role matches the selected role portal
+        bool roleMatches = false;
+        if (selectedRole == 'rider') {
+          roleMatches = authUser.isRider;
+        } else if (selectedRole == 'dc_manager') {
+          roleMatches = authUser.isDcManager;
+        } else if (selectedRole == 'client') {
+          roleMatches = authUser.isClientAdmin;
+        } else if (selectedRole == 'closer') {
+          roleMatches = authUser.isCloser;
+        }
+
+        if (!roleMatches) {
+          debugPrint('[AUTH_UI] 🛑 Access Denied: User role "${authUser.role}" does not match selected portal "$selectedRole"');
+          // Logout to clear the session immediately
+          await ref.read(authProvider.notifier).logout();
+          if (mounted) {
+            setState(() {
+              _roleMismatchError = 'Access Denied: This account is registered as a ${authUser.roleDescription}. You can only log in under the ${authUser.roleDescription} tab.';
+            });
+          }
+          return;
+        }
+
         try {
-          if (authState.user?.isClient == true) {
+          if (authUser.isClientAdmin || authUser.isCloser) {
             debugPrint('[AUTH_UI] 🛍️ Navigating Merchant/Client to Client Portal (/client)...');
             context.go('/client');
-          } else if (authState.user?.isDcManager == true) {
+          } else if (authUser.isDcManager) {
             debugPrint('[AUTH_UI] 🏢 Navigating DC Manager to DC Operations Console (/dc)...');
             context.go('/dc');
           } else {
-            debugPrint('[AUTH_UI] 🚚 Navigating Delivery Agent (${authState.user?.firstName} ${authState.user?.lastName}) to PDA Dashboard (/)...');
+            debugPrint('[AUTH_UI] 🚚 Navigating Delivery Agent (${authUser.firstName} ${authUser.lastName}) to PDA Dashboard (/)...');
             context.go('/');
           }
         } catch (routerErr) {
@@ -213,7 +253,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
 
           const SizedBox(height: 20),
 
-          if (authState.errorMessage != null) ...[
+          if (_roleMismatchError != null || authState.errorMessage != null) ...[
             Container(
               padding: const EdgeInsets.all(12),
               margin: const EdgeInsets.only(bottom: 16),
@@ -228,7 +268,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      authState.errorMessage!,
+                      _roleMismatchError ?? authState.errorMessage!,
                       style: const TextStyle(color: AppColors.danger, fontSize: 13),
                     ),
                   ),
@@ -388,7 +428,9 @@ class _LoginFormState extends ConsumerState<LoginForm> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: selectedRole == 'dc_manager'
                     ? const Color(0xFF0B192C)
-                    : (selectedRole == 'client' ? const Color(0xFF0D9488) : AppColors.orange),
+                    : (selectedRole == 'client'
+                        ? const Color(0xFF0D9488)
+                        : (selectedRole == 'closer' ? const Color(0xFF6366F1) : AppColors.orange)),
                 foregroundColor: Colors.white,
                 elevation: 1,
                 shape: RoundedRectangleBorder(
@@ -404,21 +446,33 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                     )
                   : Row(
                       mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          selectedRole == 'dc_manager'
-                              ? 'Sign In to DC Console'
-                              : (selectedRole == 'client' ? 'Sign In to Client Portal' : 'Sign In to PDA App'),
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                        Flexible(
+                          child: Text(
+                            selectedRole == 'dc_manager'
+                                ? 'Sign In to DC Console'
+                                : (selectedRole == 'client'
+                                    ? 'Sign In to Client Portal'
+                                    : (selectedRole == 'closer'
+                                        ? 'Sign In as Telesales Closer'
+                                        : 'Sign In to PDA App')),
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         const SizedBox(width: 8),
                         Icon(
                           selectedRole == 'dc_manager'
                               ? Icons.dashboard_rounded
-                              : (selectedRole == 'client' ? Icons.storefront_rounded : Icons.arrow_forward_rounded),
+                              : (selectedRole == 'client'
+                                  ? Icons.storefront_rounded
+                                  : (selectedRole == 'closer'
+                                      ? Icons.headset_mic_rounded
+                                      : Icons.arrow_forward_rounded)),
                           size: 18,
                         ),
                       ],

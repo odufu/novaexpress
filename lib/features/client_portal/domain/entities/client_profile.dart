@@ -40,6 +40,13 @@ class ClientProfile {
         (json['company_name']?.toString().toLowerCase().contains('novacale') ?? false) ||
         (json['name']?.toString().toLowerCase().contains('novacale') ?? false);
 
+    int closersCount = 0;
+    if (json['client_closers'] is List) {
+      closersCount = (json['client_closers'] as List).length;
+    } else {
+      closersCount = (json['total_closers_count'] as num?)?.toInt() ?? 0;
+    }
+
     return ClientProfile(
       id: json['id']?.toString() ?? '',
       companyName: json['company_name']?.toString() ?? json['name']?.toString() ?? 'Novacale Limited',
@@ -53,7 +60,7 @@ class ClientProfile {
       tier: json['tier']?.toString() ?? (isEnt ? 'enterprise' : 'standard_merchant'),
       closerLimit: (json['closer_limit'] as num?)?.toInt() ?? (isEnt ? 250 : 0),
       isEnterprise: isEnt,
-      totalClosersCount: (json['total_closers_count'] as num?)?.toInt() ?? 0,
+      totalClosersCount: closersCount,
       isActive: json['is_active'] == true || json['is_active'] == 1,
       createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'].toString()) : null,
     );

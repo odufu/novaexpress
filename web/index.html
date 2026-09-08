@@ -104,8 +104,7 @@
     <p class="system-status">Initializing Operational System...</p>
   </div>
 
-  <!-- Official Paystack Inline SDK -->
-  <script src="https://js.paystack.co/v1/inline.js"></script>
+  <!-- Paystack Inline SDK (Lazy-loaded on demand to prevent unused CSS 403 warnings) -->
   <script>
     window.payWithPaystack = function(options, onSuccess, onClose) {
       function executePaystack() {

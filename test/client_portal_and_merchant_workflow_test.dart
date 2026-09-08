@@ -45,7 +45,7 @@ class _MockOrdersRemoteDS implements OrdersRemoteDataSource {
 
 class _MockStockRemoteDS implements StockRemoteDataSource {
   @override
-  Future<List<StockItemModel>> getVehicleStockItems([String? agentId]) async => [];
+  Future<List<StockItemModel>> getVehicleStockItems([String? agentId, String? dcId]) async => [];
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

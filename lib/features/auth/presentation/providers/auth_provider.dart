@@ -120,8 +120,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> checkCurrentUser() async {
-    debugPrint('[AUTH_PROVIDER] 🔍 checkCurrentUser() initiated...');
-    
     // 1. Instantly restore from Local Storage cache so UI (and avatar) loads without flashing
     try {
       final cachedJson = await localStorageService?.getCachedUserProfile();
@@ -212,7 +210,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
         final userUpdateData = <String, dynamic>{
           'first_name': firstName,
           'last_name': lastName,
-          'phone': phone,
           'phone_number': phone,
           'updated_at': DateTime.now().toIso8601String(),
         };
@@ -232,9 +229,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
           'bank_account_name': bankAccountName,
           'last_sync_at': DateTime.now().toIso8601String(),
         };
-        if (cleanAvatar != null && cleanAvatar.isNotEmpty) {
-          agentUpdateData['avatar_url'] = cleanAvatar;
-        }
 
         // 3. Persist to live Supabase DB using resilient service client & standard client
         SupabaseClient? serviceDb;
@@ -245,28 +239,30 @@ class AuthNotifier extends StateNotifier<AuthState> {
             authOptions: const AuthClientOptions(autoRefreshToken: false),
           );
 
-          // Update users table by email (guaranteed unique key)
-          if (currentUser.email.isNotEmpty) {
-            await serviceDb
-                .from(SupabaseConstants.usersTable)
-                .update(userUpdateData)
-                .ilike('email', currentUser.email.trim());
+          // Update users table
+          try {
+            if (currentUser.email.isNotEmpty) {
+              await serviceDb
+                  .from(SupabaseConstants.usersTable)
+                  .update(userUpdateData)
+                  .ilike('email', currentUser.email.trim());
+            }
+            if (currentUser.id.isNotEmpty) {
+              await serviceDb
+                  .from(SupabaseConstants.usersTable)
+                  .update(userUpdateData)
+                  .eq('id', currentUser.id);
+            }
+            if (currentUser.authUserId != null && currentUser.authUserId!.isNotEmpty) {
+              await serviceDb
+                  .from(SupabaseConstants.usersTable)
+                  .update(userUpdateData)
+                  .eq('id', currentUser.authUserId!);
+            }
+            debugPrint('[AUTH_PROVIDER] ✅ Users table updated for: ${currentUser.email} (Avatar: $cleanAvatar)');
+          } catch (userErr) {
+            debugPrint('[AUTH_PROVIDER] ⚠️ Users table update notice: $userErr');
           }
-
-          // Also update users table by id / authUserId
-          if (currentUser.id.isNotEmpty) {
-            await serviceDb
-                .from(SupabaseConstants.usersTable)
-                .update(userUpdateData)
-                .eq('id', currentUser.id);
-          }
-          if (currentUser.authUserId != null && currentUser.authUserId!.isNotEmpty) {
-            await serviceDb
-                .from(SupabaseConstants.usersTable)
-                .update(userUpdateData)
-                .eq('id', currentUser.authUserId!);
-          }
-          debugPrint('[AUTH_PROVIDER] ✅ Users table updated for: ${currentUser.email} (Avatar: $cleanAvatar)');
 
           // Update delivery_agents table
           try {
@@ -278,14 +274,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
                 .from(SupabaseConstants.deliveryAgentsTable)
                 .update(agentUpdateData)
                 .eq('user_id', currentUser.id);
-          } catch (agentColErr) {
-            final fallbackAgentData = Map<String, dynamic>.from(agentUpdateData)..remove('avatar_url');
-            await serviceDb
-                .from(SupabaseConstants.deliveryAgentsTable)
-                .update(fallbackAgentData)
-                .eq('id', agentId);
+            debugPrint('[AUTH_PROVIDER] ✅ Delivery agents table updated for agent: $agentId');
+          } catch (agentErr) {
+            debugPrint('[AUTH_PROVIDER] ⚠️ Delivery agents table update notice: $agentErr');
           }
-          debugPrint('[AUTH_PROVIDER] ✅ Delivery agents table updated for agent: $agentId');
         } catch (dbErr) {
           debugPrint('[AUTH_PROVIDER] ⚠️ Supabase DB update notice ($dbErr)');
         } finally {

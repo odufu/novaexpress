@@ -33,12 +33,12 @@ class _MockStockRepository implements StockRepository {
   ];
 
   @override
-  Future<List<StockItemModel>> getVehicleStockItems([String? agentId]) async {
+  Future<List<StockItemModel>> getVehicleStockItems([String? agentId, String? dcId]) async {
     return List.from(mockItems);
   }
 
   @override
-  Future<List<RiderStockAllocation>> getRiderStockAllocations([String? riderId]) async {
+  Future<List<RiderStockAllocation>> getRiderStockAllocations([String? riderId, String? dcId]) async {
     return [];
   }
 
@@ -55,6 +55,7 @@ class _MockStockRepository implements StockRepository {
     String? binLocation,
     String? companyId,
     String? imageAsset,
+    String? originDcId,
   }) async {
     if (sku.toUpperCase() == 'SKU-FAIL') {
       throw Exception('Simulated database write timeout error.');

@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -172,11 +174,189 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
     'Fidelity Bank',
   ];
 
+  String? _emailError;
+  bool _isCheckingEmail = false;
+  Timer? _emailDebounceTimer;
+
+  String? _phoneError;
+  bool _isCheckingPhone = false;
+  Timer? _phoneDebounceTimer;
+
   @override
   void initState() {
     super.initState();
     _firstNameController.addListener(_autoUpdateEmail);
     _lastNameController.addListener(_autoUpdateEmail);
+    _emailController.addListener(_onEmailChanged);
+    _phoneController.addListener(_onPhoneChanged);
+  }
+
+  void _onPhoneChanged() {
+    _phoneDebounceTimer?.cancel();
+    final phone = _phoneController.text.trim();
+
+    if (phone.isEmpty) {
+      if (_phoneError != null) setState(() => _phoneError = null);
+      return;
+    }
+
+    if (phone.length < 8) {
+      if (_phoneError != 'Please enter a valid phone number.') {
+        setState(() => _phoneError = 'Please enter a valid phone number.');
+      }
+      return;
+    }
+
+    // Local fleet check
+    final dcDrivers = ref.read(dcConsoleProvider).dcDrivers;
+    if (dcDrivers.any((d) => d.phone.trim() == phone)) {
+      setState(() => _phoneError = 'This phone number is already registered to an active driver.');
+      return;
+    }
+
+    if (_phoneError != null) {
+      setState(() => _phoneError = null);
+    }
+
+    // Debounced remote check
+    _phoneDebounceTimer = Timer(const Duration(milliseconds: 450), () async {
+      if (!mounted) return;
+      final currentText = _phoneController.text.trim();
+      if (currentText != phone) return;
+
+      setState(() => _isCheckingPhone = true);
+      try {
+        final exists = await ref.read(authRemoteDataSourceProvider).checkPhoneExists(phone);
+        if (mounted && _phoneController.text.trim() == phone) {
+          setState(() {
+            _isCheckingPhone = false;
+            _phoneError = exists ? 'This phone number is already registered to another account.' : null;
+          });
+        }
+      } catch (_) {
+        if (mounted) setState(() => _isCheckingPhone = false);
+      }
+    });
+  }
+
+  Future<bool> _validatePhoneField() async {
+    final phone = _phoneController.text.trim();
+    if (phone.isEmpty) {
+      setState(() => _phoneError = 'Phone number is required.');
+      return false;
+    }
+    if (phone.length < 8) {
+      setState(() => _phoneError = 'Please enter a valid phone number.');
+      return false;
+    }
+
+    final dcDrivers = ref.read(dcConsoleProvider).dcDrivers;
+    if (dcDrivers.any((d) => d.phone.trim() == phone)) {
+      setState(() => _phoneError = 'This phone number is already registered to an active driver.');
+      return false;
+    }
+
+    if (_phoneError != null) return false;
+
+    setState(() => _isCheckingPhone = true);
+    try {
+      final exists = await ref.read(authRemoteDataSourceProvider).checkPhoneExists(phone);
+      if (mounted) {
+        setState(() {
+          _isCheckingPhone = false;
+          _phoneError = exists ? 'This phone number is already registered to another account.' : null;
+        });
+      }
+      return !exists;
+    } catch (_) {
+      if (mounted) setState(() => _isCheckingPhone = false);
+      return true;
+    }
+  }
+
+  void _onEmailChanged() {
+    _emailDebounceTimer?.cancel();
+    final email = _emailController.text.trim().toLowerCase();
+
+    if (email.isEmpty) {
+      if (_emailError != null) setState(() => _emailError = null);
+      return;
+    }
+
+    final emailRegex = RegExp(r'^[\w\.-]+@[\w\.-]+\.\w+$');
+    if (!emailRegex.hasMatch(email)) {
+      if (_emailError != 'Please enter a valid email address.') {
+        setState(() => _emailError = 'Please enter a valid email address.');
+      }
+      return;
+    }
+
+    // Local fleet check
+    final dcDrivers = ref.read(dcConsoleProvider).dcDrivers;
+    if (dcDrivers.any((d) => d.email.trim().toLowerCase() == email)) {
+      setState(() => _emailError = 'This email is already registered to an active driver.');
+      return;
+    }
+
+    if (_emailError != null) {
+      setState(() => _emailError = null);
+    }
+
+    // Debounced remote check
+    _emailDebounceTimer = Timer(const Duration(milliseconds: 450), () async {
+      if (!mounted) return;
+      final currentText = _emailController.text.trim().toLowerCase();
+      if (currentText != email) return;
+
+      setState(() => _isCheckingEmail = true);
+      try {
+        final exists = await ref.read(authRemoteDataSourceProvider).checkEmailExists(email);
+        if (mounted && _emailController.text.trim().toLowerCase() == email) {
+          setState(() {
+            _isCheckingEmail = false;
+            _emailError = exists ? 'This email is already taken. Please enter a unique email address.' : null;
+          });
+        }
+      } catch (_) {
+        if (mounted) setState(() => _isCheckingEmail = false);
+      }
+    });
+  }
+
+  Future<bool> _validateEmailField() async {
+    final email = _emailController.text.trim().toLowerCase();
+    if (email.isEmpty) {
+      setState(() => _emailError = 'Contact email is required.');
+      return false;
+    }
+    final emailRegex = RegExp(r'^[\w\.-]+@[\w\.-]+\.\w+$');
+    if (!emailRegex.hasMatch(email)) {
+      setState(() => _emailError = 'Please enter a valid email address.');
+      return false;
+    }
+
+    final dcDrivers = ref.read(dcConsoleProvider).dcDrivers;
+    if (dcDrivers.any((d) => d.email.trim().toLowerCase() == email)) {
+      setState(() => _emailError = 'This email is already registered to an active driver.');
+      return false;
+    }
+
+    if (_emailError != null) return false;
+
+    setState(() => _isCheckingEmail = true);
+    try {
+      final exists = await ref.read(authRemoteDataSourceProvider).checkEmailExists(email);
+      if (mounted) {
+        setState(() {
+          _isCheckingEmail = false;
+          _emailError = exists ? 'This email is already taken. Please enter a unique email address.' : null;
+        });
+      }
+      return !exists;
+    } catch (_) {
+      if (mounted) setState(() => _isCheckingEmail = false);
+      return true;
+    }
   }
 
   void _autoUpdateEmail() {
@@ -192,6 +372,10 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
 
   @override
   void dispose() {
+    _emailDebounceTimer?.cancel();
+    _phoneDebounceTimer?.cancel();
+    _emailController.removeListener(_onEmailChanged);
+    _phoneController.removeListener(_onPhoneChanged);
     _firstNameController.dispose();
     _lastNameController.dispose();
     _phoneController.dispose();
@@ -235,6 +419,20 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
   }
 
   Future<void> _submitOnboarding() async {
+    final isValid = await _validateEmailField();
+    if (!isValid) {
+      if (!mounted) return;
+      ref.read(dcOnboardDraftProvider.notifier).setStep(0);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ Please provide a valid, unique email address before proceeding.'),
+          backgroundColor: Color(0xFFEF4444),
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
     final draftState = ref.read(dcOnboardDraftProvider);
     final notifier = ref.read(dcOnboardDraftProvider.notifier);
     notifier.setSubmitting(true);
@@ -243,9 +441,9 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
     final lastName = _lastNameController.text.trim().isEmpty ? 'Okon' : _lastNameController.text.trim();
     final fullName = '$firstName $lastName';
     final phone = _phoneController.text.trim().isEmpty ? '08031234567' : _phoneController.text.trim();
-    final email = _emailController.text.trim().isEmpty
+    final email = _emailController.text.trim().toLowerCase().isEmpty
         ? '${firstName.toLowerCase()}.${lastName.toLowerCase()}@novaexpress.ng'
-        : _emailController.text.trim();
+        : _emailController.text.trim().toLowerCase();
     final tempPassword = _tempPasswordController.text.trim().isEmpty ? 'Password123!' : _tempPasswordController.text.trim();
     final tempPin = _tempPinController.text.trim().isEmpty ? '1234' : _tempPinController.text.trim();
 
@@ -305,7 +503,21 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
       }
       debugPrint('[DC_ONBOARD] 🚀 Delivery agent registered: ${createdUser.email} ($finalDriverCode)');
     } catch (e) {
-      debugPrint('[DC_ONBOARD] ⚠️ Registration notice: $e');
+      debugPrint('[DC_ONBOARD] ❌ Registration error: $e');
+      if (mounted) {
+        var reason = e.toString();
+        if (reason.startsWith('Exception: ')) {
+          reason = reason.substring(11);
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('⚠️ $reason'),
+            backgroundColor: const Color(0xFFEF4444),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+      return;
     }
 
     final newDriver = DCFleetDriver(
@@ -383,8 +595,11 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
       ),
       child: Container(
         width: isMobile ? double.infinity : 860,
-        constraints: BoxConstraints(maxHeight: isMobile ? screenHeight * 0.96 : 740),
-        padding: EdgeInsets.all(isMobile ? 16 : 28),
+        constraints: BoxConstraints(
+          maxWidth: 860,
+          maxHeight: math.min(screenHeight * 0.94, 760),
+        ),
+        padding: EdgeInsets.all(isMobile ? 16 : 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -491,7 +706,14 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                     const SizedBox(width: 10),
                     if (draftState.currentStep < 4)
                       ElevatedButton.icon(
-                        onPressed: () => ref.read(dcOnboardDraftProvider.notifier).nextStep(),
+                        onPressed: () async {
+                          if (draftState.currentStep == 0 || draftState.currentStep == 1) {
+                            final emailValid = await _validateEmailField();
+                            final phoneValid = await _validatePhoneField();
+                            if (!emailValid || !phoneValid) return;
+                          }
+                          ref.read(dcOnboardDraftProvider.notifier).nextStep();
+                        },
                         icon: const Icon(Icons.arrow_forward_rounded, size: 16, color: Colors.white),
                         label: const Text('Next Step', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                         style: ElevatedButton.styleFrom(
@@ -644,9 +866,47 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
         const SizedBox(height: 12),
         Row(
           children: [
-            Expanded(child: TextField(controller: _phoneController, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Phone Number', hintText: '08031234567'))),
+            Expanded(
+              child: TextField(
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
+                decoration: InputDecoration(
+                  labelText: 'Phone Number *',
+                  hintText: '08031234567',
+                  prefixIcon: const Icon(Icons.phone_outlined, size: 18),
+                  suffixIcon: _isCheckingPhone
+                      ? const SizedBox(width: 16, height: 16, child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(strokeWidth: 2)))
+                      : (_phoneError != null
+                          ? const Icon(Icons.error_outline_rounded, color: Color(0xFFEF4444), size: 20)
+                          : (_phoneController.text.isNotEmpty ? const Icon(Icons.check_circle_outline_rounded, color: Color(0xFF10B981), size: 20) : null)),
+                  errorText: _phoneError,
+                  errorStyle: GoogleFonts.inter(fontSize: 11, color: const Color(0xFFEF4444), fontWeight: FontWeight.w600),
+                  errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5)),
+                  focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFEF4444), width: 2.0)),
+                ),
+              ),
+            ),
             const SizedBox(width: 12),
-            Expanded(child: TextField(controller: _emailController, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Contact Email', hintText: 'samuel.okon@novaexpress.ng'))),
+            Expanded(
+              child: TextField(
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                decoration: InputDecoration(
+                  labelText: 'Contact Email *',
+                  hintText: 'samuel.okon@novaexpress.ng',
+                  prefixIcon: const Icon(Icons.email_outlined, size: 18),
+                  suffixIcon: _isCheckingEmail
+                      ? const SizedBox(width: 16, height: 16, child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(strokeWidth: 2)))
+                      : (_emailError != null
+                          ? const Icon(Icons.error_outline_rounded, color: Color(0xFFEF4444), size: 20)
+                          : (_emailController.text.isNotEmpty ? const Icon(Icons.check_circle_outline_rounded, color: Color(0xFF10B981), size: 20) : null)),
+                  errorText: _emailError,
+                  errorStyle: GoogleFonts.inter(fontSize: 11, color: const Color(0xFFEF4444), fontWeight: FontWeight.w600),
+                  errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5)),
+                  focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFEF4444), width: 2.0)),
+                ),
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 12),
@@ -895,10 +1155,19 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
         TextField(
           controller: _emailController,
           keyboardType: TextInputType.emailAddress,
-          decoration: const InputDecoration(
-            labelText: 'Rider Login Email Address',
+          decoration: InputDecoration(
+            labelText: 'Rider Login Email Address *',
             hintText: 'e.g. samuel.okon@novaexpress.ng',
-            prefixIcon: Icon(Icons.email_outlined, size: 18),
+            prefixIcon: const Icon(Icons.email_outlined, size: 18),
+            suffixIcon: _isCheckingEmail
+                ? const SizedBox(width: 16, height: 16, child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(strokeWidth: 2)))
+                : (_emailError != null
+                    ? const Icon(Icons.error_outline_rounded, color: Color(0xFFEF4444), size: 20)
+                    : (_emailController.text.isNotEmpty ? const Icon(Icons.check_circle_outline_rounded, color: Color(0xFF10B981), size: 20) : null)),
+            errorText: _emailError,
+            errorStyle: GoogleFonts.inter(fontSize: 11, color: const Color(0xFFEF4444), fontWeight: FontWeight.w600),
+            errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5)),
+            focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFEF4444), width: 2.0)),
           ),
         ),
         const SizedBox(height: 14),
@@ -1421,9 +1690,12 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
 
               const SizedBox(height: 20),
 
-              Row(
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
                 children: [
-                  Expanded(
+                  SizedBox(
+                    width: 250,
                     child: OutlinedButton.icon(
                       onPressed: () {
                         final credText = 'NovaExpress Rider Credentials\nAgent Code: ${slip['driverCode']}\nName: ${slip['name']}\nEmail: ${slip['email']}\nTemporary Password: ${slip['password']}\nSecurity PIN: ${slip['pin']}\nHub: ${slip['hub']}';
@@ -1434,10 +1706,13 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                       },
                       icon: const Icon(Icons.copy_rounded, size: 16),
                       label: const Text('Copy Credentials'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
+                  SizedBox(
+                    width: 250,
                     child: ElevatedButton.icon(
                       onPressed: () => Navigator.of(context).pop(),
                       icon: const Icon(Icons.check_rounded, size: 18, color: Colors.white),

@@ -80,7 +80,6 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
   final LocalStorageService _storageService;
   final Ref _ref;
   RealtimeChannel? _realtimeChannel;
-  Timer? _heartbeatTimer;
 
   NotificationsNotifier({
     required NotificationsRepository repository,
@@ -111,7 +110,6 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
     }
     if (!isTest) {
       _setupRealtimeSubscription();
-      _startHeartbeatTimer();
     }
   }
 
@@ -124,7 +122,6 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
             schema: 'public',
             table: 'notifications',
             callback: (payload) {
-              debugPrint('[NOTIFICATIONS_REALTIME] 🔔 Realtime event on notifications table: ${payload.eventType}');
               final agentId = _getAgentId();
               if (agentId.isNotEmpty) {
                 _silentSyncNotifications(agentId);
@@ -132,33 +129,10 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
             },
           )
           .subscribe();
-      debugPrint('[NOTIFICATIONS_PROVIDER] 📡 Notifications Realtime stream active.');
+      debugPrint('[NOTIFICATIONS_PROVIDER] 📡 Notifications Realtime stream active (event-driven).');
     } catch (e) {
       debugPrint('[NOTIFICATIONS_PROVIDER] ℹ️ Realtime notification notice: $e');
     }
-  }
-
-  void _startHeartbeatTimer() {
-    try {
-      final binding = WidgetsBinding.instance.runtimeType.toString().toLowerCase();
-      if (binding.contains('test') || binding.contains('automated')) {
-        return;
-      }
-    } catch (_) {}
-    try {
-      if (!kIsWeb && (Platform.environment.containsKey('FLUTTER_TEST') ||
-          Platform.environment.containsKey('TEST_PLATFORM'))) {
-        return;
-      }
-    } catch (_) {}
-    _heartbeatTimer?.cancel();
-    _heartbeatTimer = Timer.periodic(const Duration(seconds: 20), (_) {
-      if (!mounted) return;
-      final agentId = _getAgentId();
-      if (agentId.isNotEmpty) {
-        _silentSyncNotifications(agentId);
-      }
-    });
   }
 
   Future<void> _silentSyncNotifications(String agentId) async {
@@ -199,7 +173,6 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
 
   @override
   void dispose() {
-    _heartbeatTimer?.cancel();
     try {
       _realtimeChannel?.unsubscribe();
     } catch (_) {}

@@ -9,8 +9,8 @@ class StockRepositoryImpl implements StockRepository {
   StockRepositoryImpl({required this.remoteDataSource});
 
   @override
-  Future<List<StockItemEntity>> getVehicleStockItems([String? agentId]) async {
-    return await remoteDataSource.getVehicleStockItems(agentId);
+  Future<List<StockItemEntity>> getVehicleStockItems([String? agentId, String? dcId]) async {
+    return await remoteDataSource.getVehicleStockItems(agentId, dcId);
   }
 
   @override
@@ -26,6 +26,7 @@ class StockRepositoryImpl implements StockRepository {
     String? binLocation,
     String? companyId,
     String? imageAsset,
+    String? originDcId,
   }) async {
     return await remoteDataSource.createProduct(
       name: name,
@@ -39,6 +40,7 @@ class StockRepositoryImpl implements StockRepository {
       binLocation: binLocation,
       companyId: companyId,
       imageAsset: imageAsset,
+      originDcId: originDcId,
     );
   }
 
@@ -67,12 +69,14 @@ class StockRepositoryImpl implements StockRepository {
     required int quantity,
     String? waybillNumber,
     String? supplierName,
+    String? distributionCenterId,
   }) async {
     return await remoteDataSource.receiveStock(
       productIdOrSku: productIdOrSku,
       quantity: quantity,
       waybillNumber: waybillNumber,
       supplierName: supplierName,
+      distributionCenterId: distributionCenterId,
     );
   }
 
@@ -107,6 +111,27 @@ class StockRepositoryImpl implements StockRepository {
   }
 
   @override
+  Future<Map<String, dynamic>> transferStockBetweenDCs({
+    required String productIdOrSku,
+    required String sourceDcId,
+    required String sourceDcName,
+    required String destinationDcId,
+    required String destinationDcName,
+    required int quantity,
+    String? notes,
+  }) async {
+    return await remoteDataSource.transferStockBetweenDCs(
+      productIdOrSku: productIdOrSku,
+      sourceDcId: sourceDcId,
+      sourceDcName: sourceDcName,
+      destinationDcId: destinationDcId,
+      destinationDcName: destinationDcName,
+      quantity: quantity,
+      notes: notes,
+    );
+  }
+
+  @override
   Future<Map<String, dynamic>> processStockReturn({
     required String returnNumber,
     required String orderId,
@@ -128,8 +153,8 @@ class StockRepositoryImpl implements StockRepository {
   }
 
   @override
-  Future<List<RiderStockAllocation>> getRiderStockAllocations([String? riderId]) async {
-    return await remoteDataSource.getRiderStockAllocations(riderId);
+  Future<List<RiderStockAllocation>> getRiderStockAllocations([String? riderId, String? dcId]) async {
+    return await remoteDataSource.getRiderStockAllocations(riderId, dcId);
   }
 
   @override

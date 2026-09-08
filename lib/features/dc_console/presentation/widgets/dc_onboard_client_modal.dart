@@ -87,10 +87,14 @@ class _DCOnboardClientModalState extends ConsumerState<DCOnboardClientModal> {
       }
     } catch (e) {
       if (mounted) {
+        var reason = e.toString();
+        if (reason.startsWith('Exception: ')) {
+          reason = reason.substring(11);
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: const Color(0xFFEF4444),
-            content: Text('Error registering client: $e'),
+            content: Text('⚠️ $reason'),
           ),
         );
       }

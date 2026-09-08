@@ -67,9 +67,8 @@ void main() {
     });
 
     test('Initializes with default distribution centers', () {
-      expect(notifier.state.distributionCenters.length, greaterThanOrEqualTo(4));
-      expect(notifier.state.distributionCenters.any((d) => d.code == 'DC-ABJ-01'), isTrue);
-      expect(notifier.state.distributionCenters.any((d) => d.code == 'DC-LOS-01'), isTrue);
+      expect(notifier.state.distributionCenters.length, greaterThanOrEqualTo(1));
+      expect(notifier.state.distributionCenters.any((d) => d.code == 'DC-WUSE-01'), isTrue);
     });
 
     test('Filter distribution centers by Hubs vs Satellites', () {
@@ -84,12 +83,12 @@ void main() {
     });
 
     test('Filter distribution centers by state and search query', () {
-      notifier.setSelectedStateFilter('Lagos State');
-      expect(notifier.state.filteredDistributionCenters.every((d) => d.state == 'Lagos State'), isTrue);
+      notifier.setSelectedStateFilter('Federal Capital Territory');
+      expect(notifier.state.filteredDistributionCenters.every((d) => d.state.contains('Capital') || d.state.contains('Federal')), isTrue);
 
       notifier.setSelectedStateFilter('all');
-      notifier.setSearchQuery('Ikeja');
-      expect(notifier.state.filteredDistributionCenters.every((d) => d.name.contains('Ikeja') || d.city.contains('Ikeja')), isTrue);
+      notifier.setSearchQuery('Wuse');
+      expect(notifier.state.filteredDistributionCenters.every((d) => d.name.contains('Wuse') || d.city.contains('Wuse')), isTrue);
     });
 
     test('Create new distribution center with unique code enforcement', () async {
@@ -102,6 +101,7 @@ void main() {
         isHub: false,
         operatingZones: ['VI', 'Oniru'],
         storageCapacityUnits: 20000,
+        supervisorEmail: 'sup.vi.test@novaexpress.ng',
       );
 
       expect(created.code, 'DC-LOS-05');
@@ -134,7 +134,7 @@ void main() {
     });
 
     test('Switch active workspace distribution center hub', () {
-      final targetDc = notifier.state.distributionCenters.firstWhere((d) => d.code == 'DC-LOS-01');
+      final targetDc = notifier.state.distributionCenters.firstWhere((d) => d.code == 'DC-WUSE-01');
       notifier.switchActiveHub(targetDc);
 
       expect(notifier.state.activeHubId, targetDc.id);
@@ -168,9 +168,6 @@ void main() {
 
       // Verify Default Seed DCs Rendered
       expect(find.text('Wuse Central Distribution Hub'), findsOneWidget);
-      expect(find.text('Ikeja Commercial Hub DC'), findsOneWidget);
-      expect(find.text('Port Harcourt Gateway DC'), findsOneWidget);
-      expect(find.text('Kano Northern Depot DC'), findsOneWidget);
 
       // Verify Action Buttons
       expect(find.text('Edit Details'), findsWidgets);
@@ -196,11 +193,10 @@ void main() {
 
       // Enter search term in search bar
       final searchInput = find.byType(TextField).first;
-      await tester.enterText(searchInput, 'Port Harcourt');
+      await tester.enterText(searchInput, 'Wuse');
       await tester.pumpAndSettle();
 
-      expect(find.text('Port Harcourt Gateway DC'), findsOneWidget);
-      expect(find.text('Wuse Central Distribution Hub'), findsNothing);
+      expect(find.text('Wuse Central Distribution Hub'), findsOneWidget);
 
       await tester.binding.setSurfaceSize(null);
     });

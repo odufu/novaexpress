@@ -2,7 +2,7 @@ import '../entities/rider_stock_allocation.dart';
 import '../entities/stock_item.dart';
 
 abstract class StockRepository {
-  Future<List<StockItemEntity>> getVehicleStockItems([String? agentId]);
+  Future<List<StockItemEntity>> getVehicleStockItems([String? agentId, String? dcId]);
   Future<StockItemEntity> createProduct({
     required String name,
     required String sku,
@@ -15,6 +15,7 @@ abstract class StockRepository {
     String? binLocation,
     String? companyId,
     String? imageAsset,
+    String? originDcId,
   });
   Future<Map<String, dynamic>> assignStockToRider({
     required String productIdOrSku,
@@ -29,6 +30,7 @@ abstract class StockRepository {
     required int quantity,
     String? waybillNumber,
     String? supplierName,
+    String? distributionCenterId,
   });
   Future<Map<String, dynamic>> requestStockTransfer({
     required String agentId,
@@ -42,6 +44,15 @@ abstract class StockRepository {
     required String handoverCode,
     required String agentId,
   });
+  Future<Map<String, dynamic>> transferStockBetweenDCs({
+    required String productIdOrSku,
+    required String sourceDcId,
+    required String sourceDcName,
+    required String destinationDcId,
+    required String destinationDcName,
+    required int quantity,
+    String? notes,
+  });
   Future<Map<String, dynamic>> processStockReturn({
     required String returnNumber,
     required String orderId,
@@ -51,7 +62,7 @@ abstract class StockRepository {
     required String reason,
     String? notes,
   });
-  Future<List<RiderStockAllocation>> getRiderStockAllocations([String? riderId]);
+  Future<List<RiderStockAllocation>> getRiderStockAllocations([String? riderId, String? dcId]);
   Future<void> updateRiderStockCustody({
     required String riderId,
     required String productId,

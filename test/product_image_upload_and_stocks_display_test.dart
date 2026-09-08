@@ -12,7 +12,7 @@ class MockStockImageRepository implements StockRepository {
   final List<StockItemEntity> items = [];
 
   @override
-  Future<List<StockItemEntity>> getVehicleStockItems([String? agentId]) async {
+  Future<List<StockItemEntity>> getVehicleStockItems([String? agentId, String? dcId]) async {
     return items;
   }
 
@@ -29,6 +29,7 @@ class MockStockImageRepository implements StockRepository {
     String? binLocation,
     String? companyId,
     String? imageAsset,
+    String? originDcId,
   }) async {
     final newItem = StockItemEntity(
       id: 'prod_${sku.toLowerCase()}',
@@ -68,6 +69,7 @@ class MockStockImageRepository implements StockRepository {
     String? waybillNumber,
     String? supplierName,
     String? binLocation,
+    String? distributionCenterId,
   }) async => true;
 
   @override
@@ -84,6 +86,17 @@ class MockStockImageRepository implements StockRepository {
     required String requestId,
     required String handoverCode,
     required String agentId,
+  }) async => {'success': true};
+
+  @override
+  Future<Map<String, dynamic>> transferStockBetweenDCs({
+    required String productIdOrSku,
+    required String sourceDcId,
+    required String sourceDcName,
+    required String destinationDcId,
+    required String destinationDcName,
+    required int quantity,
+    String? notes,
   }) async => {'success': true};
 
   @override
@@ -108,7 +121,7 @@ class MockStockImageRepository implements StockRepository {
   }) async => {'success': true};
 
   @override
-  Future<List<RiderStockAllocation>> getRiderStockAllocations([String? riderId]) async => [];
+  Future<List<RiderStockAllocation>> getRiderStockAllocations([String? riderId, String? dcId]) async => [];
 
   @override
   Future<void> updateRiderStockCustody({

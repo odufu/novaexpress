@@ -9,6 +9,7 @@ import 'package:novexps/features/orders/domain/entities/order.dart';
 import 'package:novexps/features/orders/domain/repositories/orders_repository.dart';
 import 'package:novexps/features/orders/presentation/providers/orders_provider.dart';
 import 'package:novexps/features/stock/domain/entities/stock_item.dart';
+import 'package:novexps/features/stock/domain/entities/rider_stock_allocation.dart';
 import 'package:novexps/features/stock/domain/repositories/stock_repository.dart';
 import 'package:novexps/features/stock/presentation/providers/stock_provider.dart';
 
@@ -28,6 +29,7 @@ class MockLifecycleStockRepository implements StockRepository {
     String? binLocation,
     String? companyId,
     String? imageAsset,
+    String? originDcId,
   }) async {
     final item = StockItemEntity(
       id: 'prod-${sku.toLowerCase()}',
@@ -62,7 +64,10 @@ class MockLifecycleStockRepository implements StockRepository {
   }
 
   @override
-  Future<List<StockItemEntity>> getVehicleStockItems([String? agentId]) async => dbProducts;
+  Future<List<StockItemEntity>> getVehicleStockItems([String? agentId, String? dcId]) async => dbProducts;
+
+  @override
+  Future<List<RiderStockAllocation>> getRiderStockAllocations([String? riderId, String? dcId]) async => [];
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
