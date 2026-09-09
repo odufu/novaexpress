@@ -7,6 +7,7 @@ import '../../../../core/widgets/app_loading_overlay.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/entities/distribution_center.dart';
 import '../providers/dc_console_provider.dart';
+import 'dc_detail_page.dart';
 
 class DCDistributionCentersPage extends ConsumerStatefulWidget {
   const DCDistributionCentersPage({super.key});
@@ -17,6 +18,8 @@ class DCDistributionCentersPage extends ConsumerStatefulWidget {
 
 class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCentersPage> {
   final TextEditingController _searchController = TextEditingController();
+  DistributionCenter? _selectedDcForDetail;
+  String? _userViewMode;
 
   List<String> get _nigerianStates => ['All States', ...LocationLookupService.getAllStates()];
 
@@ -62,8 +65,21 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
     final totalCapacity = allDcs.fold<int>(0, (sum, d) => sum + d.storageCapacityUnits);
     final totalRiders = allDcs.fold<int>(0, (sum, d) => sum + d.totalAssignedRiders);
 
+    if (_selectedDcForDetail != null) {
+      return DCDetailPage(
+        dc: _selectedDcForDetail!,
+        onBack: () => setState(() => _selectedDcForDetail = null),
+        onDcUpdated: (updatedDc) {
+          setState(() {
+            _selectedDcForDetail = updatedDc;
+          });
+        },
+      );
+    }
+
     final screenWidth = MediaQuery.of(context).size.width;
-    final isCompact = screenWidth < 800;
+    final isCompact = screenWidth < 768;
+    final effectiveViewMode = _userViewMode ?? (screenWidth >= 768 ? 'table' : 'cards');
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0B1120) : const Color(0xFFF8FAFC),
@@ -260,6 +276,39 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
                           ),
                         ),
                       ),
+                      const SizedBox(width: 12),
+
+                      // View Mode Switcher: Table / Cards
+                      Container(
+                        height: 40,
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _buildViewSwitcherBtn(
+                              label: 'Table',
+                              icon: Icons.table_chart_rounded,
+                              isSelected: effectiveViewMode == 'table',
+                              isDark: isDark,
+                              onTap: () => setState(() => _userViewMode = 'table'),
+                            ),
+                            _buildViewSwitcherBtn(
+                              label: 'Cards',
+                              icon: Icons.grid_view_rounded,
+                              isSelected: effectiveViewMode == 'cards',
+                              isDark: isDark,
+                              onTap: () => setState(() => _userViewMode = 'cards'),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -286,76 +335,13 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
             ),
             const SizedBox(height: 20),
 
-            // Distribution Center Cards List
+            // Distribution Centers List: Data Table on Desktop, Cards on Mobile
             if (filteredDcs.isEmpty)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(40),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                ),
-                child: Column(
-                  children: [
-                    Icon(Icons.apartment_outlined, size: 54, color: const Color(0xFF94A3B8)),
-                    const SizedBox(height: 14),
-                    Text(
-                      'No Distribution Centers Found',
-                      style: GoogleFonts.inter(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : const Color(0xFF0F172A),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Try refining your search keyword or selected state filter.',
-                      style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B)),
-                    ),
-                  ],
-                ),
-              )
+              _buildEmptyDcsState(isDark)
+            else if (effectiveViewMode == 'table')
+              _buildDCDatatable(context, filteredDcs, isDark, dcState, notifier)
             else
-              LayoutBuilder(
-                builder: (ctx, constraints) {
-                  final isTwoCol = constraints.maxWidth >= 850;
-                  final itemWidth = isTwoCol ? (constraints.maxWidth - 16) / 2 : constraints.maxWidth;
-
-                  return Wrap(
-                    spacing: 16,
-                    runSpacing: 16,
-                    children: filteredDcs.map((dc) {
-                      final isCurrentActiveHub = dc.id == dcState.activeHubId || dc.code == dcState.activeHubCode;
-
-                      return SizedBox(
-                        width: itemWidth,
-                        child: _buildDCCard(
-                          context: context,
-                          dc: dc,
-                          isCurrentActiveHub: isCurrentActiveHub,
-                          isDark: isDark,
-                          onEdit: () => _showCreateOrEditDCDialog(context, isDark, existingDc: dc),
-                          onManageZones: () => _showZoneManagementModal(context, dc, isDark),
-                          onSwitchHub: () {
-                            notifier.switchActiveHub(dc);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Active Hub switched to ${dc.name} (${dc.code})'),
-                                backgroundColor: const Color(0xFF10B981),
-                                duration: const Duration(seconds: 2),
-                              ),
-                            );
-                          },
-                          onToggleStatus: () {
-                            notifier.toggleDistributionCenterStatus(dc.id, !dc.isActive);
-                          },
-                        ),
-                      );
-                    }).toList(),
-                  );
-                },
-              ),
+              _buildDCCardsList(context, filteredDcs, isDark, dcState, notifier),
           ],
         ),
       ),
@@ -478,19 +464,481 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
     );
   }
 
+  Widget _buildViewSwitcherBtn({
+    required String label,
+    required IconData icon,
+    required bool isSelected,
+    required bool isDark,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? const Color(0xFF2563EB)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 15,
+              color: isSelected ? Colors.white : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+            ),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected ? Colors.white : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyDcsState(bool isDark) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(40),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        children: [
+          Icon(Icons.apartment_outlined, size: 54, color: const Color(0xFF94A3B8)),
+          const SizedBox(height: 14),
+          Text(
+            'No Distribution Centers Found',
+            style: GoogleFonts.inter(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : const Color(0xFF0F172A),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Try refining your search keyword or selected state filter.',
+            style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDCCardsList(
+    BuildContext context,
+    List<DistributionCenter> dcs,
+    bool isDark,
+    DCConsoleState dcState,
+    DCConsoleNotifier notifier,
+  ) {
+    return LayoutBuilder(
+      builder: (ctx, constraints) {
+        final isTwoCol = constraints.maxWidth >= 850;
+        final itemWidth = isTwoCol ? (constraints.maxWidth - 16) / 2 : constraints.maxWidth;
+
+        return Wrap(
+          spacing: 16,
+          runSpacing: 16,
+          children: dcs.map((dc) {
+            final isCurrentActiveHub = dc.id == dcState.activeHubId || dc.code == dcState.activeHubCode;
+
+            return SizedBox(
+              width: itemWidth,
+              child: _buildDCCard(
+                context: context,
+                dc: dc,
+                isCurrentActiveHub: isCurrentActiveHub,
+                isDark: isDark,
+                onOpenDetail: () {
+                  setState(() => _selectedDcForDetail = dc);
+                },
+                onEdit: () => _showCreateOrEditDCDialog(context, isDark, existingDc: dc),
+                onManageZones: () => _showZoneManagementModal(context, dc, isDark),
+                onSwitchHub: () {
+                  notifier.switchActiveHub(dc);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Active Hub switched to ${dc.name} (${dc.code})'),
+                      backgroundColor: const Color(0xFF10B981),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                },
+                onToggleStatus: () {
+                  notifier.toggleDistributionCenterStatus(dc.id, !dc.isActive);
+                },
+              ),
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
+
+  Widget _buildDCDatatable(
+    BuildContext context,
+    List<DistributionCenter> dcs,
+    bool isDark,
+    DCConsoleState dcState,
+    DCConsoleNotifier notifier,
+  ) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: DataTable(
+            showCheckboxColumn: false,
+            headingRowColor: WidgetStateProperty.all(
+              isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+            ),
+            headingTextStyle: GoogleFonts.inter(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+              letterSpacing: 0.2,
+            ),
+            dataRowMinHeight: 68,
+            dataRowMaxHeight: 74,
+            columns: const [
+              DataColumn(label: Text('DISTRIBUTION CENTER')),
+              DataColumn(label: Text('LOCATION')),
+              DataColumn(label: Text('COVERAGE ZONES')),
+              DataColumn(label: Text('STORAGE VOLUME')),
+              DataColumn(label: Text('RIDERS & FLEET')),
+              DataColumn(label: Text('MANAGER & CONTACT')),
+              DataColumn(label: Text('STATUS')),
+              DataColumn(label: Text('ACTIONS')),
+            ],
+            rows: dcs.map((dc) {
+              final isCurrentActiveHub = dc.id == dcState.activeHubId || dc.code == dcState.activeHubCode;
+              return DataRow(
+                onSelectChanged: (_) {
+                  setState(() => _selectedDcForDetail = dc);
+                },
+                cells: [
+                  // DC Name & Code
+                  DataCell(
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: dc.isHub
+                                ? const Color(0xFFF37021).withValues(alpha: 0.12)
+                                : const Color(0xFF2563EB).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            dc.isHub ? Icons.warehouse_rounded : Icons.apartment_rounded,
+                            color: dc.isHub ? const Color(0xFFF37021) : const Color(0xFF2563EB),
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  dc.name,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                  ),
+                                ),
+                                if (isCurrentActiveHub) ...[
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF37021),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text(
+                                      'ACTIVE',
+                                      style: TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            const SizedBox(height: 3),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                  decoration: BoxDecoration(
+                                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    dc.code,
+                                    style: GoogleFonts.firaCode(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: const Color(0xFF2563EB),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  dc.isHub ? 'Regional Hub' : 'Satellite Depot',
+                                  style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Location
+                  DataCell(
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          dc.fullLocation,
+                          style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          dc.address,
+                          style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Coverage Zones
+                  DataCell(
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          '${dc.operatingZones.length} Covered LGAs',
+                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            ...dc.operatingZones.take(2).map((z) => Container(
+                              margin: const EdgeInsets.only(right: 4),
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                              ),
+                              child: Text(z, style: const TextStyle(fontSize: 10)),
+                            )),
+                            if (dc.operatingZones.length > 2)
+                              Text('+${dc.operatingZones.length - 2} more', style: const TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Storage Volume
+                  DataCell(
+                    Text(
+                      dc.displayCapacity,
+                      style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+
+                  // Riders & Fleet
+                  DataCell(
+                    Row(
+                      children: [
+                        const Icon(Icons.two_wheeler_rounded, size: 16, color: Color(0xFF10B981)),
+                        const SizedBox(width: 6),
+                        Text(
+                          '${dc.totalAssignedRiders} Riders',
+                          style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Manager & Contact
+                  DataCell(
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          dc.managerName ?? 'Unassigned Manager',
+                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600),
+                        ),
+                        if (dc.contactPhone != null && dc.contactPhone!.isNotEmpty)
+                          Text(
+                            dc.contactPhone!,
+                            style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                          ),
+                      ],
+                    ),
+                  ),
+
+                  // Status
+                  DataCell(
+                    InkWell(
+                      onTap: () => notifier.toggleDistributionCenterStatus(dc.id, !dc.isActive),
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: dc.isActive
+                              ? const Color(0xFF10B981).withValues(alpha: 0.15)
+                              : const Color(0xFF94A3B8).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: dc.isActive
+                                ? const Color(0xFF10B981).withValues(alpha: 0.3)
+                                : const Color(0xFF94A3B8).withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: dc.isActive ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              dc.isActive ? 'ONLINE' : 'OFFLINE',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: dc.isActive ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Actions
+                  DataCell(
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Tooltip(
+                          message: 'Open DC Hub Console & Operations',
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              setState(() => _selectedDcForDetail = dc);
+                            },
+                            icon: const Icon(Icons.arrow_forward_rounded, size: 14, color: Colors.white),
+                            label: const Text('Open Console', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF2563EB),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        OutlinedButton.icon(
+                          onPressed: () => _showCreateOrEditDCDialog(context, isDark, existingDc: dc),
+                          icon: const Icon(Icons.edit_note_rounded, size: 15),
+                          label: const Text('Edit Details', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                          ),
+                        ),
+                        IconButton(
+                          icon: Icon(
+                            isCurrentActiveHub ? Icons.check_circle_rounded : Icons.swap_horiz_rounded,
+                            size: 20,
+                            color: isCurrentActiveHub ? const Color(0xFF10B981) : const Color(0xFFF37021),
+                          ),
+                          tooltip: isCurrentActiveHub ? 'Currently Active DC' : 'Switch Active Hub',
+                          onPressed: isCurrentActiveHub ? null : () {
+                            notifier.switchActiveHub(dc);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Active Hub switched to ${dc.name} (${dc.code})'),
+                                backgroundColor: const Color(0xFF10B981),
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            }).toList(),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildDCCard({
     required BuildContext context,
     required DistributionCenter dc,
     required bool isCurrentActiveHub,
     required bool isDark,
+    required VoidCallback onOpenDetail,
     required VoidCallback onEdit,
     required VoidCallback onManageZones,
     required VoidCallback onSwitchHub,
     required VoidCallback onToggleStatus,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
+    return InkWell(
+      onTap: onOpenDetail,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
@@ -795,10 +1243,29 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
               ),
             ],
           ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: onOpenDetail,
+              icon: const Icon(Icons.dashboard_customize_rounded, size: 15, color: Colors.white),
+              label: const Text(
+                'Open DC Hub Console & Operations ➜',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.white),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2563EB),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildStatItem(String label, String value, bool isDark, {bool isBold = false}) {
     return Column(
