@@ -197,7 +197,9 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
 
       // 3. Resolve rider assignment UUID if present
       String? validRiderId;
-      final rawRiderId = insertPayload['delivery_agent_id']?.toString() ?? '';
+      final rawRiderId = insertPayload['delivery_agent_id']?.toString() ??
+          insertPayload['assigned_agent_id']?.toString() ??
+          '';
       if (rawRiderId.isNotEmpty && uuidRegex.hasMatch(rawRiderId)) {
         validRiderId = rawRiderId;
       } else if (rawRiderId.isNotEmpty) {
@@ -235,6 +237,20 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
           ? clientProvidedId
           : UuidHelper.generate();
 
+      final pkgDealId = insertPayload['package_deal_id']?.toString();
+      final pkgDealName = insertPayload['package_deal_name']?.toString();
+      var deliveryNotes = insertPayload['delivery_notes']?.toString();
+      if ((pkgDealId != null || pkgDealName != null) && !(deliveryNotes?.contains('[PACKAGE_DEAL:') ?? false)) {
+        final pkgTag = '[PACKAGE_DEAL: {"id": "${pkgDealId ?? ''}", "name": "${pkgDealName ?? ''}", "quantity": $qty, "price": $totalAmount}]';
+        deliveryNotes = deliveryNotes != null ? '$deliveryNotes $pkgTag' : pkgTag;
+      }
+
+      final fulfillment = insertPayload['fulfillment_type']?.toString() ?? 'client_package';
+      final rawStatus = insertPayload['status']?.toString();
+      final resolvedStatus = (rawStatus == 'pending' || rawStatus == 'unassigned' || rawStatus == 'pending_dispatch')
+          ? (validRiderId != null ? 'assigned' : 'pending_dispatch')
+          : (rawStatus ?? (validRiderId != null ? 'assigned' : 'pending_dispatch'));
+
       // 5. Construct strictly-typed database payload with only valid columns
       final sanitizedDbPayload = <String, dynamic>{
         'id': validOrderUuid,
@@ -250,8 +266,9 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
         'delivery_city': insertPayload['delivery_city']?.toString() ?? 'Abuja',
         'delivery_address': insertPayload['delivery_address']?.toString() ?? 'Delivery Address',
         'landmark': insertPayload['landmark']?.toString(),
-        'lga': insertPayload['lga']?.toString(),
-        'fulfillment_type': 'distributed_inventory',
+        'delivery_lga': insertPayload['delivery_lga']?.toString() ?? insertPayload['lga']?.toString(),
+        'lga': insertPayload['lga']?.toString() ?? insertPayload['delivery_lga']?.toString(),
+        'fulfillment_type': fulfillment,
         'quantity': qty,
         'paid_quantity': (insertPayload['paid_quantity'] as num?)?.toInt() ?? qty,
         'free_quantity': (insertPayload['free_quantity'] as num?)?.toInt() ?? 0,
@@ -260,25 +277,44 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
         'total_amount': totalAmount,
         'payment_type': paymentType,
         'payment_status': paymentStatus,
-        'status': (insertPayload['status']?.toString() == 'pending' || insertPayload['status']?.toString() == 'unassigned')
-            ? 'new'
-            : (insertPayload['status']?.toString() ?? (validRiderId != null ? 'in_transit' : 'new')),
+        'status': resolvedStatus,
         'delivery_method': 'cash',
         'client_delivery_fee': (insertPayload['client_delivery_fee'] as num?)?.toDouble() ?? 5000.0,
         'agent_entitlement': (insertPayload['agent_entitlement'] as num?)?.toDouble() ?? 2500.0,
         'delivery_agent_id': validRiderId,
         'assigned_agent_id': validRiderId,
-        'delivery_notes': insertPayload['delivery_notes']?.toString(),
+        'client_id': insertPayload['client_id']?.toString(),
+        'closer_id': insertPayload['closer_id']?.toString(),
+        'closer_name': insertPayload['closer_name']?.toString(),
+        'closer_code': insertPayload['closer_code']?.toString(),
+        'lead_id': insertPayload['lead_id']?.toString(),
+        'assignment_status': insertPayload['assignment_status']?.toString() ?? (validRiderId != null ? 'auto_assigned' : 'pending_rider_assignment'),
+        'routing_notes': insertPayload['routing_notes']?.toString(),
+        'delivery_notes': deliveryNotes,
         'created_at': DateTime.now().toIso8601String(),
       };
 
       OrderModel createdModel;
       try {
-        final response = await dbClient
-            .from(SupabaseConstants.ordersTable)
-            .insert(sanitizedDbPayload)
-            .select('*, products(name, sku, base_price)')
-            .single();
+        final payloadWithPkg = Map<String, dynamic>.from(sanitizedDbPayload);
+        if (pkgDealId != null) payloadWithPkg['package_deal_id'] = pkgDealId;
+        if (pkgDealName != null) payloadWithPkg['package_deal_name'] = pkgDealName;
+
+        Map<String, dynamic> response;
+        try {
+          response = await dbClient
+              .from(SupabaseConstants.ordersTable)
+              .insert(payloadWithPkg)
+              .select('*, products(name, sku, base_price)')
+              .single();
+        } catch (_) {
+          // Fallback if schema doesn't have package_deal_id column
+          response = await dbClient
+              .from(SupabaseConstants.ordersTable)
+              .insert(sanitizedDbPayload)
+              .select('*, products(name, sku, base_price)')
+              .single();
+        }
 
         createdModel = OrderModel.fromJson(response);
         debugPrint('[ORDERS_DATASOURCE] ✅ Successfully created order ${createdModel.orderNumber} (ID: ${createdModel.id}) in live Supabase DB.');
@@ -287,6 +323,8 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
         createdModel = OrderModel.fromJson({
           ...sanitizedDbPayload,
           'id': validOrderUuid,
+          'package_deal_id': pkgDealId,
+          'package_deal_name': pkgDealName,
         });
       }
 
@@ -313,6 +351,28 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
           });
         } catch (_) {}
       }
+
+      // Ensure createdModel is fully enriched with all client, DC, and rider attributes
+      createdModel = OrderModel.fromEntity(
+        createdModel.copyWith(
+          deliveryAgentId: validRiderId,
+          deliveryAgentName: insertPayload['delivery_agent_name']?.toString() ?? _assignedRiderNamesByOrderId[createdModel.id],
+          deliveryAgentCode: insertPayload['delivery_agent_code']?.toString() ?? _assignedRiderCodesByOrderId[createdModel.id],
+          deliveryAgentPhone: insertPayload['delivery_agent_phone']?.toString(),
+          distributionCenterId: dcId,
+          distributionCenterName: insertPayload['distribution_center_name']?.toString() ?? createdModel.distributionCenterName,
+          clientId: insertPayload['client_id']?.toString() ?? createdModel.clientId,
+          clientName: insertPayload['client_name']?.toString() ?? createdModel.clientName,
+          clientCompany: insertPayload['client_name']?.toString() ?? createdModel.clientCompany,
+          packageDealId: pkgDealId ?? createdModel.packageDealId,
+          packageDealName: pkgDealName ?? createdModel.packageDealName,
+          fulfillmentType: fulfillment,
+          closerId: insertPayload['closer_id']?.toString() ?? createdModel.closerId,
+          closerName: insertPayload['closer_name']?.toString() ?? createdModel.closerName,
+          closerCode: insertPayload['closer_code']?.toString() ?? createdModel.closerCode,
+          leadId: insertPayload['lead_id']?.toString() ?? createdModel.leadId,
+        ),
+      );
 
       _createdOrders.removeWhere((o) => o.id == createdModel.id || o.orderNumber == createdModel.orderNumber);
       _createdOrders.insert(0, createdModel);
@@ -602,19 +662,9 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
     };
     if (paymentStatus != null) {
       updateData['payment_status'] = paymentStatus;
-      if (paymentStatus == 'remitted') {
-        updateData['remittance_status'] = 'remitted';
-        updateData['financial_settlement_status'] = 'cash_remitted_verified';
-        updateData['remitted_at'] = DateTime.now().toIso8601String();
-      }
     }
     if (paymentType != null) {
       updateData['payment_type'] = paymentType;
-    }
-    if (notes != null && notes.contains('[REMITTED')) {
-      updateData['remittance_status'] = 'remitted';
-      updateData['financial_settlement_status'] = 'cash_remitted_verified';
-      updateData['remitted_at'] = DateTime.now().toIso8601String();
     }
     String combinedNotes = notes ?? '';
     if (customerSignatureUrl != null) {
@@ -676,8 +726,6 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
         }
       } catch (serviceErr) {
         debugPrint('[ORDERS_DATASOURCE] ℹ️ updateOrderStatus fallback notice: $serviceErr');
-      } finally {
-        dbClient?.dispose();
       }
     }
   }

@@ -718,6 +718,40 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     }
   }
 
+  Future<bool> checkClientEmailExists(String email) async {
+    final cleanEmail = email.trim().toLowerCase();
+    if (cleanEmail.isEmpty) return false;
+
+    // 1. Check in local registered clients state
+    if (state.clients.any((c) => c.email.toLowerCase() == cleanEmail)) {
+      return true;
+    }
+
+    // 2. Check demo accounts & in-memory registered users
+    const demoAccounts = {
+      'emeka.rider@novaexpress.ng',
+      'rider.emeka@novaexpress.com',
+      'joel.odufu@novaexpress.ng',
+      'dc.supervisor@novaexpress.ng',
+      'client.novacale@novaexpress.ng',
+      'closer.amaka@novacale.ng',
+    };
+    if (demoAccounts.contains(cleanEmail)) return true;
+
+    final registeredUser = AuthRemoteDataSourceImpl.getRegisteredUser(cleanEmail);
+    if (registeredUser != null) return true;
+
+    // 3. Query remote database via repository
+    if (!isTestEnvironment) {
+      try {
+        return await _repository.checkEmailExists(cleanEmail);
+      } catch (e) {
+        debugPrint('[DC_CONSOLE] ℹ️ checkClientEmailExists remote notice: $e');
+      }
+    }
+    return false;
+  }
+
   Future<ClientProfile> createClient({
     required String companyName,
     required String contactPerson,
@@ -728,10 +762,22 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     required String stateName,
     required String tier,
     int closerLimit = 250,
+    String? password,
+    String? clientCode,
+    String? bankName,
+    String? bankAccountNumber,
+    String? bankAccountName,
+    dynamic authDataSource,
   }) async {
     state = state.copyWith(isLoading: true);
     final cleanEmail = email.trim().toLowerCase();
-    if (state.clients.any((c) => c.email.toLowerCase() == cleanEmail)) {
+    final effectivePassword = (password != null && password.trim().length >= 6)
+        ? password.trim()
+        : 'ClientPass123!';
+
+    if (state.clients.any((c) => c.email.toLowerCase() == cleanEmail) ||
+        AuthRemoteDataSourceImpl.getRegisteredUser(cleanEmail) != null ||
+        cleanEmail == 'client.novacale@novaexpress.ng') {
       state = state.copyWith(isLoading: false);
       throw Exception("A user with email '$cleanEmail' already exists. Please use a unique email address.");
     }
@@ -749,19 +795,25 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
           stateName: stateName.trim(),
           tier: tier,
           closerLimit: closerLimit,
+          password: effectivePassword,
+          clientCode: clientCode,
+          bankName: bankName,
+          bankAccountNumber: bankAccountNumber,
+          bankAccountName: bankAccountName,
+          authDataSource: authDataSource,
         );
       } catch (dbErr) {
         if (dbErr.toString().contains('already exists')) {
           rethrow;
         }
         debugPrint('[DC_CONSOLE] ℹ️ Remote createClient notice: $dbErr. Utilizing resilient local fallback.');
-        final isEnt = tier == 'enterprise';
+        final isEnt = tier.toLowerCase() == 'enterprise';
         final cleanName = companyName.trim();
         final words = cleanName.split(RegExp(r'\s+'));
         String prefix = words.take(2).map((w) => w.isNotEmpty ? w[0].toUpperCase() : '').join();
         if (prefix.length < 2) prefix = cleanName.length >= 2 ? cleanName.substring(0, 2).toUpperCase() : 'CL';
         final suffix = (100 + (DateTime.now().millisecondsSinceEpoch % 900) + 1).toString().padLeft(3, '0');
-        final clientCode = 'CLI-$prefix-$suffix';
+        final code = clientCode?.trim().isNotEmpty == true ? clientCode!.trim().toUpperCase() : 'CLI-$prefix-$suffix';
         final clientId = '00000000-0000-4000-8000-${DateTime.now().millisecondsSinceEpoch.toString().padLeft(12, '0')}';
 
         newClient = ClientProfile(
@@ -773,12 +825,36 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
           address: address.trim(),
           city: city.trim(),
           state: stateName.trim(),
-          code: clientCode,
+          code: code,
           tier: tier,
           closerLimit: isEnt ? closerLimit : 0,
           isEnterprise: isEnt,
           totalClosersCount: 0,
           createdAt: DateTime.now(),
+        );
+
+        // Always register in Auth store so client can log in
+        final nameParts = contactPerson.trim().split(' ');
+        final fName = nameParts.isNotEmpty ? nameParts.first : cleanName;
+        final lName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : 'Admin';
+        AuthRemoteDataSourceImpl.registerUserInMemory(
+          UserModel(
+            id: 'cli_${DateTime.now().millisecondsSinceEpoch}',
+            email: cleanEmail,
+            firstName: fName,
+            lastName: lName,
+            phone: phone.trim(),
+            role: 'client',
+            clientId: clientId,
+            clientCompanyName: cleanName,
+            deliveryAgentCode: code,
+            operatingState: stateName.trim(),
+            operatingCity: city.trim(),
+            bankName: bankName ?? '',
+            bankAccountNumber: bankAccountNumber ?? '',
+            bankAccountName: bankAccountName ?? '',
+          ),
+          effectivePassword,
         );
       }
 

@@ -89,4 +89,39 @@ class AuthRepositoryImpl implements AuthRepository {
       operatingCity: operatingCity,
     );
   }
+
+  @override
+  Future<UserEntity> registerClientAccount({
+    required String email,
+    required String password,
+    required String companyName,
+    required String contactPerson,
+    required String phone,
+    required String address,
+    required String city,
+    required String stateName,
+    String tier = 'standard_merchant',
+    int closerLimit = 0,
+    String? clientCode,
+    String? bankName,
+    String? bankAccountNumber,
+    String? bankAccountName,
+  }) async {
+    return await remoteDataSource.registerClientAccount(
+      email: email,
+      password: password,
+      companyName: companyName,
+      contactPerson: contactPerson,
+      phone: phone,
+      address: address,
+      city: city,
+      stateName: stateName,
+      tier: tier,
+      closerLimit: closerLimit,
+      clientCode: clientCode,
+      bankName: bankName,
+      bankAccountNumber: bankAccountNumber,
+      bankAccountName: bankAccountName,
+    );
+  }
 }

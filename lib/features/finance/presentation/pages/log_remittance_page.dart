@@ -484,7 +484,6 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
                   onPressed: financeState.isLoading
                       ? null
                       : () => _handlePaystackRemit(
-                          context,
                           enteredAmount,
                           user,
                           grossCollections,
@@ -525,7 +524,6 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
   }
 
   void _handlePaystackRemit(
-    BuildContext context,
     double enteredAmount,
     dynamic user,
     double grossCollections,
@@ -543,7 +541,7 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
         : (enteredAmount > 0 ? enteredAmount : expectedAmount);
 
     if (finalAmount <= 0) {
-      _onPaymentFailure(context, 'Please enter a valid amount to remit.');
+      _onPaymentFailure('Please enter a valid amount to remit.');
       return;
     }
 
@@ -584,7 +582,9 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
             associatedOrders: associatedOrders,
           );
 
-      if (success && context.mounted) {
+      if (!mounted) return;
+
+      if (success) {
         _amountController.text = isPartial ? remainingAfterPayment.toInt().toString() : '0';
         ref.read(logRemittanceEnteredAmountProvider.notifier).state = isPartial ? remainingAfterPayment : 0.0;
         ref.read(logRemittanceInitialSetProvider.notifier).state = true;
@@ -602,11 +602,11 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
               actionRoute: '/cash/history',
             );
 
-        if (!context.mounted) return;
-        _showSuccessCard(context, finalAmount, confirmedRef, remainingAfterPayment, isPartial);
+        if (!mounted) return;
+        _showSuccessCard(finalAmount, confirmedRef, remainingAfterPayment, isPartial);
       } else {
-        if (!context.mounted) return;
-        _onPaymentFailure(context, 'Could not record verified remittance to ledger. Please check network.');
+        if (!mounted) return;
+        _onPaymentFailure('Could not record verified remittance to ledger. Please check network.');
       }
     }
 
@@ -614,7 +614,7 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
     final timestamp = DateTime.now().millisecondsSinceEpoch.toString().substring(7);
     final paymentRef = 'PSTK-RMT-${cleanCode.isNotEmpty ? cleanCode : 'RDR'}-$timestamp';
 
-    if (!context.mounted) return;
+    if (!mounted) return;
     PaystackGatewayLauncher.openPayment(
       context: context,
       amount: finalAmount,
@@ -629,8 +629,8 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
     );
   }
 
-  void _onPaymentFailure(BuildContext context, String message) {
-    if (!context.mounted) return;
+  void _onPaymentFailure(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         backgroundColor: const Color(0xFFDC2626),
@@ -647,14 +647,15 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
   }
 
   void _showSuccessCard(
-    BuildContext context,
     double amountPaid,
     String reference,
     double remainingBalance,
     bool isPartial,
   ) {
+    if (!mounted) return;
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       isDismissible: false,
       enableDrag: false,
       backgroundColor: Colors.transparent,
@@ -733,8 +734,10 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
               height: 48,
               child: ElevatedButton(
                 onPressed: () {
-                  Navigator.pop(ctx);
-                  context.push('/remittance/receipt/$reference');
+                  Navigator.of(ctx, rootNavigator: true).pop();
+                  if (mounted) {
+                    context.push('/remittance/receipt/$reference');
+                  }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF00A2D3),
@@ -746,8 +749,10 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
             const SizedBox(height: 8),
             TextButton(
               onPressed: () {
-                Navigator.pop(ctx);
-                context.pop();
+                Navigator.of(ctx, rootNavigator: true).pop();
+                if (mounted) {
+                  context.pop();
+                }
               },
               child: Text('Done & Return to Finance', style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B))),
             ),

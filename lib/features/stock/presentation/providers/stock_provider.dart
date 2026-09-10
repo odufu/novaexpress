@@ -516,6 +516,8 @@ class StockNotifier extends StateNotifier<StockState> {
     String? binLocation,
     String? imageAsset,
     String? originDcId,
+    List<String>? coveringStates,
+    Map<String, int>? dcStocks,
   }) async {
     String? resolvedOriginDcId = (originDcId != null && originDcId.isNotEmpty) ? originDcId : null;
     if (resolvedOriginDcId == null) {
@@ -543,6 +545,8 @@ class StockNotifier extends StateNotifier<StockState> {
         binLocation: binLocation,
         imageAsset: imageAsset,
         originDcId: resolvedOriginDcId,
+        coveringStates: coveringStates,
+        dcStocks: dcStocks,
       );
     } catch (_) {
       final newId = 'prod_${DateTime.now().millisecondsSinceEpoch}';

@@ -116,7 +116,19 @@ class _CashPageState extends ConsumerState<CashPage> {
     final double totalRemitted = financialSummary.totalRemittedAllTime;
     final double totalCommission = financialSummary.totalCommissionRetained;
     final double totalTransport = financialSummary.totalTransportRetained;
-    final double toRemit = financialSummary.pendingRemittanceToDC;
+    final double rawToRemit = financialSummary.pendingRemittanceToDC;
+    final unremittedDeliveredCash = recentDeliveredOrders
+        .where((o) => o.isCashPod && !o.isRemitted && o.paymentStatus.toLowerCase() != 'remitted' && o.remittanceStatus.toLowerCase() != 'remitted')
+        .toList();
+    final double unremittedFallbackPayable = unremittedDeliveredCash.fold(0.0, (acc, o) {
+      final comm = (user?.commissionRate != null && user!.commissionRate > 0) ? user.commissionRate : 1000.0;
+      final trans = (user?.transportAllowance != null && user!.transportAllowance > 0) ? user.transportAllowance : 1500.0;
+      final pos = (dcFinanceSettings.isPosFeeReimbursable && o.totalAmount > 0) ? dcFinanceSettings.computePosFee(o.totalAmount) : 0.0;
+      return acc + (o.totalAmount - comm - trans - pos).clamp(0.0, double.infinity);
+    });
+    final double toRemit = (rawToRemit > 0)
+        ? rawToRemit
+        : (unremittedDeliveredCash.isNotEmpty ? unremittedFallbackPayable : 0.0);
     final double riderBalance = financialSummary.myDirectTransfersBalance;
 
     ref.listen<AuthState>(authProvider, (previous, next) {

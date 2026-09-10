@@ -132,14 +132,50 @@ class FinancialSummary {
         return r.associatedOrders.any((ao) => unremittedOrderIds.contains(ao.orderId) || unremittedOrderNumbers.contains(ao.orderNumber));
       }).fold(0.0, (acc, r) => acc + r.amount);
 
+      // Identify already-remitted cash orders
+      final remittedDeliveredCashOrders = deliveredCashOrders
+          .where((o) => o.isRemitted || o.paymentStatus.toLowerCase() == 'remitted' || o.remittanceStatus.toLowerCase() == 'remitted')
+          .toList();
+      final remittedOrderIds = remittedDeliveredCashOrders.map((o) => o.id).toSet();
+      final remittedOrderNumbers = remittedDeliveredCashOrders.map((o) => o.orderNumber).toSet();
+      final remittedAssociatedRemitted = remittances.where((r) {
+        if (r.associatedOrders.isEmpty) return false;
+        return r.associatedOrders.any((ao) => remittedOrderIds.contains(ao.orderId) || remittedOrderNumbers.contains(ao.orderNumber));
+      }).fold(0.0, (acc, r) => acc + r.amount);
+
+      // Calculate net cash payable for already remitted orders
+      double remittedOrdersNetPayable = 0.0;
+      if (remittedDeliveredCashOrders.isNotEmpty) {
+        final double remCash = remittedDeliveredCashOrders.fold(0.0, (acc, o) => acc + o.totalAmount);
+        final double remCommission = remittedDeliveredCashOrders.fold(
+          0.0,
+          (acc, o) => acc + ((user?.commissionRate != null && user!.commissionRate > 0)
+              ? user.commissionRate
+              : (o.agentEntitlement > 0 && o.agentEntitlement != 2500.0 ? o.agentEntitlement : commissionPerOrder)),
+        );
+        final double remTransport = remittedDeliveredCashOrders.fold(
+          0.0,
+          (acc, o) => acc + ((user?.transportAllowance != null && user!.transportAllowance > 0)
+              ? user.transportAllowance
+              : (o.transportFee > 0 && o.transportFee != 1500.0 ? o.transportFee : transportPerOrder)),
+        );
+        remittedOrdersNetPayable = isSalaried
+            ? remCash
+            : (remCash - remCommission - remTransport).clamp(0.0, double.infinity);
+      }
+
       // For general/bulk remittances or tests where remittances don't have individual associatedOrders attached
       final unassociatedRemitted = remittances
           .where((r) => r.associatedOrders.isEmpty)
           .fold(0.0, (acc, r) => acc + r.amount);
 
+      // Unassociated remittances first satisfy historical remitted orders before any surplus applies to unremitted orders
+      final uncoveredRemittedOrdersNet = (remittedOrdersNetPayable - remittedAssociatedRemitted).clamp(0.0, double.infinity);
+      final surplusUnassociatedRemitted = (unassociatedRemitted - uncoveredRemittedOrdersNet).clamp(0.0, double.infinity);
+
       final totalRemittedForThisBatch = batchAssociatedRemitted > 0
           ? batchAssociatedRemitted
-          : unassociatedRemitted;
+          : surplusUnassociatedRemitted;
 
       final diff = netCashPayable - totalRemittedForThisBatch;
       pendingRemittanceToDC = diff > 1.0 ? diff : 0.0;

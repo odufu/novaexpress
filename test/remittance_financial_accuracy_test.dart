@@ -284,5 +284,89 @@ void main() {
       expect(summary.pendingRemittanceToDC, equals(0.0));
       expect(summary.deliveredCashOrdersCount, equals(0));
     });
+
+    test('Daniel Onyanwu case: Historical settled remittances do not zero out new unremitted order', () {
+      // 1. Five historical remitted orders
+      final remOrder1 = order1.copyWith(
+        orderNumber: 'TRK-2591',
+        totalAmount: 55000.0,
+        remittanceStatus: 'remitted',
+        deliveryNotes: '[POD Collected via Cash] [REMITTED: PSTK-RMT-PDA7000-420083 | Amount: ₦146500]',
+      );
+      final remOrder2 = order1.copyWith(
+        orderNumber: 'TRK-8712',
+        totalAmount: 50000.0,
+        remittanceStatus: 'remitted',
+        deliveryNotes: '[POD Collected via Cash] [REMITTED: PSTK-RMT-PDA7000-420083 | Amount: ₦146500]',
+      );
+      final remOrder3 = order1.copyWith(
+        orderNumber: 'TRK-7954',
+        totalAmount: 50000.0,
+        remittanceStatus: 'remitted',
+        deliveryNotes: '[POD Collected via Cash] [REMITTED: PSTK-RMT-PDA7000-420083 | Amount: ₦146500]',
+      );
+      final remOrder4 = order1.copyWith(
+        orderNumber: 'TRK-6919',
+        totalAmount: 55000.0,
+        remittanceStatus: 'remitted',
+        deliveryNotes: '[POD Collected via Cash] [REMITTED: PSTK-RMT-PDA7454-384865 | Amount: ₦49900]',
+      );
+
+      // 2. One unremitted delivered order (Samuel Jackson)
+      final unremittedOrder = OrderEntity(
+        id: 'ord-samuel-jackson',
+        orderNumber: 'NOV-2026-7332',
+        customerName: 'Samuel Jackson',
+        customerPhone: '08055555555',
+        deliveryState: 'Abuja',
+        deliveryCity: 'Garki',
+        deliveryAddress: 'Back of redeemed church',
+        productName: 'Alpha Man',
+        status: 'delivered',
+        quantity: 5,
+        basePrice: 55000.0,
+        upsellAmount: 0.0,
+        totalAmount: 55000.0,
+        paymentType: 'pay_on_delivery',
+        paymentStatus: 'collected',
+        remittanceStatus: 'unremitted',
+        deliveryNotes: '[POD Collected via Cash] Cash in custody.',
+        agentEntitlement: 1000.0,
+        transportFee: 1500.0,
+        createdAt: DateTime.now(),
+      );
+
+      // 3. Historical remittances (unassociated in DB or associated via notes)
+      final histRem1 = RemittanceEntity(
+        id: 'rem-hist-1',
+        referenceNumber: 'PSTK-RMT-PDA7454-384865',
+        amount: 49900.0,
+        status: 'verified',
+        paymentMethod: 'paystack',
+        notes: '[PAYSTACK] Ref: PSTK-RMT-PDA7454-384865 [Orders: TRK-6919] - Auto-verified instant remittance.',
+        createdAt: DateTime.now().subtract(const Duration(days: 2)),
+      );
+      final histRem2 = RemittanceEntity(
+        id: 'rem-hist-2',
+        referenceNumber: 'PSTK-RMT-PDA7000-420083',
+        amount: 146500.0,
+        status: 'verified',
+        paymentMethod: 'paystack',
+        notes: '[PAYSTACK] Ref: PSTK-RMT-PDA7000-420083 [Orders: TRK-2591, TRK-8712, TRK-7954] - Auto-verified instant remittance.',
+        createdAt: DateTime.now().subtract(const Duration(days: 2)),
+      );
+
+      // Even when remittances have empty associatedOrders list:
+      final summary = FinancialSummary.calculate(
+        orders: [remOrder1, remOrder2, remOrder3, remOrder4, unremittedOrder],
+        remittances: [histRem1, histRem2],
+        user: user,
+        posFee: 900.0,
+      );
+
+      // Gross: 55,000. Comm: 1,000. Trans: 1,500. POS Fee: 900.
+      // Net Payable for Samuel Jackson MUST be 51,600 and MUST NOT be zeroed out!
+      expect(summary.pendingRemittanceToDC, equals(51600.0));
+    });
   });
 }

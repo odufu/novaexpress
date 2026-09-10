@@ -27,37 +27,41 @@ class PaystackGatewayLauncher {
     VoidCallback? onCancel,
   }) async {
     // 1. Show connecting dialog
+    BuildContext? dialogContext;
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => Dialog(
-        backgroundColor: Colors.transparent,
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: const Color(0xFF0F172A),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFF334155)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(strokeWidth: 2.5, color: Color(0xFF00A2D3)),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Text(
-                  'Initializing Real Paystack Gateway...',
-                  style: GoogleFonts.inter(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w600),
+      builder: (ctx) {
+        dialogContext = ctx;
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0F172A),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFF334155)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2.5, color: Color(0xFF00A2D3)),
                 ),
-              ),
-            ],
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    'Initializing Real Paystack Gateway...',
+                    style: GoogleFonts.inter(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
 
     String? authUrl;
@@ -78,9 +82,14 @@ class PaystackGatewayLauncher {
       debugPrint('[PAYSTACK_LAUNCHER] Error initializing Paystack: $e');
     }
 
-    if (!context.mounted) return;
-    // Dismiss the connecting dialog
-    Navigator.of(context, rootNavigator: true).pop();
+    // Safely dismiss the connecting dialog without popping parent routes
+    if (dialogContext != null && dialogContext!.mounted) {
+      Navigator.of(dialogContext!).pop();
+    } else if (context.mounted) {
+      Navigator.of(context, rootNavigator: true).maybePop();
+    }
+
+    bool hasHandledSuccess = false;
 
     if (kIsWeb) {
       // WEB: Popup the authentic Paystack Checkout modal directly on the current screen!
@@ -97,13 +106,18 @@ class PaystackGatewayLauncher {
           'agent_id': agentId,
         },
         onSuccess: (ref) {
+          if (hasHandledSuccess) return;
+          hasHandledSuccess = true;
           onSuccess(ref);
         },
         onClose: () async {
+          if (hasHandledSuccess) return;
           // Verify on close in case payment completed but webhook/callback lagged
           try {
             final result = await _paystackService.verifyTransaction(reference);
             if (result.isSuccessful) {
+              if (hasHandledSuccess) return;
+              hasHandledSuccess = true;
               onSuccess(reference);
             } else {
               onCancel?.call();
@@ -113,6 +127,7 @@ class PaystackGatewayLauncher {
           }
         },
         onFallback: () {
+          if (hasHandledSuccess) return;
           // Fallback if browser extensions or blockers block inline JS
           PaystackCheckoutOverlay.show(
             context: context,
@@ -124,12 +139,17 @@ class PaystackGatewayLauncher {
             agentId: agentId,
             transactionType: transactionType,
             title: title,
-            onSuccess: onSuccess,
+            onSuccess: (ref) {
+              if (hasHandledSuccess) return;
+              hasHandledSuccess = true;
+              onSuccess(ref);
+            },
             onCancel: onCancel,
           );
         },
       );
     } else {
+      if (!context.mounted) return;
       // MOBILE (Android / iOS): Open real Paystack in-app screen with native WebView
       if (authUrl == null || authUrl.isEmpty) {
         PaystackCheckoutOverlay.show(
@@ -148,6 +168,7 @@ class PaystackGatewayLauncher {
         return;
       }
 
+      if (!context.mounted) return;
       final bool? success = await Navigator.push<bool>(
         context,
         MaterialPageRoute(

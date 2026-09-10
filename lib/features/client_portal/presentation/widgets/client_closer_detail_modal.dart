@@ -6,7 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/widgets/product_image_widget.dart';
 import '../../../dc_console/presentation/providers/product_catalog_provider.dart';
-import '../../../dc_console/presentation/widgets/dc_order_detail_modal.dart';
+import 'client_order_tracking_modal.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../../domain/entities/client_closer.dart';
 import '../../domain/entities/customer_lead.dart';
@@ -513,7 +513,7 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
               child: TabBarView(
                 controller: _tabController,
                 children: [
-                  // Tab 1: Orders List (Tap to open DCOrderDetailModal)
+                  // Tab 1: Orders List (Tap to open ClientOrderTrackingModal)
                   _buildOrdersTab(closerOrders, isDark, currencyFormatter),
 
                   // Tab 2: Leads Pipeline
@@ -883,7 +883,7 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
   }
 
   // ==========================================
-  // TAB 1: ORDERS LIST (TAP OPENS DCOrderDetailModal)
+  // TAB 1: ORDERS LIST (TAP OPENS ClientOrderTrackingModal)
   // ==========================================
   Widget _buildOrdersTab(List<OrderEntity> orders, bool isDark, NumberFormat currencyFormatter) {
     return Padding(
@@ -987,13 +987,7 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
     }
 
     return InkWell(
-      onTap: () {
-        // OPEN FULL UNIVERSAL DC ORDER DETAIL MODAL
-        showDialog(
-          context: context,
-          builder: (ctx) => DCOrderDetailModal(order: order),
-        );
-      },
+      onTap: () => ClientOrderTrackingModal.show(context, order),
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.all(14),

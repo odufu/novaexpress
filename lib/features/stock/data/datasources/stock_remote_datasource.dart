@@ -30,6 +30,8 @@ abstract class StockRemoteDataSource {
     String? clientId,
     String? imageAsset,
     String? originDcId,
+    List<String>? coveringStates,
+    Map<String, int>? dcStocks,
   });
   Future<Map<String, dynamic>> assignStockToRider({
     required String productIdOrSku,
@@ -119,6 +121,55 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
       } catch (_) {}
     }
     return {};
+  }
+
+  List<String> _parseCoveringStates(String? description) {
+    if (description == null) return [];
+    final match = RegExp(r'\[COVERING_STATES:\s*(\[.*?\])\]').firstMatch(description);
+    if (match != null) {
+      try {
+        final decoded = jsonDecode(match.group(1)!) as List<dynamic>;
+        return decoded.map((e) => e.toString()).toList();
+      } catch (_) {}
+    }
+    return [];
+  }
+
+  bool _stateMatches(String dcState, String targetState) {
+    final cleanDc = dcState.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+    final cleanTarget = targetState.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+    if (cleanDc.isEmpty || cleanTarget.isEmpty) return false;
+    if (cleanDc == cleanTarget) return true;
+    if (cleanDc.contains(cleanTarget) || cleanTarget.contains(cleanDc)) return true;
+    if ((cleanDc.contains('abuja') || cleanDc.contains('fct')) &&
+        (cleanTarget.contains('abuja') || cleanTarget.contains('fct'))) {
+      return true;
+    }
+    return false;
+  }
+
+  Map<String, String>? _dcStateMapCache;
+  Future<Map<String, String>> _resolveDcStateMap(SupabaseClient dbClient) async {
+    if (_dcStateMapCache != null && _dcStateMapCache!.isNotEmpty) {
+      return _dcStateMapCache!;
+    }
+    final map = <String, String>{
+      '22222222-2222-4222-8222-222222222222': 'Federal Capital Territory',
+      '00000000-0000-4000-8000-788825051520': 'Benue',
+      '00000000-0000-4000-8000-788889180011': 'Ekiti',
+    };
+    try {
+      final res = await dbClient.from('distribution_centers').select('id, state');
+      for (final r in res as List) {
+        final id = r['id']?.toString() ?? '';
+        final st = r['state']?.toString() ?? '';
+        if (id.isNotEmpty && st.isNotEmpty) {
+          map[id] = st;
+        }
+      }
+      _dcStateMapCache = map;
+    } catch (_) {}
+    return map;
   }
 
   @override
@@ -251,6 +302,9 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
 
       final List<StockItemModel> resultItems = [];
       final Set<String> processedNames = {};
+      final dcStateMap = (validDcId != null && validDcId.isNotEmpty)
+          ? await _resolveDcStateMap(dbClient)
+          : <String, String>{};
 
       // 1. Process products from products table
       for (final p in productsList) {
@@ -295,6 +349,7 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
         final int availableCount;
         final int assignedCount;
         final int totalInCustody;
+        bool isCoveredByThisDc = true;
 
         if (validAgentId != null) {
           // Rider View: Available is physical transfers minus delivered orders
@@ -307,15 +362,24 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
           final dbQty = (json['stock_quantity'] as num?)?.toInt() ?? 0;
           final pDesc = json['description']?.toString() ?? '';
 
+          int scopedQty = 0;
           if (validDcId != null && validDcId.isNotEmpty) {
             final dcStocks = _parseDcStocks(pDesc);
             final originDc = _parseOriginDc(pDesc);
+            final coveringStates = _parseCoveringStates(pDesc);
 
-            int scopedQty = 0;
-            if (dcStocks.isNotEmpty) {
-              scopedQty = dcStocks[validDcId] ?? 0;
-            } else if (originDc != null && originDc.isNotEmpty) {
-              scopedQty = (originDc == validDcId) ? dbQty : 0;
+            if (coveringStates.isNotEmpty || dcStocks.isNotEmpty) {
+              final dcState = dcStateMap[validDcId] ?? '';
+              final bool matchesDcState = coveringStates.any((st) => _stateMatches(dcState, st));
+              final bool matchesExplicitDc = dcStocks.containsKey(validDcId) || originDc == validDcId;
+
+              if (matchesDcState || matchesExplicitDc) {
+                isCoveredByThisDc = true;
+                scopedQty = dcStocks[validDcId] ?? (originDc == validDcId ? dbQty : 0);
+              } else {
+                isCoveredByThisDc = false;
+                scopedQty = 0;
+              }
             } else {
               // Legacy untagged products
               const otukpoDcId = '00000000-0000-4000-8000-788825051520';
@@ -338,7 +402,12 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
           totalInCustody = availableCount;
         }
 
-        // In DC Overview, all master products are visible so any DC can request restock or package
+        // When viewing a specific DC, products with defined covering states that exclude this DC MUST NOT appear!
+        if (validDcId != null && validDcId.isNotEmpty && !isCoveredByThisDc) {
+          continue;
+        }
+
+        // In DC Overview, all covered products are visible (even with availableCount 0 awaiting initial supply)
         if (validAgentId == null || availableCount > 0 || totalAllocatedToRider > 0 || deliveredQty > 0 || inTransitQty > 0) {
           json['assigned_count'] = assignedCount;
           json['delivered_count'] = deliveredQty;
@@ -429,6 +498,8 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
     String? clientId,
     String? imageAsset,
     String? originDcId,
+    List<String>? coveringStates,
+    Map<String, int>? dcStocks,
   }) async {
     final dbClient = _getAuthDbClient();
     const compId = '11111111-1111-4111-8111-111111111111';
@@ -437,7 +508,12 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
     if (imageAsset != null && imageAsset.trim().isNotEmpty && !finalDesc.contains('[IMAGE_URL:')) {
       finalDesc = '$finalDesc [IMAGE_URL: ${imageAsset.trim()}]';
     }
-    if (originDcId != null && originDcId.trim().isNotEmpty) {
+    if (coveringStates != null && coveringStates.isNotEmpty && !finalDesc.contains('[COVERING_STATES:')) {
+      finalDesc = '$finalDesc [COVERING_STATES: ${jsonEncode(coveringStates)}]';
+    }
+    if (dcStocks != null && dcStocks.isNotEmpty && !finalDesc.contains('[DC_STOCKS:')) {
+      finalDesc = '$finalDesc [DC_STOCKS: ${jsonEncode(dcStocks)}]';
+    } else if (originDcId != null && originDcId.trim().isNotEmpty) {
       final cleanDc = originDcId.trim();
       if (!finalDesc.contains('[ORIGIN_DC:')) {
         finalDesc = '$finalDesc [ORIGIN_DC: $cleanDc]';

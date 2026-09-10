@@ -34,11 +34,20 @@
     }
 
     #splash-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: #0A0E1A;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       text-align: center;
+      z-index: 99999;
+      pointer-events: none;
+      transition: opacity 0.4s ease-out;
     }
 
     .logo-wrapper {
@@ -157,6 +166,36 @@
   </script>
 
   <script src="flutter_bootstrap.js" async></script>
+
+  <script>
+    function removeSplashScreen() {
+      var splash = document.getElementById('splash-container');
+      if (splash) {
+        splash.style.opacity = '0';
+        setTimeout(function () {
+          if (splash && splash.parentNode) {
+            splash.parentNode.removeChild(splash);
+          }
+        }, 400);
+      }
+    }
+
+    window.addEventListener('flutter-first-frame', removeSplashScreen);
+
+    // Continuous check in case first-frame event fired before listener or was missed
+    var checkFlutterLoadedInterval = setInterval(function () {
+      if (document.querySelector('flutter-view') || document.querySelector('flt-glass-pane') || document.querySelector('canvas')) {
+        clearInterval(checkFlutterLoadedInterval);
+        removeSplashScreen();
+      }
+    }, 150);
+
+    // Guaranteed safety fallback: never trap user on splash screen
+    setTimeout(function () {
+      clearInterval(checkFlutterLoadedInterval);
+      removeSplashScreen();
+    }, 5000);
+  </script>
 </body>
 </html>
 

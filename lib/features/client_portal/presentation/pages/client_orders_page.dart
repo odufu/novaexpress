@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/constants/nigeria_locations.dart';
 import '../../../../core/theme/theme_provider.dart';
-import '../../../dc_console/presentation/widgets/dc_order_detail_modal.dart';
+import '../widgets/client_order_tracking_modal.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../providers/client_portal_provider.dart';
 import '../widgets/client_create_order_modal.dart';
@@ -381,10 +381,7 @@ class _ClientOrdersPageState extends ConsumerState<ClientOrdersPage> {
 
   Widget _buildOrderTableRow(OrderEntity order, bool isDark) {
     return InkWell(
-      onTap: () => showDialog(
-        context: context,
-        builder: (ctx) => DCOrderDetailModal(order: order),
-      ),
+      onTap: () => ClientOrderTrackingModal.show(context, order),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
@@ -515,10 +512,7 @@ class _ClientOrdersPageState extends ConsumerState<ClientOrdersPage> {
 
   Widget _buildOrderMobileCard(OrderEntity order, bool isDark) {
     return InkWell(
-      onTap: () => showDialog(
-        context: context,
-        builder: (ctx) => DCOrderDetailModal(order: order),
-      ),
+      onTap: () => ClientOrderTrackingModal.show(context, order),
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.all(14),

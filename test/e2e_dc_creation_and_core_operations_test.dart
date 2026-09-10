@@ -232,6 +232,8 @@ class _MockStockRemoteDS implements StockRemoteDataSource {
     String? clientId,
     String? imageAsset,
     String? originDcId,
+    List<String>? coveringStates,
+    Map<String, int>? dcStocks,
   }) async {
     final model = StockItemModel(
       id: 'prod-${sku.toLowerCase()}',

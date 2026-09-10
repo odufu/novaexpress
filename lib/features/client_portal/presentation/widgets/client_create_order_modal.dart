@@ -11,13 +11,27 @@ import '../../../orders/domain/services/order_routing_service.dart';
 import '../providers/client_portal_provider.dart';
 
 class ClientCreateOrderModal extends ConsumerStatefulWidget {
-  const ClientCreateOrderModal({super.key});
+  final CatalogProduct? initialProduct;
+  final ProductPackage? initialPackage;
 
-  static Future<void> show(BuildContext context) {
+  const ClientCreateOrderModal({
+    super.key,
+    this.initialProduct,
+    this.initialPackage,
+  });
+
+  static Future<void> show(
+    BuildContext context, {
+    CatalogProduct? product,
+    ProductPackage? package,
+  }) {
     return showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const ClientCreateOrderModal(),
+      builder: (context) => ClientCreateOrderModal(
+        initialProduct: product,
+        initialPackage: package,
+      ),
     );
   }
 
@@ -43,14 +57,50 @@ class _ClientCreateOrderModalState extends ConsumerState<ClientCreateOrderModal>
   int _quantity = 1;
   double _price = 22000.0;
   String _paymentType = 'Pay on Delivery (Cash/POS)';
+  String _dispatchMode = 'auto_assign'; // 'auto_assign' or 'dc_pool'
 
   bool _isSubmitting = false;
 
   @override
   void initState() {
     super.initState();
-    _loadLgas();
-    _initDefaultProduct();
+    _initProductAndState();
+  }
+
+  void _initProductAndState() {
+    if (widget.initialProduct != null) {
+      _selectedProduct = widget.initialProduct;
+      if (widget.initialPackage != null) {
+        _selectedPackage = widget.initialPackage;
+        _quantity = widget.initialPackage!.quantity;
+        _price = widget.initialPackage!.packagePrice;
+      } else {
+        final catalog = ref.read(productCatalogProvider);
+        final pkgs = catalog.getPackagesForProduct(_selectedProduct!.name);
+        if (pkgs.isNotEmpty) {
+          _selectedPackage = pkgs.first;
+          _quantity = _selectedPackage!.quantity;
+          _price = _selectedPackage!.packagePrice;
+        } else {
+          _selectedPackage = null;
+          _quantity = 1;
+          _price = _selectedProduct!.defaultUnitPrice;
+        }
+      }
+
+      if (_selectedProduct!.coveringStates.isNotEmpty) {
+        final hasCurrentState = _selectedProduct!.coveringStates.any(
+          (s) => s.toLowerCase().contains(_selectedState.toLowerCase()) || _selectedState.toLowerCase().contains(s.toLowerCase()),
+        );
+        if (!hasCurrentState) {
+          _selectedState = _selectedProduct!.coveringStates.first;
+        }
+      }
+      _loadLgas();
+    } else {
+      _loadLgas();
+      _initDefaultProduct();
+    }
   }
 
   void _loadLgas() {
@@ -74,6 +124,10 @@ class _ClientCreateOrderModalState extends ConsumerState<ClientCreateOrderModal>
         _selectedPackage = pkgs.first;
         _quantity = _selectedPackage!.quantity;
         _price = _selectedPackage!.packagePrice;
+      }
+      if (_selectedProduct!.coveringStates.isNotEmpty) {
+        _selectedState = _selectedProduct!.coveringStates.first;
+        _loadLgas();
       }
     }
   }
@@ -103,6 +157,16 @@ class _ClientCreateOrderModalState extends ConsumerState<ClientCreateOrderModal>
         _quantity = 1;
         _price = prod.defaultUnitPrice;
       }
+
+      if (prod.coveringStates.isNotEmpty) {
+        final hasCurrentState = prod.coveringStates.any(
+          (s) => s.toLowerCase().contains(_selectedState.toLowerCase()) || _selectedState.toLowerCase().contains(s.toLowerCase()),
+        );
+        if (!hasCurrentState) {
+          _selectedState = prod.coveringStates.first;
+          _loadLgas();
+        }
+      }
     });
   }
 
@@ -126,6 +190,7 @@ class _ClientCreateOrderModalState extends ConsumerState<ClientCreateOrderModal>
 
     setState(() => _isSubmitting = true);
     try {
+      final isAutoAssign = _dispatchMode == 'auto_assign';
       final order = await ref.read(clientPortalProvider.notifier).createOrder(
         customerName: _customerNameController.text.trim(),
         customerPhone: _customerPhoneController.text.trim(),
@@ -142,11 +207,16 @@ class _ClientCreateOrderModalState extends ConsumerState<ClientCreateOrderModal>
         packageId: _selectedPackage?.id,
         packageName: _selectedPackage?.packageName,
         paymentType: _paymentType,
+        autoAssignRider: isAutoAssign,
         notes: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
       );
 
       if (mounted) {
         Navigator.of(context).pop();
+        final successMsg = isAutoAssign && order.deliveryAgentName != null
+            ? 'Order ${order.orderNumber} created & auto-assigned live to ${order.deliveryAgentName} (${order.deliveryLga})!'
+            : 'Order ${order.orderNumber} created & sent live to ${order.distributionCenterName ?? "DC Hub"} unassigned pool for rider dispatch!';
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: const Color(0xFF0D9488),
@@ -156,7 +226,7 @@ class _ClientCreateOrderModalState extends ConsumerState<ClientCreateOrderModal>
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Order ${order.orderNumber} created and dispatched successfully to ${order.deliveryLga}!',
+                    successMsg,
                     style: GoogleFonts.inter(fontWeight: FontWeight.w600),
                   ),
                 ),
@@ -490,6 +560,33 @@ class _ClientCreateOrderModalState extends ConsumerState<ClientCreateOrderModal>
                     // Section 3: Delivery Location (State & LGA Routing)
                     _buildSectionHeader('3. Destination & Multi-Zone Dispatch', Icons.place_outlined),
                     const SizedBox(height: 12),
+                    if (_selectedProduct != null && _selectedProduct!.coveringStates.isNotEmpty) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF37021).withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFF37021).withValues(alpha: 0.25)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.location_on_outlined, size: 14, color: Color(0xFFF37021)),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'Product Covering States: ${_selectedProduct!.coveringStates.join(", ")}',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFFEA580C),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
                     LayoutBuilder(
                       builder: (context, constraints) {
                         final isRow = constraints.maxWidth >= 450;
@@ -554,71 +651,222 @@ class _ClientCreateOrderModalState extends ConsumerState<ClientCreateOrderModal>
                       validator: (v) => v == null || v.trim().isEmpty ? 'Delivery address is required' : null,
                     ),
 
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 16),
 
-                    // Real-Time Auto Dispatch Live Preview Banner
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: routingPreview.isAssignedToRider
-                            ? const Color(0xFFF0FDF4)
-                            : const Color(0xFFFFFBEB),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: routingPreview.isAssignedToRider
-                              ? const Color(0xFF86EFAC)
-                              : const Color(0xFFFCD34D),
-                        ),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(
-                            routingPreview.isAssignedToRider
-                                ? Icons.verified_rounded
-                                : Icons.info_outline_rounded,
-                            color: routingPreview.isAssignedToRider
-                                ? const Color(0xFF16A34A)
-                                : const Color(0xFFD97706),
-                            size: 20,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                    // Dispatch Workflow Option
+                    Text(
+                      'Dispatch & Fleet Assignment Workflow',
+                      style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF475569)),
+                    ),
+                    const SizedBox(height: 8),
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isRow = constraints.maxWidth >= 450;
+                        final autoCard = InkWell(
+                          onTap: () => setState(() => _dispatchMode = 'auto_assign'),
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                            decoration: BoxDecoration(
+                              color: _dispatchMode == 'auto_assign'
+                                  ? const Color(0xFF0D9488).withValues(alpha: 0.1)
+                                  : const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: _dispatchMode == 'auto_assign'
+                                    ? const Color(0xFF0D9488)
+                                    : const Color(0xFFCBD5E1),
+                                width: _dispatchMode == 'auto_assign' ? 1.5 : 1,
+                              ),
+                            ),
+                            child: Row(
                               children: [
-                                Text(
-                                  routingPreview.isAssignedToRider
-                                      ? 'Automated Dispatch Target: ${routingPreview.distributionCenter?.name}'
-                                      : (routingPreview.distributionCenter != null
-                                          ? 'Routed to Hub: ${routingPreview.distributionCenter?.name} (Pending Rider Assignment)'
-                                          : 'Escalates to Grand DC HQ (Manual Routing)'),
-                                  style: GoogleFonts.inter(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13,
-                                    color: routingPreview.isAssignedToRider
-                                        ? const Color(0xFF166534)
-                                        : const Color(0xFF92400E),
-                                  ),
+                                Icon(
+                                  _dispatchMode == 'auto_assign' ? Icons.radio_button_checked : Icons.radio_button_off,
+                                  color: _dispatchMode == 'auto_assign' ? const Color(0xFF0D9488) : const Color(0xFF94A3B8),
+                                  size: 18,
                                 ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  routingPreview.driver != null
-                                      ? 'Assigned Rider: ${routingPreview.driver?.name} (${routingPreview.driver?.phone})'
-                                      : routingPreview.dispatchDiagnosis,
-                                  style: GoogleFonts.inter(
-                                    fontSize: 12,
-                                    color: routingPreview.isAssignedToRider
-                                        ? const Color(0xFF15803D)
-                                        : const Color(0xFFB45309),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('⚡ System Auto-Assign', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                                      Text('Live match to LGA rider', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
+                                    ],
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                        ],
-                      ),
+                        );
+
+                        final poolCard = InkWell(
+                          onTap: () => setState(() => _dispatchMode = 'dc_pool'),
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                            decoration: BoxDecoration(
+                              color: _dispatchMode == 'dc_pool'
+                                  ? const Color(0xFFF37021).withValues(alpha: 0.1)
+                                  : const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: _dispatchMode == 'dc_pool'
+                                    ? const Color(0xFFF37021)
+                                    : const Color(0xFFCBD5E1),
+                                width: _dispatchMode == 'dc_pool' ? 1.5 : 1,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  _dispatchMode == 'dc_pool' ? Icons.radio_button_checked : Icons.radio_button_off,
+                                  color: _dispatchMode == 'dc_pool' ? const Color(0xFFF37021) : const Color(0xFF94A3B8),
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('🏢 DC Hub Pool', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                                      Text('DC manager assigns rider', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+
+                        return isRow
+                            ? Row(
+                                children: [
+                                  Expanded(child: autoCard),
+                                  const SizedBox(width: 12),
+                                  Expanded(child: poolCard),
+                                ],
+                              )
+                            : Column(
+                                children: [
+                                  autoCard,
+                                  const SizedBox(height: 10),
+                                  poolCard,
+                                ],
+                              );
+                      },
                     ),
+                    const SizedBox(height: 14),
+
+                    // Real-Time Dispatch Live Preview Banner
+                    if (_dispatchMode == 'auto_assign') ...[
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: routingPreview.isAssignedToRider
+                              ? const Color(0xFFF0FDF4)
+                              : const Color(0xFFFFFBEB),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: routingPreview.isAssignedToRider
+                                ? const Color(0xFF86EFAC)
+                                : const Color(0xFFFCD34D),
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              routingPreview.isAssignedToRider
+                                  ? Icons.verified_rounded
+                                  : Icons.info_outline_rounded,
+                              color: routingPreview.isAssignedToRider
+                                  ? const Color(0xFF16A34A)
+                                  : const Color(0xFFD97706),
+                              size: 20,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    routingPreview.isAssignedToRider
+                                        ? 'Automated Dispatch Target: ${routingPreview.distributionCenter?.name}'
+                                        : (routingPreview.distributionCenter != null
+                                            ? 'Routed to Hub: ${routingPreview.distributionCenter?.name} (Pending Rider Assignment)'
+                                            : 'Escalates to Grand DC HQ (Manual Routing)'),
+                                    style: GoogleFonts.inter(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                      color: routingPreview.isAssignedToRider
+                                          ? const Color(0xFF166534)
+                                          : const Color(0xFF92400E),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    routingPreview.driver != null
+                                        ? 'Assigned Rider: ${routingPreview.driver?.name} (${routingPreview.driver?.phone})'
+                                        : routingPreview.dispatchDiagnosis,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      color: routingPreview.isAssignedToRider
+                                          ? const Color(0xFF15803D)
+                                          : const Color(0xFFB45309),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ] else ...[
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF7ED),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFFDBA74)),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(
+                              Icons.warehouse_rounded,
+                              color: Color(0xFFEA580C),
+                              size: 20,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'DC Hub Destination: ${routingPreview.distributionCenter?.name ?? "Regional Distribution Center"}',
+                                    style: GoogleFonts.inter(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                      color: const Color(0xFF9A3412),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Order will appear live in the DC Unassigned Pool for the hub supervisor to assign to a delivery rider.',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      color: const Color(0xFFC2410C),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
 
                     const SizedBox(height: 24),
 
@@ -627,6 +875,7 @@ class _ClientCreateOrderModalState extends ConsumerState<ClientCreateOrderModal>
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       value: _paymentType,
+                      isExpanded: true,
                       decoration: _inputDecoration('Payment Type'),
                       items: const [
                         DropdownMenuItem(value: 'Pay on Delivery (Cash/POS)', child: Text('Pay on Delivery (Cash or POS)')),

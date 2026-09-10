@@ -47,3 +47,10 @@ class TransactionFeeCalculator {
   }
 }
 
+class Formatters {
+  static String currency(num amount) {
+    final formatter = NumberFormat('#,##0.00');
+    return formatter.format(amount);
+  }
+}
+

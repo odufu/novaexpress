@@ -10,6 +10,8 @@ import '../../../dc_console/presentation/providers/product_catalog_provider.dart
 import '../../../orders/domain/entities/order.dart';
 import '../../../orders/domain/services/order_routing_service.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
+import '../../../stock/presentation/providers/stock_provider.dart';
+import '../../../dc_console/domain/entities/distribution_center.dart';
 import '../../domain/entities/client_closer.dart';
 import '../../domain/entities/client_profile.dart';
 import '../../domain/entities/customer_lead.dart';
@@ -249,6 +251,38 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
           ),
         ) {
     loadClientData();
+    _ref.listen<OrdersState>(ordersProvider, (previous, next) {
+      if (next.orders.isEmpty) return;
+      final companyName = state.clientProfile.companyName.toLowerCase();
+      final clientId = state.clientProfile.id;
+      final matchingOrders = next.orders.where((o) =>
+          (o.clientName.toLowerCase().contains(companyName)) ||
+          (o.clientId != null && o.clientId == clientId) ||
+          o.productName.toLowerCase().contains('grazer')).toList();
+      if (matchingOrders.isNotEmpty) {
+        final merged = [...matchingOrders];
+        for (final existing in state.orders) {
+          if (!merged.any((m) => m.id == existing.id || m.orderNumber == existing.orderNumber)) {
+            merged.add(existing);
+          }
+        }
+        state = state.copyWith(orders: merged);
+      }
+    });
+  }
+
+  /// Syncs an order updated by DC console or rider dispatch back into client portal state
+  void syncOrderUpdate(OrderEntity updatedOrder) {
+    final updatedOrders = state.orders.map((o) {
+      if (o.id == updatedOrder.id || o.orderNumber == updatedOrder.orderNumber) {
+        return updatedOrder;
+      }
+      return o;
+    }).toList();
+    if (!updatedOrders.any((o) => o.id == updatedOrder.id || o.orderNumber == updatedOrder.orderNumber)) {
+      updatedOrders.insert(0, updatedOrder);
+    }
+    state = state.copyWith(orders: updatedOrders);
   }
 
   void setSearchQuery(String query) {
@@ -716,6 +750,7 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
     String? packageId,
     String? packageName,
     String paymentType = 'Pay on Delivery (Cash/POS)',
+    bool autoAssignRider = true,
     String? closerId,
     String? closerName,
     String? closerCode,
@@ -753,12 +788,14 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         productName: productName,
         packageDealId: packageId,
         packageDealName: packageName,
+        fulfillmentType: 'client_package',
         clientName: state.clientProfile.companyName,
         clientId: state.clientProfile.id,
         closerId: closerId,
         closerName: closerName,
         closerCode: closerCode,
         leadId: leadId,
+        deliveryNotes: notes,
         createdAt: DateTime.now(),
       );
 
@@ -772,21 +809,29 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
 
       final String assignedDcId = routingResult.distributionCenter?.id ??
           (allDcs.isNotEmpty ? allDcs.firstWhere((dc) => dc.isHub, orElse: () => allDcs.first).id : '22222222-2222-4222-8222-222222222222');
-      final String? assignedDriverId = routingResult.driver?.id;
-      final String? assignedDriverName = routingResult.driver?.name;
-      final String? assignedDriverPhone = routingResult.driver?.phone;
+      final String assignedDcName = routingResult.distributionCenter?.name ?? dcState.activeHubName;
 
+      String? assignedDriverId;
+      String? assignedDriverName;
+      String? assignedDriverPhone;
+      String? assignedDriverCode;
       String initialStatus;
       String assignmentStatus;
-      if (routingResult.status == RoutingStatus.assignedToRider && routingResult.driver != null) {
+
+      if (autoAssignRider && routingResult.status == RoutingStatus.assignedToRider && routingResult.driver != null) {
         initialStatus = 'assigned';
         assignmentStatus = 'auto_assigned';
-      } else if (routingResult.status == RoutingStatus.routedToDcOnly) {
-        initialStatus = 'pending_dispatch';
-        assignmentStatus = 'pending_rider_assignment';
+        assignedDriverId = routingResult.driver?.id;
+        assignedDriverName = routingResult.driver?.name;
+        assignedDriverPhone = routingResult.driver?.phone;
+        assignedDriverCode = routingResult.driver?.driverCode;
       } else {
         initialStatus = 'pending_dispatch';
-        assignmentStatus = 'pending_dc_assignment';
+        assignmentStatus = 'pending_rider_assignment';
+        assignedDriverId = null;
+        assignedDriverName = null;
+        assignedDriverPhone = null;
+        assignedDriverCode = null;
       }
 
       final newOrder = OrderEntity(
@@ -811,58 +856,70 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         packageDealName: packageName,
         deliveryAgentId: assignedDriverId,
         deliveryAgentName: assignedDriverName,
+        deliveryAgentCode: assignedDriverCode,
         deliveryAgentPhone: assignedDriverPhone,
         distributionCenterId: assignedDcId,
-        distributionCenterName: routingResult.distributionCenter?.name ?? dcState.activeHubName,
+        distributionCenterName: assignedDcName,
+        fulfillmentType: 'client_package',
         clientName: state.clientProfile.companyName,
         clientId: state.clientProfile.id,
         closerId: closerId,
         closerName: closerName,
         closerCode: closerCode,
         leadId: leadId,
+        deliveryNotes: notes,
         createdAt: DateTime.now(),
       );
 
-      // 3. Persist order via OrdersProvider
-      Future.microtask(() async {
-        try {
-          await _ref.read(ordersProvider.notifier).createOrder({
-            'id': newOrder.id,
-            'order_number': newOrder.orderNumber,
-            'customer_name': newOrder.customerName,
-            'customer_phone': newOrder.customerPhone,
-            'customer_alt_phone': newOrder.customerAltPhone,
-            'delivery_address': newOrder.deliveryAddress,
-            'delivery_city': newOrder.deliveryCity,
-            'delivery_state': newOrder.deliveryState,
-            'delivery_lga': newOrder.deliveryLga,
-            'distribution_center_id': newOrder.distributionCenterId,
-            'assigned_agent_id': newOrder.deliveryAgentId,
-            'status': newOrder.status,
-            'assignment_status': assignmentStatus,
-            'routing_notes': routingResult.dispatchDiagnosis,
-            'total_amount': newOrder.totalAmount,
-            'base_price': newOrder.basePrice,
-            'product_name': newOrder.productName,
-            'quantity': newOrder.quantity,
-            'client_name': newOrder.clientName,
-            'client_id': newOrder.clientId,
-            'closer_id': newOrder.closerId,
-            'closer_name': newOrder.closerName,
-            'closer_code': newOrder.closerCode,
-            'lead_id': newOrder.leadId,
-            'payment_type': newOrder.paymentType,
-            'payment_status': 'pending',
-            'created_at': DateTime.now().toIso8601String(),
-          });
-          debugPrint('[CLIENT_PORTAL] ✅ Order ${newOrder.orderNumber} (Closer: ${newOrder.closerName ?? "N/A"}) delegated to OrdersProvider.');
-        } catch (dbErr) {
-          debugPrint('[CLIENT_PORTAL] ℹ️ Order creation sync notice: $dbErr');
-        }
-      });
+      // 3. Persist order via OrdersProvider synchronously so DC & Supabase are immediately live
+      try {
+        await _ref.read(ordersProvider.notifier).createOrder({
+          'id': newOrder.id,
+          'order_number': newOrder.orderNumber,
+          'customer_name': newOrder.customerName,
+          'customer_phone': newOrder.customerPhone,
+          'customer_alt_phone': newOrder.customerAltPhone,
+          'delivery_address': newOrder.deliveryAddress,
+          'delivery_city': newOrder.deliveryCity,
+          'delivery_state': newOrder.deliveryState,
+          'delivery_lga': newOrder.deliveryLga,
+          'lga': newOrder.deliveryLga,
+          'distribution_center_id': newOrder.distributionCenterId,
+          'distribution_center_name': newOrder.distributionCenterName,
+          'delivery_agent_id': newOrder.deliveryAgentId,
+          'assigned_agent_id': newOrder.deliveryAgentId,
+          'delivery_agent_name': newOrder.deliveryAgentName,
+          'delivery_agent_code': newOrder.deliveryAgentCode,
+          'delivery_agent_phone': newOrder.deliveryAgentPhone,
+          'status': newOrder.status,
+          'assignment_status': assignmentStatus,
+          'routing_notes': routingResult.dispatchDiagnosis,
+          'total_amount': newOrder.totalAmount,
+          'base_price': newOrder.basePrice,
+          'product_id': productId,
+          'product_name': newOrder.productName,
+          'package_deal_id': newOrder.packageDealId,
+          'package_deal_name': newOrder.packageDealName,
+          'quantity': newOrder.quantity,
+          'fulfillment_type': 'client_package',
+          'client_name': newOrder.clientName,
+          'client_id': newOrder.clientId,
+          'closer_id': newOrder.closerId,
+          'closer_name': newOrder.closerName,
+          'closer_code': newOrder.closerCode,
+          'lead_id': newOrder.leadId,
+          'payment_type': newOrder.paymentType,
+          'payment_status': 'pending',
+          'delivery_notes': notes,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+        debugPrint('[CLIENT_PORTAL] ✅ Order ${newOrder.orderNumber} (Closer: ${newOrder.closerName ?? "N/A"}) persisted live to OrdersProvider & DC.');
+      } catch (dbErr) {
+        debugPrint('[CLIENT_PORTAL] ℹ️ Order creation sync notice: $dbErr');
+      }
 
       // 4. Update local state
-      final updatedOrders = [newOrder, ...state.orders];
+      final updatedOrders = [newOrder, ...state.orders.where((o) => o.id != newOrder.id && o.orderNumber != newOrder.orderNumber)];
       state = state.copyWith(orders: updatedOrders, isLoading: false);
 
       return newOrder;
@@ -872,7 +929,20 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
     }
   }
 
-  /// Create a new Merchant Product
+  static bool _stateMatches(String dcState, String targetState) {
+    final cleanDc = dcState.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+    final cleanTarget = targetState.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+    if (cleanDc.isEmpty || cleanTarget.isEmpty) return false;
+    if (cleanDc == cleanTarget) return true;
+    if (cleanDc.contains(cleanTarget) || cleanTarget.contains(cleanDc)) return true;
+    if ((cleanDc.contains('abuja') || cleanDc.contains('fct')) &&
+        (cleanTarget.contains('abuja') || cleanTarget.contains('fct'))) {
+      return true;
+    }
+    return false;
+  }
+
+  /// Create a new Merchant Product with covering states & DC allocation
   Future<CatalogProduct> createProduct({
     required String name,
     required String sku,
@@ -880,21 +950,116 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
     String category = 'Health & Wellness',
     String? description,
     String? imageUrl,
+    required List<String> coveringStates,
   }) async {
     state = state.copyWith(isLoading: true);
     try {
-      final newProd = CatalogProduct(
-        id: 'prod-${DateTime.now().millisecondsSinceEpoch}',
-        name: name.trim(),
-        sku: sku.trim(),
-        clientName: state.clientProfile.companyName,
-        defaultUnitPrice: unitPrice,
+      final cleanName = name.trim();
+      final cleanSku = sku.trim().toUpperCase();
+      final clientCompany = state.clientProfile.companyName;
+      final clientId = state.clientProfile.id;
+
+      // 1. Resolve DCs located in the selected covering states
+      final dcState = _ref.read(dcConsoleProvider);
+      final List<DistributionCenter> allDcs = dcState.distributionCenters.isNotEmpty
+          ? dcState.distributionCenters
+          : defaultDistributionCenters;
+
+      final matchingDcs = allDcs.where((dc) {
+        return coveringStates.any((st) => _stateMatches(dc.state, st));
+      }).toList();
+
+      // Initial DC stock is strictly 0 until supplied by the client
+      final dcStocks = <String, int>{
+        for (final dc in matchingDcs) dc.id: 0,
+      };
+
+      // 2. Register into central DC Inventory (StockProvider)
+      await _ref.read(stockProvider.notifier).addNewProduct(
+        name: cleanName,
+        sku: cleanSku,
         category: category,
+        price: unitPrice,
+        ownerName: clientCompany,
+        clientId: clientId,
+        initialQuantity: 0,
+        description: description ?? '',
+        imageAsset: imageUrl,
+        coveringStates: coveringStates,
+        dcStocks: dcStocks,
       );
 
-      final updatedProducts = [...state.products, newProd];
+      // 3. Register into Master Commercial Catalog with auto-built packages
+      final newProd = await _ref.read(productCatalogProvider.notifier).registerNewProduct(
+        name: cleanName,
+        sku: cleanSku,
+        baseUnitPrice: unitPrice,
+        category: category,
+        clientName: clientCompany,
+        clientId: clientId,
+        description: description,
+        imageUrl: imageUrl,
+        coveringStates: coveringStates,
+      );
+
+      final updatedProducts = [
+        ...state.products.where((p) => p.sku.toUpperCase() != cleanSku),
+        newProd,
+      ];
       state = state.copyWith(products: updatedProducts, isLoading: false);
       return newProd;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      rethrow;
+    }
+  }
+
+  /// Supply product stock / inbound consignment to NovaExpress covering DCs
+  Future<void> supplyProductStock({
+    required String productId,
+    required String sku,
+    required String productName,
+    required Map<String, int> dcAllocations, // { dcId: units }
+    String? waybillNumber,
+    String? notes,
+  }) async {
+    state = state.copyWith(isLoading: true);
+    try {
+      final clientCompany = state.clientProfile.companyName;
+      final resolvedWaybill = waybillNumber?.trim().isNotEmpty == true
+          ? waybillNumber!.trim()
+          : 'WAYBILL-${sku.trim().toUpperCase()}-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+
+      int totalUnitsSupplied = 0;
+      for (final entry in dcAllocations.entries) {
+        final dcId = entry.key;
+        final qty = entry.value;
+        if (qty > 0) {
+          totalUnitsSupplied += qty;
+          await _ref.read(stockProvider.notifier).receiveStock(
+            productIdOrSku: sku.trim(),
+            quantity: qty,
+            waybillNumber: resolvedWaybill,
+            distributionCenterId: dcId,
+            supplierName: clientCompany,
+          );
+        }
+      }
+
+      // Refresh product catalog & active DC stock
+      await _ref.read(productCatalogProvider.notifier).reloadCatalog();
+      final activeHub = _ref.read(dcConsoleProvider).activeHubId;
+      await _ref.read(stockProvider.notifier).fetchStockItems(null, activeHub);
+
+      // Update local client products stock count
+      final updatedProducts = state.products.map((p) {
+        if (p.id == productId || p.sku.toUpperCase() == sku.trim().toUpperCase() || p.name.toLowerCase() == productName.trim().toLowerCase()) {
+          return p.copyWith(totalStockAcrossHubs: p.totalStockAcrossHubs + totalUnitsSupplied);
+        }
+        return p;
+      }).toList();
+
+      state = state.copyWith(products: updatedProducts, isLoading: false);
     } catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
       rethrow;
@@ -928,6 +1093,68 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
       final updatedPackages = [...state.packages, pkg];
       state = state.copyWith(packages: updatedPackages, isLoading: false);
       return pkg;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      rethrow;
+    }
+  }
+
+  /// Update an existing Commercial Package Deal on a Product
+  Future<ProductPackage?> updatePackage({
+    required String productName,
+    required String packageId,
+    required String packageName,
+    required int quantity,
+    int? paidQuantity,
+    int? freeQuantity,
+    required double packagePrice,
+    String? description,
+  }) async {
+    state = state.copyWith(isLoading: true);
+    try {
+      final pkg = _ref.read(productCatalogProvider.notifier).updatePackage(
+        productName: productName,
+        packageId: packageId,
+        packageName: packageName,
+        quantity: quantity,
+        paidQuantity: paidQuantity,
+        freeQuantity: freeQuantity,
+        packagePrice: packagePrice,
+        description: description,
+      );
+
+      if (pkg != null) {
+        final updatedPackages = state.packages.map((p) => p.id == packageId ? pkg : p).toList();
+        state = state.copyWith(packages: updatedPackages, isLoading: false);
+      } else {
+        state = state.copyWith(isLoading: false);
+      }
+      return pkg;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      rethrow;
+    }
+  }
+
+  /// Delete a Commercial Package Deal from a Product
+  Future<bool> deletePackage({
+    required String productName,
+    required String packageId,
+  }) async {
+    state = state.copyWith(isLoading: true);
+    try {
+      final success = _ref.read(productCatalogProvider.notifier).deletePackage(
+        productName: productName,
+        packageId: packageId,
+      );
+
+      if (success) {
+        final updatedPackages = state.packages.where((p) => p.id != packageId).toList();
+        state = state.copyWith(packages: updatedPackages, isLoading: false);
+      } else {
+        state = state.copyWith(isLoading: false);
+      }
+      return success;
     } catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
       rethrow;

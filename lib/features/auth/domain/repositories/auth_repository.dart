@@ -35,4 +35,20 @@ abstract class AuthRepository {
     String? operatingState,
     String? operatingCity,
   });
+  Future<UserEntity> registerClientAccount({
+    required String email,
+    required String password,
+    required String companyName,
+    required String contactPerson,
+    required String phone,
+    required String address,
+    required String city,
+    required String stateName,
+    String tier,
+    int closerLimit,
+    String? clientCode,
+    String? bankName,
+    String? bankAccountNumber,
+    String? bankAccountName,
+  });
 }

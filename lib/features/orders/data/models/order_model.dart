@@ -1,3 +1,4 @@
+import 'dart:convert';
 import '../../domain/entities/order.dart';
 
 class OrderModel extends OrderEntity {
@@ -194,6 +195,19 @@ class OrderModel extends OrderEntity {
         json['proof_of_delivery_url']?.toString() ??
         json['signature_url']?.toString();
 
+    String? pkgId = json['package_deal_id']?.toString();
+    String? pkgName = json['package_deal_name']?.toString();
+    if ((pkgId == null || pkgName == null) && notes.contains('[PACKAGE_DEAL:')) {
+      final match = RegExp(r'\[PACKAGE_DEAL:\s*(\{.*?\})\]').firstMatch(notes);
+      if (match != null) {
+        try {
+          final decoded = jsonDecode(match.group(1)!) as Map<String, dynamic>;
+          pkgId ??= decoded['id']?.toString();
+          pkgName ??= decoded['name']?.toString();
+        } catch (_) {}
+      }
+    }
+
     return OrderModel(
       id: json['id'] ?? '',
       orderNumber: json['order_number'] ?? '',
@@ -221,8 +235,8 @@ class OrderModel extends OrderEntity {
       clientCompany: json['client_company'] ?? json['client_name'] ?? 'Novacale Limited',
       clientPhone: json['client_phone']?.toString(),
       clientEmail: json['client_email']?.toString(),
-      packageDealId: json['package_deal_id']?.toString(),
-      packageDealName: json['package_deal_name']?.toString(),
+      packageDealId: pkgId,
+      packageDealName: pkgName,
       packageCustodyId: json['package_custody_id'],
       clientDeliveryFee: (json['client_delivery_fee'] as num?)?.toDouble() ?? 5000.0,
       agentEntitlement: (json['agent_entitlement'] as num?)?.toDouble() ?? 2500.0,

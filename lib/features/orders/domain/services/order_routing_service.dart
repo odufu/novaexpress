@@ -57,16 +57,14 @@ class OrderRoutingService {
       // Pick specific hub or first matching LGA DC
       matchedDc = lgaMatchingDcs.firstWhere((dc) => dc.isHub, orElse: () => lgaMatchingDcs.first);
     } else {
-      // B. Priority 2: State-level match if LGA was empty
-      if (orderLga.isEmpty) {
-        final stateMatchingDcs = distributionCenters.where((dc) {
-          if (!dc.isActive) return false;
-          return dc.coversLocation(stateName: orderState, lgaName: '');
-        }).toList();
+      // B. Priority 2: State-level match across regional DCs in this state
+      final stateMatchingDcs = distributionCenters.where((dc) {
+        if (!dc.isActive) return false;
+        return dc.coversLocation(stateName: orderState, lgaName: '');
+      }).toList();
 
-        if (stateMatchingDcs.isNotEmpty) {
-          matchedDc = stateMatchingDcs.firstWhere((dc) => dc.isHub, orElse: () => stateMatchingDcs.first);
-        }
+      if (stateMatchingDcs.isNotEmpty) {
+        matchedDc = stateMatchingDcs.firstWhere((dc) => dc.isHub, orElse: () => stateMatchingDcs.first);
       }
     }
 

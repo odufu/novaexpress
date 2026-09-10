@@ -115,9 +115,32 @@ class RemittanceModel extends RemittanceEntity {
     }
 
     final List<dynamic>? rawOrders = json['associated_orders'] ?? json['orders'] ?? json['order_breakdown'];
-    final List<RemittanceOrderItem> orders = rawOrders != null
+    List<RemittanceOrderItem> orders = rawOrders != null
         ? rawOrders.map((o) => RemittanceOrderItem.fromJson(Map<String, dynamic>.from(o))).toList()
         : const [];
+
+    if (orders.isEmpty) {
+      final notesStr = json['notes']?.toString() ?? '';
+      final ordersMatch = RegExp(r'\[Orders:\s*([^\]]+)\]', caseSensitive: false).firstMatch(notesStr);
+      if (ordersMatch != null) {
+        final orderTokens = ordersMatch.group(1)!.split(',');
+        orders = orderTokens
+            .map((s) => s.trim())
+            .where((s) => s.isNotEmpty)
+            .map((orderNum) => RemittanceOrderItem(
+                  orderId: '',
+                  orderNumber: orderNum,
+                  customerName: '',
+                  status: 'delivered',
+                  paymentType: 'pay_on_delivery',
+                  cashCollected: 0.0,
+                  riderCommission: 0.0,
+                  transportAllowance: 0.0,
+                  date: parsedCreated,
+                ))
+            .toList();
+      }
+    }
 
     return RemittanceModel(
       id: id,

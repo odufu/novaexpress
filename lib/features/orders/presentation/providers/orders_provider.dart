@@ -270,7 +270,13 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     final cached = await _storageService.getCachedOrders(_getScopeKey());
     if (!mounted) return;
     if (cached != null && cached.isNotEmpty) {
-      final sortedCached = _sortOrdersByOperationalPriority(cached);
+      final merged = [...cached];
+      for (final o in state.orders) {
+        if (!merged.any((m) => m.id == o.id || m.orderNumber == o.orderNumber)) {
+          merged.add(o);
+        }
+      }
+      final sortedCached = _sortOrdersByOperationalPriority(merged);
       state = state.copyWith(orders: sortedCached);
       debugPrint('[ORDERS_PROVIDER] ⚡ Hydrated ${sortedCached.length} orders from local cache for scope (${_getScopeKey()}).');
     }
@@ -297,13 +303,25 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
         final idToLoad = (agentId != null && agentId.isNotEmpty) ? agentId : _getActiveAgentId();
         final rawOrders = await _repository.getAssignedOrders(idToLoad);
         if (!mounted) return;
-        final orderEntities = _sortOrdersByOperationalPriority(rawOrders);
+        final merged = [...rawOrders];
+        for (final o in state.orders) {
+          if (!merged.any((m) => m.id == o.id || m.orderNumber == o.orderNumber)) {
+            merged.add(o);
+          }
+        }
+        final orderEntities = _sortOrdersByOperationalPriority(merged);
         state = state.copyWith(isLoading: false, orders: orderEntities);
         await _storageService.cacheOrders(orderEntities, _getScopeKey());
       } else {
         final rawOrders = await _repository.getDistributionCenterOrders('22222222-2222-4222-8222-222222222222');
         if (!mounted) return;
-        final orderEntities = _sortOrdersByOperationalPriority(rawOrders);
+        final merged = [...rawOrders];
+        for (final o in state.orders) {
+          if (!merged.any((m) => m.id == o.id || m.orderNumber == o.orderNumber)) {
+            merged.add(o);
+          }
+        }
+        final orderEntities = _sortOrdersByOperationalPriority(merged);
         state = state.copyWith(isLoading: false, orders: orderEntities);
         await _storageService.cacheOrders(orderEntities, _getScopeKey());
       }
@@ -322,7 +340,13 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     try {
       final rawOrders = await _repository.getDistributionCenterOrders(dcId ?? '22222222-2222-4222-8222-222222222222');
       if (!mounted) return;
-      final orderEntities = _sortOrdersByOperationalPriority(rawOrders);
+      final merged = [...rawOrders];
+      for (final o in state.orders) {
+        if (!merged.any((m) => m.id == o.id || m.orderNumber == o.orderNumber)) {
+          merged.add(o);
+        }
+      }
+      final orderEntities = _sortOrdersByOperationalPriority(merged);
       state = state.copyWith(isLoading: false, orders: orderEntities);
       await _storageService.cacheOrders(orderEntities, 'dc');
     } catch (e) {
@@ -463,39 +487,17 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
 
       final updatedList = state.orders.map((o) {
         if (o.id == orderId || o.orderNumber == orderId) {
-          return OrderModel(
-            id: o.id,
-            orderNumber: o.orderNumber,
-            customerName: o.customerName,
-            customerPhone: o.customerPhone,
-            customerAltPhone: o.customerAltPhone,
-            deliveryState: o.deliveryState,
-            deliveryCity: o.deliveryCity,
-            deliveryAddress: o.deliveryAddress,
-            landmark: o.landmark,
-            lga: o.lga,
-            productName: o.productName,
-            status: 'in_transit',
-            quantity: o.quantity,
-            paidQuantity: o.paidQuantity,
-            freeQuantity: o.freeQuantity,
-            basePrice: o.basePrice,
-            upsellAmount: o.upsellAmount,
-            totalAmount: o.totalAmount,
-            paymentType: o.paymentType,
-            paymentStatus: o.paymentStatus,
-            fulfillmentType: o.fulfillmentType,
-            clientName: o.clientName,
-            packageCustodyId: o.packageCustodyId,
-            clientDeliveryFee: o.clientDeliveryFee,
-            agentEntitlement: dynamicEntitlement,
-            transportFee: dynamicTransport,
-            deliveryNotes: o.deliveryNotes,
-            createdAt: o.createdAt,
-            deliveryAgentId: riderId,
-            deliveryAgentName: riderName,
-            deliveryAgentCode: riderCode,
-            distributionCenterId: o.distributionCenterId ?? '22222222-2222-4222-8222-222222222222',
+          return OrderModel.fromEntity(
+            o.copyWith(
+              status: 'in_transit',
+              deliveryAgentId: riderId,
+              deliveryAgentName: riderName,
+              deliveryAgentCode: riderCode,
+              agentEntitlement: dynamicEntitlement,
+              transportFee: dynamicTransport,
+              assignedAt: DateTime.now(),
+              distributionCenterId: o.distributionCenterId ?? '22222222-2222-4222-8222-222222222222',
+            ),
           );
         }
         return o;

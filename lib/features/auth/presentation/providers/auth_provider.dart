@@ -119,6 +119,63 @@ class AuthNotifier extends StateNotifier<AuthState> {
     return mockUser;
   }
 
+  Future<UserEntity> registerClientAccount({
+    required String email,
+    required String password,
+    required String companyName,
+    required String contactPerson,
+    required String phone,
+    required String address,
+    required String city,
+    required String stateName,
+    String tier = 'standard_merchant',
+    int closerLimit = 0,
+    String? clientCode,
+    String? bankName,
+    String? bankAccountNumber,
+    String? bankAccountName,
+  }) async {
+    if (authRepository != null) {
+      return await authRepository!.registerClientAccount(
+        email: email,
+        password: password,
+        companyName: companyName,
+        contactPerson: contactPerson,
+        phone: phone,
+        address: address,
+        city: city,
+        stateName: stateName,
+        tier: tier,
+        closerLimit: closerLimit,
+        clientCode: clientCode,
+        bankName: bankName,
+        bankAccountNumber: bankAccountNumber,
+        bankAccountName: bankAccountName,
+      );
+    }
+    final nameParts = contactPerson.trim().split(' ');
+    final fName = nameParts.isNotEmpty ? nameParts.first : companyName;
+    final lName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : 'Admin';
+    final mockUser = UserModel(
+      id: 'cli_${DateTime.now().millisecondsSinceEpoch}',
+      email: email.trim().toLowerCase(),
+      firstName: fName,
+      lastName: lName,
+      phone: phone.trim(),
+      role: 'client',
+      clientId: 'c_${DateTime.now().millisecondsSinceEpoch}',
+      clientCompanyName: companyName.trim(),
+      deliveryAgentCode: clientCode ?? 'CLI-01',
+      operatingState: stateName.trim(),
+      operatingCity: city.trim(),
+      bankName: bankName ?? '',
+      bankAccountNumber: bankAccountNumber ?? '',
+      bankAccountName: bankAccountName ?? '',
+    );
+    AuthRemoteDataSourceImpl.registerUserInMemory(mockUser, password);
+    return mockUser;
+  }
+
   Future<void> checkCurrentUser() async {
     // 1. Instantly restore from Local Storage cache so UI (and avatar) loads without flashing
     try {

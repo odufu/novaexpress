@@ -227,7 +227,22 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
         final basePrice = (map['base_price'] as num?)?.toDouble() ?? 25000.0;
         final category = map['category']?.toString() ?? 'Health & Wellness';
         final description = map['description']?.toString() ?? '';
-        const clientName = 'Novacare Limited';
+        final clientName = map['client_name']?.toString() ?? 'Novacare Limited';
+        final clientId = map['client_id']?.toString();
+        final imageUrl = map['image_url']?.toString();
+
+        List<String> parsedCoveringStates = [];
+        if (map['covering_states'] is List) {
+          parsedCoveringStates = (map['covering_states'] as List).map((e) => e.toString()).toList();
+        } else if (description.contains('[COVERING_STATES:')) {
+          final match = RegExp(r'\[COVERING_STATES:\s*(\[.*?\])\]').firstMatch(description);
+          if (match != null) {
+            try {
+              final decoded = jsonDecode(match.group(1)!) as List<dynamic>;
+              parsedCoveringStates = decoded.map((e) => e.toString()).toList();
+            } catch (_) {}
+          }
+        }
 
         List<ProductPackage> parsedPackages = [];
 
@@ -295,8 +310,12 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
             name: name,
             sku: sku,
             clientName: clientName,
+            clientId: clientId,
             defaultUnitPrice: basePrice,
             category: category,
+            description: description,
+            imageUrl: imageUrl,
+            coveringStates: parsedCoveringStates,
             packages: parsedPackages,
           ),
         );
@@ -326,14 +345,25 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
         authOptions: const AuthClientOptions(autoRefreshToken: false),
       );
 
+      final updatedProducts = <CatalogProduct>[];
+
       for (final p in state.products) {
-        var cleanBaseDesc = p.name;
-        // Clean out previous audit tag
-        if (cleanBaseDesc.contains('[PACKAGES:')) {
-          cleanBaseDesc = cleanBaseDesc.split('[PACKAGES:').first.trim();
+        var baseDesc = (p.description != null && p.description!.trim().isNotEmpty)
+            ? p.description!
+            : p.name;
+        // Clean out previous [PACKAGES: ...] tag
+        final pkgRegex = RegExp(r'\[PACKAGES:\s*(\[.*?\])\]');
+        baseDesc = baseDesc.replaceAll(pkgRegex, '').trim();
+
+        // Ensure covering states tag is present if product has covering states
+        if (p.coveringStates.isNotEmpty && !baseDesc.contains('[COVERING_STATES:')) {
+          baseDesc = '$baseDesc [COVERING_STATES: ${jsonEncode(p.coveringStates)}]';
         }
+
         final packagesJson = jsonEncode(p.packages.map((pkg) => pkg.toJson()).toList());
-        final combinedDesc = '$cleanBaseDesc - Distributed Inventory [PACKAGES: $packagesJson]';
+        final combinedDesc = '$baseDesc [PACKAGES: $packagesJson]'.trim();
+        final updatedProd = p.copyWith(description: combinedDesc);
+        updatedProducts.add(updatedProd);
 
         try {
           final res = await dbClient.from('products').update({
@@ -366,6 +396,9 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
             }).eq('name', p.name);
           } catch (_) {}
         }
+      }
+      if (updatedProducts.isNotEmpty) {
+        state = state.copyWith(products: updatedProducts);
       }
       debugPrint('[CATALOG_PROVIDER] 💾 Persisted ${state.products.length} products & commercial packages to Supabase.');
     } catch (e) {
@@ -586,6 +619,10 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
     required double baseUnitPrice,
     String category = 'Health & Wellness',
     String clientName = 'Novacare Limited',
+    String? clientId,
+    String? description,
+    String? imageUrl,
+    List<String> coveringStates = const [],
     List<ProductPackage>? packages,
   }) async {
     final cleanName = name.trim();
@@ -605,8 +642,12 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
       name: cleanName,
       sku: cleanSku,
       clientName: clientName,
+      clientId: clientId,
       defaultUnitPrice: baseUnitPrice,
       category: category,
+      description: description,
+      imageUrl: imageUrl,
+      coveringStates: coveringStates,
       packages: initialPackages,
     );
 

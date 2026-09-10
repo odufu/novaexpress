@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 /// Product Package Entity
 /// Represents a commercial package or deal created by a seller for a specific product
 /// e.g. "1 Pack" for ₦22,000 or "5 Packs Mega Deal" for ₦55,000
@@ -133,10 +135,13 @@ class CatalogProduct {
   final String name;
   final String sku;
   final String clientName;
+  final String? clientId;
   final double defaultUnitPrice;
   final String category;
+  final String? description;
   final String? imageUrl;
   final int totalStockAcrossHubs;
+  final List<String> coveringStates;
   final List<ProductPackage> packages;
 
   const CatalogProduct({
@@ -144,10 +149,13 @@ class CatalogProduct {
     required this.name,
     required this.sku,
     required this.clientName,
+    this.clientId,
     required this.defaultUnitPrice,
     this.category = 'Health & Wellness',
+    this.description,
     this.imageUrl,
     this.totalStockAcrossHubs = 100,
+    this.coveringStates = const [],
     this.packages = const [],
   });
 
@@ -156,10 +164,13 @@ class CatalogProduct {
     String? name,
     String? sku,
     String? clientName,
+    String? clientId,
     double? defaultUnitPrice,
     String? category,
+    String? description,
     String? imageUrl,
     int? totalStockAcrossHubs,
+    List<String>? coveringStates,
     List<ProductPackage>? packages,
   }) {
     return CatalogProduct(
@@ -167,10 +178,13 @@ class CatalogProduct {
       name: name ?? this.name,
       sku: sku ?? this.sku,
       clientName: clientName ?? this.clientName,
+      clientId: clientId ?? this.clientId,
       defaultUnitPrice: defaultUnitPrice ?? this.defaultUnitPrice,
       category: category ?? this.category,
+      description: description ?? this.description,
       imageUrl: imageUrl ?? this.imageUrl,
       totalStockAcrossHubs: totalStockAcrossHubs ?? this.totalStockAcrossHubs,
+      coveringStates: coveringStates ?? this.coveringStates,
       packages: packages ?? this.packages,
     );
   }
@@ -181,24 +195,44 @@ class CatalogProduct {
       'name': name,
       'sku': sku,
       'client_name': clientName,
+      if (clientId != null) 'client_id': clientId,
       'default_unit_price': defaultUnitPrice,
       'category': category,
+      if (description != null) 'description': description,
       'image_url': imageUrl,
       'total_stock': totalStockAcrossHubs,
+      'covering_states': coveringStates,
       'packages': packages.map((p) => p.toJson()).toList(),
     };
   }
 
   factory CatalogProduct.fromJson(Map<String, dynamic> json) {
+    List<String> parsedCoveringStates = [];
+    if (json['covering_states'] is List) {
+      parsedCoveringStates = (json['covering_states'] as List).map((e) => e.toString()).toList();
+    } else if (json['description'] != null) {
+      final desc = json['description'].toString();
+      final match = RegExp(r'\[COVERING_STATES:\s*(\[.*?\])\]').firstMatch(desc);
+      if (match != null) {
+        try {
+          final decoded = jsonDecode(match.group(1)!) as List<dynamic>;
+          parsedCoveringStates = decoded.map((e) => e.toString()).toList();
+        } catch (_) {}
+      }
+    }
+
     return CatalogProduct(
       id: json['id'] as String? ?? 'prod-${DateTime.now().millisecondsSinceEpoch}',
       name: json['name'] as String? ?? 'Product',
       sku: json['sku'] as String? ?? 'SKU-001',
       clientName: json['client_name'] as String? ?? 'Novacare Limited',
+      clientId: json['client_id'] as String?,
       defaultUnitPrice: (json['default_unit_price'] as num?)?.toDouble() ?? 0.0,
       category: json['category'] as String? ?? 'Health & Wellness',
+      description: json['description'] as String?,
       imageUrl: json['image_url'] as String?,
       totalStockAcrossHubs: (json['total_stock'] as num?)?.toInt() ?? 100,
+      coveringStates: parsedCoveringStates,
       packages: (json['packages'] as List<dynamic>?)
               ?.map((e) => ProductPackage.fromJson(e as Map<String, dynamic>))
               .toList() ??

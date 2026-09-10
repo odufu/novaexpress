@@ -20,6 +20,14 @@ class NotificationsRemoteDataSourceImpl implements NotificationsRemoteDataSource
 
   NotificationsRemoteDataSourceImpl({required this.supabaseClient});
 
+  SupabaseClient get _activeClient {
+    try {
+      return Supabase.instance.client;
+    } catch (_) {
+      return supabaseClient;
+    }
+  }
+
   @override
   Future<List<AppNotificationEntity>> getNotifications([String? agentId]) async {
     if (agentId == null || agentId.isEmpty) {
@@ -30,7 +38,7 @@ class NotificationsRemoteDataSourceImpl implements NotificationsRemoteDataSource
       // 1. Resolve agentId if it matches user_id or delivery_agent_id
       String resolvedAgentId = agentId;
       try {
-        final agentCheck = await supabaseClient
+        final agentCheck = await _activeClient
             .from('delivery_agents')
             .select('id')
             .or('id.eq.$agentId,user_id.eq.$agentId')
@@ -40,7 +48,7 @@ class NotificationsRemoteDataSourceImpl implements NotificationsRemoteDataSource
         }
       } catch (_) {}
 
-      final response = await supabaseClient
+      final response = await _activeClient
           .from('notifications')
           .select('*')
           .or('delivery_agent_id.eq.$resolvedAgentId,delivery_agent_id.eq.$agentId')
@@ -75,7 +83,7 @@ class NotificationsRemoteDataSourceImpl implements NotificationsRemoteDataSource
 
       String resolvedAgentId = agentId;
       try {
-        final agentCheck = await supabaseClient
+        final agentCheck = await _activeClient
             .from('delivery_agents')
             .select('id')
             .or('id.eq.$agentId,user_id.eq.$agentId')
@@ -85,7 +93,7 @@ class NotificationsRemoteDataSourceImpl implements NotificationsRemoteDataSource
         }
       } catch (_) {}
 
-      await supabaseClient.from('notifications').insert({
+      await _activeClient.from('notifications').insert({
         'company_id': '11111111-1111-4111-8111-111111111111',
         'delivery_agent_id': resolvedAgentId,
         'title': title,
@@ -104,7 +112,7 @@ class NotificationsRemoteDataSourceImpl implements NotificationsRemoteDataSource
   @override
   Future<void> markAsRead(String notificationId) async {
     try {
-      await supabaseClient
+      await _activeClient
           .from('notifications')
           .update({'is_read': true})
           .eq('id', notificationId);
@@ -114,7 +122,7 @@ class NotificationsRemoteDataSourceImpl implements NotificationsRemoteDataSource
   @override
   Future<void> markAllAsRead() async {
     try {
-      await supabaseClient
+      await _activeClient
           .from('notifications')
           .update({'is_read': true})
           .eq('is_read', false);

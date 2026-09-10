@@ -147,6 +147,11 @@ class StockItemEntity {
       desc = desc.replaceAll(RegExp(r'\[DC_STOCKS:\s*\{.*?\}\]'), '').trim();
     }
 
+    // Remove [COVERING_STATES: ...] tag
+    if (desc.contains('[COVERING_STATES:')) {
+      desc = desc.replaceAll(RegExp(r'\[COVERING_STATES:\s*\[.*?\]\]'), '').trim();
+    }
+
     // Remove [PACKAGES: ...] tag (including nested JSON brackets)
     if (desc.contains('[PACKAGES:')) {
       final start = desc.indexOf('[PACKAGES:');

@@ -204,6 +204,11 @@ class DCConsoleRepositoryImpl implements DCConsoleRepository {
   }
 
   @override
+  Future<bool> checkEmailExists(String email) async {
+    return await _remoteDataSource.checkEmailExists(email);
+  }
+
+  @override
   Future<ClientProfile> createClient({
     required String companyName,
     required String contactPerson,
@@ -214,6 +219,12 @@ class DCConsoleRepositoryImpl implements DCConsoleRepository {
     required String stateName,
     String tier = 'standard',
     int closerLimit = 100,
+    String? password,
+    String? clientCode,
+    String? bankName,
+    String? bankAccountNumber,
+    String? bankAccountName,
+    dynamic authDataSource,
   }) async {
     return await _remoteDataSource.createClient(
       companyName: companyName,
@@ -225,6 +236,12 @@ class DCConsoleRepositoryImpl implements DCConsoleRepository {
       stateName: stateName,
       tier: tier,
       closerLimit: closerLimit,
+      password: password,
+      clientCode: clientCode,
+      bankName: bankName,
+      bankAccountNumber: bankAccountNumber,
+      bankAccountName: bankAccountName,
+      authDataSource: authDataSource,
     );
   }
 }

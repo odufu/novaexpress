@@ -53,7 +53,16 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
 
     if (!mounted || _hasNavigated) return;
 
-    await ref.read(authProvider.notifier).checkCurrentUser();
+    try {
+      await ref.read(authProvider.notifier).checkCurrentUser().timeout(
+        const Duration(seconds: 4),
+        onTimeout: () {
+          debugPrint('[SPLASH] ⏱️ checkCurrentUser timeout after 4s. Continuing to route.');
+        },
+      );
+    } catch (e) {
+      debugPrint('[SPLASH] ⚠️ Notice during checkCurrentUser: $e');
+    }
     if (!mounted || _hasNavigated) return;
 
     _hasNavigated = true;

@@ -14,6 +14,7 @@ import '../../domain/entities/distribution_center.dart';
 import '../providers/dc_console_provider.dart';
 import '../widgets/dc_create_order_modal.dart';
 import '../widgets/dc_csv_order_import_modal.dart';
+import '../widgets/dc_onboard_client_modal.dart';
 import '../widgets/dc_onboard_rider_modal.dart';
 import '../widgets/dc_order_detail_modal.dart';
 import '../widgets/dc_product_detail_modal.dart';
@@ -143,7 +144,7 @@ class _DCDetailPageState extends ConsumerState<DCDetailPage> with SingleTickerPr
     return allOrders.where((o) {
       final matchesDc = o.distributionCenterId == _currentDc.id ||
           o.deliveryAgentCode == _currentDc.code ||
-          _currentDc.coversLga(o.lga ?? '');
+          _currentDc.coversLocation(stateName: o.deliveryState, lgaName: o.lga ?? '');
       if (!matchesDc) return false;
 
       // Search
@@ -331,7 +332,7 @@ class _DCDetailPageState extends ConsumerState<DCDetailPage> with SingleTickerPr
     final allDrivers = dcState.dcDrivers;
     final dcRiders = _getDcRiders(allDrivers);
 
-    final dcRemittances = _getDcRemittances(allOrders.where((o) => o.distributionCenterId == _currentDc.id || _currentDc.coversLga(o.lga ?? '')).toList(), allDrivers);
+    final dcRemittances = _getDcRemittances(allOrders.where((o) => o.distributionCenterId == _currentDc.id || _currentDc.coversLocation(stateName: o.deliveryState, lgaName: o.lga ?? '')).toList(), allDrivers);
 
     final stockState = ref.watch(stockProvider);
     final dcStocks = _getDcStocks(stockState.stockItems);
@@ -542,29 +543,53 @@ class _DCDetailPageState extends ConsumerState<DCDetailPage> with SingleTickerPr
                   ],
                 ),
               ),
-              if (!isCurrentActive)
-                ElevatedButton.icon(
-                  onPressed: () {
-                    notifier.switchActiveHub(_currentDc);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Switched Active Console Hub to ${_currentDc.name}'),
-                        backgroundColor: const Color(0xFF10B981),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () => showDialog(
+                      context: context,
+                      builder: (ctx) => const DCOnboardClientModal(),
+                    ),
+                    icon: const Icon(Icons.add_business_rounded, size: 16, color: Colors.white),
+                    label: Text(
+                      isDesktop ? 'Onboard Client' : 'Client +',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0D9488),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                  if (!isCurrentActive) ...[
+                    const SizedBox(width: 8),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        notifier.switchActiveHub(_currentDc);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Switched Active Console Hub to ${_currentDc.name}'),
+                            backgroundColor: const Color(0xFF10B981),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.flash_on_rounded, size: 16, color: Colors.white),
+                      label: Text(
+                        isDesktop ? 'Set as Active Console Hub' : 'Set Active',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                       ),
-                    );
-                  },
-                  icon: const Icon(Icons.flash_on_rounded, size: 16, color: Colors.white),
-                  label: Text(
-                    isDesktop ? 'Set as Active Console Hub' : 'Set Active',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFF37021),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFF37021),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ],
           ),
         ],

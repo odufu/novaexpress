@@ -53,7 +53,8 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(ordersProvider.notifier).loadDcOrders('22222222-2222-4222-8222-222222222222');
+      final activeHub = ref.read(dcConsoleProvider).activeHubId;
+      ref.read(ordersProvider.notifier).loadDcOrders(activeHub);
     });
   }
 
@@ -116,6 +117,12 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
     final activeDateFilter = ref.watch(dcOrdersDateFilterProvider);
     final customRange = ref.watch(dcOrdersCustomDateRangeProvider);
     final singleDate = ref.watch(dcOrdersSingleDateProvider);
+
+    ref.listen<DCConsoleState>(dcConsoleProvider, (previous, next) {
+      if (previous?.activeHubId != next.activeHubId) {
+        ref.read(ordersProvider.notifier).loadDcOrders(next.activeHubId);
+      }
+    });
 
     final dateFilteredOrders = _filterOrdersByDate(ordersState.orders, activeDateFilter, customRange, singleDate);
 
@@ -1507,7 +1514,15 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
                       DataCell(
                         InkWell(
                           onTap: () => showDialog(context: context, builder: (ctx) => DCOrderDetailModal(order: order)),
-                          child: Text(order.clientName.isNotEmpty ? order.clientName : 'Novacare', style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B))),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(order.clientName.isNotEmpty ? order.clientName : 'Novacale', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
+                              if (order.packageDealName != null && order.packageDealName!.isNotEmpty)
+                                Text('🏷️ ${order.packageDealName}', style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF0D9488))),
+                            ],
+                          ),
                         ),
                       ),
 

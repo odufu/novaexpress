@@ -28,6 +28,8 @@ class StockRepositoryImpl implements StockRepository {
     String? clientId,
     String? imageAsset,
     String? originDcId,
+    List<String>? coveringStates,
+    Map<String, int>? dcStocks,
   }) async {
     return await remoteDataSource.createProduct(
       name: name,
@@ -43,6 +45,8 @@ class StockRepositoryImpl implements StockRepository {
       clientId: clientId,
       imageAsset: imageAsset,
       originDcId: originDcId,
+      coveringStates: coveringStates,
+      dcStocks: dcStocks,
     );
   }
 

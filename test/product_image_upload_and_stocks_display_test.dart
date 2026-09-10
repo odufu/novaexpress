@@ -31,6 +31,8 @@ class MockStockImageRepository implements StockRepository {
     String? clientId,
     String? imageAsset,
     String? originDcId,
+    List<String>? coveringStates,
+    Map<String, int>? dcStocks,
   }) async {
     final newItem = StockItemEntity(
       id: 'prod_${sku.toLowerCase()}',

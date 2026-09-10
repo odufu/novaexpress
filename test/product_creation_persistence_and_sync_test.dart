@@ -46,6 +46,8 @@ class _MockStockRepository implements StockRepository {
     String? clientId,
     String? imageAsset,
     String? originDcId,
+    List<String>? coveringStates,
+    Map<String, int>? dcStocks,
   }) async {
     final newItem = StockItemModel(
       id: 'prod_test_${DateTime.now().millisecondsSinceEpoch}',

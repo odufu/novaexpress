@@ -59,6 +59,8 @@ class _MockStockRepository implements StockRepository {
     String? clientId,
     String? imageAsset,
     String? originDcId,
+    List<String>? coveringStates,
+    Map<String, int>? dcStocks,
   }) async {
     if (sku.toUpperCase() == 'SKU-FAIL') {
       throw Exception('Simulated database write timeout error.');

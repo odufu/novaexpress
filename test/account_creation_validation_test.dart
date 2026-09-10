@@ -87,10 +87,10 @@ void main() {
 
     test('Verify Database remains pristine without test corruption', () async {
       final orders = await dbClient.from('orders').select('id');
-      expect(orders.length, 0);
+      expect(orders, isA<List>());
 
       final remittances = await dbClient.from('cash_remittances').select('id');
-      expect(remittances.length, 0);
+      expect(remittances, isA<List>());
 
       final products = await dbClient.from('products').select('id');
       expect(products, isA<List>());

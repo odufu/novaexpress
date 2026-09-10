@@ -74,6 +74,9 @@ abstract class DCConsoleRepository {
   /// Fetches registered enterprise clients and merchants
   Future<List<ClientProfile>> getClients();
 
+  /// Checks if an email address is already registered in the system
+  Future<bool> checkEmailExists(String email);
+
   /// Creates a new enterprise merchant / client account
   Future<ClientProfile> createClient({
     required String companyName,
@@ -85,5 +88,11 @@ abstract class DCConsoleRepository {
     required String stateName,
     String tier = 'standard',
     int closerLimit = 100,
+    String? password,
+    String? clientCode,
+    String? bankName,
+    String? bankAccountNumber,
+    String? bankAccountName,
+    dynamic authDataSource,
   });
 }
