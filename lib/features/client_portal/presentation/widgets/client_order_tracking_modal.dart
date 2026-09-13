@@ -89,17 +89,26 @@ class ClientOrderTrackingModal extends ConsumerWidget {
     final isAssigned = statusStr == 'assigned' || isInTransit || isDelivered || assignedDriver != null;
     final isFailed = currentOrder.isFailed || statusStr == 'failed' || statusStr == 'cancelled' || statusStr == 'rejected';
 
+    final mediaQuery = MediaQuery.of(context);
+    final isCompact = mediaQuery.size.width < 500;
+
     return Dialog(
       backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isCompact ? 12 : 16,
+        vertical: isCompact ? 16 : 24,
+      ),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 720, maxHeight: 840),
+        constraints: BoxConstraints(
+          maxWidth: 720,
+          maxHeight: mediaQuery.size.height * 0.9,
+        ),
         child: Column(
           children: [
             // Modal Header
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+              padding: EdgeInsets.symmetric(horizontal: isCompact ? 14 : 24, vertical: 16),
               decoration: const BoxDecoration(
                 color: Color(0xFF0F172A),
                 borderRadius: BorderRadius.only(
@@ -122,7 +131,10 @@ class ClientOrderTrackingModal extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
+                        Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 8,
+                          runSpacing: 4,
                           children: [
                             Text(
                               'Order ${currentOrder.orderNumber}',
@@ -132,7 +144,6 @@ class ClientOrderTrackingModal extends ConsumerWidget {
                                 color: Colors.white,
                               ),
                             ),
-                            const SizedBox(width: 8),
                             _buildStatusPill(currentOrder.status),
                           ],
                         ),
@@ -143,6 +154,7 @@ class ClientOrderTrackingModal extends ConsumerWidget {
                             fontSize: 12,
                             color: const Color(0xFF94A3B8),
                           ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
@@ -275,7 +287,7 @@ class ClientOrderTrackingModal extends ConsumerWidget {
 
             // Modal Footer
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              padding: EdgeInsets.symmetric(horizontal: isCompact ? 14 : 24, vertical: 12),
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF151D36) : const Color(0xFFF8FAFC),
                 border: Border(top: BorderSide(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0))),
@@ -284,10 +296,14 @@ class ClientOrderTrackingModal extends ConsumerWidget {
                   bottomRight: Radius.circular(16),
                 ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                runSpacing: 8,
                 children: [
                   Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       const Icon(Icons.business_rounded, size: 16, color: Color(0xFF64748B)),
                       const SizedBox(width: 6),

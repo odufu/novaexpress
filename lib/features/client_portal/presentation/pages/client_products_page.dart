@@ -194,7 +194,10 @@ class _ClientProductsPageState extends ConsumerState<ClientProductsPage> {
         return RefreshIndicator(
           onRefresh: () => ref.read(clientPortalProvider.notifier).loadClientData(),
           child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+            padding: EdgeInsets.symmetric(
+              horizontal: isDesktop ? 18 : 12,
+              vertical: isDesktop ? 20 : 14,
+            ),
             children: [
               // 1. Header Bar
               _buildTopHeader(isDark),
@@ -288,8 +291,9 @@ class _ClientProductsPageState extends ConsumerState<ClientProductsPage> {
             ],
           ),
         ),
-        Row(
-          mainAxisSize: MainAxisSize.min,
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
           children: [
             OutlinedButton.icon(
               style: OutlinedButton.styleFrom(
@@ -305,7 +309,6 @@ class _ClientProductsPageState extends ConsumerState<ClientProductsPage> {
                 style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700),
               ),
             ),
-            const SizedBox(width: 10),
             ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFF37021),
@@ -341,7 +344,9 @@ class _ClientProductsPageState extends ConsumerState<ClientProductsPage> {
       builder: (context, constraints) {
         final width = constraints.maxWidth;
         int crossAxisCount = 5;
-        if (width < 600) {
+        if (width < 380) {
+          crossAxisCount = 1;
+        } else if (width < 620) {
           crossAxisCount = 2;
         } else if (width < 960) {
           crossAxisCount = 3;
@@ -1508,9 +1513,12 @@ class _ClientProductsPageState extends ConsumerState<ClientProductsPage> {
                   ),
                   onPressed: () => ClientSupplyStockModal.show(context, product),
                   icon: const Icon(Icons.local_shipping_rounded, size: 13),
-                  label: Text(
-                    'Supply Stock',
-                    style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700),
+                  label: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      'Supply Stock',
+                      style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700),
+                    ),
                   ),
                 ),
               ),
@@ -1528,9 +1536,12 @@ class _ClientProductsPageState extends ConsumerState<ClientProductsPage> {
                   ),
                   onPressed: () => ClientCreateOrderModal.show(context, product: product),
                   icon: const Icon(Icons.add_shopping_cart_rounded, size: 13),
-                  label: Text(
-                    'Create Order',
-                    style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700),
+                  label: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      'Create Order',
+                      style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700),
+                    ),
                   ),
                 ),
               ),

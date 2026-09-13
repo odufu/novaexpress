@@ -75,6 +75,7 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
                 isDark: isDark,
               ),
             ),
+      bottomNavigationBar: isDesktop ? null : _buildMobileBottomNav(context, activeTab, state, isDark),
       body: SafeArea(
         child: Row(
           children: [
@@ -496,11 +497,12 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
   ) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isCompact = screenWidth < 800;
+    final isVeryCompact = screenWidth < 500;
     final activeTitle = _getActiveTabTitle(activeTab, isCloser);
 
     return Container(
-      height: 64,
-      padding: EdgeInsets.symmetric(horizontal: isCompact ? 10 : 20),
+      height: 60,
+      padding: EdgeInsets.symmetric(horizontal: isCompact ? 8 : 20),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
         border: Border(
@@ -514,52 +516,53 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
           if (!isDesktop)
             IconButton(
               icon: const Icon(Icons.menu_rounded),
+              tooltip: 'Navigation Menu',
               onPressed: () => _scaffoldKey.currentState?.openDrawer(),
             ),
 
-          // Active Merchant / Closer Station Status Pill
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+          // Active Merchant / Closer Station Status Pill (hide on very small screens to preserve title space)
+          if (!isVeryCompact)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+              margin: const EdgeInsets.only(right: 10),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 7,
+                    height: 7,
+                    decoration: BoxDecoration(
+                      color: isCloser ? const Color(0xFFF37021) : const Color(0xFF10B981),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    isCloser ? 'Closer Desk' : (isCompact ? state.clientProfile.code : state.clientProfile.companyName),
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 7,
-                  height: 7,
-                  decoration: BoxDecoration(
-                    color: isCloser ? const Color(0xFFF37021) : const Color(0xFF10B981),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  isCloser ? 'Closer Desk' : (isCompact ? state.clientProfile.code : state.clientProfile.companyName),
-                  style: GoogleFonts.inter(
-                    fontSize: isCompact ? 11 : 12,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : const Color(0xFF0F172A),
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(width: 12),
 
           // Active Screen Title
           Expanded(
             child: Text(
               activeTitle,
               style: GoogleFonts.inter(
-                fontSize: isCompact ? 13 : 15,
+                fontSize: isCompact ? 13.5 : 15,
                 fontWeight: FontWeight.w800,
                 color: isDark ? Colors.white : const Color(0xFF0F172A),
               ),
@@ -578,41 +581,124 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
             onPressed: () => ref.read(themeProvider.notifier).toggleTheme(),
           ),
 
-          if (!isCloser && !isCompact) ...[
-            const SizedBox(width: 6),
-            ElevatedButton.icon(
-              onPressed: () {
-                showDialog(
-                  context: context,
-                  builder: (context) => const ClientCreateOrderModal(),
-                );
-              },
-              icon: const Icon(Icons.add_rounded, size: 16, color: Colors.white),
-              label: Text(
-                'Book Order',
-                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white),
+          if (!isCloser) ...[
+            if (isCompact)
+              IconButton(
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (context) => const ClientCreateOrderModal(),
+                  );
+                },
+                icon: const Icon(Icons.add_circle_rounded, color: Color(0xFFF37021), size: 24),
+                tooltip: 'Book Order',
+              )
+            else
+              ElevatedButton.icon(
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (context) => const ClientCreateOrderModal(),
+                  );
+                },
+                icon: const Icon(Icons.add_rounded, size: 16, color: Colors.white),
+                label: Text(
+                  'Book Order',
+                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFF37021),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  elevation: 0,
+                ),
               ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFF37021),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                elevation: 0,
-              ),
-            ),
           ],
 
-          const SizedBox(width: 8),
+          const SizedBox(width: 4),
 
           // User Profile Avatar
           UserAvatarWidget(
             avatarUrl: authUser?.avatarUrl,
             fullName: isCloser ? (authUser?.fullName ?? 'Amaka Chioma') : state.clientProfile.companyName,
-            radius: 16,
+            radius: 15,
             showBorder: true,
             borderColor: const Color(0xFFF37021),
             borderWidth: 1.5,
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildMobileBottomNav(
+    BuildContext context,
+    String activeTab,
+    ClientPortalState state,
+    bool isDark,
+  ) {
+    final navItems = [
+      (key: 'dashboard', label: 'Dashboard', icon: Icons.dashboard_rounded),
+      (key: 'orders', label: 'Orders', icon: Icons.local_shipping_rounded),
+      (key: 'products', label: 'Products', icon: Icons.inventory_2_rounded),
+      (key: 'finance', label: 'Finance', icon: Icons.account_balance_wallet_rounded),
+      if (state.clientProfile.isEnterprise)
+        (key: 'closers', label: 'Closers', icon: Icons.people_alt_rounded),
+    ];
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : Colors.white,
+        border: Border(
+          top: BorderSide(
+            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+          ),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 56,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: navItems.map((item) {
+              final isSelected = activeTab == item.key;
+              return Expanded(
+                child: InkWell(
+                  onTap: () => ref.read(clientActiveTabProvider.notifier).state = item.key,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        item.icon,
+                        size: 20,
+                        color: isSelected ? const Color(0xFFF37021) : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        item.label,
+                        style: GoogleFonts.inter(
+                          fontSize: 10.5,
+                          fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                          color: isSelected ? const Color(0xFFF37021) : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
       ),
     );
   }

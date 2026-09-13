@@ -76,8 +76,11 @@ class _ClientConsignmentsModalState
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         backgroundColor: isDark ? const Color(0xFF1F2937) : Colors.white,
         child: Container(
-          constraints: const BoxConstraints(maxWidth: 600, maxHeight: 700),
-          padding: const EdgeInsets.all(24),
+          constraints: BoxConstraints(
+            maxWidth: 600,
+            maxHeight: MediaQuery.of(ctx).size.height * 0.88,
+          ),
+          padding: EdgeInsets.all(MediaQuery.of(ctx).size.width < 500 ? 14 : 24),
           child: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -86,26 +89,29 @@ class _ClientConsignmentsModalState
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          transfer.transferNumber,
-                          style: GoogleFonts.inter(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: isDark ? Colors.white : const Color(0xFF111827),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            transfer.transferNumber,
+                            style: GoogleFonts.inter(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: isDark ? Colors.white : const Color(0xFF111827),
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Waybill & Dual-Signature Handshake Proof',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Waybill & Dual-Signature Handshake Proof',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                     IconButton(
                       icon: const Icon(Icons.close_rounded),
@@ -223,120 +229,120 @@ class _ClientConsignmentsModalState
                   ),
                 ),
                 const SizedBox(height: 12),
-                Row(
-                  children: [
-                    // Party A: Merchant / Sender
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF111827) : const Color(0xFFF9FAFB),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: isDark ? const Color(0xFF374151) : const Color(0xFFE5E7EB),
-                          ),
+                LayoutBuilder(
+                  builder: (context, sigConstraints) {
+                    final isNarrow = sigConstraints.maxWidth < 460;
+
+                    final partyACard = Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF111827) : const Color(0xFFF9FAFB),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isDark ? const Color(0xFF374151) : const Color(0xFFE5E7EB),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(Icons.outbox_rounded, size: 16, color: Color(0xFF3B82F6)),
-                                const SizedBox(width: 6),
-                                Text(
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.outbox_rounded, size: 16, color: Color(0xFF3B82F6)),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
                                   'Party A: Merchant Dispatch',
                                   style: GoogleFonts.inter(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w600,
                                     color: const Color(0xFF3B82F6),
                                   ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              transfer.senderName ?? 'Merchant Admin',
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: isDark ? Colors.white : const Color(0xFF111827),
                               ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            transfer.senderName ?? 'Merchant Admin',
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? Colors.white : const Color(0xFF111827),
                             ),
-                            Text(
-                              transfer.dispatchedAt != null
-                                  ? 'Signed: ${transfer.dispatchedAt!.toLocal().toString().substring(0, 16)}'
-                                  : 'Signed on Glass',
-                              style: GoogleFonts.inter(
-                                fontSize: 10,
-                                color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
-                              ),
+                          ),
+                          Text(
+                            transfer.dispatchedAt != null
+                                ? 'Signed: ${transfer.dispatchedAt!.toLocal().toString().substring(0, 16)}'
+                                : 'Signed on Glass',
+                            style: GoogleFonts.inter(
+                              fontSize: 10,
+                              color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
                             ),
-                            const SizedBox(height: 8),
-                            Container(
-                              height: 80,
-                              width: double.infinity,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: const Color(0xFFD1D5DB)),
-                              ),
-                              child: (transfer.senderSignatureUrl != null &&
-                                      transfer.senderSignatureUrl!.isNotEmpty)
-                                  ? Image.network(
-                                      transfer.senderSignatureUrl!,
-                                      fit: BoxFit.contain,
-                                      errorBuilder: (_, __, ___) => const Center(
-                                        child: Text(
-                                          'Signature Captured ✓',
-                                          style: TextStyle(
-                                            color: Color(0xFF10B981),
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ),
-                                    )
-                                  : const Center(
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            height: 80,
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFFD1D5DB)),
+                            ),
+                            child: (transfer.senderSignatureUrl != null &&
+                                    transfer.senderSignatureUrl!.isNotEmpty)
+                                ? Image.network(
+                                    transfer.senderSignatureUrl!,
+                                    fit: BoxFit.contain,
+                                    errorBuilder: (_, __, ___) => const Center(
                                       child: Text(
-                                        'Authorized Digital Signature',
+                                        'Signature Captured ✓',
                                         style: TextStyle(
-                                          color: Color(0xFF6B7280),
-                                          fontSize: 10,
+                                          color: Color(0xFF10B981),
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
                                         ),
                                       ),
                                     ),
-                            ),
-                          ],
+                                  )
+                                : const Center(
+                                    child: Text(
+                                      'Authorized Digital Signature',
+                                      style: TextStyle(
+                                        color: Color(0xFF6B7280),
+                                        fontSize: 10,
+                                      ),
+                                    ),
+                                  ),
+                          ),
+                        ],
+                      ),
+                    );
+
+                    final partyBCard = Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF111827) : const Color(0xFFF9FAFB),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isDark ? const Color(0xFF374151) : const Color(0xFFE5E7EB),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-
-                    // Party B: DC Supervisor / Receiver
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF111827) : const Color(0xFFF9FAFB),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: isDark ? const Color(0xFF374151) : const Color(0xFFE5E7EB),
-                          ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.inventory_2_rounded,
-                                  size: 16,
-                                  color: (transfer.isCompleted || transfer.isDiscrepancyReported)
-                                      ? const Color(0xFF10B981)
-                                      : const Color(0xFFF59E0B),
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.inventory_2_rounded,
+                                size: 16,
+                                color: (transfer.isCompleted || transfer.isDiscrepancyReported)
+                                    ? const Color(0xFF10B981)
+                                    : const Color(0xFFF59E0B),
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
                                   'Party B: DC Receipt',
                                   style: GoogleFonts.inter(
                                     fontSize: 11,
@@ -345,70 +351,89 @@ class _ClientConsignmentsModalState
                                         ? const Color(0xFF10B981)
                                         : const Color(0xFFF59E0B),
                                   ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              transfer.receiverName ?? 'Awaiting DC Intake',
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: isDark ? Colors.white : const Color(0xFF111827),
                               ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            transfer.receiverName ?? 'Awaiting DC Intake',
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? Colors.white : const Color(0xFF111827),
                             ),
-                            Text(
-                              transfer.receivedAt != null
-                                  ? 'Verified: ${transfer.receivedAt!.toLocal().toString().substring(0, 16)}'
-                                  : 'Pending physical arrival',
-                              style: GoogleFonts.inter(
-                                fontSize: 10,
-                                color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
-                              ),
+                          ),
+                          Text(
+                            transfer.receivedAt != null
+                                ? 'Verified: ${transfer.receivedAt!.toLocal().toString().substring(0, 16)}'
+                                : 'Pending physical arrival',
+                            style: GoogleFonts.inter(
+                              fontSize: 10,
+                              color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
                             ),
-                            const SizedBox(height: 8),
-                            Container(
-                              height: 80,
-                              width: double.infinity,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: const Color(0xFFD1D5DB)),
-                              ),
-                              child: (transfer.receiverSignatureUrl != null &&
-                                      transfer.receiverSignatureUrl!.isNotEmpty)
-                                  ? Image.network(
-                                      transfer.receiverSignatureUrl!,
-                                      fit: BoxFit.contain,
-                                      errorBuilder: (_, __, ___) => const Center(
-                                        child: Text(
-                                          'Signature Verified ✓',
-                                          style: TextStyle(
-                                            color: Color(0xFF10B981),
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ),
-                                    )
-                                  : Center(
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            height: 80,
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFFD1D5DB)),
+                            ),
+                            child: (transfer.receiverSignatureUrl != null &&
+                                    transfer.receiverSignatureUrl!.isNotEmpty)
+                                ? Image.network(
+                                    transfer.receiverSignatureUrl!,
+                                    fit: BoxFit.contain,
+                                    errorBuilder: (_, __, ___) => const Center(
                                       child: Text(
-                                        transfer.isDispatched
-                                            ? 'Pending DC Supervisor Countersignature'
-                                            : 'Not Countersigned',
-                                        textAlign: TextAlign.center,
+                                        'Signature Verified ✓',
                                         style: TextStyle(
-                                          color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
-                                          fontSize: 10,
+                                          color: Color(0xFF10B981),
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
                                         ),
                                       ),
                                     ),
-                            ),
-                          ],
-                        ),
+                                  )
+                                : Center(
+                                    child: Text(
+                                      transfer.isDispatched
+                                          ? 'Pending DC Supervisor Countersignature'
+                                          : 'Not Countersigned',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+                                        fontSize: 10,
+                                      ),
+                                    ),
+                                  ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
+                    );
+
+                    if (isNarrow) {
+                      return Column(
+                        children: [
+                          partyACard,
+                          const SizedBox(height: 12),
+                          partyBCard,
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      children: [
+                        Expanded(child: partyACard),
+                        const SizedBox(width: 12),
+                        Expanded(child: partyBCard),
+                      ],
+                    );
+                  },
                 ),
 
                 if (transfer.hasDiscrepancy &&
@@ -474,13 +499,22 @@ class _ClientConsignmentsModalState
       return true;
     }).toList();
 
+    final mediaQuery = MediaQuery.of(context);
+    final isCompact = mediaQuery.size.width < 550;
+
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       backgroundColor: isDark ? const Color(0xFF1F2937) : Colors.white,
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isCompact ? 12 : 16,
+        vertical: isCompact ? 16 : 24,
+      ),
       child: Container(
-        width: 850,
-        height: 650,
-        padding: const EdgeInsets.all(24),
+        constraints: BoxConstraints(
+          maxWidth: 850,
+          maxHeight: mediaQuery.size.height * 0.88,
+        ),
+        padding: EdgeInsets.all(isCompact ? 14 : 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -488,38 +522,44 @@ class _ClientConsignmentsModalState
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF10B981).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.local_shipping_rounded, color: Color(0xFF10B981), size: 24),
                       ),
-                      child: const Icon(Icons.local_shipping_rounded, color: Color(0xFF10B981), size: 24),
-                    ),
-                    const SizedBox(width: 14),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Inbound Stock Consignments',
-                          style: GoogleFonts.inter(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                            color: isDark ? Colors.white : const Color(0xFF111827),
-                          ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Inbound Stock Consignments',
+                              style: GoogleFonts.inter(
+                                fontSize: isCompact ? 16 : 20,
+                                fontWeight: FontWeight.w700,
+                                color: isDark ? Colors.white : const Color(0xFF111827),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              'Two-way signed chain of custody from Merchant to Distribution Centers',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                         ),
-                        Text(
-                          'Two-way signed chain of custody from Merchant to Distribution Centers',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.close_rounded),
@@ -527,19 +567,22 @@ class _ClientConsignmentsModalState
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
 
             // Filter Tabs
-            Row(
-              children: [
-                _buildFilterChip('all', 'All Consignments (${transfers.length})', isDark),
-                const SizedBox(width: 8),
-                _buildFilterChip('dispatched', 'In Transit (${stockState.pendingClientSupplies.length})', isDark),
-                const SizedBox(width: 8),
-                _buildFilterChip('completed', 'Received & Verified', isDark),
-                const SizedBox(width: 8),
-                _buildFilterChip('discrepancy', 'Discrepancies', isDark),
-              ],
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildFilterChip('all', 'All Consignments (${transfers.length})', isDark),
+                  const SizedBox(width: 8),
+                  _buildFilterChip('dispatched', 'In Transit (${stockState.pendingClientSupplies.length})', isDark),
+                  const SizedBox(width: 8),
+                  _buildFilterChip('completed', 'Received & Verified', isDark),
+                  const SizedBox(width: 8),
+                  _buildFilterChip('discrepancy', 'Discrepancies', isDark),
+                ],
+              ),
             ),
             const SizedBox(height: 16),
 
@@ -572,7 +615,7 @@ class _ClientConsignmentsModalState
                             final statusColor = _getStatusColor(trf.status);
 
                             return Container(
-                              padding: const EdgeInsets.all(16),
+                              padding: EdgeInsets.all(isCompact ? 12 : 16),
                               decoration: BoxDecoration(
                                 color: isDark ? const Color(0xFF111827) : const Color(0xFFF9FAFB),
                                 borderRadius: BorderRadius.circular(12),
@@ -580,87 +623,90 @@ class _ClientConsignmentsModalState
                                   color: isDark ? const Color(0xFF374151) : const Color(0xFFE5E7EB),
                                 ),
                               ),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Text(
-                                              trf.transferNumber,
-                                              style: GoogleFonts.inter(
-                                                fontSize: 15,
-                                                fontWeight: FontWeight.w700,
-                                                color: isDark ? Colors.white : const Color(0xFF111827),
-                                              ),
+                              child: LayoutBuilder(
+                                builder: (context, itemConstraints) {
+                                  final isItemNarrow = itemConstraints.maxWidth < 480;
+
+                                  final detailsColumn = Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Wrap(
+                                        crossAxisAlignment: WrapCrossAlignment.center,
+                                        spacing: 8,
+                                        runSpacing: 4,
+                                        children: [
+                                          Text(
+                                            trf.transferNumber,
+                                            style: GoogleFonts.inter(
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w700,
+                                              color: isDark ? Colors.white : const Color(0xFF111827),
                                             ),
-                                            const SizedBox(width: 10),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                              decoration: BoxDecoration(
-                                                color: statusColor.withValues(alpha: 0.1),
-                                                borderRadius: BorderRadius.circular(6),
-                                              ),
-                                              child: Text(
-                                                _getStatusLabel(trf.status),
-                                                style: GoogleFonts.inter(
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: statusColor,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Text(
-                                          'Destination Hub: ${trf.destinationWarehouseName ?? 'DC Station'} • Created: ${trf.createdAt.toLocal().toString().substring(0, 10)}',
-                                          style: GoogleFonts.inter(
-                                            fontSize: 12,
-                                            color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
                                           ),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: statusColor.withValues(alpha: 0.1),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: Text(
+                                              _getStatusLabel(trf.status),
+                                              style: GoogleFonts.inter(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                                color: statusColor,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        'Destination Hub: ${trf.destinationWarehouseName ?? 'DC Station'} • Created: ${trf.createdAt.toLocal().toString().substring(0, 10)}',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 12,
+                                          color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
                                         ),
-                                        const SizedBox(height: 4),
-                                        Row(
-                                          children: [
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Wrap(
+                                        spacing: 12,
+                                        runSpacing: 4,
+                                        children: [
+                                          Text(
+                                            'Total Units: ${trf.totalQuantityRequested}',
+                                            style: GoogleFonts.inter(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                              color: isDark ? Colors.white : const Color(0xFF111827),
+                                            ),
+                                          ),
+                                          if (trf.isCompleted || trf.isDiscrepancyReported) ...[
                                             Text(
-                                              'Total Units: ${trf.totalQuantityRequested}',
+                                              'Received: ${trf.totalQuantityReceived}',
                                               style: GoogleFonts.inter(
                                                 fontSize: 12,
                                                 fontWeight: FontWeight.w600,
-                                                color: isDark ? Colors.white : const Color(0xFF111827),
+                                                color: const Color(0xFF10B981),
                                               ),
                                             ),
-                                            if (trf.isCompleted || trf.isDiscrepancyReported) ...[
-                                              const SizedBox(width: 12),
+                                            if (trf.totalQuantityDamaged > 0) ...[
                                               Text(
-                                                '• Received: ${trf.totalQuantityReceived}',
+                                                'Damaged: ${trf.totalQuantityDamaged}',
                                                 style: GoogleFonts.inter(
                                                   fontSize: 12,
                                                   fontWeight: FontWeight.w600,
-                                                  color: const Color(0xFF10B981),
+                                                  color: const Color(0xFFEF4444),
                                                 ),
                                               ),
-                                              if (trf.totalQuantityDamaged > 0) ...[
-                                                const SizedBox(width: 8),
-                                                Text(
-                                                  '• Damaged: ${trf.totalQuantityDamaged}',
-                                                  style: GoogleFonts.inter(
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.w600,
-                                                    color: const Color(0xFFEF4444),
-                                                  ),
-                                                ),
-                                              ],
                                             ],
                                           ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  OutlinedButton.icon(
+                                        ],
+                                      ),
+                                    ],
+                                  );
+
+                                  final actionBtn = OutlinedButton.icon(
                                     onPressed: () => _showTransferDetail(trf, isDark),
                                     icon: const Icon(Icons.draw_rounded, size: 16),
                                     label: const Text('View Signatures'),
@@ -669,8 +715,29 @@ class _ClientConsignmentsModalState
                                       side: const BorderSide(color: Color(0xFF3B82F6)),
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                     ),
-                                  ),
-                                ],
+                                  );
+
+                                  if (isItemNarrow) {
+                                    return Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        detailsColumn,
+                                        const SizedBox(height: 10),
+                                        Align(
+                                          alignment: Alignment.centerRight,
+                                          child: actionBtn,
+                                        ),
+                                      ],
+                                    );
+                                  }
+
+                                  return Row(
+                                    children: [
+                                      Expanded(child: detailsColumn),
+                                      actionBtn,
+                                    ],
+                                  );
+                                },
                               ),
                             );
                           },

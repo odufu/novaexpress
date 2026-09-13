@@ -408,14 +408,18 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
     final totalRevenue = closerOrders.where((o) => o.isDelivered).fold(0.0, (sum, o) => sum + o.totalAmount);
     final totalCommissionEarned = closerOrders.where((o) => o.isDelivered).length * _currentCloser.commissionRate;
 
+    final mediaQuery = MediaQuery.of(context);
+    final isCompactScreen = mediaQuery.size.width < 500;
+
     return Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isCompactScreen ? 10 : 16,
+        vertical: 20,
+      ),
       backgroundColor: Colors.transparent,
       child: Container(
-        width: 1050,
-        height: 820,
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.92,
+          maxHeight: mediaQuery.size.height * 0.92,
           maxWidth: 1050,
         ),
         decoration: BoxDecoration(
@@ -608,21 +612,21 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 6,
+                      runSpacing: 4,
                       children: [
-                        Flexible(
-                          child: Text(
-                            _currentCloser.fullName,
-                            style: GoogleFonts.inter(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                              color: isDark ? Colors.white : const Color(0xFF0F172A),
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                        Text(
+                          _currentCloser.fullName,
+                          style: GoogleFonts.inter(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                           decoration: BoxDecoration(
@@ -638,7 +642,6 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
                             ),
                           ),
                         ),
-                        const SizedBox(width: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                           decoration: BoxDecoration(
@@ -672,8 +675,10 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
             ],
           );
 
-          final actionButtons = Row(
-            mainAxisSize: MainAxisSize.min,
+          final actionButtons = Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               // Edit Profile
               IconButton(
@@ -685,7 +690,6 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
                 icon: const Icon(Icons.edit_outlined, size: 18),
                 onPressed: _showEditProfileDialog,
               ),
-              const SizedBox(width: 8),
 
               // Reset Password
               OutlinedButton.icon(
@@ -702,7 +706,6 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
                   style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600),
                 ),
               ),
-              const SizedBox(width: 8),
 
               // Activate / Deactivate
               ElevatedButton.icon(
@@ -724,7 +727,6 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
                   style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700),
                 ),
               ),
-              const SizedBox(width: 8),
 
               // Close Modal
               IconButton(
@@ -777,7 +779,9 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
       child: LayoutBuilder(
         builder: (context, constraints) {
           final isWide = constraints.maxWidth >= 750;
-          final crossCount = isWide ? 6 : 3;
+          final isCompact = constraints.maxWidth < 480;
+          final crossCount = isWide ? 6 : (isCompact ? 2 : 3);
+          final childAspectRatio = isWide ? 2.1 : (isCompact ? 2.3 : 1.9);
 
           return GridView.count(
             shrinkWrap: true,
@@ -785,7 +789,7 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
             crossAxisCount: crossCount,
             crossAxisSpacing: 10,
             mainAxisSpacing: 8,
-            childAspectRatio: isWide ? 2.1 : 1.9,
+            childAspectRatio: childAspectRatio,
             children: [
               _buildKpiCard(
                 title: 'Leads Assigned',
@@ -1124,29 +1128,28 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
       child: Column(
         children: [
           // Filter Chips & Search Bar
-          Row(
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 38,
-                  child: TextField(
-                    onChanged: (v) => setState(() => _leadSearchQuery = v),
-                    style: GoogleFonts.inter(fontSize: 12, color: isDark ? Colors.white : const Color(0xFF0F172A)),
-                    decoration: InputDecoration(
-                      hintText: 'Search customer name, phone, product...',
-                      hintStyle: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
-                      prefixIcon: const Icon(Icons.search_rounded, size: 16, color: Color(0xFF94A3B8)),
-                      filled: true,
-                      fillColor: isDark ? const Color(0xFF0B1021) : const Color(0xFFF8FAFC),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 10),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0))),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0))),
-                    ),
+          LayoutBuilder(
+            builder: (context, filterConstraints) {
+              final isNarrow = filterConstraints.maxWidth < 420;
+              final searchField = SizedBox(
+                height: 38,
+                child: TextField(
+                  onChanged: (v) => setState(() => _leadSearchQuery = v),
+                  style: GoogleFonts.inter(fontSize: 12, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                  decoration: InputDecoration(
+                    hintText: 'Search customer name, phone, product...',
+                    hintStyle: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
+                    prefixIcon: const Icon(Icons.search_rounded, size: 16, color: Color(0xFF94A3B8)),
+                    filled: true,
+                    fillColor: isDark ? const Color(0xFF0B1021) : const Color(0xFFF8FAFC),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0))),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0))),
                   ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              DropdownButton<String>(
+              );
+
+              final dropdown = DropdownButton<String>(
                 value: _selectedLeadFilter,
                 dropdownColor: isDark ? const Color(0xFF151D36) : Colors.white,
                 style: GoogleFonts.inter(fontSize: 12, color: isDark ? Colors.white : const Color(0xFF0F172A)),
@@ -1160,8 +1163,30 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
                 onChanged: (v) {
                   if (v != null) setState(() => _selectedLeadFilter = v);
                 },
-              ),
-            ],
+              );
+
+              if (isNarrow) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    searchField,
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: dropdown,
+                    ),
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(child: searchField),
+                  const SizedBox(width: 10),
+                  dropdown,
+                ],
+              );
+            },
           ),
           const SizedBox(height: 12),
 
@@ -1426,9 +1451,11 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
                   children: [
                     const Icon(Icons.hub_outlined, color: Color(0xFFF37021), size: 18),
                     const SizedBox(width: 8),
-                    Text(
-                      'Primary Dispatch Hub: Wuse Central Distribution Hub (Abuja)',
-                      style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                    Expanded(
+                      child: Text(
+                        'Primary Dispatch Hub: Wuse Central Distribution Hub (Abuja)',
+                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                      ),
                     ),
                   ],
                 ),
@@ -1513,14 +1540,39 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
           ),
           const SizedBox(height: 12),
 
-          Row(
-            children: [
-              Expanded(child: _buildStatusMetricCard('Delivered (Paid)', '${deliveredOrders.length}', const Color(0xFF10B981), isDark)),
-              const SizedBox(width: 10),
-              Expanded(child: _buildStatusMetricCard('In Transit', '${inTransitOrders.length}', const Color(0xFF3B82F6), isDark)),
-              const SizedBox(width: 10),
-              Expanded(child: _buildStatusMetricCard('Pending Dispatch', '${pendingOrders.length}', const Color(0xFFF59E0B), isDark)),
-            ],
+          LayoutBuilder(
+            builder: (context, metricConstraints) {
+              final isNarrow = metricConstraints.maxWidth < 450;
+              final card1 = _buildStatusMetricCard('Delivered (Paid)', '${deliveredOrders.length}', const Color(0xFF10B981), isDark);
+              final card2 = _buildStatusMetricCard('In Transit', '${inTransitOrders.length}', const Color(0xFF3B82F6), isDark);
+              final card3 = _buildStatusMetricCard('Pending Dispatch', '${pendingOrders.length}', const Color(0xFFF59E0B), isDark);
+
+              if (isNarrow) {
+                return Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(child: card1),
+                        const SizedBox(width: 10),
+                        Expanded(child: card2),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    card3,
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(child: card1),
+                  const SizedBox(width: 10),
+                  Expanded(child: card2),
+                  const SizedBox(width: 10),
+                  Expanded(child: card3),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -1555,8 +1607,17 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8))),
+          Expanded(
+            flex: 4,
+            child: Text(
+              label,
+              style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
           Flexible(
+            flex: 5,
             child: Text(
               value,
               style: GoogleFonts.inter(

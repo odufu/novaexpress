@@ -181,12 +181,21 @@ class _ClientAddProductModalState extends ConsumerState<ClientAddProductModal> {
       return s.toLowerCase().contains(_stateSearchQuery.toLowerCase());
     }).toList();
 
+    final mediaQuery = MediaQuery.of(context);
+    final isCompactScreen = mediaQuery.size.width < 500;
+
     return Dialog(
       backgroundColor: isDark ? const Color(0xFF10172A) : Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isCompactScreen ? 12 : 16,
+        vertical: isCompactScreen ? 16 : 24,
+      ),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 680, maxHeight: 850),
+        constraints: BoxConstraints(
+          maxWidth: 680,
+          maxHeight: mediaQuery.size.height * 0.9,
+        ),
         child: Column(
           children: [
             // Modal Header
@@ -553,9 +562,12 @@ class _ClientAddProductModalState extends ConsumerState<ClientAddProductModal> {
                               children: [
                                 Row(
                                   children: [
-                                    Text(
-                                      'Wholesale Unit Cost (COGS)',
-                                      style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF334155)),
+                                    Expanded(
+                                      child: Text(
+                                        'Wholesale Unit Cost (COGS)',
+                                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF334155)),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
                                     ),
                                     const SizedBox(width: 4),
                                     Tooltip(
@@ -588,94 +600,114 @@ class _ClientAddProductModalState extends ConsumerState<ClientAddProductModal> {
                       ),
                       const SizedBox(height: 16),
 
-                      // Barcode, Weight & Low Stock Threshold
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            flex: 3,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Barcode / EAN (Optional)',
-                                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF334155)),
+                      // Barcode, Weight & Low Stock Threshold (Responsive Layout)
+                      LayoutBuilder(
+                        builder: (context, innerConstraints) {
+                          final isNarrow = innerConstraints.maxWidth < 480;
+
+                          final barcodeField = Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Barcode / EAN (Optional)',
+                                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF334155)),
+                              ),
+                              const SizedBox(height: 6),
+                              TextFormField(
+                                controller: _barcodeCtrl,
+                                style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : Colors.black87),
+                                decoration: InputDecoration(
+                                  hintText: 'e.g. 615123456789',
+                                  hintStyle: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF94A3B8)),
+                                  prefixIcon: const Icon(Icons.qr_code_scanner_rounded, size: 18, color: Color(0xFF64748B)),
+                                  filled: true,
+                                  fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))),
+                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                                 ),
-                                const SizedBox(height: 6),
-                                TextFormField(
-                                  controller: _barcodeCtrl,
-                                  style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : Colors.black87),
-                                  decoration: InputDecoration(
-                                    hintText: 'e.g. 615123456789',
-                                    hintStyle: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF94A3B8)),
-                                    prefixIcon: const Icon(Icons.qr_code_scanner_rounded, size: 18, color: Color(0xFF64748B)),
-                                    filled: true,
-                                    fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))),
-                                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))),
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                  ),
+                              ),
+                            ],
+                          );
+
+                          final weightField = Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Weight (kg)',
+                                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF334155)),
+                              ),
+                              const SizedBox(height: 6),
+                              TextFormField(
+                                controller: _weightKgCtrl,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : Colors.black87),
+                                decoration: InputDecoration(
+                                  hintText: '0.5',
+                                  suffixText: 'kg',
+                                  filled: true,
+                                  fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))),
+                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                ),
+                              ),
+                            ],
+                          );
+
+                          final lowStockField = Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Low Stock Alert',
+                                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF334155)),
+                              ),
+                              const SizedBox(height: 6),
+                              TextFormField(
+                                controller: _lowStockThresholdCtrl,
+                                keyboardType: TextInputType.number,
+                                style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : Colors.black87),
+                                decoration: InputDecoration(
+                                  hintText: '10',
+                                  suffixText: 'units',
+                                  filled: true,
+                                  fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))),
+                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                ),
+                              ),
+                            ],
+                          );
+
+                          if (isNarrow) {
+                            return Column(
+                              children: [
+                                barcodeField,
+                                const SizedBox(height: 12),
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(child: weightField),
+                                    const SizedBox(width: 10),
+                                    Expanded(child: lowStockField),
+                                  ],
                                 ),
                               ],
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            flex: 2,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Weight (kg)',
-                                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF334155)),
-                                ),
-                                const SizedBox(height: 6),
-                                TextFormField(
-                                  controller: _weightKgCtrl,
-                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                  style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : Colors.black87),
-                                  decoration: InputDecoration(
-                                    hintText: '0.5',
-                                    suffixText: 'kg',
-                                    filled: true,
-                                    fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))),
-                                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))),
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            flex: 2,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Low Stock Alert',
-                                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF334155)),
-                                ),
-                                const SizedBox(height: 6),
-                                TextFormField(
-                                  controller: _lowStockThresholdCtrl,
-                                  keyboardType: TextInputType.number,
-                                  style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : Colors.black87),
-                                  decoration: InputDecoration(
-                                    hintText: '10',
-                                    suffixText: 'units',
-                                    filled: true,
-                                    fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))),
-                                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))),
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                            );
+                          }
+
+                          return Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(flex: 3, child: barcodeField),
+                              const SizedBox(width: 10),
+                              Expanded(flex: 2, child: weightField),
+                              const SizedBox(width: 10),
+                              Expanded(flex: 2, child: lowStockField),
+                            ],
+                          );
+                        },
                       ),
                       const SizedBox(height: 16),
 
@@ -846,14 +878,16 @@ class _ClientAddProductModalState extends ConsumerState<ClientAddProductModal> {
                                   color: matchingDcs.isNotEmpty ? const Color(0xFF10B981) : const Color(0xFFEF4444),
                                 ),
                                 const SizedBox(width: 8),
-                                Text(
-                                  matchingDcs.isNotEmpty
-                                      ? 'Distribution Hubs Receiving Initial Inventory (${matchingDcs.length})'
-                                      : 'No Active Distribution Centers In Selected States',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w800,
-                                    color: matchingDcs.isNotEmpty ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                                Expanded(
+                                  child: Text(
+                                    matchingDcs.isNotEmpty
+                                        ? 'Distribution Hubs Receiving Initial Inventory (${matchingDcs.length})'
+                                        : 'No Active Distribution Centers In Selected States',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800,
+                                      color: matchingDcs.isNotEmpty ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                                    ),
                                   ),
                                 ),
                               ],
@@ -914,8 +948,11 @@ class _ClientAddProductModalState extends ConsumerState<ClientAddProductModal> {
                   ),
                 ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+              child: Wrap(
+                alignment: WrapAlignment.end,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                runSpacing: 8,
                 children: [
                   TextButton(
                     onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
@@ -928,7 +965,6 @@ class _ClientAddProductModalState extends ConsumerState<ClientAddProductModal> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
                   ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFF37021),

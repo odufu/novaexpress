@@ -230,20 +230,29 @@ class _ClientAddPackageModalState extends ConsumerState<ClientAddPackageModal> {
     final cardBg = isDark ? const Color(0xFF0F172A) : Colors.white;
     final borderColor = isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0);
 
+    final mediaQuery = MediaQuery.of(context);
+    final isCompact = mediaQuery.size.width < 500;
+
     return Dialog(
       backgroundColor: cardBg,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
         side: BorderSide(color: borderColor),
       ),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isCompact ? 12 : 16,
+        vertical: isCompact ? 16 : 24,
+      ),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 640, maxHeight: 760),
+        constraints: BoxConstraints(
+          maxWidth: 640,
+          maxHeight: mediaQuery.size.height * 0.9,
+        ),
         child: Column(
           children: [
             // Header
             Container(
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.all(isCompact ? 14 : 20),
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF1E294A) : const Color(0xFFFFF7ED),
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
@@ -365,69 +374,87 @@ class _ClientAddPackageModalState extends ConsumerState<ClientAddPackageModal> {
                       ),
                       const SizedBox(height: 16),
 
-                      // Quantities Row: Total, Paid, Bonus
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                      // Quantities: Total, Paid, Bonus
+                      LayoutBuilder(
+                        builder: (context, qConstraints) {
+                          final totalCol = Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Total Units',
+                                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF64748B)),
+                              ),
+                              const SizedBox(height: 6),
+                              TextFormField(
+                                controller: _qtyController,
+                                keyboardType: TextInputType.number,
+                                decoration: _inputDecoration(isDark, '3'),
+                                onChanged: (_) => setState(() {}),
+                                validator: (v) {
+                                  final n = int.tryParse(v ?? '');
+                                  if (n == null || n <= 0) return 'Required';
+                                  return null;
+                                },
+                              ),
+                            ],
+                          );
+                          final paidCol = Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Paid Units',
+                                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF64748B)),
+                              ),
+                              const SizedBox(height: 6),
+                              TextFormField(
+                                controller: _paidQtyController,
+                                keyboardType: TextInputType.number,
+                                decoration: _inputDecoration(isDark, '3'),
+                              ),
+                            ],
+                          );
+                          final freeCol = Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Free / Bonus',
+                                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF64748B)),
+                              ),
+                              const SizedBox(height: 6),
+                              TextFormField(
+                                controller: _freeQtyController,
+                                keyboardType: TextInputType.number,
+                                decoration: _inputDecoration(isDark, '0'),
+                              ),
+                            ],
+                          );
+
+                          if (qConstraints.maxWidth < 450) {
+                            return Column(
                               children: [
-                                Text(
-                                  'Total Units',
-                                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF64748B)),
-                                ),
-                                const SizedBox(height: 6),
-                                TextFormField(
-                                  controller: _qtyController,
-                                  keyboardType: TextInputType.number,
-                                  decoration: _inputDecoration(isDark, '3'),
-                                  onChanged: (_) => setState(() {}),
-                                  validator: (v) {
-                                    final n = int.tryParse(v ?? '');
-                                    if (n == null || n <= 0) return 'Required';
-                                    return null;
-                                  },
+                                totalCol,
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    Expanded(child: paidCol),
+                                    const SizedBox(width: 10),
+                                    Expanded(child: freeCol),
+                                  ],
                                 ),
                               ],
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Paid Units',
-                                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF64748B)),
-                                ),
-                                const SizedBox(height: 6),
-                                TextFormField(
-                                  controller: _paidQtyController,
-                                  keyboardType: TextInputType.number,
-                                  decoration: _inputDecoration(isDark, '3'),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Free / Bonus',
-                                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF64748B)),
-                                ),
-                                const SizedBox(height: 6),
-                                TextFormField(
-                                  controller: _freeQtyController,
-                                  keyboardType: TextInputType.number,
-                                  decoration: _inputDecoration(isDark, '0'),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                            );
+                          }
+
+                          return Row(
+                            children: [
+                              Expanded(child: totalCol),
+                              const SizedBox(width: 10),
+                              Expanded(child: paidCol),
+                              const SizedBox(width: 10),
+                              Expanded(child: freeCol),
+                            ],
+                          );
+                        },
                       ),
                       const SizedBox(height: 16),
 
@@ -568,14 +595,17 @@ class _ClientAddPackageModalState extends ConsumerState<ClientAddPackageModal> {
 
             // Actions
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              padding: EdgeInsets.symmetric(horizontal: isCompact ? 14 : 20, vertical: 12),
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF1E294A) : const Color(0xFFF8FAFC),
                 borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
                 border: Border(top: BorderSide(color: borderColor)),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+              child: Wrap(
+                alignment: WrapAlignment.end,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                runSpacing: 8,
                 children: [
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(),
@@ -586,7 +616,6 @@ class _ClientAddPackageModalState extends ConsumerState<ClientAddPackageModal> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFF37021),

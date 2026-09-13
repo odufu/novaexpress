@@ -103,14 +103,16 @@ class _ClientOnboardCloserModalState extends ConsumerState<ClientOnboardCloserMo
     final currentCount = clientState.closers.length;
     final maxLimit = clientState.clientProfile.closerLimit;
 
+    final isCompact = MediaQuery.of(context).size.width < 500;
+
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       backgroundColor: Colors.white,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      insetPadding: EdgeInsets.symmetric(horizontal: isCompact ? 14 : 20, vertical: 24),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 540),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(28),
+          padding: EdgeInsets.all(isCompact ? 18 : 28),
           child: Form(
             key: _formKey,
             child: Column(
@@ -121,35 +123,43 @@ class _ClientOnboardCloserModalState extends ConsumerState<ClientOnboardCloserMo
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF6366F1).withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(12),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF6366F1).withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.person_add_alt_1_rounded, color: Color(0xFF6366F1), size: 24),
                           ),
-                          child: const Icon(Icons.person_add_alt_1_rounded, color: Color(0xFF6366F1), size: 24),
-                        ),
-                        const SizedBox(width: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Onboard Telesales Closer',
-                              style: GoogleFonts.inter(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                color: const Color(0xFF0F172A),
-                              ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Onboard Telesales Closer',
+                                  style: GoogleFonts.inter(
+                                    fontSize: isCompact ? 16 : 18,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFF0F172A),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  'Capacity: $currentCount / $maxLimit Active Closers',
+                                  style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
                             ),
-                            Text(
-                              'Capacity: $currentCount / $maxLimit Active Closers',
-                              style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
-                            ),
-                          ],
-                        ),
-                      ],
+                          ),
+                        ],
+                      ),
                     ),
                     IconButton(
                       icon: const Icon(Icons.close_rounded, color: Color(0xFF94A3B8)),

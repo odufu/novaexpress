@@ -616,10 +616,14 @@ class _ClientOrdersPageState extends ConsumerState<ClientOrdersPage> {
             const SizedBox(height: 8),
 
             // Dispatch & Closer Attribution
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              runSpacing: 4,
               children: [
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     const Icon(Icons.two_wheeler_rounded, size: 14, color: Color(0xFF94A3B8)),
                     const SizedBox(width: 4),

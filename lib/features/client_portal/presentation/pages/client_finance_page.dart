@@ -90,7 +90,10 @@ class _ClientFinancePageState extends ConsumerState<ClientFinancePage> {
     return RefreshIndicator(
       onRefresh: () => ref.read(clientPortalProvider.notifier).loadClientData(),
       child: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        padding: EdgeInsets.symmetric(
+          horizontal: MediaQuery.of(context).size.width < 650 ? 14 : 24,
+          vertical: 20,
+        ),
         children: [
           // Top Control & Product Filter Bar
           _buildTopFilterBar(context, ref, state, allProducts, isDark),
@@ -151,41 +154,46 @@ class _ClientFinancePageState extends ConsumerState<ClientFinancePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF37021).withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.account_balance_wallet_rounded, color: Color(0xFFF37021), size: 22),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Finance & Settlements Command',
-                      style: GoogleFonts.inter(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: isDark ? Colors.white : const Color(0xFF0F172A),
-                      ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isWide = constraints.maxWidth >= 640;
+              final headerTitle = Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF37021).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    Text(
-                      'Live cash flow visibility, field COD custody, logistics deductions, and bank payouts',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                      ),
+                    child: const Icon(Icons.account_balance_wallet_rounded, color: Color(0xFFF37021), size: 22),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Finance & Settlements Command',
+                          style: GoogleFonts.inter(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          ),
+                        ),
+                        Text(
+                          'Live cash flow visibility, field COD custody, logistics deductions, and bank payouts',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-              // CSV Export Action
-              OutlinedButton.icon(
+                  ),
+                ],
+              );
+
+              final exportButton = OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(
                   foregroundColor: const Color(0xFFF37021),
                   side: const BorderSide(color: Color(0xFFF37021)),
@@ -206,8 +214,25 @@ class _ClientFinancePageState extends ConsumerState<ClientFinancePage> {
                   'Export Statement',
                   style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13),
                 ),
-              ),
-            ],
+              );
+
+              return isWide
+                  ? Row(
+                      children: [
+                        Expanded(child: headerTitle),
+                        const SizedBox(width: 14),
+                        exportButton,
+                      ],
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        headerTitle,
+                        const SizedBox(height: 14),
+                        SizedBox(width: double.infinity, child: exportButton),
+                      ],
+                    );
+            },
           ),
           const SizedBox(height: 16),
           const Divider(height: 1),
@@ -323,7 +348,7 @@ class _ClientFinancePageState extends ConsumerState<ClientFinancePage> {
           crossAxisCount: crossAxisCount,
           crossAxisSpacing: 14,
           mainAxisSpacing: 14,
-          childAspectRatio: constraints.maxWidth > 1250 ? 1.65 : 2.0,
+          childAspectRatio: constraints.maxWidth > 1250 ? 1.65 : (constraints.maxWidth <= 550 ? 2.4 : 2.0),
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           children: [
@@ -513,76 +538,122 @@ class _ClientFinancePageState extends ConsumerState<ClientFinancePage> {
           ),
         ],
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-            ),
-            child: const Icon(Icons.account_balance_rounded, color: Color(0xFF2DD4BF), size: 28),
-          ),
-          const SizedBox(width: 18),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isWide = constraints.maxWidth >= 640;
+
+          final bankInfo = Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                ),
+                child: const Icon(Icons.account_balance_rounded, color: Color(0xFF2DD4BF), size: 28),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Designated Settlement Bank Account',
-                      style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF2DD4BF)),
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        Text(
+                          'Designated Settlement Bank Account',
+                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF2DD4BF)),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2DD4BF).withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            'Verified for Payouts',
+                            style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF2DD4BF)),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF2DD4BF).withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        'Verified for Payouts',
-                        style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF2DD4BF)),
-                      ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '${profile.bankName} • ${profile.accountNumber}',
+                      style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.white),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Beneficiary: ${profile.accountName} • Cycle: ${profile.settlementFrequency.toUpperCase()} (${profile.settlementDay})',
+                      style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  '${profile.bankName} • ${profile.accountNumber}',
-                  style: GoogleFonts.inter(fontSize: 19, fontWeight: FontWeight.w900, color: Colors.white),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Beneficiary: ${profile.accountName} • Cycle: ${profile.settlementFrequency.toUpperCase()} (${profile.settlementDay})',
-                  style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 16),
-          if (settlements.isNotEmpty)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+              ),
+            ],
+          );
+
+          final payoutBatch = settlements.isNotEmpty
+              ? Container(
+                  padding: isWide ? EdgeInsets.zero : const EdgeInsets.only(top: 14),
+                  decoration: isWide
+                      ? null
+                      : BoxDecoration(
+                          border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.1))),
+                        ),
+                  child: Row(
+                    mainAxisAlignment: isWide ? MainAxisAlignment.end : MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: isWide ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Latest Payout Batch',
+                            style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
+                          ),
+                          Text(
+                            '₦${_formatMoney(settlements.first.netPayoutAmount)}',
+                            style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.white),
+                          ),
+                          Text(
+                            settlements.first.settlementNumber,
+                            style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFFF37021)),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                )
+              : null;
+
+          if (isWide) {
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Text(
-                  'Latest Payout Batch',
-                  style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
-                ),
-                Text(
-                  '₦${_formatMoney(settlements.first.netPayoutAmount)}',
-                  style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.white),
-                ),
-                Text(
-                  settlements.first.settlementNumber,
-                  style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFFF37021)),
-                ),
+                Expanded(child: bankInfo),
+                if (payoutBatch != null) ...[
+                  const SizedBox(width: 16),
+                  payoutBatch,
+                ],
               ],
-            ),
-        ],
+            );
+          } else {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                bankInfo,
+                if (payoutBatch != null) ...[
+                  const SizedBox(height: 14),
+                  payoutBatch,
+                ],
+              ],
+            );
+          }
+        },
       ),
     );
   }
@@ -605,8 +676,11 @@ class _ClientFinancePageState extends ConsumerState<ClientFinancePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 12,
+            runSpacing: 8,
             children: [
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -648,67 +722,60 @@ class _ClientFinancePageState extends ConsumerState<ClientFinancePage> {
                 DataColumn(label: Text('Product & SKU', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12))),
                 DataColumn(label: Text('Units Sold', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12))),
                 DataColumn(label: Text('Gross GMV', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12))),
-                DataColumn(label: Text('Money Outside', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12))),
-                DataColumn(label: Text('In DC Custody', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12))),
-                DataColumn(label: Text('Remitted to Bank', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12))),
-                DataColumn(label: Text('Logistics Fees', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12))),
-                DataColumn(label: Text('Net Remittance', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12))),
+                DataColumn(label: Text('Logistics Costs', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12))),
+                DataColumn(label: Text('Net Realized', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12))),
                 DataColumn(label: Text('COGS', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12))),
-                DataColumn(label: Text('Commercial Profit', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12))),
-                DataColumn(label: Text('Success Rate', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12))),
+                DataColumn(label: Text('Commercial GP', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12))),
+                DataColumn(label: Text('Gross Margin', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12))),
+                DataColumn(label: Text('Awaiting Remittance', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12))),
+                DataColumn(label: Text('Money Outside', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12))),
               ],
               rows: summaries.map((s) {
-                final isFilteredThis = state.selectedFinanceProductFilter.toLowerCase() == s.productName.toLowerCase();
+                final isFiltered = state.selectedFinanceProductFilter == s.productName;
                 return DataRow(
-                  color: isFilteredThis
-                      ? WidgetStateProperty.all(const Color(0xFFF37021).withValues(alpha: 0.08))
-                      : null,
+                  selected: isFiltered,
+                  onSelectChanged: (_) {
+                    ref.read(clientPortalProvider.notifier).setFinanceProductFilter(
+                          isFiltered ? 'all' : s.productName,
+                        );
+                  },
                   cells: [
                     DataCell(
-                      InkWell(
-                        onTap: () => ref.read(clientPortalProvider.notifier).setFinanceProductFilter(s.productName),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              s.productName,
-                              style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: const Color(0xFF2563EB)),
-                            ),
-                            Text(
-                              s.productSku,
-                              style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8)),
-                            ),
-                          ],
-                        ),
+                      Row(
+                        children: [
+                          Icon(Icons.inventory_2_rounded, size: 16, color: isFiltered ? const Color(0xFFF37021) : const Color(0xFF2563EB)),
+                          const SizedBox(width: 8),
+                          Text(s.productName, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13)),
+                        ],
                       ),
                     ),
-                    DataCell(Text('${s.unitsDelivered} units', style: GoogleFonts.inter(fontWeight: FontWeight.w600))),
-                    DataCell(Text('₦${_formatMoney(s.grossDeliveredValue)}', style: GoogleFonts.inter(fontWeight: FontWeight.bold))),
-                    DataCell(Text('₦${_formatMoney(s.moneyOutside)}', style: GoogleFonts.inter(color: const Color(0xFFF59E0B), fontWeight: FontWeight.w700))),
-                    DataCell(Text('₦${_formatMoney(s.awaitingRemittance)}', style: GoogleFonts.inter(color: const Color(0xFF2563EB), fontWeight: FontWeight.w700))),
-                    DataCell(Text('₦${_formatMoney(s.remittedToBank)}', style: GoogleFonts.inter(color: const Color(0xFF10B981), fontWeight: FontWeight.w700))),
-                    DataCell(Text('₦${_formatMoney(s.logisticsDeliveryFees)}', style: GoogleFonts.inter(color: const Color(0xFFEF4444)))),
-                    DataCell(Text('₦${_formatMoney(s.netRealizedRevenue)}', style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: const Color(0xFF10B981)))),
-                    DataCell(Text('₦${_formatMoney(s.cogs)}', style: GoogleFonts.inter(color: const Color(0xFF64748B)))),
-                    DataCell(Text('₦${_formatMoney(s.commercialGrossProfit)} (${s.profitMarginPercentage.toStringAsFixed(1)}%)', style: GoogleFonts.inter(fontWeight: FontWeight.w900, color: const Color(0xFF0D9488)))),
+                    DataCell(Text('${s.deliveredOrders} units', style: GoogleFonts.inter(fontSize: 12))),
+                    DataCell(Text('₦${_formatMoney(s.grossDeliveredValue)}', style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 12))),
+                    DataCell(Text('-₦${_formatMoney(s.logisticsDeliveryFees)}', style: GoogleFonts.inter(color: const Color(0xFFEF4444), fontSize: 12))),
+                    DataCell(Text('₦${_formatMoney(s.netRealizedRevenue)}', style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: const Color(0xFF10B981), fontSize: 12))),
+                    DataCell(Text('-₦${_formatMoney(s.cogs)}', style: GoogleFonts.inter(color: const Color(0xFF64748B), fontSize: 12))),
+                    DataCell(Text('₦${_formatMoney(s.commercialGrossProfit)}', style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: const Color(0xFF0D9488), fontSize: 12))),
                     DataCell(
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: s.deliverySuccessRate >= 80 ? const Color(0xFF10B981).withValues(alpha: 0.15) : const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                          color: s.profitMarginPercentage >= 50
+                              ? const Color(0xFF10B981).withValues(alpha: 0.15)
+                              : const Color(0xFFF59E0B).withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          '${s.deliverySuccessRate.toStringAsFixed(1)}%',
+                          '${s.profitMarginPercentage.toStringAsFixed(1)}%',
                           style: GoogleFonts.inter(
-                            fontSize: 11,
                             fontWeight: FontWeight.bold,
-                            color: s.deliverySuccessRate >= 80 ? const Color(0xFF10B981) : const Color(0xFFD97706),
+                            fontSize: 11,
+                            color: s.profitMarginPercentage >= 50 ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
                           ),
                         ),
                       ),
                     ),
+                    DataCell(Text('₦${_formatMoney(s.awaitingRemittance)}', style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: const Color(0xFF2563EB), fontSize: 12))),
+                    DataCell(Text('₦${_formatMoney(s.moneyOutside)}', style: GoogleFonts.inter(color: const Color(0xFFF59E0B), fontSize: 12))),
                   ],
                 );
               }).toList(),
@@ -734,33 +801,32 @@ class _ClientFinancePageState extends ConsumerState<ClientFinancePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Financial Transaction & Settlement Ledger (${orders.length})',
-                      style: GoogleFonts.inter(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: isDark ? Colors.white : const Color(0xFF0F172A),
-                      ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isWide = constraints.maxWidth >= 640;
+              final headerTitle = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Financial Transaction & Settlement Ledger (${orders.length})',
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
                     ),
-                    Text(
-                      'Individual orders breakdown with gross price, logistics fees, and payout status',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                      ),
+                  ),
+                  Text(
+                    'Individual orders breakdown with gross price, logistics fees, and payout status',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                     ),
-                  ],
-                ),
-              ),
-              // Search field
-              SizedBox(
-                width: 250,
+                  ),
+                ],
+              );
+
+              final searchField = SizedBox(
+                width: isWide ? 250 : double.infinity,
                 child: TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
@@ -776,8 +842,25 @@ class _ClientFinancePageState extends ConsumerState<ClientFinancePage> {
                     ),
                   ),
                 ),
-              ),
-            ],
+              );
+
+              return isWide
+                  ? Row(
+                      children: [
+                        Expanded(child: headerTitle),
+                        const SizedBox(width: 14),
+                        searchField,
+                      ],
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        headerTitle,
+                        const SizedBox(height: 12),
+                        searchField,
+                      ],
+                    );
+            },
           ),
           const SizedBox(height: 16),
 
@@ -853,27 +936,38 @@ class _ClientFinancePageState extends ConsumerState<ClientFinancePage> {
                         order.orderNumber,
                         style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 13),
                       ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          '• ${order.productName}',
+                          style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                       const SizedBox(width: 8),
                       Text(
-                        '• ${order.productName}',
-                        style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
-                      ),
-                      const Spacer(),
-                      Text(
                         '₦${_formatMoney(order.totalAmount)}',
-                        style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 15),
+                        style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 14),
                       ),
                     ],
                   ),
-                  subtitle: Row(
-                    children: [
-                      Text(
-                        '${order.customerName} (${order.deliveryCity}) • Fee: -₦${_formatMoney(fee)} • Net: ₦${_formatMoney(net)}',
-                        style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
-                      ),
-                      const Spacer(),
-                      _buildStatusBadge(order),
-                    ],
+                  subtitle: Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '${order.customerName} (${order.deliveryCity}) • Fee: -₦${_formatMoney(fee)} • Net: ₦${_formatMoney(net)}',
+                            style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        _buildStatusBadge(order),
+                      ],
+                    ),
                   ),
                 );
               },
@@ -976,7 +1070,10 @@ class _ClientFinancePageState extends ConsumerState<ClientFinancePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 10,
+                  runSpacing: 4,
                   children: [
                     Text(
                       '10:00 PM Daily Remittance Closeout',
@@ -986,7 +1083,6 @@ class _ClientFinancePageState extends ConsumerState<ClientFinancePage> {
                         color: isDark ? Colors.white : const Color(0xFF065F46),
                       ),
                     ),
-                    const SizedBox(width: 10),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
@@ -1039,10 +1135,10 @@ class _ClientFinancePageState extends ConsumerState<ClientFinancePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isWide = constraints.maxWidth >= 600;
+              final headerText = Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
@@ -1054,8 +1150,9 @@ class _ClientFinancePageState extends ConsumerState<ClientFinancePage> {
                     style: GoogleFonts.inter(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                   ),
                 ],
-              ),
-              Container(
+              );
+
+              final totalBadge = Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF37021).withValues(alpha: 0.1),
@@ -1063,14 +1160,32 @@ class _ClientFinancePageState extends ConsumerState<ClientFinancePage> {
                   border: Border.all(color: const Color(0xFFF37021).withValues(alpha: 0.3)),
                 ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+                  crossAxisAlignment: isWide ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                   children: [
                     Text('Total Capital in Custody', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFFF37021), fontWeight: FontWeight.w600)),
                     Text(currency.format(grandTotalValue), style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w900, color: const Color(0xFFF37021))),
                   ],
                 ),
-              ),
-            ],
+              );
+
+              return isWide
+                  ? Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(child: headerText),
+                        const SizedBox(width: 14),
+                        totalBadge,
+                      ],
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        headerText,
+                        const SizedBox(height: 12),
+                        totalBadge,
+                      ],
+                    );
+            },
           ),
           const SizedBox(height: 16),
           const Divider(height: 1),
@@ -1316,8 +1431,11 @@ class _ClientFinancePageState extends ConsumerState<ClientFinancePage> {
         children: [
           Padding(
             padding: const EdgeInsets.all(20),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 12,
+              runSpacing: 4,
               children: [
                 Text('Daily Settlement Batches & Receipts', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800)),
                 Text('${settlements.length} Batches Processed', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),

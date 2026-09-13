@@ -632,8 +632,8 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
                   : 'REM-${rem.id.length >= 6 ? rem.id.substring(0, 6).toUpperCase() : "892102"}';
               final isPaystack = rem.paymentMethod.toLowerCase().contains('paystack') || refCode.startsWith('PSTK');
               final driver = drivers.where((d) => d.id == rem.deliveryAgentId || d.driverCode == rem.deliveryAgentId).firstOrNull;
-              final riderName = driver != null ? driver.name : 'Emeka Rider';
-              final riderCode = driver != null ? driver.driverCode : 'PDA-7000';
+              final riderName = driver != null ? driver.name : (rem.payerName?.isNotEmpty == true ? rem.payerName! : 'Unassigned Rider');
+              final riderCode = driver != null ? driver.driverCode : 'N/A';
 
               return TableRow(
                 decoration: BoxDecoration(

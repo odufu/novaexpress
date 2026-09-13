@@ -34,41 +34,14 @@ final List<DistributionCenter> defaultDistributionCenters = [
     isActive: true,
     operatingZones: const ['Abuja Municipal (AMAC)', 'AMAC', 'Wuse I', 'Wuse II', 'Maitama', 'Garki', 'Jabi', 'Utako', 'Central Area', 'Guzape'],
     storageCapacityUnits: 50000,
-    totalAssignedRiders: 1,
+    totalAssignedRiders: 0,
     activeInventoryBatches: 0,
     createdAt: DateTime(2026, 1, 1),
     updatedAt: DateTime(2026, 1, 1),
   ),
 ];
 
-final List<DCFleetDriver> defaultFleetDrivers = [
-  DCFleetDriver(
-    id: 'b1111111-1111-4111-8111-111111111111',
-    driverCode: 'PDA-7000',
-    name: 'Emeka Rider',
-    phone: '08012345678',
-    email: 'emeka.rider@novaexpress.ng',
-    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-    distributionCenterId: '22222222-2222-4222-8222-222222222222',
-    status: 'active',
-    assignedZone: 'Abuja Municipal (AMAC)',
-    coveredLgas: const ['Abuja Municipal (AMAC)', 'AMAC', 'Wuse II', 'Maitama', 'Garki'],
-    vehicleType: 'Motorcycle',
-    vehiclePlate: 'ABJ-894-XA',
-    vehicleModel: 'Bajaj Boxer 150',
-    totalAssignedOrders: 0,
-    completedOrders: 0,
-    routeProgressPercent: 0.0,
-    efficiencyRating: 5.0,
-    cashInCustody: 0.0,
-    itemsInCustody: 0,
-    commissionRate: 1000.0,
-    transportAllowance: 1500.0,
-    failedDeliveryAllowance: 500.0,
-    compensationType: 'commission',
-    personnelType: 'pda',
-  ),
-];
+const List<DCFleetDriver> defaultFleetDrivers = [];
 
 const List<ClientProfile> defaultRegisteredClients = [];
 
@@ -518,7 +491,7 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
             ),
         super(DCConsoleState(
           distributionCenters: defaultDistributionCenters,
-          drivers: defaultFleetDrivers,
+          drivers: const [],
         )) {
     if (!isTestEnvironment) {
       _initDrivers();
@@ -1430,8 +1403,9 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
         await _storageService.cacheFleetDrivers(mergedList);
         debugPrint('[DC_CONSOLE_PROVIDER] 🚚 Loaded ${dbDrivers.length} active fleet drivers via repository (Total active fleet: ${mergedList.length}) and merged custom compensation terms.');
       } else {
-        state = state.copyWith(drivers: defaultFleetDrivers, isLoading: false);
-        await _storageService.cacheFleetDrivers(defaultFleetDrivers);
+        state = state.copyWith(drivers: const [], isLoading: false);
+        await _storageService.cacheFleetDrivers(const []);
+        debugPrint('[DC_CONSOLE_PROVIDER] 🚚 Zero drivers in remote database. Clean slate active.');
       }
     } catch (e) {
       debugPrint('[DC_CONSOLE_PROVIDER] ℹ️ Fleet fetch notice ($e). Local cached drivers retained.');

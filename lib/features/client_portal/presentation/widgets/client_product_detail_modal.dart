@@ -177,12 +177,21 @@ class _ClientProductDetailModalState extends ConsumerState<ClientProductDetailMo
       }
     }
 
+    final mediaQuery = MediaQuery.of(context);
+    final isCompact = mediaQuery.size.width < 550;
+
     return Dialog(
       backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isCompact ? 12 : 20,
+        vertical: isCompact ? 16 : 24,
+      ),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 880, maxHeight: 860),
+        constraints: BoxConstraints(
+          maxWidth: 880,
+          maxHeight: mediaQuery.size.height * 0.9,
+        ),
         child: Column(
           children: [
             // Modal Header
@@ -332,19 +341,19 @@ class _ClientProductDetailModalState extends ConsumerState<ClientProductDetailMo
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 8,
+                  runSpacing: 4,
                   children: [
-                    Flexible(
-                      child: Text(
-                        product.name,
-                        style: GoogleFonts.inter(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: isDark ? Colors.white : const Color(0xFF0F172A),
-                        ),
+                    Text(
+                      product.name,
+                      style: GoogleFonts.inter(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
                       ),
                     ),
-                    const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
@@ -535,7 +544,10 @@ class _ClientProductDetailModalState extends ConsumerState<ClientProductDetailMo
           LayoutBuilder(
             builder: (context, constraints) {
               final isWide = constraints.maxWidth >= 600;
-              final cardWidth = isWide ? (constraints.maxWidth - 24) / 3 : (constraints.maxWidth - 12) / 2;
+              final isCompact = constraints.maxWidth < 400;
+              final cardWidth = isWide
+                  ? (constraints.maxWidth - 24) / 3
+                  : (isCompact ? constraints.maxWidth : (constraints.maxWidth - 12) / 2);
 
               return Wrap(
                 spacing: 12,
@@ -602,7 +614,10 @@ class _ClientProductDetailModalState extends ConsumerState<ClientProductDetailMo
           const SizedBox(height: 24),
 
           // Orders Breakdown & History
-          Row(
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 4,
             children: [
               Text(
                 'Recent Orders for ${product.name}',
@@ -612,7 +627,6 @@ class _ClientProductDetailModalState extends ConsumerState<ClientProductDetailMo
                   color: isDark ? Colors.white : const Color(0xFF0F172A),
                 ),
               ),
-              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                 decoration: BoxDecoration(
@@ -823,12 +837,15 @@ class _ClientProductDetailModalState extends ConsumerState<ClientProductDetailMo
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Text(
-                        '• ${order.customerName}',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      Expanded(
+                        child: Text(
+                          '• ${order.customerName}',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
@@ -974,7 +991,10 @@ class _ClientProductDetailModalState extends ConsumerState<ClientProductDetailMo
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
+                            Wrap(
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 8,
+                              runSpacing: 4,
                               children: [
                                 Text(
                                   dc.name,
@@ -984,7 +1004,6 @@ class _ClientProductDetailModalState extends ConsumerState<ClientProductDetailMo
                                     color: isDark ? Colors.white : const Color(0xFF0F172A),
                                   ),
                                 ),
-                                const SizedBox(width: 8),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
@@ -1228,7 +1247,10 @@ class _ClientProductDetailModalState extends ConsumerState<ClientProductDetailMo
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Row(
+                                  Wrap(
+                                    crossAxisAlignment: WrapCrossAlignment.center,
+                                    spacing: 8,
+                                    runSpacing: 4,
                                     children: [
                                       Text(
                                         pkg.packageName,
@@ -1238,8 +1260,7 @@ class _ClientProductDetailModalState extends ConsumerState<ClientProductDetailMo
                                           color: isDark ? Colors.white : const Color(0xFF0F172A),
                                         ),
                                       ),
-                                      if (pkg.freeQuantity > 0) ...[
-                                        const SizedBox(width: 8),
+                                      if (pkg.freeQuantity > 0)
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                           decoration: BoxDecoration(
@@ -1255,7 +1276,6 @@ class _ClientProductDetailModalState extends ConsumerState<ClientProductDetailMo
                                             ),
                                           ),
                                         ),
-                                      ],
                                     ],
                                   ),
                                   const SizedBox(height: 3),
@@ -1426,10 +1446,14 @@ class _ClientProductDetailModalState extends ConsumerState<ClientProductDetailMo
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 8,
+                runSpacing: 6,
                 children: [
                   Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       const Icon(Icons.calculate_rounded, size: 18, color: Color(0xFFF37021)),
                       const SizedBox(width: 8),
@@ -1458,53 +1482,77 @@ class _ClientProductDetailModalState extends ConsumerState<ClientProductDetailMo
                 ],
               ),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              LayoutBuilder(
+                builder: (context, matrixConstraints) {
+                  final isNarrow = matrixConstraints.maxWidth < 550;
+                  final col1 = Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Retail Price', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8))),
+                      const SizedBox(height: 2),
+                      Text('₦${Formatters.currency(product.defaultUnitPrice)}', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold)),
+                    ],
+                  );
+                  final col2 = Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Wholesale Cost', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8))),
+                      const SizedBox(height: 2),
+                      Text('₦${Formatters.currency(product.costPrice)}', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF0D9488))),
+                    ],
+                  );
+                  final col3 = Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Unit Margin', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8))),
+                      const SizedBox(height: 2),
+                      Text(
+                        '₦${Formatters.currency(unitGrossMargin)} (${marginPercent.toStringAsFixed(1)}%)',
+                        style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF10B981)),
+                      ),
+                    ],
+                  );
+                  final col4 = Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Stock Value (Cost)', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8))),
+                      const SizedBox(height: 2),
+                      Text('₦${Formatters.currency(stockValuationAtCost)}', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB))),
+                      Text('Retail: ₦${Formatters.currency(stockValuationAtRetail)}', style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8))),
+                    ],
+                  );
+
+                  if (isNarrow) {
+                    return Column(
                       children: [
-                        Text('Retail Price', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8))),
-                        const SizedBox(height: 2),
-                        Text('₦${Formatters.currency(product.defaultUnitPrice)}', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Wholesale Cost', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8))),
-                        const SizedBox(height: 2),
-                        Text('₦${Formatters.currency(product.costPrice)}', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF0D9488))),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Unit Margin', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8))),
-                        const SizedBox(height: 2),
-                        Text(
-                          '₦${Formatters.currency(unitGrossMargin)} (${marginPercent.toStringAsFixed(1)}%)',
-                          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF10B981)),
+                        Row(
+                          children: [
+                            Expanded(child: col1),
+                            const SizedBox(width: 12),
+                            Expanded(child: col2),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(child: col3),
+                            const SizedBox(width: 12),
+                            Expanded(child: col4),
+                          ],
                         ),
                       ],
-                    ),
-                  ),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Stock Value (Cost)', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8))),
-                        const SizedBox(height: 2),
-                        Text('₦${Formatters.currency(stockValuationAtCost)}', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB))),
-                        Text('Retail: ₦${Formatters.currency(stockValuationAtRetail)}', style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8))),
-                      ],
-                    ),
-                  ),
-                ],
+                    );
+                  }
+
+                  return Row(
+                    children: [
+                      Expanded(child: col1),
+                      Expanded(child: col2),
+                      Expanded(child: col3),
+                      Expanded(child: col4),
+                    ],
+                  );
+                },
               ),
               if (product.costPrice <= 0) ...[
                 const SizedBox(height: 10),

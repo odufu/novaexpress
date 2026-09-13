@@ -161,22 +161,28 @@ class ClientCloserWorkspacePage extends ConsumerWidget {
                     child: const Icon(Icons.headset_mic_rounded, color: Color(0xFFF37021), size: 24),
                   ),
                   const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${currentCloser.fullName} (${currentCloser.closerCode})',
-                        style: GoogleFonts.inter(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
+                  Flexible(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${currentCloser.fullName} (${currentCloser.closerCode})',
+                          style: GoogleFonts.inter(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                      Text(
-                        '${state.clientProfile.companyName} • Telesales Closer Desk',
-                        style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)),
-                      ),
-                    ],
+                        Text(
+                          '${state.clientProfile.companyName} • Telesales Closer Desk',
+                          style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),

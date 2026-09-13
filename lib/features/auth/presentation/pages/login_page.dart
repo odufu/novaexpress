@@ -7,12 +7,18 @@ class LoginPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isCompact = screenWidth < 400;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF7FAFC),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            padding: EdgeInsets.symmetric(
+              horizontal: isCompact ? 14 : 24,
+              vertical: isCompact ? 12 : 16,
+            ),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 480),
               child: Column(
@@ -31,14 +37,14 @@ class LoginPage extends StatelessWidget {
                         ),
                       ],
                     ),
-                    padding: const EdgeInsets.all(24),
+                    padding: EdgeInsets.all(isCompact ? 16 : 24),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         // Circular Logo Header Badge
                         Container(
-                          width: 110,
-                          height: 110,
+                          width: isCompact ? 96 : 110,
+                          height: isCompact ? 96 : 110,
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
                             color: Colors.white,
@@ -59,19 +65,19 @@ class LoginPage extends StatelessWidget {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 16),
-                        const Text(
+                        const SizedBox(height: 14),
+                        Text(
                           'NovaExpress',
                           style: TextStyle(
-                            fontSize: 24,
+                            fontSize: isCompact ? 22 : 24,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF181C1E),
+                            color: const Color(0xFF181C1E),
                           ),
                         ),
                         const Text(
                           'Operations & Logistics Portal',
                           style: TextStyle(
-                            fontSize: 14,
+                            fontSize: 13.5,
                             fontWeight: FontWeight.w600,
                             color: Color(0xFF0F172A),
                           ),
@@ -80,34 +86,46 @@ class LoginPage extends StatelessWidget {
                         const Text(
                           'Single unified sign-in for DCs, Merchants, Closers & Field PDAs',
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 11.5,
                             color: Color(0xFF64748B),
                           ),
                           textAlign: TextAlign.center,
                         ),
-                        const SizedBox(height: 24),
+                        SizedBox(height: isCompact ? 18 : 24),
                         const LoginForm(),
-                        const SizedBox(height: 20),
-                        OutlinedButton.icon(
-                          onPressed: () async {
-                            final uri = Uri.parse('presentation/index.html');
-                            if (await canLaunchUrl(uri)) {
-                              await launchUrl(uri);
-                            }
-                          },
-                          icon: const Icon(Icons.slideshow_rounded, size: 18, color: Color(0xFF006C4C)),
-                          label: const Text(
-                            'Open Interactive System Presentation',
-                            style: TextStyle(
-                              color: Color(0xFF006C4C),
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
+                        const SizedBox(height: 18),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton(
+                            onPressed: () async {
+                              final uri = Uri.parse('presentation/index.html');
+                              if (await canLaunchUrl(uri)) {
+                                await launchUrl(uri);
+                              }
+                            },
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              side: const BorderSide(color: Color(0xFF006C4C)),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             ),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            side: const BorderSide(color: Color(0xFF006C4C)),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            child: const FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.slideshow_rounded, size: 18, color: Color(0xFF006C4C)),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Open Interactive System Presentation',
+                                    style: TextStyle(
+                                      color: Color(0xFF006C4C),
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                       ],

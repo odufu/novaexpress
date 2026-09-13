@@ -17,9 +17,9 @@ class LoginForm extends ConsumerStatefulWidget {
 
 class _LoginFormState extends ConsumerState<LoginForm> {
   final _formKey = GlobalKey<FormState>();
-  final _agentIdController = TextEditingController(text: 'emeka.rider@novaexpress.ng');
+  final _agentIdController = TextEditingController(text: 'dc.supervisor@novaexpress.ng');
   final _passwordController = TextEditingController(text: 'Password123!');
-  String? _selectedDemoRole;
+  String? _selectedDemoRole = 'dc_manager';
 
   @override
   void dispose() {
@@ -92,8 +92,11 @@ class _LoginFormState extends ConsumerState<LoginForm> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 6,
+                  runSpacing: 2,
                   children: [
                     Text(
                       'QUICK TEST AUTOFILL',
@@ -105,9 +108,9 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                       ),
                     ),
                     Text(
-                      'Role routes automatically upon login',
+                      'Role routes on login',
                       style: GoogleFonts.inter(
-                        fontSize: 10,
+                        fontSize: 9.5,
                         color: const Color(0xFF94A3B8),
                         fontStyle: FontStyle.italic,
                       ),
@@ -120,13 +123,6 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                   runSpacing: 6,
                   children: [
                     _buildAutofillChip(
-                      label: 'Field Rider (PDA)',
-                      roleKey: 'rider',
-                      icon: Icons.two_wheeler_rounded,
-                      color: AppColors.orange,
-                      onTap: () => _quickFill('rider', 'emeka.rider@novaexpress.ng', 'Password123!'),
-                    ),
-                    _buildAutofillChip(
                       label: 'DC Supervisor',
                       roleKey: 'dc_manager',
                       icon: Icons.admin_panel_settings_rounded,
@@ -134,18 +130,25 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                       onTap: () => _quickFill('dc_manager', 'dc.supervisor@novaexpress.ng', 'Password123!'),
                     ),
                     _buildAutofillChip(
+                      label: 'Field Rider (PDA)',
+                      roleKey: 'rider',
+                      icon: Icons.two_wheeler_rounded,
+                      color: AppColors.orange,
+                      onTap: () => _quickFill('rider', 'rider@novaexpress.ng', 'Password123!'),
+                    ),
+                    _buildAutofillChip(
                       label: 'Merchant Admin',
                       roleKey: 'client',
                       icon: Icons.storefront_rounded,
                       color: const Color(0xFF0D9488),
-                      onTap: () => _quickFill('client', 'client.novacale@novaexpress.ng', 'ClientPass123!'),
+                      onTap: () => _quickFill('client', 'client@novaexpress.ng', 'Password123!'),
                     ),
                     _buildAutofillChip(
                       label: 'Telesales Closer',
                       roleKey: 'closer',
                       icon: Icons.headset_mic_rounded,
                       color: const Color(0xFF6366F1),
-                      onTap: () => _quickFill('closer', 'closer.amaka@novacale.ng', 'CloserPass123!'),
+                      onTap: () => _quickFill('closer', 'closer@novaexpress.ng', 'Password123!'),
                     ),
                   ],
                 ),
@@ -271,8 +274,11 @@ class _LoginFormState extends ConsumerState<LoginForm> {
           const SizedBox(height: 12),
 
           // Remember Me & Forgot Password Row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 4,
             children: [
               InkWell(
                 onTap: () {
@@ -302,7 +308,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                       'Remember me',
                       style: TextStyle(
                         color: Color(0xFF475569),
-                        fontSize: 13,
+                        fontSize: 12.5,
                       ),
                     ),
                   ],
@@ -315,7 +321,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                   style: TextStyle(
                     color: AppColors.navy,
                     fontWeight: FontWeight.bold,
-                    fontSize: 13,
+                    fontSize: 12.5,
                   ),
                 ),
               ),
@@ -344,20 +350,23 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                       height: 22,
                       child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                     )
-                  : Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Sign In to Assigned Workspace',
-                          style: GoogleFonts.inter(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.3,
+                  : FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'Sign In to Assigned Workspace',
+                            style: GoogleFonts.inter(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.3,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        const Icon(Icons.arrow_forward_rounded, size: 18),
-                      ],
+                          const SizedBox(width: 8),
+                          const Icon(Icons.arrow_forward_rounded, size: 18),
+                        ],
+                      ),
                     ),
             ),
           ),
@@ -381,7 +390,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
         onTap: onTap,
         borderRadius: BorderRadius.circular(8),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
@@ -392,12 +401,12 @@ class _LoginFormState extends ConsumerState<LoginForm> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 14, color: isSelected ? color : const Color(0xFF64748B)),
-              const SizedBox(width: 6),
+              Icon(icon, size: 13, color: isSelected ? color : const Color(0xFF64748B)),
+              const SizedBox(width: 5),
               Text(
                 label,
                 style: GoogleFonts.inter(
-                  fontSize: 11,
+                  fontSize: 10.5,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                   color: isSelected ? color : const Color(0xFF334155),
                 ),

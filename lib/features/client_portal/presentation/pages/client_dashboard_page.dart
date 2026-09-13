@@ -18,11 +18,13 @@ class ClientDashboardPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(clientPortalProvider);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isCompact = screenWidth < 650;
 
     return RefreshIndicator(
       onRefresh: () => ref.read(clientPortalProvider.notifier).loadClientData(),
       child: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        padding: EdgeInsets.symmetric(horizontal: isCompact ? 14 : 24, vertical: isCompact ? 14 : 20),
         children: [
           // Welcome & Quick Action Header
           _buildWelcomeBanner(context, ref, state),
@@ -44,8 +46,11 @@ class ClientDashboardPage extends ConsumerWidget {
   }
 
   Widget _buildWelcomeBanner(BuildContext context, WidgetRef ref, ClientPortalState state) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isCompact = screenWidth < 650;
+
     return Container(
-      padding: const EdgeInsets.all(22),
+      padding: EdgeInsets.all(isCompact ? 16 : 22),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
@@ -61,80 +66,107 @@ class ClientDashboardPage extends ConsumerWidget {
           ),
         ],
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 6,
-                  crossAxisAlignment: WrapCrossAlignment.center,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0D9488).withValues(alpha: 0.25),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFF2DD4BF).withValues(alpha: 0.4)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.verified_rounded, color: Color(0xFF2DD4BF), size: 14),
-                          const SizedBox(width: 6),
-                          Text(
-                            state.clientProfile.code,
-                            style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF2DD4BF)),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0D9488).withValues(alpha: 0.25),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: const Color(0xFF2DD4BF).withValues(alpha: 0.4)),
                           ),
-                        ],
-                      ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.verified_rounded, color: Color(0xFF2DD4BF), size: 14),
+                              const SizedBox(width: 6),
+                              Text(
+                                state.clientProfile.code,
+                                style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF2DD4BF)),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          'Live Merchant Console',
+                          style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)),
+                        ),
+                      ],
                     ),
+                    const SizedBox(height: 10),
                     Text(
-                      'Live Merchant Console',
-                      style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)),
+                      state.clientProfile.companyName,
+                      style: GoogleFonts.inter(
+                        fontSize: isCompact ? 19 : 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Managing Director: ${state.clientProfile.contactPerson} • ${state.clientProfile.city}, ${state.clientProfile.state}',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: const Color(0xFF94A3B8),
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
-                Text(
-                  state.clientProfile.companyName,
-                  style: GoogleFonts.inter(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+              ),
+              if (!isCompact) ...[
+                const SizedBox(width: 16),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0D9488),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Managing Director: ${state.clientProfile.contactPerson} • ${state.clientProfile.city}, ${state.clientProfile.state}',
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    color: const Color(0xFF94A3B8),
+                  onPressed: () => ClientCreateOrderModal.show(context),
+                  icon: const Icon(Icons.add_shopping_cart_rounded, size: 18),
+                  label: Text(
+                    'Create New Order',
+                    style: GoogleFonts.inter(fontWeight: FontWeight.bold),
                   ),
-                  overflow: TextOverflow.ellipsis,
                 ),
               ],
-            ),
+            ],
           ),
-          const SizedBox(width: 16),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0D9488),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          if (isCompact) ...[
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0D9488),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                onPressed: () => ClientCreateOrderModal.show(context),
+                icon: const Icon(Icons.add_shopping_cart_rounded, size: 18),
+                label: Text(
+                  'Create New Order',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+              ),
             ),
-            onPressed: () => ClientCreateOrderModal.show(context),
-            icon: const Icon(Icons.add_shopping_cart_rounded, size: 18),
-            label: Text(
-              'Create New Order',
-              style: GoogleFonts.inter(fontWeight: FontWeight.bold),
-            ),
-          ),
+          ],
         ],
       ),
     );
@@ -144,11 +176,12 @@ class ClientDashboardPage extends ConsumerWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final crossAxisCount = constraints.maxWidth > 900 ? 4 : (constraints.maxWidth > 550 ? 2 : 1);
+        final aspectRatio = constraints.maxWidth > 900 ? 2.1 : (constraints.maxWidth > 550 ? 2.1 : 3.0);
         return GridView.count(
           crossAxisCount: crossAxisCount,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          childAspectRatio: 2.1,
+          crossAxisSpacing: 14,
+          mainAxisSpacing: 14,
+          childAspectRatio: aspectRatio,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           children: [
@@ -376,100 +409,181 @@ class ClientDashboardPage extends ConsumerWidget {
                 ),
               ),
             )
-          else
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: recentOrders.length,
-              separatorBuilder: (context, index) => const Divider(color: Color(0xFFF1F5F9), height: 16),
-              itemBuilder: (context, index) {
-                final order = recentOrders[index];
-                return InkWell(
-                  onTap: () => ClientOrderTrackingModal.show(context, order),
-                  borderRadius: BorderRadius.circular(8),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF0D9488).withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Icon(Icons.local_shipping_rounded, color: Color(0xFF0D9488), size: 20),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          flex: 3,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                order.orderNumber,
-                                style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: const Color(0xFF0F172A)),
+          else ...[
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isTableMode = constraints.maxWidth >= 650;
+                return ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: recentOrders.length,
+                  separatorBuilder: (context, index) => const Divider(color: Color(0xFFF1F5F9), height: 16),
+                  itemBuilder: (context, index) {
+                    final order = recentOrders[index];
+                    return InkWell(
+                      onTap: () => ClientOrderTrackingModal.show(context, order),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                        child: isTableMode
+                            ? Row(
+                                children: [
+                                  Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF0D9488).withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Icon(Icons.local_shipping_rounded, color: Color(0xFF0D9488), size: 20),
+                                  ),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    flex: 3,
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          order.orderNumber,
+                                          style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: const Color(0xFF0F172A)),
+                                        ),
+                                        Text(
+                                          '${order.customerName} • ${order.deliveryLga ?? "AMAC"}, ${order.deliveryState}',
+                                          style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Expanded(
+                                    flex: 2,
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          '${order.productName} (${order.packageName ?? "${order.quantity} units"})',
+                                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500, color: const Color(0xFF1E293B)),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        Text(
+                                          '₦${order.totalAmount.toStringAsFixed(0)} • ${order.paymentType}',
+                                          style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Expanded(
+                                    flex: 2,
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          order.assignedAgentName ?? (order.distributionCenterName ?? 'Station DC'),
+                                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF0F172A)),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        Text(
+                                          order.assignedAgentPhone ?? 'Auto-Assigned',
+                                          style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  _buildStatusBadge(order.status),
+                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    icon: const Icon(Icons.track_changes_rounded, color: Color(0xFF0D9488), size: 20),
+                                    tooltip: 'Track Live Status',
+                                    onPressed: () => ClientOrderTrackingModal.show(context, order),
+                                  ),
+                                ],
+                              )
+                            : Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          order.orderNumber,
+                                          style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: const Color(0xFF0F172A)),
+                                        ),
+                                        _buildStatusBadge(order.status),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      order.customerName,
+                                      style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF1E293B)),
+                                    ),
+                                    Text(
+                                      '${order.customerPhone} • ${order.deliveryLga ?? "AMAC"}, ${order.deliveryState}',
+                                      style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            '${order.productName} (${order.packageName ?? "${order.quantity} units"})',
+                                            style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w500, color: const Color(0xFF334155)),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        Text(
+                                          '₦${order.totalAmount.toStringAsFixed(0)}',
+                                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF10B981)),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            const Icon(Icons.two_wheeler_rounded, size: 13, color: Color(0xFF94A3B8)),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              order.assignedAgentName ?? (order.distributionCenterName ?? 'Station DC'),
+                                              style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                                            ),
+                                          ],
+                                        ),
+                                        Row(
+                                          children: [
+                                            Text('Track', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF0D9488))),
+                                            const Icon(Icons.chevron_right_rounded, size: 14, color: Color(0xFF0D9488)),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
                               ),
-                              Text(
-                                '${order.customerName} • ${order.deliveryLga ?? "AMAC"}, ${order.deliveryState}',
-                                style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                        Expanded(
-                          flex: 2,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '${order.productName} (${order.packageName ?? "${order.quantity} units"})',
-                                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500, color: const Color(0xFF1E293B)),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              Text(
-                                '₦${order.totalAmount.toStringAsFixed(0)} • ${order.paymentType}',
-                                style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                        Expanded(
-                          flex: 2,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                order.assignedAgentName ?? (order.distributionCenterName ?? 'Station DC'),
-                                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF0F172A)),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              Text(
-                                order.assignedAgentPhone ?? 'Auto-Assigned',
-                                style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
-                              ),
-                            ],
-                          ),
-                        ),
-                        _buildStatusBadge(order.status),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          icon: const Icon(Icons.track_changes_rounded, color: Color(0xFF0D9488), size: 20),
-                          tooltip: 'Track Live Status',
-                          onPressed: () => ClientOrderTrackingModal.show(context, order),
-                        ),
-                      ],
-                    ),
-                  ),
+                      ),
+                    );
+                  },
                 );
               },
             ),
+          ],
         ],
       ),
     );

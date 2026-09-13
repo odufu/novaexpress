@@ -293,16 +293,25 @@ class _ClientCreateOrderModalState extends ConsumerState<ClientCreateOrderModal>
       stockAllocations: const [],
     );
 
+    final mediaQuery = MediaQuery.of(context);
+    final isCompact = mediaQuery.size.width < 500;
+
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isCompact ? 12 : 16,
+        vertical: isCompact ? 16 : 24,
+      ),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 680, maxHeight: 780),
+        constraints: BoxConstraints(
+          maxWidth: 680,
+          maxHeight: mediaQuery.size.height * 0.9,
+        ),
         child: Column(
           children: [
             // Header
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+              padding: EdgeInsets.symmetric(horizontal: isCompact ? 14 : 24, vertical: 16),
               decoration: const BoxDecoration(
                 color: Color(0xFF0F172A),
                 borderRadius: BorderRadius.only(
@@ -356,7 +365,7 @@ class _ClientCreateOrderModalState extends ConsumerState<ClientCreateOrderModal>
               child: Form(
                 key: _formKey,
                 child: ListView(
-                  padding: const EdgeInsets.all(24),
+                  padding: EdgeInsets.all(isCompact ? 14 : 24),
                   children: [
                     // Section 1: Product & Package Selection
                     _buildSectionHeader('1. Product & Commercial Package Deal', Icons.inventory_2_outlined),
@@ -951,7 +960,7 @@ class _ClientCreateOrderModalState extends ConsumerState<ClientCreateOrderModal>
 
             // Footer Actions
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              padding: EdgeInsets.symmetric(horizontal: isCompact ? 14 : 24, vertical: 14),
               decoration: const BoxDecoration(
                 color: Color(0xFFF8FAFC),
                 border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
@@ -960,8 +969,11 @@ class _ClientCreateOrderModalState extends ConsumerState<ClientCreateOrderModal>
                   bottomRight: Radius.circular(16),
                 ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+              child: Wrap(
+                alignment: WrapAlignment.end,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                runSpacing: 8,
                 children: [
                   OutlinedButton(
                     style: OutlinedButton.styleFrom(
@@ -970,7 +982,6 @@ class _ClientCreateOrderModalState extends ConsumerState<ClientCreateOrderModal>
                     onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
                     child: const Text('Cancel'),
                   ),
-                  const SizedBox(width: 12),
                   ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF0D9488),

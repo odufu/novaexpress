@@ -229,12 +229,21 @@ class _ClientSupplyStockModalState extends ConsumerState<ClientSupplyStockModal>
 
     final sumAllocated = _computeSumAllocated(coveredDcs);
 
+    final mediaQuery = MediaQuery.of(context);
+    final isCompactScreen = mediaQuery.size.width < 500;
+
     return Dialog(
       backgroundColor: isDark ? const Color(0xFF10172A) : Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isCompactScreen ? 12 : 16,
+        vertical: isCompactScreen ? 16 : 24,
+      ),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 680, maxHeight: 850),
+        constraints: BoxConstraints(
+          maxWidth: 680,
+          maxHeight: mediaQuery.size.height * 0.9,
+        ),
         child: Column(
           children: [
             // Header
@@ -303,62 +312,116 @@ class _ClientSupplyStockModalState extends ConsumerState<ClientSupplyStockModal>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Product Summary Card
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF37021).withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Icon(Icons.inventory_2_outlined, color: Color(0xFFF37021), size: 22),
+                      LayoutBuilder(
+                        builder: (context, cardConstraints) {
+                          final isNarrow = cardConstraints.maxWidth < 480;
+                          final badge = Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: widget.product.totalStockAcrossHubs > 0
+                                  ? const Color(0xFF10B981).withValues(alpha: 0.15)
+                                  : const Color(0xFFEF4444).withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(6),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
+                            child: Text(
+                              widget.product.totalStockAcrossHubs > 0
+                                  ? '${widget.product.totalStockAcrossHubs} Units Available'
+                                  : 'Awaiting Initial Supply (0)',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: widget.product.totalStockAcrossHubs > 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                              ),
+                            ),
+                          );
+
+                          if (isNarrow) {
+                            return Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                              ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    widget.product.name,
-                                    style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                                  Row(
+                                    children: [
+                                      Container(
+                                        width: 38,
+                                        height: 38,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF37021).withValues(alpha: 0.15),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: const Icon(Icons.inventory_2_outlined, color: Color(0xFFF37021), size: 20),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              widget.product.name,
+                                              style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                                            ),
+                                            Text(
+                                              'SKU: ${widget.product.sku}',
+                                              style: GoogleFonts.inter(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    'SKU: ${widget.product.sku} • Retail: ₦${widget.product.defaultUnitPrice.toStringAsFixed(0)}',
-                                    style: GoogleFonts.inter(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-                                  ),
+                                  const SizedBox(height: 8),
+                                  badge,
                                 ],
                               ),
+                            );
+                          }
+
+                          return Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
                             ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: widget.product.totalStockAcrossHubs > 0
-                                    ? const Color(0xFF10B981).withValues(alpha: 0.15)
-                                    : const Color(0xFFEF4444).withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                widget.product.totalStockAcrossHubs > 0
-                                    ? '${widget.product.totalStockAcrossHubs} Units Available'
-                                    : 'Awaiting Initial Supply (0)',
-                                style: GoogleFonts.inter(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: widget.product.totalStockAcrossHubs > 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF37021).withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(Icons.inventory_2_outlined, color: Color(0xFFF37021), size: 22),
                                 ),
-                              ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        widget.product.name,
+                                        style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'SKU: ${widget.product.sku} • Retail: ₦${widget.product.defaultUnitPrice.toStringAsFixed(0)}',
+                                        style: GoogleFonts.inter(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                badge,
+                              ],
                             ),
-                          ],
-                        ),
+                          );
+                        },
                       ),
                       const SizedBox(height: 16),
 
@@ -391,96 +454,119 @@ class _ClientSupplyStockModalState extends ConsumerState<ClientSupplyStockModal>
                       ],
 
                       // Consignment Details Row
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                      LayoutBuilder(
+                        builder: (context, rowConstraints) {
+                          final isNarrow = rowConstraints.maxWidth < 450;
+                          final unitsField = Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Total Physical Units to Supply *',
+                                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF334155)),
+                              ),
+                              const SizedBox(height: 6),
+                              TextFormField(
+                                controller: _totalUnitsCtrl,
+                                keyboardType: TextInputType.number,
+                                onChanged: (_) => setState(() {}),
+                                style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : Colors.black87),
+                                decoration: InputDecoration(
+                                  hintText: 'e.g. 500',
+                                  filled: true,
+                                  fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                ),
+                                validator: (v) {
+                                  final val = int.tryParse(v?.trim() ?? '');
+                                  if (val == null || val <= 0) return 'Enter a valid quantity';
+                                  return null;
+                                },
+                              ),
+                            ],
+                          );
+
+                          final waybillField = Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Waybill / Batch Reference *',
+                                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF334155)),
+                              ),
+                              const SizedBox(height: 6),
+                              TextFormField(
+                                controller: _waybillCtrl,
+                                style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : Colors.black87),
+                                decoration: InputDecoration(
+                                  hintText: 'CONSIGN-001',
+                                  filled: true,
+                                  fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                ),
+                                validator: (v) => v == null || v.trim().isEmpty ? 'Waybill required' : null,
+                              ),
+                            ],
+                          );
+
+                          if (isNarrow) {
+                            return Column(
                               children: [
-                                Text(
-                                  'Total Physical Units to Supply *',
-                                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF334155)),
-                                ),
-                                const SizedBox(height: 6),
-                                TextFormField(
-                                  controller: _totalUnitsCtrl,
-                                  keyboardType: TextInputType.number,
-                                  onChanged: (_) => setState(() {}),
-                                  style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : Colors.black87),
-                                  decoration: InputDecoration(
-                                    hintText: 'e.g. 500',
-                                    filled: true,
-                                    fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))),
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                  ),
-                                  validator: (v) {
-                                    final val = int.tryParse(v?.trim() ?? '');
-                                    if (val == null || val <= 0) return 'Enter a valid quantity';
-                                    return null;
-                                  },
-                                ),
+                                unitsField,
+                                const SizedBox(height: 12),
+                                waybillField,
                               ],
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Waybill / Batch Reference *',
-                                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF334155)),
-                                ),
-                                const SizedBox(height: 6),
-                                TextFormField(
-                                  controller: _waybillCtrl,
-                                  style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : Colors.black87),
-                                  decoration: InputDecoration(
-                                    hintText: 'CONSIGN-001',
-                                    filled: true,
-                                    fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))),
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                  ),
-                                  validator: (v) => v == null || v.trim().isEmpty ? 'Waybill required' : null,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                            );
+                          }
+
+                          return Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(child: unitsField),
+                              const SizedBox(width: 14),
+                              Expanded(child: waybillField),
+                            ],
+                          );
+                        },
                       ),
                       const SizedBox(height: 16),
 
                       // Distribution Mode Selector
-                      Row(
+                      Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 8,
+                        runSpacing: 8,
                         children: [
                           Text(
                             'Distribution Allocation Mode:',
                             style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF334155)),
                           ),
-                          const Spacer(),
-                          ChoiceChip(
-                            label: Text('Equal Split', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600)),
-                            selected: _isEqualSplit,
-                            selectedColor: const Color(0xFF10B981).withValues(alpha: 0.2),
-                            onSelected: (val) {
-                              setState(() {
-                                _isEqualSplit = true;
-                              });
-                            },
-                          ),
-                          const SizedBox(width: 8),
-                          ChoiceChip(
-                            label: Text('Custom Allocation', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600)),
-                            selected: !_isEqualSplit,
-                            selectedColor: const Color(0xFFF37021).withValues(alpha: 0.2),
-                            onSelected: (val) {
-                              setState(() {
-                                _isEqualSplit = false;
-                              });
-                            },
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 6,
+                            children: [
+                              ChoiceChip(
+                                label: Text('Equal Split', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600)),
+                                selected: _isEqualSplit,
+                                selectedColor: const Color(0xFF10B981).withValues(alpha: 0.2),
+                                onSelected: (val) {
+                                  setState(() {
+                                    _isEqualSplit = true;
+                                  });
+                                },
+                              ),
+                              ChoiceChip(
+                                label: Text('Custom Allocation', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600)),
+                                selected: !_isEqualSplit,
+                                selectedColor: const Color(0xFFF37021).withValues(alpha: 0.2),
+                                onSelected: (val) {
+                                  setState(() {
+                                    _isEqualSplit = false;
+                                  });
+                                },
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -497,8 +583,11 @@ class _ClientSupplyStockModalState extends ConsumerState<ClientSupplyStockModal>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            Wrap(
+                              alignment: WrapAlignment.spaceBetween,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 8,
+                              runSpacing: 6,
                               children: [
                                 Text(
                                   'Covering Distribution Hubs (${coveredDcs.length})',
@@ -619,8 +708,11 @@ class _ClientSupplyStockModalState extends ConsumerState<ClientSupplyStockModal>
                   ),
                 ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+              child: Wrap(
+                alignment: WrapAlignment.end,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                runSpacing: 8,
                 children: [
                   TextButton(
                     onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
@@ -633,7 +725,6 @@ class _ClientSupplyStockModalState extends ConsumerState<ClientSupplyStockModal>
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
                   ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF10B981),

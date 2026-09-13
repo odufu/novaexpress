@@ -203,11 +203,11 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
           ? resolvedDriver.name
           : (firstOrder.deliveryAgentName != null && firstOrder.deliveryAgentName!.isNotEmpty && firstOrder.deliveryAgentName != 'Fleet Rider'
               ? firstOrder.deliveryAgentName!
-              : (resolvedDriver?.name ?? (dcState.drivers.isNotEmpty ? dcState.drivers.first.name : 'Emeka Rider')));
+              : (resolvedDriver?.name ?? (dcState.drivers.isNotEmpty ? dcState.drivers.first.name : 'Unassigned Rider')));
 
       final riderCode = (resolvedDriver?.driverCode.isNotEmpty == true && resolvedDriver!.driverCode != 'PDA-7000')
           ? resolvedDriver.driverCode
-          : (firstOrder.deliveryAgentCode ?? (resolvedDriver?.driverCode ?? (dcState.drivers.isNotEmpty ? dcState.drivers.first.driverCode : 'PDA-7000')));
+          : (firstOrder.deliveryAgentCode ?? (resolvedDriver?.driverCode ?? (dcState.drivers.isNotEmpty ? dcState.drivers.first.driverCode : 'UNASSIGNED')));
 
       final riderAvatarUrl = resolvedDriver?.avatarUrl ?? '';
       final riderPhone = resolvedDriver?.phone ?? firstOrder.deliveryAgentPhone ?? firstOrder.customerPhone;
@@ -253,11 +253,11 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
             ? resolvedDriver.name
             : (order.deliveryAgentName != null && order.deliveryAgentName!.isNotEmpty && order.deliveryAgentName != 'Fleet Rider'
                 ? order.deliveryAgentName!
-                : (resolvedDriver?.name ?? (dcState.drivers.isNotEmpty ? dcState.drivers.first.name : 'Emeka Rider')));
+                : (resolvedDriver?.name ?? (dcState.drivers.isNotEmpty ? dcState.drivers.first.name : 'Unassigned Rider')));
 
         final riderCode = (resolvedDriver?.driverCode.isNotEmpty == true && resolvedDriver!.driverCode != 'PDA-7000')
             ? resolvedDriver.driverCode
-            : (order.deliveryAgentCode ?? (resolvedDriver?.driverCode ?? (dcState.drivers.isNotEmpty ? dcState.drivers.first.driverCode : 'PDA-7000')));
+            : (order.deliveryAgentCode ?? (resolvedDriver?.driverCode ?? (dcState.drivers.isNotEmpty ? dcState.drivers.first.driverCode : 'UNASSIGNED')));
 
         final riderAvatarUrl = resolvedDriver?.avatarUrl ?? '';
         final riderPhone = resolvedDriver?.phone ?? order.deliveryAgentPhone ?? '08031234567';
@@ -331,11 +331,11 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
             ? resolvedDriver.name
             : (firstMatch?.deliveryAgentName != null && firstMatch!.deliveryAgentName!.isNotEmpty && firstMatch.deliveryAgentName != 'Fleet Rider'
                 ? firstMatch.deliveryAgentName!
-                : (resolvedDriver?.name ?? (dcState.drivers.isNotEmpty ? dcState.drivers.first.name : 'Emeka Rider')));
+                : (resolvedDriver?.name ?? (dcState.drivers.isNotEmpty ? dcState.drivers.first.name : 'Unassigned Rider')));
 
         final riderCode = (resolvedDriver?.driverCode.isNotEmpty == true && resolvedDriver!.driverCode != 'PDA-7000')
             ? resolvedDriver.driverCode
-            : (firstMatch?.deliveryAgentCode ?? (resolvedDriver?.driverCode ?? (dcState.drivers.isNotEmpty ? dcState.drivers.first.driverCode : 'PDA-7000')));
+            : (firstMatch?.deliveryAgentCode ?? (resolvedDriver?.driverCode ?? (dcState.drivers.isNotEmpty ? dcState.drivers.first.driverCode : 'UNASSIGNED')));
 
         final riderAvatarUrl = resolvedDriver?.avatarUrl ?? '';
         final riderPhone = resolvedDriver?.phone ?? firstMatch?.deliveryAgentPhone ?? '08031234567';
@@ -396,11 +396,11 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
             ? resolvedDriver.name
             : (order.deliveryAgentName != null && order.deliveryAgentName!.isNotEmpty && order.deliveryAgentName != 'Fleet Rider'
                 ? order.deliveryAgentName!
-                : (resolvedDriver?.name ?? (dcState.drivers.isNotEmpty ? dcState.drivers.first.name : 'Emeka Rider')));
+                : (resolvedDriver?.name ?? (dcState.drivers.isNotEmpty ? dcState.drivers.first.name : 'Unassigned Rider')));
 
         final riderCode = (resolvedDriver?.driverCode.isNotEmpty == true && resolvedDriver!.driverCode != 'PDA-7000')
             ? resolvedDriver.driverCode
-            : (order.deliveryAgentCode ?? (resolvedDriver?.driverCode ?? (dcState.drivers.isNotEmpty ? dcState.drivers.first.driverCode : 'PDA-7000')));
+            : (order.deliveryAgentCode ?? (resolvedDriver?.driverCode ?? (dcState.drivers.isNotEmpty ? dcState.drivers.first.driverCode : 'UNASSIGNED')));
 
         final riderAvatarUrl = resolvedDriver?.avatarUrl ?? '';
         final riderPhone = resolvedDriver?.phone ?? order.deliveryAgentPhone ?? '08031234567';
