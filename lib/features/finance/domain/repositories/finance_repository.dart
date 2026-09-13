@@ -6,6 +6,7 @@ abstract class FinanceRepository {
   Future<RemittanceEntity> submitRemittance({
     required String agentId,
     required String companyId,
+    String? distributionCenterId,
     required double amount,
     required String paymentMethod,
     double grossCollections = 0.0,

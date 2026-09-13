@@ -69,16 +69,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
     final authState = ref.read(authProvider);
 
     if (authState.isAuthenticated && authState.user != null) {
-      if (authState.user?.isClient == true) {
-        debugPrint('[SPLASH] 🛍️ Authenticated Merchant (${authState.user?.email}) -> Routing to /client');
-        context.go('/client');
-      } else if (authState.user?.isDcManager == true) {
-        debugPrint('[SPLASH] 🏢 Authenticated DC Manager (${authState.user?.email}) -> Routing to /dc');
-        context.go('/dc');
-      } else {
-        debugPrint('[SPLASH] 🚚 Authenticated Rider (${authState.user?.email}) -> Routing to /');
-        context.go('/');
-      }
+      final user = authState.user!;
+      final target = user.homeConsoleRoute;
+      debugPrint('[SPLASH] 🎯 Authenticated ${user.roleDescription} (${user.email}) -> Routing to $target');
+      context.go(target);
     } else {
       debugPrint('[SPLASH] 🔒 No active session -> Routing to /login');
       context.go('/login');

@@ -10,6 +10,7 @@ import '../../../dc_console/domain/entities/distribution_center.dart';
 import '../../../dc_console/presentation/providers/dc_console_provider.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
+import '../../../pipeline_chat/presentation/widgets/order_pipeline_chat_sheet.dart';
 
 class ClientOrderTrackingModal extends ConsumerWidget {
   final OrderEntity order;
@@ -146,6 +147,12 @@ class ClientOrderTrackingModal extends ConsumerWidget {
                       ],
                     ),
                   ),
+                  IconButton(
+                    tooltip: 'Order Pipeline Chat (DC Hub & Rider)',
+                    icon: const Icon(Icons.forum_outlined, color: Color(0xFF2DD4BF), size: 20),
+                    onPressed: () => OrderPipelineChatSheet.showForOrder(context, currentOrder),
+                  ),
+                  const SizedBox(width: 4),
                   IconButton(
                     icon: const Icon(Icons.close_rounded, color: Color(0xFF94A3B8)),
                     onPressed: () => Navigator.of(context).pop(),

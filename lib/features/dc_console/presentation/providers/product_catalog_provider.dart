@@ -52,26 +52,7 @@ class ProductCatalogState {
 
   List<ProductPackage> getPackagesForProduct(String productName) {
     final prod = findProductByName(productName);
-    if (prod != null && prod.packages.isNotEmpty) {
-      if (prod.packages.length == 1 && prod.packages.first.packageName == '1 Unit (Single)') {
-        return ProductCatalogNotifier.buildDefaultPackagesForProduct(
-          productId: prod.id,
-          productName: prod.name,
-          productSku: prod.sku,
-          baseUnitPrice: prod.defaultUnitPrice,
-          clientName: prod.clientName,
-        );
-      }
-      return prod.packages;
-    }
-    // Return rich default commercial packages for this product
-    return ProductCatalogNotifier.buildDefaultPackagesForProduct(
-      productId: prod?.id ?? 'prod-${productName.hashCode.abs()}',
-      productName: prod?.name ?? productName,
-      productSku: prod?.sku,
-      baseUnitPrice: prod?.defaultUnitPrice ?? 25000.0,
-      clientName: prod?.clientName ?? 'Novacare Limited',
-    );
+    return prod?.packages ?? const [];
   }
 }
 
@@ -84,23 +65,20 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
     _initCatalog();
   }
 
-  /// Builds the standard suite of commercial package bundles for any product
+  /// Builds the baseline single-unit commercial package for a product.
+  /// NOTE: Strict pricing governance forbids synthetic multi-pack discount calculations.
+  /// All multi-pack bundles must be pre-created by merchants or operators in public.product_packages.
   static List<ProductPackage> buildDefaultPackagesForProduct({
     required String productId,
     required String productName,
     String? productSku,
     required double baseUnitPrice,
-    String clientName = 'Novacare Limited',
+    String clientName = '',
   }) {
     final sku = productSku ?? 'SKU-${productName.hashCode.abs()}';
-    final isGrazer = productName.toLowerCase().contains('grazer');
-    final p1Price = baseUnitPrice > 0 ? baseUnitPrice : 25000.0;
-    final p2Price = isGrazer ? 35000.0 : (p1Price >= 25000 ? 35000.0 : (p1Price * 2 * 0.85).roundToDouble());
-    final p3Price = isGrazer ? 50000.0 : (p1Price >= 25000 ? 50000.0 : (p1Price * 3 * 0.80).roundToDouble());
-    const p5Price = 55000.0;
+    final p1Price = baseUnitPrice > 0 ? baseUnitPrice : 0.0;
 
     return [
-      // 1 Unit (Single)
       ProductPackage(
         id: 'pkg-${sku.toLowerCase()}-1',
         productId: productId,
@@ -112,51 +90,6 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
         freeQuantity: 0,
         packagePrice: p1Price,
         clientName: clientName,
-        createdAt: DateTime.now(),
-      ),
-      // 2-Pack Special Deal
-      ProductPackage(
-        id: 'pkg-${sku.toLowerCase()}-2',
-        productId: productId,
-        productName: productName,
-        productSku: sku,
-        packageName: '$productName 2-Pack Special Deal',
-        quantity: 2,
-        paidQuantity: 2,
-        freeQuantity: 0,
-        packagePrice: p2Price,
-        clientName: clientName,
-        description: '2 Units Pack Deal',
-        createdAt: DateTime.now(),
-      ),
-      // 3-Pack Value Deal
-      ProductPackage(
-        id: 'pkg-${sku.toLowerCase()}-3',
-        productId: productId,
-        productName: productName,
-        productSku: sku,
-        packageName: '$productName 3-Pack Value Deal',
-        quantity: 3,
-        paidQuantity: 3,
-        freeQuantity: 0,
-        packagePrice: p3Price,
-        clientName: clientName,
-        description: '3 Units Value Bundle',
-        createdAt: DateTime.now(),
-      ),
-      // 5-Pack Mega Deal (4 + 1 Free @ ₦55,000)
-      ProductPackage(
-        id: 'pkg-${sku.toLowerCase()}-5',
-        productId: productId,
-        productName: productName,
-        productSku: sku,
-        packageName: '$productName 5-Pack Mega Deal (4 + 1 Free)',
-        quantity: 5,
-        paidQuantity: 4,
-        freeQuantity: 1,
-        packagePrice: p5Price,
-        clientName: clientName,
-        description: 'Buy 4 Units, Get 1 Free Bonus (5 Total Physical Units)',
         createdAt: DateTime.now(),
       ),
     ];
@@ -189,8 +122,17 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
             reloadCatalog();
           },
         )
+        ..onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'product_packages',
+          callback: (payload) {
+            debugPrint('[CATALOG_PROVIDER] ⚡ Realtime change on product_packages table (${payload.eventType}). Syncing...');
+            reloadCatalog();
+          },
+        )
         ..subscribe();
-      debugPrint('[CATALOG_PROVIDER] 📡 Realtime channel active for product catalogue.');
+      debugPrint('[CATALOG_PROVIDER] 📡 Realtime channel active for product catalogue & packages.');
     } catch (e) {
       debugPrint('[CATALOG_PROVIDER] ℹ️ Realtime subscription notice: $e');
     }
@@ -217,6 +159,21 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
           .select()
           .order('created_at', ascending: true);
 
+      List<ProductPackage> dbPackages = [];
+      try {
+        final packagesRes = await dbClient
+            .from('product_packages')
+            .select()
+            .order('created_at', ascending: true);
+        for (final pkgRow in (packagesRes as List)) {
+          try {
+            dbPackages.add(ProductPackage.fromJson(pkgRow as Map<String, dynamic>));
+          } catch (_) {}
+        }
+      } catch (pkgErr) {
+        debugPrint('[CATALOG_PROVIDER] ℹ️ Supabase product_packages fetch notice: $pkgErr');
+      }
+
       final List<CatalogProduct> fetchedProducts = [];
 
       for (final raw in (response as List)) {
@@ -224,12 +181,17 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
         final id = map['id']?.toString() ?? 'prod-${DateTime.now().millisecondsSinceEpoch}';
         final name = map['name']?.toString() ?? 'Product';
         final sku = map['sku']?.toString() ?? 'SKU-001';
-        final basePrice = (map['base_price'] as num?)?.toDouble() ?? 25000.0;
+        final basePrice = (map['base_price'] as num?)?.toDouble() ?? 0.0;
+        final costPrice = (map['cost_price'] as num?)?.toDouble() ?? 0.0;
+        final barcode = map['barcode']?.toString();
+        final weightKg = (map['weight_kg'] as num?)?.toDouble() ?? 0.5;
+        final lowStockThreshold = (map['low_stock_threshold'] as num?)?.toInt() ?? 10;
         final category = map['category']?.toString() ?? 'Health & Wellness';
         final description = map['description']?.toString() ?? '';
-        final clientName = map['client_name']?.toString() ?? 'Novacare Limited';
+        final clientName = map['client_name']?.toString() ?? '';
         final clientId = map['client_id']?.toString();
         final imageUrl = map['image_url']?.toString();
+        final stockCount = (map['available_count'] ?? map['stock_quantity'] as num?)?.toInt() ?? 0;
 
         List<String> parsedCoveringStates = [];
         if (map['covering_states'] is List) {
@@ -246,7 +208,17 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
 
         List<ProductPackage> parsedPackages = [];
 
-        // Check if packages JSON is embedded in description: e.g. [PACKAGES: [{"id": "...", ...}]]
+        // 1. Gather packages from Supabase product_packages table
+        final matchingDbPackages = dbPackages.where((dp) {
+          final matchProdId = dp.productId == id;
+          final matchSku = dp.productSku != null && dp.productSku!.toUpperCase() == sku.toUpperCase();
+          final matchName = dp.productName.trim().toLowerCase() == name.trim().toLowerCase();
+          final matchClient = dp.clientId == null || dp.clientId == clientId || dp.clientName.toLowerCase() == clientName.toLowerCase();
+          return (matchProdId || matchSku || matchName) && matchClient;
+        }).toList();
+        parsedPackages.addAll(matchingDbPackages);
+
+        // 2. Check if packages JSON is embedded in description: e.g. [PACKAGES: [{"id": "...", ...}]]
         if (description.contains('[PACKAGES:')) {
           try {
             final pkgMarker = description.indexOf('[PACKAGES:');
@@ -268,9 +240,12 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
               if (jsonEnd != -1) {
                 final jsonStr = description.substring(jsonStart, jsonEnd + 1).trim();
                 final decodedList = jsonDecode(jsonStr) as List;
-                parsedPackages = decodedList
-                    .map((item) => ProductPackage.fromJson(item as Map<String, dynamic>))
-                    .toList();
+                for (final item in decodedList) {
+                  final pkg = ProductPackage.fromJson(item as Map<String, dynamic>);
+                  if (!parsedPackages.any((p) => p.id == pkg.id || p.packageName.toLowerCase() == pkg.packageName.toLowerCase())) {
+                    parsedPackages.add(pkg);
+                  }
+                }
               }
             }
           } catch (e) {
@@ -278,7 +253,7 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
           }
         }
 
-        // Merge with existing packages in memory / local cache
+        // 3. Merge with existing packages in memory / local cache
         final cachedProd = state.findProductByName(name) ?? state.findProductBySku(sku);
         if (cachedProd != null && cachedProd.packages.isNotEmpty) {
           for (final cachedPkg in cachedProd.packages) {
@@ -288,8 +263,8 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
           }
         }
 
-        // If packages list only contains single 1-unit or is empty, enrich with default full packages
-        if (parsedPackages.length <= 1) {
+        // 4. If packages list is empty, add baseline 1-unit package
+        if (parsedPackages.isEmpty && basePrice > 0) {
           final defaults = buildDefaultPackagesForProduct(
             productId: id,
             productName: name,
@@ -297,11 +272,7 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
             baseUnitPrice: basePrice,
             clientName: clientName,
           );
-          for (final defPkg in defaults) {
-            if (!parsedPackages.any((p) => p.packageName.toLowerCase() == defPkg.packageName.toLowerCase())) {
-              parsedPackages.add(defPkg);
-            }
-          }
+          parsedPackages.addAll(defaults);
         }
 
         fetchedProducts.add(
@@ -312,9 +283,14 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
             clientName: clientName,
             clientId: clientId,
             defaultUnitPrice: basePrice,
+            costPrice: costPrice,
+            barcode: barcode,
+            weightKg: weightKg,
+            lowStockThreshold: lowStockThreshold,
             category: category,
             description: description,
             imageUrl: imageUrl,
+            totalStockAcrossHubs: stockCount,
             coveringStates: parsedCoveringStates,
             packages: parsedPackages,
           ),
@@ -366,34 +342,48 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
         updatedProducts.add(updatedProd);
 
         try {
-          final res = await dbClient.from('products').update({
-            'description': combinedDesc,
-          }).eq('id', p.id).select();
-
-          if ((res as List).isEmpty) {
-            final resByName = await dbClient.from('products').update({
+          final bool isValidUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(p.id);
+          dynamic res;
+          if (isValidUuid) {
+            res = await dbClient.from('products').update({
               'description': combinedDesc,
-            }).eq('name', p.name).select();
+            }).eq('id', p.id).select();
+          }
 
-            if ((resByName as List).isEmpty) {
-              // Not yet created in remote DB, upsert it now cleanly
-              const compId = '11111111-1111-4111-8111-111111111111';
-              await dbClient.from('products').upsert({
-                'company_id': compId,
-                'name': p.name,
-                'sku': p.sku,
-                'category': p.category,
-                'base_price': p.defaultUnitPrice,
+          if (res == null || (res as List).isEmpty) {
+            final resBySku = await dbClient.from('products').update({
+              'description': combinedDesc,
+            }).eq('sku', p.sku).select();
+
+            if ((resBySku as List).isEmpty) {
+              final resByName = await dbClient.from('products').update({
                 'description': combinedDesc,
-                'is_active': true,
-              }, onConflict: 'sku');
+              }).eq('name', p.name).select();
+
+              if ((resByName as List).isEmpty) {
+                // Not yet created in remote DB, upsert it now cleanly
+                const compId = '11111111-1111-4111-8111-111111111111';
+                final Map<String, dynamic> insertPayload = {
+                  'company_id': compId,
+                  'name': p.name,
+                  'sku': p.sku,
+                  'category': p.category,
+                  'base_price': p.defaultUnitPrice,
+                  'description': combinedDesc,
+                  'is_active': true,
+                };
+                if (isValidUuid) {
+                  insertPayload['id'] = p.id;
+                }
+                await dbClient.from('products').upsert(insertPayload, onConflict: 'sku');
+              }
             }
           }
         } catch (_) {
           try {
             await dbClient.from('products').update({
               'description': combinedDesc,
-            }).eq('name', p.name);
+            }).eq('sku', p.sku);
           } catch (_) {}
         }
       }
@@ -470,6 +460,8 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
 
   /// Creates and registers a new commercial package for a product (or creates the product if new).
   /// This newly registered package is immediately persistent across devices and reusable across all future orders!
+  /// Creates and registers a new commercial package for a product (or creates the product if new).
+  /// This newly registered package is immediately persistent across devices and reusable across all future orders!
   ProductPackage addPackageToProduct({
     required String productName,
     required String packageName,
@@ -478,22 +470,29 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
     int? freeQuantity,
     required double packagePrice,
     String? clientName,
+    String? clientId,
+    String? productId,
     String? productSku,
     String? description,
   }) {
     final cleanProd = productName.trim();
     final cleanPkg = packageName.trim();
-    final cleanClient = clientName?.trim().isNotEmpty == true ? clientName!.trim() : 'Novacare Limited';
-
     final existingProduct = state.findProductByName(cleanProd) ?? (productSku != null ? state.findProductBySku(productSku) : null);
-    final packageId = 'pkg-${DateTime.now().millisecondsSinceEpoch}';
+    final cleanClient = clientName?.trim().isNotEmpty == true
+        ? clientName!.trim()
+        : (existingProduct?.clientName ?? '');
     final totalUnits = quantity > 0 ? quantity : 1;
     final paidUnits = paidQuantity ?? totalUnits;
     final freeUnits = freeQuantity ?? 0;
+    final effectiveClientId = clientId ?? existingProduct?.clientId;
+    final cleanSku = (productSku ?? existingProduct?.sku ?? cleanProd).replaceAll(' ', '_').toLowerCase();
+    final packageId = effectiveClientId != null && effectiveClientId.isNotEmpty
+        ? 'pkg_${effectiveClientId}_${cleanSku}_${totalUnits}_${DateTime.now().millisecondsSinceEpoch}'
+        : 'pkg-${DateTime.now().millisecondsSinceEpoch}';
 
     final newPackage = ProductPackage(
       id: packageId,
-      productId: existingProduct?.id ?? 'prod-${DateTime.now().millisecondsSinceEpoch}',
+      productId: productId ?? existingProduct?.id ?? 'prod-${DateTime.now().millisecondsSinceEpoch}',
       productName: existingProduct?.name ?? cleanProd,
       productSku: productSku ?? existingProduct?.sku,
       packageName: cleanPkg,
@@ -502,6 +501,7 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
       freeQuantity: freeUnits,
       packagePrice: packagePrice,
       clientName: existingProduct?.clientName ?? cleanClient,
+      clientId: effectiveClientId,
       description: description,
       isCustom: true,
       createdAt: DateTime.now(),
@@ -520,16 +520,27 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
     } else {
       // Create new product with this new package
       final newProduct = CatalogProduct(
-        id: 'prod-${DateTime.now().millisecondsSinceEpoch}',
+        id: productId ?? 'prod-${DateTime.now().millisecondsSinceEpoch}',
         name: cleanProd,
         sku: productSku ?? 'SKU-${cleanProd.replaceAll(" ", "").substring(0, cleanProd.replaceAll(" ", "").length.clamp(0, 4)).toUpperCase()}-${DateTime.now().millisecond}',
         clientName: cleanClient,
+        clientId: effectiveClientId,
         defaultUnitPrice: totalUnits > 0 ? packagePrice / totalUnits : packagePrice,
         packages: [newPackage],
       );
 
       state = state.copyWith(products: [...state.products, newProduct]);
     }
+
+    // Persist to Supabase product_packages table asynchronously
+    try {
+      final client = Supabase.instance.client;
+      client.from('product_packages').upsert(newPackage.toJson()).then((_) {
+        debugPrint('[CATALOG_PROVIDER] ✅ Persisted package ${newPackage.packageName} to Supabase product_packages.');
+      }).catchError((err) {
+        debugPrint('[CATALOG_PROVIDER] ℹ️ Error saving to product_packages table: $err');
+      });
+    } catch (_) {}
 
     _persistCatalog();
     return newPackage;
@@ -541,25 +552,24 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
     if (existingProduct == null) return false;
 
     final updatedPackages = existingProduct.packages.where((p) => p.id != packageId).toList();
-    if (updatedPackages.isEmpty) {
-      // Keep at least standard commercial defaults
-      updatedPackages.addAll(
-        buildDefaultPackagesForProduct(
-          productId: existingProduct.id,
-          productName: existingProduct.name,
-          productSku: existingProduct.sku,
-          baseUnitPrice: existingProduct.defaultUnitPrice,
-          clientName: existingProduct.clientName,
-        ),
-      );
-    }
-
+    // Maintain autonomous package sets: do not force re-injection of standard defaults
     final updatedProduct = existingProduct.copyWith(packages: updatedPackages);
     final updatedProductList = state.products.map((p) {
       return p.id == existingProduct.id ? updatedProduct : p;
     }).toList();
 
     state = state.copyWith(products: updatedProductList);
+
+    // Delete from Supabase product_packages table asynchronously
+    try {
+      final client = Supabase.instance.client;
+      client.from('product_packages').delete().eq('id', packageId).then((_) {
+        debugPrint('[CATALOG_PROVIDER] ✅ Deleted package $packageId from Supabase product_packages.');
+      }).catchError((err) {
+        debugPrint('[CATALOG_PROVIDER] ℹ️ Error deleting from product_packages: $err');
+      });
+    } catch (_) {}
+
     _persistCatalog();
     return true;
   }
@@ -608,17 +618,33 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
     }).toList();
 
     state = state.copyWith(products: updatedProductList);
+
+    // Update in Supabase product_packages table asynchronously
+    try {
+      final client = Supabase.instance.client;
+      client.from('product_packages').update(updatedPkg!.toJson()).eq('id', packageId).then((_) {
+        debugPrint('[CATALOG_PROVIDER] ✅ Updated package $packageId in Supabase product_packages.');
+      }).catchError((err) {
+        debugPrint('[CATALOG_PROVIDER] ℹ️ Error updating product_packages: $err');
+      });
+    } catch (_) {}
+
     _persistCatalog();
     return updatedPkg;
   }
 
   /// Explicitly registers a new product and its default packages in the catalog
   Future<CatalogProduct> registerNewProduct({
+    String? id,
     required String name,
     required String sku,
     required double baseUnitPrice,
+    double? costPrice,
+    String? barcode,
+    double? weightKg,
+    int? lowStockThreshold,
     String category = 'Health & Wellness',
-    String clientName = 'Novacare Limited',
+    String clientName = '',
     String? clientId,
     String? description,
     String? imageUrl,
@@ -627,7 +653,7 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
   }) async {
     final cleanName = name.trim();
     final cleanSku = sku.trim().toUpperCase();
-    final newId = 'prod-${DateTime.now().millisecondsSinceEpoch}';
+    final newId = (id != null && id.isNotEmpty) ? id : 'prod-${DateTime.now().millisecondsSinceEpoch}';
     final initialPackages = packages ??
         buildDefaultPackagesForProduct(
           productId: newId,
@@ -644,9 +670,14 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
       clientName: clientName,
       clientId: clientId,
       defaultUnitPrice: baseUnitPrice,
+      costPrice: costPrice ?? 0.0,
+      barcode: barcode,
+      weightKg: weightKg ?? 0.5,
+      lowStockThreshold: lowStockThreshold ?? 10,
       category: category,
       description: description,
       imageUrl: imageUrl,
+      totalStockAcrossHubs: 0,
       coveringStates: coveringStates,
       packages: initialPackages,
     );
@@ -656,6 +687,40 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
       newProduct
     ];
     state = state.copyWith(products: updated);
+
+    // Persist new product and packages directly to Supabase
+    try {
+      final client = Supabase.instance.client;
+      final bool isValidUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(newId);
+      final Map<String, dynamic> productPayload = {
+        'name': cleanName,
+        'sku': cleanSku,
+        'base_price': baseUnitPrice,
+        'category': category,
+        'client_name': clientName,
+        'client_id': clientId,
+        'description': description,
+        'image_url': imageUrl,
+        'stock_quantity': 0,
+        'available_count': 0,
+        'in_transit_count': 0,
+        'delivered_count': 0,
+        'is_active': true,
+        'company_id': '11111111-1111-4111-8111-111111111111',
+      };
+      if (isValidUuid) {
+        productPayload['id'] = newId;
+      }
+      await client.from('products').upsert(productPayload, onConflict: 'sku');
+
+      for (final pkg in initialPackages) {
+        final pkgPayload = pkg.copyWith(productId: newId, clientName: clientName, clientId: clientId).toJson();
+        await client.from('product_packages').upsert(pkgPayload);
+      }
+    } catch (e) {
+      debugPrint('[CATALOG_PROVIDER] ℹ️ Register product to Supabase notice: $e');
+    }
+
     await _persistCatalog();
     return newProduct;
   }

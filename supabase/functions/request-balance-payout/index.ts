@@ -35,10 +35,10 @@ serve(async (req: Request) => {
       );
     }
 
-    // 1. Verify agent balance
+    // 1. Verify agent balance, company, and DC assignment
     const { data: agent, error: agentError } = await supabaseClient
       .from("delivery_agents")
-      .select("direct_transfer_balance")
+      .select("id, company_id, distribution_center_id, direct_transfer_balance")
       .eq("id", payload.agentId)
       .single();
 
@@ -60,21 +60,27 @@ serve(async (req: Request) => {
       );
     }
 
-    const payoutNumber = `PAY-${Math.floor(1000 + Math.random() * 9000)}`;
+    // Format: PO-YYYYMMDD-XXXX
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+    const payoutNumber = `PO-${dateStr}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-    // 2. Insert Payout Request
+    // 2. Insert into authoritative payout_requests table
     const { data: payout, error: payoutError } = await supabaseClient
       .from("payout_requests")
       .insert({
         payout_number: payoutNumber,
         delivery_agent_id: payload.agentId,
+        company_id: agent.company_id || "11111111-1111-4111-8111-111111111111",
+        distribution_center_id: agent.distribution_center_id || null,
         amount: payload.amount,
         bank_name: payload.bankName,
         account_number: payload.accountNumber,
         account_name: payload.accountName,
         status: "pending",
-        dc_notes: payload.notes || "Requested via PDA App",
-        created_at: new Date().toISOString(),
+        notes: payload.notes || "Requested via PDA Mobile App",
+        created_at: now.toISOString(),
+        updated_at: now.toISOString(),
       })
       .select()
       .single();
@@ -98,20 +104,20 @@ serve(async (req: Request) => {
       reference: payoutNumber,
       status: "pending",
       description: `Withdrawal from My Balance to ${payload.bankName} (${payload.accountNumber}). Awaiting DC Approval.`,
-      created_at: new Date().toISOString(),
+      created_at: now.toISOString(),
     });
 
     return new Response(
       JSON.stringify({
         success: true,
         payout,
-        message: "Payout request submitted successfully and pending DC Finance review.",
+        message: "Payout request submitted successfully. Awaiting DC approval.",
       }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 201, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: (error as Error).message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

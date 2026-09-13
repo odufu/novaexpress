@@ -7,6 +7,7 @@ import '../widgets/client_order_tracking_modal.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../providers/client_portal_provider.dart';
 import '../widgets/client_create_order_modal.dart';
+import '../../../pipeline_chat/presentation/widgets/order_pipeline_chat_sheet.dart';
 
 class ClientOrdersPage extends ConsumerStatefulWidget {
   const ClientOrdersPage({super.key});
@@ -337,9 +338,9 @@ class _ClientOrdersPageState extends ConsumerState<ClientOrdersPage> {
             borderSide: BorderSide(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
           ),
         ),
-        items: [
-          const DropdownMenuItem(value: 'all', child: Text('All States')),
-          ...NigeriaLocations.states.map((s) => DropdownMenuItem(value: s, child: Text(s))),
+        items: <DropdownMenuItem<String>>[
+          const DropdownMenuItem<String>(value: 'all', child: Text('All States')),
+          ...NigeriaLocations.states.map((s) => DropdownMenuItem<String>(value: s, child: Text(s))),
         ],
         onChanged: (val) {
           if (val != null) ref.read(clientPortalProvider.notifier).setStateFilter(val);
@@ -502,7 +503,15 @@ class _ClientOrdersPageState extends ConsumerState<ClientOrdersPage> {
 
             // Status Badge
             _buildStatusBadge(order.status),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.forum_outlined, size: 18, color: Color(0xFF0D9488)),
+              tooltip: 'Order Pipeline Chat',
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+              onPressed: () => OrderPipelineChatSheet.showForOrder(context, order),
+            ),
+            const SizedBox(width: 4),
             const Icon(Icons.visibility_outlined, size: 18, color: Color(0xFF0D9488)),
           ],
         ),
@@ -632,6 +641,22 @@ class _ClientOrdersPageState extends ConsumerState<ClientOrdersPage> {
                       style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: const Color(0xFFF37021)),
                     ),
                   ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () => OrderPipelineChatSheet.showForOrder(context, order),
+                  icon: const Icon(Icons.forum_outlined, size: 14, color: Color(0xFF0D9488)),
+                  label: const Text('Pipeline Chat', style: TextStyle(fontSize: 11.5, color: Color(0xFF0D9488), fontWeight: FontWeight.bold)),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    side: const BorderSide(color: Color(0xFF0D9488)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
               ],
             ),
           ],

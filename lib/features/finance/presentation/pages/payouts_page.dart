@@ -142,7 +142,7 @@ class _PayoutsPageState extends ConsumerState<PayoutsPage> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Withdraw earnings accumulated from Monnify direct transfers. Subject to DC approval.',
+                    'Withdraw earnings accumulated from direct transfer and prepaid deliveries. Subject to DC approval.',
                     style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
                   ),
                   const SizedBox(height: 16),
@@ -221,10 +221,17 @@ class _PayoutsPageState extends ConsumerState<PayoutsPage> {
                     height: 48,
                     child: ElevatedButton(
                       onPressed: () async {
-                        final reqAmount = double.tryParse(amountController.text.trim()) ?? 0.0;
-                        if (reqAmount <= 0 || (availableBalance > 0 && reqAmount > availableBalance)) {
+                        if (availableBalance <= 0) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Please enter a valid amount within your available balance.')),
+                            const SnackBar(content: Text('You have no withdrawable balance at this time.')),
+                          );
+                          return;
+                        }
+
+                        final reqAmount = double.tryParse(amountController.text.trim()) ?? 0.0;
+                        if (reqAmount <= 0 || reqAmount > availableBalance) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Please enter an amount between ₦1.00 and ${CurrencyFormatter.formatNaira(availableBalance)}.')),
                           );
                           return;
                         }

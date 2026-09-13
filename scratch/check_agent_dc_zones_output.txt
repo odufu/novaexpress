@@ -1,0 +1,12 @@
+=== DELIVERY AGENTS ===
+ID: a9282b2a-8c02-4f64-aa01-373f5983d12d | Code: PDA-7707 | DC: 00000000-0000-4000-8000-788889180011 | State: Abuja (FCT) | City: Ado Ekiti | LGAs: [] | Status: available | OnDuty: true | Active: true
+ID: b1111111-1111-4111-8111-111111111111 | Code: PDA-7000 | DC: 22222222-2222-4222-8222-222222222222 | State: Abuja (FCT) | City: Wuse 2 | LGAs: [] | Status: available | OnDuty: true | Active: true
+ID: cd6b53b0-5203-48f3-ae9b-81c6a0e9e5f3 | Code: PDA-7437 | DC: 00000000-0000-4000-8000-788825051520 | State: Abuja (FCT) | City: Ado | LGAs: ["Ado","Agatu","Apa","Buruku","Gboko","Guma","Gwer East","Katsina-Ala","Konshisha","Kwande","Makurdi","Obi","Ogbadibo","Ohimini","Okpokwu","Tarka","Ushongo","Vandeikya","Otukpo"] | Status: available | OnDuty: true | Active: true
+ID: e4f3b2f4-963a-48a8-879d-c108de780303 | Code: RDR-351 | DC: 00000000-0000-4000-8000-788825051520 | State: Abuja (FCT) | City: Ado | LGAs: [] | Status: available | OnDuty: true | Active: true
+ID: efcf71a2-486c-455d-bf38-66f088f443c6 | Code: PDA-7454 | DC: 00000000-0000-4000-8000-788825051520 | State: Abuja (FCT) | City: Agatu | LGAs: [] | Status: available | OnDuty: true | Active: true
+ID: 1dc54867-8334-4f53-a3f0-f2247daf6ada | Code: PDA-7802 | DC: 00000000-0000-4000-8000-788825051520 | State: Abuja (FCT) | City: Ado | LGAs: [] | Status: available | OnDuty: true | Active: true
+
+=== DISTRIBUTION CENTERS ===
+ID: 22222222-2222-4222-8222-222222222222 | Name: Wuse Central Distribution Hub | State: Abuja (FCT) | City: Wuse 2 | Zones: [] | Hub: true | Grand: true | Active: true
+ID: 00000000-0000-4000-8000-788825051520 | Name: Otukpo DC | State: Benue | City: Otukpo | Zones: ["Ado","Agatu","Apa","Buruku","Gboko","Guma","Gwer East","Katsina-Ala","Konshisha","Kwande","Makurdi","Obi","Ogbadibo","Ohimini","Okpokwu","Tarka","Ushongo","Vandeikya","Otukpo"] | Hub: false | Grand: false | Active: true
+ID: 00000000-0000-4000-8000-788889180011 | Name: Ekiti State DC | State: Ekiti | City: Ikere | Zones: ["Ado Ekiti","Efon","Ekiti East","Ekiti South-West","Ekiti West","Emure","Gbonyin","Ido Osi","Ijero","Ikere","Ikole","Ilejemeje","Irepodun/Ifelodun","Ise/Orun","Moba","Oye"] | Hub: false | Grand: false | Active: true

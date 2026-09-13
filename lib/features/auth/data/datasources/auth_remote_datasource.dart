@@ -56,6 +56,7 @@ abstract class AuthRemoteDataSource {
     String? bankName,
     String? bankAccountNumber,
     String? bankAccountName,
+    String? clientId,
   });
   Future<bool> checkEmailExists(String email);
   Future<bool> checkPhoneExists(String phone);
@@ -244,6 +245,7 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
     String? bankName,
     String? bankAccountNumber,
     String? bankAccountName,
+    String? clientId,
   }) async {
     final parts = contactPerson.trim().split(' ');
     final fName = parts.isNotEmpty ? parts.first : companyName;
@@ -255,7 +257,7 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
       lastName: lName,
       phone: phone.trim(),
       role: 'client',
-      clientId: 'c_${DateTime.now().millisecondsSinceEpoch}',
+      clientId: clientId ?? 'c_${DateTime.now().millisecondsSinceEpoch}',
       clientCompanyName: companyName.trim(),
       deliveryAgentCode: clientCode ?? 'CLI-01',
       operatingState: stateName.trim(),
@@ -530,7 +532,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         final clientRes = await dbClient
             .from('clients')
             .select('id')
-            .or('email.ilike.$cleanEmail,contact_email.ilike.$cleanEmail')
+            .ilike('email', cleanEmail)
             .maybeSingle();
         if (clientRes != null) return true;
       } catch (_) {}
@@ -687,7 +689,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         }
       }
 
-      // 3. Insert into public.users table (schema: id, company_id, email, phone_number, first_name, last_name, role)
+      // 3. Insert into public.users table (schema: id, company_id, email, phone_number, first_name, last_name, role, distribution_center_id)
+      final effectiveDcId = distributionCenterId.isNotEmpty ? distributionCenterId : '22222222-2222-4222-8222-222222222222';
       try {
         await dbClient.from(SupabaseConstants.usersTable).insert({
           'id': userId,
@@ -697,6 +700,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           'first_name': firstName,
           'last_name': lastName,
           'role': 'delivery_agent',
+          'distribution_center_id': effectiveDcId,
         });
         debugPrint('[AUTH_DATASOURCE] ✅ Users table record inserted: $userId ($cleanEmail)');
       } catch (userErr) {
@@ -722,7 +726,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           'id': agentId,
           'user_id': userId,
           'agent_code': agentCode,
-          'distribution_center_id': distributionCenterId.isNotEmpty ? distributionCenterId : '22222222-2222-4222-8222-222222222222',
+          'distribution_center_id': effectiveDcId,
           'vehicle_type': vehicleType,
           'vehicle_plate_number': vehiclePlateNumber,
           'operating_state': 'Abuja (FCT)',
@@ -957,6 +961,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     String? bankName,
     String? bankAccountNumber,
     String? bankAccountName,
+    String? clientId,
   }) async {
     final cleanEmail = email.trim().toLowerCase();
     final cleanCompany = companyName.trim();
@@ -976,7 +981,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     );
 
     String userId = 'u-cli-${DateTime.now().millisecondsSinceEpoch}-${math.Random().nextInt(9999)}';
-    String clientId = _generateUuid();
+    String effectiveClientId = (clientId != null && clientId.trim().isNotEmpty) ? clientId.trim() : _generateUuid();
     String? authUserId;
 
     // Generate Client Code if not provided
@@ -1012,14 +1017,30 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       try {
         final existingClient = await dbClient
             .from('clients')
-            .select('id, contact_email, email')
-            .or('email.ilike.$cleanEmail,contact_email.ilike.$cleanEmail')
+            .select('id, email')
+            .ilike('email', cleanEmail)
             .maybeSingle();
-        if (existingClient != null) {
+        if (existingClient != null && existingClient['id'] != effectiveClientId) {
           throw Exception("A client with email '$cleanEmail' already exists. Please choose a different client login email.");
         }
       } catch (clientCheckErr) {
         if (clientCheckErr.toString().contains('already exists')) rethrow;
+      }
+
+      // Check phone uniqueness in users table
+      if (cleanPhone.isNotEmpty) {
+        try {
+          final existingPhoneUser = await dbClient
+              .from(SupabaseConstants.usersTable)
+              .select('id, email, phone_number')
+              .eq('phone_number', cleanPhone)
+              .maybeSingle();
+          if (existingPhoneUser != null && existingPhoneUser['id'] != userId) {
+            throw Exception("The phone number '$cleanPhone' is already registered to user (${existingPhoneUser['email']}). Please enter a unique phone number.");
+          }
+        } catch (phoneCheckErr) {
+          if (phoneCheckErr.toString().contains('already registered')) rethrow;
+        }
       }
 
       // 2. Provision Supabase Auth User
@@ -1076,33 +1097,40 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         }
       }
 
-      // 3. Insert into public.clients table
+      // 3. Insert into public.clients table (if not already existing)
       try {
-        final clientInsertRes = await dbClient.from('clients').insert({
-          'id': clientId,
-          'name': cleanCompany,
-          'company_name': cleanCompany,
-          'code': effectiveCode,
-          'contact_name': cleanPerson,
-          'contact_person': cleanPerson,
-          'contact_email': cleanEmail,
-          'email': cleanEmail,
-          'contact_phone': cleanPhone,
-          'phone': cleanPhone,
-          'address': cleanAddress,
-          'city': cleanCity,
-          'state': cleanState,
-          'tier': tier,
-          'closer_limit': effectiveCloserLimit,
-          'is_enterprise': isEnterprise,
-          'is_active': true,
-          'company_id': '11111111-1111-4111-8111-111111111111',
-        }).select().maybeSingle();
+        final existingClientRow = await dbClient
+            .from('clients')
+            .select('id')
+            .eq('id', effectiveClientId)
+            .maybeSingle();
 
-        if (clientInsertRes != null && clientInsertRes['id'] != null) {
-          clientId = clientInsertRes['id'].toString();
+        if (existingClientRow == null) {
+          final clientInsertRes = await dbClient.from('clients').insert({
+            'id': effectiveClientId,
+            'name': cleanCompany,
+            'company_name': cleanCompany,
+            'code': effectiveCode,
+            'contact_person': cleanPerson,
+            'email': cleanEmail,
+            'phone': cleanPhone,
+            'address': cleanAddress,
+            'city': cleanCity,
+            'state': cleanState,
+            'tier': tier,
+            'closer_limit': effectiveCloserLimit,
+            'is_enterprise': isEnterprise,
+            'is_active': true,
+            'company_id': '11111111-1111-4111-8111-111111111111',
+          }).select().maybeSingle();
+
+          if (clientInsertRes != null && clientInsertRes['id'] != null) {
+            effectiveClientId = clientInsertRes['id'].toString();
+          }
+          debugPrint('[AUTH_DATASOURCE] ✅ Clients table record inserted: $effectiveClientId ($cleanCompany)');
+        } else {
+          debugPrint('[AUTH_DATASOURCE] ℹ️ Clients table record already exists for: $effectiveClientId');
         }
-        debugPrint('[AUTH_DATASOURCE] ✅ Clients table record inserted: $clientId ($cleanCompany)');
       } catch (clientInsertErr) {
         debugPrint('[AUTH_DATASOURCE] ℹ️ Clients table insert notice ($clientInsertErr)');
       }
@@ -1117,11 +1145,26 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           'first_name': fName,
           'last_name': lName,
           'role': 'client',
-          'client_id': clientId,
+          'client_id': effectiveClientId,
         });
-        debugPrint('[AUTH_DATASOURCE] ✅ Users table record inserted for Client Admin: $userId ($cleanEmail)');
+        debugPrint('[AUTH_DATASOURCE] ✅ Users table record inserted for Client Admin: $userId ($cleanEmail, Client: $effectiveClientId)');
       } catch (userErr) {
         debugPrint('[AUTH_DATASOURCE] ℹ️ Users table insert notice for client ($userErr)');
+        if (userErr.toString().contains('users_phone_number_key') || userErr.toString().contains('23505')) {
+          try {
+            await dbClient.from(SupabaseConstants.usersTable).insert({
+              'id': userId,
+              'company_id': '11111111-1111-4111-8111-111111111111',
+              'email': cleanEmail,
+              'phone_number': '$cleanPhone-cli',
+              'first_name': fName,
+              'last_name': lName,
+              'role': 'client',
+              'client_id': effectiveClientId,
+            });
+            debugPrint('[AUTH_DATASOURCE] ✅ Users table record inserted with scoped phone for Client Admin: $userId');
+          } catch (_) {}
+        }
       }
     } finally {
       dbClient.dispose();
@@ -1137,7 +1180,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       role: 'client',
       deliveryAgentId: null,
       deliveryAgentCode: effectiveCode,
-      clientId: clientId,
+      clientId: effectiveClientId,
       clientCompanyName: cleanCompany,
       operatingState: cleanState,
       operatingCity: cleanCity,
@@ -1218,16 +1261,16 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       }
       if (rawRole.isEmpty) {
         try {
-          final isClientRow = await dbClient.from('clients').select('id').ilike('contact_email', cleanEmail).maybeSingle();
+          final isClientRow = await dbClient.from('clients').select('id').ilike('email', cleanEmail).maybeSingle();
           if (isClientRow != null) rawRole = 'client';
         } catch (_) {}
       }
       if (rawRole.isEmpty) {
-        if (cleanEmail == 'client.novacale@novaexpress.ng' || cleanEmail == 'client.novacale@novaexpress.com') {
+        if (cleanEmail.contains('client') || cleanEmail.contains('merchant')) {
           rawRole = 'client';
-        } else if (cleanEmail == 'closer.amaka@novacale.ng') {
+        } else if (cleanEmail.contains('closer')) {
           rawRole = 'closer';
-        } else if (cleanEmail == 'dc.supervisor@novaexpress.ng' || cleanEmail == 'dc.supervisor@novaexpress.com') {
+        } else if (cleanEmail.contains('supervisor') || cleanEmail.contains('manager')) {
           rawRole = 'dc_manager';
         } else {
           rawRole = 'delivery_agent';
@@ -1244,33 +1287,40 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       if (isCloser) {
         merged['role'] = 'closer';
         merged['delivery_agent_id'] = null;
-        merged['closer_id'] ??= '44444444-4444-4444-8444-444444444444';
-        merged['closer_code'] ??= 'CLS-NOVA-001';
-        merged['client_company_name'] ??= 'Novacale Limited';
-        merged['company_name'] ??= 'Novacale Limited';
-        merged['first_name'] ??= 'Amaka';
-        merged['last_name'] ??= 'Chioma';
 
         try {
           final closerRes = await dbClient
               .from('client_closers')
               .select()
-              .or('email.ilike.$cleanEmail,id.eq.$userId')
+              .or('email.ilike.$cleanEmail,id.eq.$userId,user_id.eq.$userId')
               .maybeSingle();
           if (closerRes != null) {
             merged['closer_id'] = closerRes['id'];
             merged['closer_code'] = closerRes['closer_code'];
             merged['phone'] = closerRes['phone'] ?? merged['phone'] ?? merged['phone_number'];
+            if (closerRes['avatar_url'] != null && closerRes['avatar_url'].toString().isNotEmpty) {
+              merged['avatar_url'] = closerRes['avatar_url'];
+            }
             if (closerRes['full_name'] != null) {
               final parts = closerRes['full_name'].toString().trim().split(' ');
               merged['first_name'] = parts.first;
               merged['last_name'] = parts.length > 1 ? parts.sublist(1).join(' ') : '';
             }
-            final clientId = closerRes['client_id'];
+            final clientId = closerRes['client_id'] ?? userRes?['client_id'];
             if (clientId != null) {
               final clientRes = await dbClient.from('clients').select('id, name').eq('id', clientId).maybeSingle();
               if (clientRes != null) {
                 merged['client_id'] = clientRes['id'];
+                merged['client_company_name'] = clientRes['name'];
+                merged['company_name'] = clientRes['name'];
+              }
+            }
+          } else {
+            final linkedClientId = userRes?['client_id'];
+            if (linkedClientId != null) {
+              merged['client_id'] = linkedClientId;
+              final clientRes = await dbClient.from('clients').select('id, name').eq('id', linkedClientId).maybeSingle();
+              if (clientRes != null) {
                 merged['client_company_name'] = clientRes['name'];
                 merged['company_name'] = clientRes['name'];
               }
@@ -1282,26 +1332,21 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       } else if (isClientAdmin) {
         merged['role'] = 'client';
         merged['delivery_agent_id'] = null;
-        merged['client_id'] ??= '33333333-3333-4333-8333-333333333333';
-        merged['client_company_name'] ??= 'Novacale Limited';
-        merged['company_name'] ??= 'Novacale Limited';
-        merged['first_name'] ??= 'Dr. Chuka';
-        merged['last_name'] ??= 'Okafor';
-        merged['delivery_agent_code'] ??= 'CLI-01';
 
         try {
           Map<String, dynamic>? clientRes;
-          final linkedClientId = userRes?['client_id'];
-          if (linkedClientId != null) {
+          final linkedClientId = userRes?['client_id'] ?? merged['client_id'];
+          if (linkedClientId != null && linkedClientId.toString().isNotEmpty) {
             clientRes = await dbClient.from('clients').select().eq('id', linkedClientId).maybeSingle();
           }
-          clientRes ??= await dbClient.from('clients').select().ilike('contact_email', cleanEmail).maybeSingle();
+          clientRes ??= await dbClient.from('clients').select().ilike('email', cleanEmail).maybeSingle();
 
           if (clientRes != null) {
             merged['client_id'] = clientRes['id'];
-            merged['client_company_name'] = clientRes['name'];
-            merged['company_name'] = clientRes['name'];
-            merged['phone'] = clientRes['contact_phone'] ?? merged['phone'] ?? merged['phone_number'];
+            merged['client_company_name'] = clientRes['name'] ?? clientRes['company_name'];
+            merged['company_name'] = clientRes['name'] ?? clientRes['company_name'];
+            merged['delivery_agent_code'] = clientRes['code'] ?? merged['delivery_agent_code'] ?? 'CLI-01';
+            merged['phone'] = clientRes['contact_phone'] ?? clientRes['phone'] ?? merged['phone'] ?? merged['phone_number'];
             if (clientRes['contact_name'] != null && (userRes?['first_name'] == null || userRes!['first_name'].toString().isEmpty)) {
               final parts = clientRes['contact_name'].toString().trim().split(' ');
               merged['first_name'] = parts.first;
@@ -1311,6 +1356,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         } catch (e) {
           debugPrint('[AUTH_DATASOURCE] ℹ️ Client merchant query notice ($e)');
         }
+
+        merged['client_id'] ??= userRes?['client_id'] ?? userId;
+        merged['client_company_name'] ??= userRes?['client_company_name'] ?? userRes?['company_name'] ?? '';
+        merged['first_name'] ??= userRes?['first_name'] ?? '';
+        merged['last_name'] ??= userRes?['last_name'] ?? '';
+        merged['delivery_agent_code'] ??= userRes?['delivery_agent_code'] ?? 'CLI-01';
       } else if (isDcStaff) {
         merged['role'] = 'dc_manager';
         merged['delivery_agent_id'] = null;

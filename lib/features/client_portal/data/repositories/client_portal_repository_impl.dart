@@ -1,5 +1,6 @@
 import '../../domain/entities/client_closer.dart';
 import '../../domain/entities/client_profile.dart';
+import '../../domain/entities/client_settlement.dart';
 import '../../domain/entities/customer_lead.dart';
 import '../../domain/repositories/client_portal_repository.dart';
 import '../datasources/client_portal_remote_datasource.dart';
@@ -16,6 +17,8 @@ class ClientPortalRepositoryImpl implements ClientPortalRepository {
     required String fullName,
     required String email,
     required String phone,
+    String? password,
+    String? avatarUrl,
     int dailyCallTarget = 50,
     double commissionRate = 500.0,
   }) async {
@@ -24,6 +27,8 @@ class ClientPortalRepositoryImpl implements ClientPortalRepository {
       fullName: fullName,
       email: email,
       phone: phone,
+      password: password,
+      avatarUrl: avatarUrl,
       dailyCallTarget: dailyCallTarget,
       commissionRate: commissionRate,
     );
@@ -130,6 +135,24 @@ class ClientPortalRepositoryImpl implements ClientPortalRepository {
       return await _remoteDataSource.fetchClientProfile(clientId);
     } catch (_) {
       return null;
+    }
+  }
+
+  @override
+  Future<List<ClientSettlement>> getClientSettlements(String clientId) async {
+    try {
+      return await _remoteDataSource.fetchClientSettlements(clientId);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getMerchantAssetCustody(String clientId) async {
+    try {
+      return await _remoteDataSource.fetchMerchantAssetCustody(clientId);
+    } catch (_) {
+      return {};
     }
   }
 }

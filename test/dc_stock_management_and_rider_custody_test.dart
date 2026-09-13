@@ -112,6 +112,11 @@ class MockStockRepository implements StockRepository {
   }
 
   @override
+  Future<List<Map<String, dynamic>>> fetchPendingDcReturns(String dcId) async {
+    return [];
+  }
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 

@@ -7,7 +7,10 @@ import '../../../../core/helpers/formatters.dart';
 import '../../../../core/widgets/app_skeleton_loader.dart';
 import '../../../finance/domain/entities/remittance.dart';
 import '../../../finance/presentation/providers/finance_provider.dart';
+import '../../../orders/domain/entities/order.dart';
+import '../../../orders/presentation/providers/orders_provider.dart';
 import '../providers/dc_console_provider.dart';
+import '../widgets/dc_daily_merchant_settlement_modal.dart';
 
 final dcFinanceFilterProvider = StateProvider.autoDispose<String>((ref) => 'all');
 final dcFinanceSearchProvider = StateProvider.autoDispose<String>((ref) => '');
@@ -34,7 +37,8 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(financeProvider.notifier).loadRemittances('22222222-2222-4222-8222-222222222222');
+      final activeHubId = ref.read(dcConsoleProvider).activeHubId;
+      ref.read(financeProvider.notifier).loadRemittances(activeHubId);
     });
   }
 
@@ -81,16 +85,27 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
     final isDark = theme.brightness == Brightness.dark;
     final financeState = ref.watch(financeProvider);
     final dcState = ref.watch(dcConsoleProvider);
+    final ordersState = ref.watch(ordersProvider);
     final selectedFilter = ref.watch(dcFinanceFilterProvider);
     final searchQuery = ref.watch(dcFinanceSearchProvider);
     final denomTotal = ref.watch(dcFinanceDenominationTotalProvider);
     final screenWidth = MediaQuery.of(context).size.width;
     final isCompact = screenWidth < 800;
 
+    ref.listen<DCConsoleState>(dcConsoleProvider, (previous, next) {
+      if (previous?.activeHubId != next.activeHubId && next.activeHubId.isNotEmpty) {
+        ref.read(financeProvider.notifier).loadRemittances(next.activeHubId);
+      }
+    });
+
+    final currentHubId = dcState.activeHubId;
     final dcRiderIds = dcState.drivers.map((d) => d.id).toSet();
-    final allRemittances = dcState.isCurrentHubGrandDc
-        ? financeState.remittances
-        : financeState.remittances.where((r) => dcRiderIds.contains(r.deliveryAgentId)).toList();
+    final allRemittances = financeState.remittances.where((r) {
+      if (r.distributionCenterId != null && r.distributionCenterId!.isNotEmpty) {
+        return r.distributionCenterId == currentHubId;
+      }
+      return dcRiderIds.contains(r.deliveryAgentId);
+    }).toList();
     final filteredList = _getFilteredRemittances(allRemittances, selectedFilter, searchQuery);
 
     final totalReconciled = allRemittances.fold(0.0, (sum, r) => sum + r.amount);
@@ -140,6 +155,22 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
                       style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
                     ),
                   ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              ElevatedButton.icon(
+                onPressed: () => _openMerchantSettlementPicker(context, ref, dcState, ordersState.orders),
+                icon: const Icon(Icons.nightlight_round, size: 16, color: Colors.white),
+                label: Text(
+                  '10:00 PM Daily Settlement',
+                  style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700, color: Colors.white),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0284C7),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  elevation: 0,
                 ),
               ),
             ],
@@ -375,6 +406,124 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
     );
   }
 
+  void _openMerchantSettlementPicker(BuildContext context, WidgetRef ref, DCConsoleState dcState, List<OrderEntity> allOrders) {
+    if (dcState.clients.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Color(0xFFF97316),
+          content: Text('No merchant clients registered in network yet.'),
+        ),
+      );
+      return;
+    }
+
+    if (dcState.clients.length == 1) {
+      final client = dcState.clients.first;
+      final eligible = allOrders.where((o) =>
+        (o.merchantId == client.id || o.clientId == client.id) &&
+        (o.paymentMethod.toLowerCase() == 'cash' ||
+            o.paymentMethod.toLowerCase() == 'cod' ||
+            o.paymentMethod.toLowerCase() == 'direct_transfer' ||
+            o.paymentType == 'direct_transfer') &&
+        o.status.toLowerCase() == 'delivered' &&
+        o.financeSettlementStatus != 'settled'
+      ).toList();
+      DCDailyMerchantSettlementModal.show(
+        context: context,
+        client: client,
+        eligibleOrders: eligible,
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              const Icon(Icons.nightlight_round, color: Color(0xFF0284C7), size: 22),
+              const SizedBox(width: 8),
+              Text(
+                '10:00 PM Daily Merchant Settlement',
+                style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: 480,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Select a merchant partner to generate itemized clearinghouse deductions and finalize bank payout disbursement:',
+                  style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                ),
+                const SizedBox(height: 16),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 320),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: dcState.clients.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (cCtx, i) {
+                      final c = dcState.clients[i];
+                      final eligibleOrders = allOrders.where((o) =>
+                        (o.merchantId == c.id || o.clientId == c.id) &&
+                        (o.paymentMethod.toLowerCase() == 'cash' ||
+                            o.paymentMethod.toLowerCase() == 'cod' ||
+                            o.paymentMethod.toLowerCase() == 'direct_transfer' ||
+                            o.paymentType == 'direct_transfer') &&
+                        o.status.toLowerCase() == 'delivered' &&
+                        o.financeSettlementStatus != 'settled'
+                      ).toList();
+
+                      final unsettledSum = eligibleOrders.fold(0.0, (sum, o) => sum + o.totalAmount);
+
+                      return ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: const Color(0xFF0284C7).withValues(alpha: 0.12),
+                          child: Text(
+                            c.companyName.isNotEmpty ? c.companyName[0].toUpperCase() : 'M',
+                            style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: const Color(0xFF0284C7)),
+                          ),
+                        ),
+                        title: Text(c.companyName, style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                        subtitle: Text(
+                          '${eligibleOrders.length} delivered orders pending settlement • ${CurrencyFormatter.formatNaira(unsettledSum)} gross',
+                          style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
+                        ),
+                        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF94A3B8)),
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          DCDailyMerchantSettlementModal.show(
+                            context: context,
+                            client: c,
+                            eligibleOrders: eligibleOrders,
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildMetricTile(String title, String value, String subtitle, IconData icon, Color color, bool isDark) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -595,7 +744,7 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
                       child: FittedBox(
                         fit: BoxFit.scaleDown,
                         alignment: Alignment.centerLeft,
-                        child: rem.isPartialRemittance
+                        child: rem.isPending
                             ? Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
                                 decoration: BoxDecoration(
@@ -606,54 +755,74 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const Icon(Icons.published_with_changes_rounded, size: 10, color: Color(0xFFEA580C)),
+                                    const Icon(Icons.hourglass_top_rounded, size: 10, color: Color(0xFFEA580C)),
                                     const SizedBox(width: 3.5),
                                     Text(
-                                      'PARTIAL ⚠️',
+                                      'PENDING AUDIT ⏳',
                                       style: GoogleFonts.jetBrainsMono(fontSize: 8.5, fontWeight: FontWeight.w900, color: const Color(0xFFEA580C)),
                                     ),
                                   ],
                                 ),
                               )
-                            : (rem.isRejected
+                            : (rem.isPartialRemittance
                                 ? Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFFFEE2E2),
+                                      color: const Color(0xFFFFF7ED),
                                       borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: const Color(0xFFFCA5A5)),
+                                      border: Border.all(color: const Color(0xFFFDBA74)),
                                     ),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        const Icon(Icons.cancel_rounded, size: 10, color: Color(0xFFDC2626)),
+                                        const Icon(Icons.published_with_changes_rounded, size: 10, color: Color(0xFFEA580C)),
                                         const SizedBox(width: 3.5),
                                         Text(
-                                          'REJECTED ❌',
-                                          style: GoogleFonts.jetBrainsMono(fontSize: 9, fontWeight: FontWeight.w900, color: const Color(0xFFDC2626)),
+                                          'PARTIAL ⚠️',
+                                          style: GoogleFonts.jetBrainsMono(fontSize: 8.5, fontWeight: FontWeight.w900, color: const Color(0xFFEA580C)),
                                         ),
                                       ],
                                     ),
                                   )
-                                : Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFDCFCE7),
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: const Color(0xFF86EFAC)),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(Icons.check_circle_rounded, size: 10, color: Color(0xFF16A34A)),
-                                        const SizedBox(width: 3.5),
-                                        Text(
-                                          'COMPLETE ⚡',
-                                          style: GoogleFonts.jetBrainsMono(fontSize: 9, fontWeight: FontWeight.w900, color: const Color(0xFF15803D)),
+                                : (rem.isRejected
+                                    ? Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFFEE2E2),
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(color: const Color(0xFFFCA5A5)),
                                         ),
-                                      ],
-                                    ),
-                                  )),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.cancel_rounded, size: 10, color: Color(0xFFDC2626)),
+                                            const SizedBox(width: 3.5),
+                                            Text(
+                                              'REJECTED ❌',
+                                              style: GoogleFonts.jetBrainsMono(fontSize: 9, fontWeight: FontWeight.w900, color: const Color(0xFFDC2626)),
+                                            ),
+                                          ],
+                                        ),
+                                      )
+                                    : Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFDCFCE7),
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(color: const Color(0xFF86EFAC)),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.check_circle_rounded, size: 10, color: Color(0xFF16A34A)),
+                                            const SizedBox(width: 3.5),
+                                            Text(
+                                              'COMPLETE ⚡',
+                                              style: GoogleFonts.jetBrainsMono(fontSize: 9, fontWeight: FontWeight.w900, color: const Color(0xFF15803D)),
+                                            ),
+                                          ],
+                                        ),
+                                      ))),
                       ),
                     ),
                   ),
@@ -784,25 +953,35 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: isPartial ? const Color(0xFFFFF7ED) : const Color(0xFFDCFCE7),
+                          color: rem.isPending
+                              ? const Color(0xFFFFF7ED)
+                              : (isPartial ? const Color(0xFFFFF7ED) : const Color(0xFFDCFCE7)),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: isPartial ? const Color(0xFFFDBA74) : const Color(0xFF86EFAC)),
+                          border: Border.all(
+                            color: rem.isPending
+                                ? const Color(0xFFFDBA74)
+                                : (isPartial ? const Color(0xFFFDBA74) : const Color(0xFF86EFAC)),
+                          ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              isPartial ? Icons.published_with_changes_rounded : Icons.check_circle_rounded,
+                              rem.isPending
+                                  ? Icons.hourglass_top_rounded
+                                  : (isPartial ? Icons.published_with_changes_rounded : Icons.check_circle_rounded),
                               size: 14,
-                              color: isPartial ? const Color(0xFFEA580C) : const Color(0xFF16A34A),
+                              color: (rem.isPending || isPartial) ? const Color(0xFFEA580C) : const Color(0xFF16A34A),
                             ),
                             const SizedBox(width: 5),
                             Text(
-                              isPartial ? 'PARTIAL SETTLEMENT' : 'SUCCESSFUL / SETTLED',
+                              rem.isPending
+                                  ? 'PENDING DC CASH VERIFICATION'
+                                  : (isPartial ? 'PARTIAL SETTLEMENT' : 'SUCCESSFUL / SETTLED'),
                               style: GoogleFonts.jetBrainsMono(
                                 fontSize: 10.5,
                                 fontWeight: FontWeight.bold,
-                                color: isPartial ? const Color(0xFFEA580C) : const Color(0xFF15803D),
+                                color: (rem.isPending || isPartial) ? const Color(0xFFEA580C) : const Color(0xFF15803D),
                               ),
                             ),
                           ],
@@ -843,17 +1022,21 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: isPartial
+                    color: rem.isPending
                         ? (isDark ? const Color(0xFF7C2D12).withValues(alpha: 0.3) : const Color(0xFFFFF7ED))
-                        : (isDark ? const Color(0xFF064E3B).withValues(alpha: 0.3) : const Color(0xFFF0FDF4)),
+                        : (isPartial
+                            ? (isDark ? const Color(0xFF7C2D12).withValues(alpha: 0.3) : const Color(0xFFFFF7ED))
+                            : (isDark ? const Color(0xFF064E3B).withValues(alpha: 0.3) : const Color(0xFFF0FDF4))),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: isPartial ? const Color(0xFFF97316) : const Color(0xFF10B981)),
+                    border: Border.all(color: (rem.isPending || isPartial) ? const Color(0xFFF97316) : const Color(0xFF10B981)),
                   ),
                   child: Row(
                     children: [
                       Icon(
-                        isPartial ? Icons.published_with_changes_rounded : Icons.verified_rounded,
-                        color: isPartial ? const Color(0xFFEA580C) : const Color(0xFF16A34A),
+                        rem.isPending
+                            ? Icons.hourglass_top_rounded
+                            : (isPartial ? Icons.published_with_changes_rounded : Icons.verified_rounded),
+                        color: (rem.isPending || isPartial) ? const Color(0xFFEA580C) : const Color(0xFF16A34A),
                         size: 22,
                       ),
                       const SizedBox(width: 10),
@@ -862,17 +1045,21 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              isPartial ? 'Partial Settlement Reconciled' : 'Payment Verified & Settled',
+                              rem.isPending
+                                  ? 'Pending Cash Handover Audit'
+                                  : (isPartial ? 'Partial Settlement Reconciled' : 'Payment Verified & Settled'),
                               style: GoogleFonts.inter(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
-                                color: isPartial ? const Color(0xFFEA580C) : const Color(0xFF16A34A),
+                                color: (rem.isPending || isPartial) ? const Color(0xFFEA580C) : const Color(0xFF16A34A),
                               ),
                             ),
                             Text(
-                              isPartial
-                                  ? 'Paid ${CurrencyFormatter.formatNaira(rem.amount)} of expected ${CurrencyFormatter.formatNaira(expectedHandover)}. Shortage balance recorded in hub audit.'
-                                  : 'This remittance was completed via Paystack and automatically credited to the DC treasury pool.',
+                              rem.isPending
+                                  ? 'Rider submitted physical cash handover of ${CurrencyFormatter.formatNaira(rem.amount)}. Awaiting DC cash desk physical confirmation.'
+                                  : (isPartial
+                                      ? 'Paid ${CurrencyFormatter.formatNaira(rem.amount)} of expected ${CurrencyFormatter.formatNaira(expectedHandover)}. Shortage balance recorded in hub audit.'
+                                      : 'This remittance was completed via Paystack and automatically credited to the DC treasury pool.'),
                               style: GoogleFonts.inter(
                                 fontSize: 10.5,
                                 color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
@@ -978,6 +1165,48 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
                 ),
 
                 const SizedBox(height: 18),
+
+                // Pending Cash Verification Action
+                if (rem.isPending) ...[
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        try {
+                          final res = await ref.read(dcConsoleProvider.notifier).approveCashRemittance(rem.id);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                backgroundColor: const Color(0xFF10B981),
+                                content: Text(res['message']?.toString() ?? 'Remittance ${rem.referenceNumber} verified and approved successfully!'),
+                              ),
+                            );
+                            ref.read(financeProvider.notifier).loadRemittances(ref.read(dcConsoleProvider).activeHubId);
+                          }
+                        } catch (err) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(backgroundColor: const Color(0xFFEF4444), content: Text('Error approving remittance: $err')),
+                            );
+                          }
+                        }
+                      },
+                      icon: const Icon(Icons.check_circle_rounded, size: 16, color: Colors.white),
+                      label: Text(
+                        'Verify & Approve Cash Handover (${CurrencyFormatter.formatNaira(rem.amount)})',
+                        style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 13, color: Colors.white),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF10B981),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
 
                 // 6. ACTION BUTTONS (SHARE & DOWNLOAD & CLOSE)
                 Row(

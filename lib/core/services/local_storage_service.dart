@@ -56,8 +56,8 @@ abstract class LocalStorageService {
   Future<void> cacheReturnItems(List<DCReturnItem> returns);
   Future<List<DCReturnItem>?> getCachedReturnItems();
 
-  Future<void> cacheRemittances(List<RemittanceEntity> remittances);
-  Future<List<RemittanceEntity>?> getCachedRemittances();
+  Future<void> cacheRemittances(List<RemittanceEntity> remittances, [String? scopeKey]);
+  Future<List<RemittanceEntity>?> getCachedRemittances([String? scopeKey]);
 
   Future<void> cacheTransactions(List<TransactionItem> transactions);
   Future<List<TransactionItem>?> getCachedTransactions();
@@ -433,19 +433,21 @@ class LocalStorageServiceImpl implements LocalStorageService {
   // --- Remittances Caching ---
 
   @override
-  Future<void> cacheRemittances(List<RemittanceEntity> remittances) async {
+  Future<void> cacheRemittances(List<RemittanceEntity> remittances, [String? scopeKey]) async {
+    final key = (scopeKey != null && scopeKey.isNotEmpty) ? '${_remittancesKey}_$scopeKey' : _remittancesKey;
     final list = remittances.map((r) {
       if (r is RemittanceModel) return r.toJson();
       return RemittanceModel.fromEntity(r).toJson();
     }).toList();
-    await saveJsonList(_remittancesKey, list);
-    await setLastSyncTime('remittances');
-    debugPrint('[LOCAL_STORAGE] 💾 Cached ${remittances.length} remittances to local storage.');
+    await saveJsonList(key, list);
+    await setLastSyncTime(key);
+    debugPrint('[LOCAL_STORAGE] 💾 Cached ${remittances.length} remittances to local storage ($key).');
   }
 
   @override
-  Future<List<RemittanceEntity>?> getCachedRemittances() async {
-    final rawList = await getJsonList(_remittancesKey);
+  Future<List<RemittanceEntity>?> getCachedRemittances([String? scopeKey]) async {
+    final key = (scopeKey != null && scopeKey.isNotEmpty) ? '${_remittancesKey}_$scopeKey' : _remittancesKey;
+    final rawList = await getJsonList(key);
     if (rawList == null || rawList.isEmpty) return null;
 
     final remittances = <RemittanceEntity>[];

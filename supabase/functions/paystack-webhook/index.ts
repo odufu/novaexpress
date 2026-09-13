@@ -17,7 +17,7 @@ serve(async (req: Request) => {
 
   try {
     const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "https://oygtaeriljuelhshfvkv.supabase.co",
+      Deno.env.get("SUPABASE_URL") ?? "https://qpcafevjsrbauweuiiyq.supabase.co",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
@@ -212,9 +212,15 @@ serve(async (req: Request) => {
           verified_at: new Date().toISOString(),
           payment_method: "paystack",
           distribution_center_id: dcId,
-          notes: remittanceNotes,
           updated_at: new Date().toISOString(),
         }).eq("id", remittanceId);
+
+        // Atomically decrement rider COD balance and mark linked orders as remitted
+        try {
+          await supabaseClient.rpc("fn_approve_cash_remittance", {
+            p_remittance_id: remittanceId,
+          });
+        } catch (_) {}
       } else if (agentId) {
         // If logged directly via reference
         const { data: updated } = await supabaseClient.from("cash_remittances").update({
@@ -240,10 +246,12 @@ serve(async (req: Request) => {
           updated_at: new Date().toISOString(),
         }).eq("reference_number", reference).select();
 
+        let targetRemId = updated && updated.length > 0 ? updated[0].id : null;
+
         // If not existed yet, insert directly
-        if (!updated || updated.length === 0) {
+        if (!targetRemId) {
           try {
-            await supabaseClient.from("cash_remittances").insert({
+            const { data: newRem } = await supabaseClient.from("cash_remittances").insert({
               company_id: "11111111-1111-4111-8111-111111111111",
               delivery_agent_id: agentId,
               distribution_center_id: dcId,
@@ -267,6 +275,16 @@ serve(async (req: Request) => {
               verified_at: new Date().toISOString(),
               notes: remittanceNotes,
               created_at: new Date().toISOString(),
+            }).select().single();
+
+            if (newRem) targetRemId = newRem.id;
+          } catch (_) {}
+        }
+
+        if (targetRemId) {
+          try {
+            await supabaseClient.rpc("fn_approve_cash_remittance", {
+              p_remittance_id: targetRemId,
             });
           } catch (_) {}
         }

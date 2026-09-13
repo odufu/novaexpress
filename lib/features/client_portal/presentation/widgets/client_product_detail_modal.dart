@@ -52,9 +52,9 @@ class _ClientProductDetailModalState extends ConsumerState<ClientProductDetailMo
   void initState() {
     super.initState();
     _tabController = TabController(
-      length: 3,
+      length: 4,
       vsync: this,
-      initialIndex: widget.initialTabIndex.clamp(0, 2),
+      initialIndex: widget.initialTabIndex.clamp(0, 3),
     );
   }
 
@@ -223,6 +223,10 @@ class _ClientProductDetailModalState extends ConsumerState<ClientProductDetailMo
                     icon: const Icon(Icons.local_offer_rounded, size: 16),
                     text: 'Deal Packages (${packages.length})',
                   ),
+                  const Tab(
+                    icon: Icon(Icons.account_balance_wallet_rounded, size: 16),
+                    text: 'Product Financials',
+                  ),
                 ],
               ),
             ),
@@ -264,6 +268,15 @@ class _ClientProductDetailModalState extends ConsumerState<ClientProductDetailMo
                     product: liveProduct,
                     packages: packages,
                     productOrders: productOrders,
+                    isDark: isDark,
+                  ),
+
+                  // Tab 4: Product Financials Breakdown
+                  _buildProductFinancialsTab(
+                    context: context,
+                    product: liveProduct,
+                    productOrders: productOrders,
+                    coveringDcs: coveringDcs,
                     isDark: isDark,
                   ),
                 ],
@@ -1325,6 +1338,517 @@ class _ClientProductDetailModalState extends ConsumerState<ClientProductDetailMo
               },
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildProductFinancialsTab({
+    required BuildContext context,
+    required CatalogProduct product,
+    required List<OrderEntity> productOrders,
+    required List<DistributionCenter> coveringDcs,
+    required bool isDark,
+  }) {
+    final pSummary = ClientProductFinanceSummary.calculate(
+      orders: productOrders,
+      productName: product.name,
+      productSku: product.sku,
+      costPrice: product.costPrice,
+    );
+
+    final double unitGrossMargin = product.defaultUnitPrice - product.costPrice;
+    final double marginPercent = product.defaultUnitPrice > 0
+        ? (unitGrossMargin / product.defaultUnitPrice) * 100.0
+        : 0.0;
+    final double stockValuationAtCost = product.totalStockAcrossHubs * product.costPrice;
+    final double stockValuationAtRetail = product.totalStockAcrossHubs * product.defaultUnitPrice;
+
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        // Financial Overview Header
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: isDark
+                  ? [const Color(0xFF0F172A), const Color(0xFF1E293B)]
+                  : [const Color(0xFF031632), const Color(0xFF0F2B56)],
+            ),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF37021).withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.account_balance_wallet_rounded, color: Color(0xFFF37021), size: 24),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${product.name} — Commercial & Financial Matrix',
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
+                    ),
+                    Text(
+                      'Retail Price: ₦${Formatters.currency(product.defaultUnitPrice)} • Wholesale Cost: ₦${Formatters.currency(product.costPrice)} • Total Orders: ${pSummary.totalOrders}',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        color: const Color(0xFF94A3B8),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Commercial Matrix & Asset Valuation Card
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.calculate_rounded, size: 18, color: Color(0xFFF37021)),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Unit Commercial Matrix & Stock Valuation',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (product.costPrice <= 0)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '⚠️ Cost Price Not Set',
+                        style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w600, color: const Color(0xFFD97706)),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Retail Price', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8))),
+                        const SizedBox(height: 2),
+                        Text('₦${Formatters.currency(product.defaultUnitPrice)}', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Wholesale Cost', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8))),
+                        const SizedBox(height: 2),
+                        Text('₦${Formatters.currency(product.costPrice)}', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF0D9488))),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Unit Margin', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8))),
+                        const SizedBox(height: 2),
+                        Text(
+                          '₦${Formatters.currency(unitGrossMargin)} (${marginPercent.toStringAsFixed(1)}%)',
+                          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF10B981)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Stock Value (Cost)', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8))),
+                        const SizedBox(height: 2),
+                        Text('₦${Formatters.currency(stockValuationAtCost)}', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB))),
+                        Text('Retail: ₦${Formatters.currency(stockValuationAtRetail)}', style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8))),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              if (product.costPrice <= 0) ...[
+                const SizedBox(height: 10),
+                Text(
+                  '💡 Tip: Set wholesale unit cost for ${product.name} to unlock automated COGS & commercial net profit tracking.',
+                  style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8), fontStyle: FontStyle.italic),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // 4 KPI Metric Cards for this Product
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = constraints.maxWidth > 600;
+            return GridView.count(
+              crossAxisCount: isWide ? 2 : 1,
+              crossAxisSpacing: 14,
+              mainAxisSpacing: 14,
+              childAspectRatio: isWide ? 2.5 : 2.8,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              children: [
+                // 1. Money Outside
+                _buildProductKpiCard(
+                  title: 'Money Outside (In Field COD)',
+                  amount: '₦${Formatters.currency(pSummary.moneyOutside)}',
+                  subtitle: '${pSummary.inTransitOrders} in transit • ${pSummary.pendingOrders} pending dispatch',
+                  badge: 'Field COD Risk',
+                  badgeColor: const Color(0xFFF59E0B),
+                  icon: Icons.near_me_rounded,
+                  isDark: isDark,
+                ),
+
+                // 2. In DC Custody
+                _buildProductKpiCard(
+                  title: 'Collected & In Custody',
+                  amount: '₦${Formatters.currency(pSummary.awaitingRemittance)}',
+                  subtitle: 'Delivered by riders • Ready for bank payout',
+                  badge: 'Awaiting Remittance',
+                  badgeColor: const Color(0xFF2563EB),
+                  icon: Icons.account_balance_wallet_rounded,
+                  isDark: isDark,
+                ),
+
+                // 3. Net Cash Remittance
+                _buildProductKpiCard(
+                  title: 'Net Cash Remittance',
+                  amount: '₦${Formatters.currency(pSummary.netRealizedRevenue)}',
+                  subtitle: 'Gross GMV: ₦${Formatters.currency(pSummary.grossDeliveredValue)} • Logistics: -₦${Formatters.currency(pSummary.logisticsDeliveryFees)}',
+                  badge: 'Payout Due',
+                  badgeColor: const Color(0xFF10B981),
+                  icon: Icons.payments_rounded,
+                  isDark: isDark,
+                ),
+
+                // 4. Commercial Gross Profit
+                _buildProductKpiCard(
+                  title: 'Commercial Gross Profit',
+                  amount: '₦${Formatters.currency(pSummary.commercialGrossProfit)}',
+                  subtitle: 'COGS: -₦${Formatters.currency(pSummary.cogs)} • Margin: ${pSummary.profitMarginPercentage.toStringAsFixed(1)}%',
+                  badge: 'Accounting Profit',
+                  badgeColor: const Color(0xFF8B5CF6),
+                  icon: Icons.trending_up_rounded,
+                  isDark: isDark,
+                ),
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 20),
+
+        // Regional Distribution Centers Breakdown
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.location_city_rounded, color: Color(0xFFF37021), size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Regional Hub & Depot Field Exposure',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (coveringDcs.isEmpty)
+                Text(
+                  'No active distribution centers currently covering this product.',
+                  style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)),
+                )
+              else
+                Column(
+                  children: coveringDcs.map((dc) {
+                    final dcOrders = productOrders.where((o) =>
+                        (o.distributionCenterId != null && o.distributionCenterId == dc.id) ||
+                        (o.deliveryState.toLowerCase() == dc.state.toLowerCase())).toList();
+
+                    final dcInTransit = dcOrders.where((o) =>
+                        o.status.toLowerCase() == 'in_transit' ||
+                        o.status.toLowerCase() == 'out_for_delivery' ||
+                        o.status.toLowerCase() == 'assigned').toList();
+
+                    final dcDelivered = dcOrders.where((o) => o.isDelivered).toList();
+
+                    final dcMoneyOutside = dcInTransit.where((o) => o.isCashPod).fold<double>(0.0, (sum, o) => sum + o.totalAmount);
+                    final dcDeliveredRev = dcDelivered.fold<double>(0.0, (sum, o) => sum + o.totalAmount);
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF0F172A) : Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  dc.name,
+                                  style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13),
+                                ),
+                                Text(
+                                  '${dc.city}, ${dc.state} • ${dcOrders.length} total orders (${dcDelivered.length} delivered)',
+                                  style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                'Outside: ₦${Formatters.currency(dcMoneyOutside)}',
+                                style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12, color: const Color(0xFFF59E0B)),
+                              ),
+                              Text(
+                                'Delivered: ₦${Formatters.currency(dcDeliveredRev)}',
+                                style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF10B981), fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        // Product Order Financial Transactions
+        Text(
+          'Financial Settlement Order Ledger (${productOrders.length})',
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: isDark ? Colors.white : const Color(0xFF0F172A),
+          ),
+        ),
+        const SizedBox(height: 10),
+        if (productOrders.isEmpty)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 30),
+              child: Text(
+                'No orders recorded for this product yet.',
+                style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF94A3B8)),
+              ),
+            ),
+          )
+        else
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: productOrders.length,
+            separatorBuilder: (_, __) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              final order = productOrders[index];
+              final fee = order.isDelivered ? order.clientDeliveryFee : 0.0;
+              final net = order.isDelivered ? (order.totalAmount - (order.isDirectTransfer ? 0.0 : fee)) : 0.0;
+
+              return ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                leading: Icon(
+                  order.isRemitted
+                      ? Icons.check_circle_rounded
+                      : (order.isDelivered ? Icons.account_balance_wallet_rounded : Icons.two_wheeler_rounded),
+                  color: order.isRemitted
+                      ? const Color(0xFF10B981)
+                      : (order.isDelivered ? const Color(0xFF2563EB) : const Color(0xFFF59E0B)),
+                  size: 20,
+                ),
+                title: Row(
+                  children: [
+                    Text(
+                      order.orderNumber,
+                      style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '• ${order.customerName}',
+                      style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '₦${Formatters.currency(order.totalAmount)}',
+                      style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                  ],
+                ),
+                subtitle: Row(
+                  children: [
+                    Text(
+                      '${order.deliveryCity} • Net: ₦${Formatters.currency(net)} • Fee: -₦${Formatters.currency(fee)}',
+                      style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
+                    ),
+                    const Spacer(),
+                    _buildProductFinanceBadge(order),
+                  ],
+                ),
+              );
+            },
+          ),
+      ],
+    );
+  }
+
+  Widget _buildProductKpiCard({
+    required String title,
+    required String amount,
+    required String subtitle,
+    required String badge,
+    required Color badgeColor,
+    required IconData icon,
+    required bool isDark,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                ),
+              ),
+              Icon(icon, color: badgeColor, size: 18),
+            ],
+          ),
+          Text(
+            amount,
+            style: GoogleFonts.inter(
+              fontSize: 19,
+              fontWeight: FontWeight.w900,
+              color: isDark ? Colors.white : const Color(0xFF0F172A),
+            ),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  subtitle,
+                  style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8)),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: badgeColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  badge,
+                  style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.bold, color: badgeColor),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProductFinanceBadge(OrderEntity order) {
+    if (order.isDirectTransfer) {
+      return _miniBadge('Prepaid', const Color(0xFF0D9488));
+    }
+    if (order.isRemitted) {
+      return _miniBadge('Remitted', const Color(0xFF10B981));
+    }
+    if (order.isDelivered) {
+      return _miniBadge('In Custody', const Color(0xFF2563EB));
+    }
+    if (order.isFailed) {
+      return _miniBadge('Failed', const Color(0xFFEF4444));
+    }
+    return _miniBadge('In Field', const Color(0xFFF59E0B));
+  }
+
+  Widget _miniBadge(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        text,
+        style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.bold, color: color),
       ),
     );
   }

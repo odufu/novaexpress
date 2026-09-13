@@ -38,6 +38,15 @@ class OrdersRepositoryImpl implements OrdersRepository {
   }
 
   @override
+  Future<void> unassignOrderFromRider({
+    required String orderId,
+  }) async {
+    await remoteDataSource.unassignOrderFromRider(
+      orderId: orderId,
+    );
+  }
+
+  @override
   Future<OrderEntity> getOrderById(String orderId) async {
     return await remoteDataSource.getOrderById(orderId);
   }

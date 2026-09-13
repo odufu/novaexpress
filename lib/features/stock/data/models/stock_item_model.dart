@@ -7,7 +7,12 @@ class StockItemModel extends StockItemEntity {
     required super.name,
     required super.description,
     required super.price,
-    super.ownerName = 'Novacare Limited',
+    super.costPrice = 0.0,
+    super.barcode,
+    super.weightKg = 0.5,
+    super.damagedCount = 0,
+    super.clientId,
+    super.ownerName = '',
     super.inventoryType = InventoryType.distributedInventory,
     super.totalInCustody = 0,
     super.reservedCount = 0,
@@ -43,9 +48,10 @@ class StockItemModel extends StockItemEntity {
     final rawPrice = json['price'] ?? json['base_price'] ?? 0.0;
     final double price = rawPrice is num ? rawPrice.toDouble() : 0.0;
 
-    final name = json['name']?.toString() ?? 'Herbal Product';
-    final sku = json['sku']?.toString() ?? 'RDT-001';
-    final ownerName = json['owner_name']?.toString() ?? json['client_name']?.toString() ?? 'Novacare Limited';
+    final name = json['name']?.toString() ?? 'Unnamed Item';
+    final sku = json['sku']?.toString() ?? 'SKU-NONE';
+    final clientId = json['client_id']?.toString();
+    final ownerName = json['owner_name']?.toString() ?? json['client_name']?.toString() ?? '';
 
     final int assigned = (json['assigned_count'] ?? json['total_assigned'] ?? json['quantity_held'] ?? 0) is num
         ? (json['assigned_count'] ?? json['total_assigned'] ?? json['quantity_held'] ?? 0).toInt()
@@ -111,12 +117,22 @@ class StockItemModel extends StockItemEntity {
       }
     }
 
+    final costPrice = (json['cost_price'] as num?)?.toDouble() ?? 0.0;
+    final barcode = json['barcode']?.toString();
+    final weightKg = (json['weight_kg'] as num?)?.toDouble() ?? 0.5;
+    final damagedCount = (json['damaged_count'] as num?)?.toInt() ?? 0;
+
     return StockItemModel(
       id: json['id']?.toString() ?? '',
       sku: sku,
       name: name,
       description: desc,
       price: price,
+      costPrice: costPrice,
+      barcode: barcode,
+      weightKg: weightKg,
+      damagedCount: damagedCount,
+      clientId: clientId,
       ownerName: ownerName,
       inventoryType: invType,
       totalInCustody: totalInCustody < 0 ? 0 : totalInCustody,
@@ -128,10 +144,10 @@ class StockItemModel extends StockItemEntity {
       awaitingReturnCount: awaitingReturn < 0 ? 0 : awaitingReturn,
       lowStockThreshold: lowThreshold,
       reorderLevel: reorderLvl,
-      category: json['category']?.toString() ?? 'Wellness',
+      category: json['category']?.toString() ?? 'General',
       imageAsset: imageAsset,
-      batchNumber: json['batch_number']?.toString() ?? 'BATCH-2026-A',
-      lastAuditDate: json['last_audit_date']?.toString() ?? 'Today, 08:30 AM',
+      batchNumber: json['batch_number']?.toString(),
+      lastAuditDate: json['last_audit_date']?.toString(),
     );
   }
 
@@ -143,6 +159,11 @@ class StockItemModel extends StockItemEntity {
       'description': description,
       'price': price,
       'base_price': price,
+      'cost_price': costPrice,
+      if (barcode != null) 'barcode': barcode,
+      'weight_kg': weightKg,
+      'damaged_count': damagedCount,
+      if (clientId != null && clientId!.isNotEmpty) 'client_id': clientId,
       'owner_name': ownerName,
       'inventory_type': inventoryType == InventoryType.novaExpressInventory ? 'novaexpress_inventory' : 'distributed_inventory',
       'total_in_custody': totalInCustody,

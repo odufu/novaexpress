@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/helpers/formatters.dart';
 import '../../../../core/widgets/product_image_widget.dart';
+import '../../../finance/domain/entities/remittance.dart';
 import '../../../finance/presentation/providers/finance_provider.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
@@ -81,6 +82,20 @@ class _DCDetailPageState extends ConsumerState<DCDetailPage> with SingleTickerPr
   // Filters - Riders
   String _riderStatusFilter = 'all';
 
+  List<RemittanceEntity> _loadedDcRemittances = [];
+  bool _isLoadingRemittances = false;
+
+  Future<void> _fetchDcRemittances() async {
+    setState(() => _isLoadingRemittances = true);
+    final items = await ref.read(financeProvider.notifier).loadDcRemittances(_currentDc.id);
+    if (mounted) {
+      setState(() {
+        _loadedDcRemittances = items;
+        _isLoadingRemittances = false;
+      });
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -104,9 +119,7 @@ class _DCDetailPageState extends ConsumerState<DCDetailPage> with SingleTickerPr
       try {
         ref.read(ordersProvider.notifier).loadDcOrders(_currentDc.id);
       } catch (_) {}
-      try {
-        ref.read(financeProvider.notifier).loadRemittances(_currentDc.id);
-      } catch (_) {}
+      _fetchDcRemittances();
       try {
         ref.read(stockProvider.notifier).fetchStockItems(null, _currentDc.id);
       } catch (_) {}
@@ -135,6 +148,14 @@ class _DCDetailPageState extends ConsumerState<DCDetailPage> with SingleTickerPr
     _oldPasswordController.dispose();
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
+
+    // Restore parent DC active hub scope when leaving DC details page
+    try {
+      final activeHubId = ref.read(dcConsoleProvider).activeHubId;
+      ref.read(ordersProvider.notifier).loadDcOrders(activeHubId);
+      ref.read(stockProvider.notifier).fetchStockItems(null, activeHubId);
+    } catch (_) {}
+
     super.dispose();
   }
 
@@ -183,89 +204,136 @@ class _DCDetailPageState extends ConsumerState<DCDetailPage> with SingleTickerPr
     }).toList();
   }
 
-  List<DCRemittanceLifecycleItem> _getDcRemittances(List<OrderEntity> dcOrders, List<DCFleetDriver> allDrivers) {
+  List<DCRemittanceLifecycleItem> _getDcRemittances(
+    List<OrderEntity> dcOrders,
+    List<DCFleetDriver> allDrivers,
+    List<RemittanceEntity> realRemittances,
+    DCConsoleState dcState,
+  ) {
     final driverMap = {for (var d in allDrivers) d.id: d};
-    final Map<String, List<OrderEntity>> riderOrders = {};
-
-    for (final order in dcOrders) {
-      final riderId = order.deliveryAgentId ?? 'unassigned';
-      riderOrders.putIfAbsent(riderId, () => []).add(order);
-    }
+    final driverByCode = {for (var d in allDrivers) d.driverCode.toLowerCase(): d};
+    final driverByName = {for (var d in allDrivers) d.name.toLowerCase(): d};
+    final orderById = {for (var o in dcOrders) o.id: o};
+    final orderByNumber = {for (var o in dcOrders) o.orderNumber: o};
 
     final List<DCRemittanceLifecycleItem> items = [];
+    final Set<String> verifiedOrderNumbers = {};
 
-    riderOrders.forEach((riderId, orders) {
-      if (orders.isEmpty) return;
-      final driver = driverMap[riderId];
-      final riderName = driver?.name ?? orders.first.deliveryAgentName ?? 'Assigned Rider ($riderId)';
+    // 1. Include real submitted/verified remittances for this DC from cash_remittances table
+    for (final rem in realRemittances) {
+      final driver = driverMap[rem.deliveryAgentId] ??
+          driverByCode[rem.deliveryAgentId.toLowerCase()] ??
+          driverByName[rem.deliveryAgentId.toLowerCase()];
+      final riderName = driver?.name ?? (rem.payerName?.isNotEmpty == true ? rem.payerName! : 'Assigned Rider');
       final riderCode = driver?.driverCode ?? 'PDA-RDR';
 
-      final cashOrders = orders.where((o) => o.isPod).toList();
-      final directOrders = orders.where((o) => !o.isPod).toList();
-
-      if (cashOrders.isNotEmpty) {
-        final gross = cashOrders.fold<double>(0.0, (s, o) => s + o.totalAmount);
-        final comm = cashOrders.length * 500.0;
-        final net = gross - comm;
-        final isAllDelivered = cashOrders.every((o) => o.status.toLowerCase() == 'delivered');
-
-        items.add(
-          DCRemittanceLifecycleItem(
-            id: 'rem-cash-$riderId',
-            referenceNumber: 'REM-${_currentDc.code}-${riderCode.replaceAll(RegExp(r'[^0-9]'), '')}',
-            riderId: riderId,
-            riderName: riderName,
-            riderCode: riderCode,
-            riderPhone: driver?.phone,
-            type: 'cash_pod',
-            status: isAllDelivered ? 'verified' : 'awaiting_remittance',
-            openingDate: orders.first.createdAt,
-            closingDate: isAllDelivered ? DateTime.now() : null,
-            grossAmount: gross,
-            commissionAmount: comm,
-            netAmount: net,
-            orders: cashOrders,
-            paymentMethod: 'Cash POD',
-          ),
-        );
+      final List<OrderEntity> matchedOrders = [];
+      for (final ao in rem.associatedOrders) {
+        if (ao.orderNumber.isNotEmpty) verifiedOrderNumbers.add(ao.orderNumber);
+        if (ao.orderId.isNotEmpty) verifiedOrderNumbers.add(ao.orderId);
+        final matched = orderById[ao.orderId] ?? orderByNumber[ao.orderNumber];
+        if (matched != null) {
+          matchedOrders.add(matched);
+        }
       }
 
-      if (directOrders.isNotEmpty) {
-        final gross = directOrders.fold<double>(0.0, (s, o) => s + o.totalAmount);
-        items.add(
-          DCRemittanceLifecycleItem(
-            id: 'rem-direct-$riderId',
-            referenceNumber: 'DIR-${_currentDc.code}-${riderCode.replaceAll(RegExp(r'[^0-9]'), '')}',
-            riderId: riderId,
-            riderName: riderName,
-            riderCode: riderCode,
-            riderPhone: driver?.phone,
-            type: 'direct_transfer',
-            status: 'direct_settled',
-            openingDate: orders.first.createdAt,
-            closingDate: DateTime.now(),
-            grossAmount: gross,
-            commissionAmount: 0.0,
-            netAmount: gross,
-            orders: directOrders,
-            paymentMethod: 'Monnify / Paystack',
-          ),
-        );
+      final isDirect = rem.paymentMethod.toLowerCase().contains('paystack') ||
+          rem.paymentMethod.toLowerCase().contains('transfer') ||
+          rem.referenceNumber.toUpperCase().startsWith('PSTK');
+
+      items.add(
+        DCRemittanceLifecycleItem(
+          id: rem.id,
+          referenceNumber: rem.referenceNumber,
+          riderId: rem.deliveryAgentId,
+          riderName: riderName,
+          riderCode: riderCode,
+          riderPhone: driver?.phone,
+          riderAvatarUrl: null,
+          type: isDirect ? 'direct_transfer' : 'cash_pod',
+          status: rem.status,
+          openingDate: rem.createdAt,
+          closingDate: rem.verifiedAt,
+          grossAmount: rem.grossCollections > 0 ? rem.grossCollections : rem.amount,
+          commissionAmount: rem.commissionDeducted,
+          transportAllowance: rem.transportAllowanceDeducted,
+          failedStipends: rem.failedStipendsDeducted,
+          posFee: rem.posFee,
+          netAmount: rem.amount,
+          orders: matchedOrders,
+          paymentMethod: isDirect ? 'Paystack Settlement' : rem.paymentMethod.toUpperCase(),
+          depositReceiptUrl: rem.depositReceiptUrl,
+          verifiedByName: rem.verifiedByName,
+          verifiedAt: rem.verifiedAt,
+          notes: rem.notes,
+        ),
+      );
+    }
+
+    // 2. Form open batches for unremitted delivered cash orders
+    final Map<String, List<OrderEntity>> unremittedCashByRider = {};
+    for (final order in dcOrders) {
+      if (order.isDirectTransfer) continue;
+      if (order.status.toLowerCase() == 'delivered') {
+        final isRemitted = order.isRemitted ||
+            order.remittanceStatus.toLowerCase() == 'remitted' ||
+            order.remittanceStatus.toLowerCase() == 'cleared' ||
+            order.paymentStatus.toLowerCase() == 'remitted' ||
+            order.financialSettlementStatus.toLowerCase() == 'cash_remitted_verified' ||
+            (order.deliveryNotes?.contains('[REMITTED') == true) ||
+            verifiedOrderNumbers.contains(order.id) ||
+            verifiedOrderNumbers.contains(order.orderNumber);
+
+        if (!isRemitted) {
+          final riderKey = order.deliveryAgentId ?? order.deliveryAgentCode ?? 'unassigned';
+          unremittedCashByRider.putIfAbsent(riderKey, () => []).add(order);
+        }
       }
+    }
+
+    unremittedCashByRider.forEach((riderKey, riderOrders) {
+      riderOrders.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      final driver = driverMap[riderKey] ?? driverByCode[riderKey.toLowerCase()] ?? driverByName[riderKey.toLowerCase()];
+      final riderName = driver?.name ?? riderOrders.first.deliveryAgentName ?? 'Assigned Rider';
+      final riderCode = driver?.driverCode ?? riderOrders.first.deliveryAgentCode ?? 'PDA-RDR';
+      final totalGross = riderOrders.fold(0.0, (sum, o) => sum + o.totalAmount);
+      final comm = riderOrders.length * 500.0;
+      final netDue = (totalGross - comm).clamp(0.0, totalGross);
+
+      items.add(
+        DCRemittanceLifecycleItem(
+          id: 'batch-unremitted-$riderKey',
+          referenceNumber: 'OPEN-BATCH-${_currentDc.code}-${riderCode.replaceAll(RegExp(r'[^0-9]'), '')}',
+          riderId: riderKey,
+          riderName: riderName,
+          riderCode: riderCode,
+          riderPhone: driver?.phone,
+          type: 'cash_pod',
+          status: 'awaiting_remittance',
+          openingDate: riderOrders.first.createdAt,
+          closingDate: null,
+          grossAmount: totalGross,
+          commissionAmount: comm,
+          netAmount: netDue,
+          orders: riderOrders,
+          paymentMethod: 'Cash POD',
+        ),
+      );
     });
 
     return items.where((rem) {
       final q = _remittanceSearchController.text.trim().toLowerCase();
       if (q.isNotEmpty) {
         final matches = rem.riderName.toLowerCase().contains(q) ||
+            rem.referenceNumber.toLowerCase().contains(q) ||
             rem.riderCode.toLowerCase().contains(q) ||
-            rem.referenceNumber.toLowerCase().contains(q);
+            (rem.notes ?? '').toLowerCase().contains(q);
         if (!matches) return false;
       }
 
-      if (_remittanceStatusFilter == 'not_remitted' && rem.status != 'awaiting_remittance') return false;
-      if (_remittanceStatusFilter == 'cleared' && rem.status != 'verified') return false;
-      if (_remittanceStatusFilter == 'direct' && rem.type != 'direct_transfer') return false;
+      if (_remittanceStatusFilter == 'not_remitted' && !rem.isAwaitingRemittance) return false;
+      if (_remittanceStatusFilter == 'cleared' && !rem.isVerified) return false;
+      if (_remittanceStatusFilter == 'direct' && !rem.isDirectTransfer) return false;
 
       return true;
     }).toList();
@@ -329,10 +397,20 @@ class _DCDetailPageState extends ConsumerState<DCDetailPage> with SingleTickerPr
     final allOrders = ordersState.orders;
     final dcOrders = _getDcOrders(allOrders);
 
-    final allDrivers = dcState.dcDrivers;
+    final allDrivers = dcState.drivers;
     final dcRiders = _getDcRiders(allDrivers);
 
-    final dcRemittances = _getDcRemittances(allOrders.where((o) => o.distributionCenterId == _currentDc.id || _currentDc.coversLocation(stateName: o.deliveryState, lgaName: o.lga ?? '')).toList(), allDrivers);
+    final financeState = ref.watch(financeProvider);
+    final activeRemittances = _loadedDcRemittances.isNotEmpty
+        ? _loadedDcRemittances
+        : financeState.remittances.where((r) => r.distributionCenterId == _currentDc.id).toList();
+
+    final dcRemittances = _getDcRemittances(
+      dcOrders,
+      allDrivers,
+      activeRemittances,
+      dcState,
+    );
 
     final stockState = ref.watch(stockProvider);
     final dcStocks = _getDcStocks(stockState.stockItems);
@@ -1232,7 +1310,9 @@ class _DCDetailPageState extends ConsumerState<DCDetailPage> with SingleTickerPr
           const SizedBox(height: 14),
 
           // Data Table or Cards
-          if (remittances.isEmpty)
+          if (_isLoadingRemittances && remittances.isEmpty)
+            const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator()))
+          else if (remittances.isEmpty)
             _buildEmptyState('No remittances found for this Distribution Center.', isDark)
           else if (_remittanceViewMode == 'table' && isDesktop)
             _buildRemittanceTable(context, remittances, isDark)
@@ -1644,7 +1724,7 @@ class _DCDetailPageState extends ConsumerState<DCDetailPage> with SingleTickerPr
   }
 
   Widget _buildStockTable(BuildContext context, List<StockItemEntity> stocks, bool isDark) {
-    final dcDrivers = ref.watch(dcConsoleProvider).dcDrivers;
+    final dcDrivers = ref.watch(dcConsoleProvider).drivers;
     final stockState = ref.watch(stockProvider);
 
     return Container(
@@ -1728,7 +1808,7 @@ class _DCDetailPageState extends ConsumerState<DCDetailPage> with SingleTickerPr
   }
 
   Widget _buildStockCardsList(BuildContext context, List<StockItemEntity> stocks, bool isDark) {
-    final dcDrivers = ref.watch(dcConsoleProvider).dcDrivers;
+    final dcDrivers = ref.watch(dcConsoleProvider).drivers;
     final stockState = ref.watch(stockProvider);
 
     return ListView.builder(

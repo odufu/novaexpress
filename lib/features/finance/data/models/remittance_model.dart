@@ -6,6 +6,8 @@ class RemittanceModel extends RemittanceEntity {
     super.referenceNumber = 'REM-00482',
     super.companyId = '',
     super.deliveryAgentId = '',
+    super.distributionCenterId,
+    super.distributionCenterName,
     super.amount = 0.0,
     super.grossCollections = 0.0,
     super.commissionDeducted = 0.0,
@@ -143,6 +145,8 @@ class RemittanceModel extends RemittanceEntity {
     }
 
     return RemittanceModel(
+      distributionCenterId: json['distribution_center_id']?.toString() ?? json['distributionCenterId']?.toString(),
+      distributionCenterName: json['distribution_center_name']?.toString() ?? json['distributionCenterName']?.toString(),
       id: id,
       referenceNumber: ref,
       companyId: json['company_id']?.toString() ?? '',
@@ -190,6 +194,8 @@ class RemittanceModel extends RemittanceEntity {
       referenceNumber: entity.referenceNumber,
       companyId: entity.companyId,
       deliveryAgentId: entity.deliveryAgentId,
+      distributionCenterId: entity.distributionCenterId,
+      distributionCenterName: entity.distributionCenterName,
       amount: entity.amount,
       grossCollections: entity.grossCollections,
       commissionDeducted: entity.commissionDeducted,
@@ -228,6 +234,8 @@ class RemittanceModel extends RemittanceEntity {
       'reference_number': referenceNumber,
       'company_id': companyId,
       'delivery_agent_id': deliveryAgentId,
+      'distribution_center_id': distributionCenterId,
+      'distribution_center_name': distributionCenterName,
       'amount': amount,
       'gross_collections': grossCollections,
       'commission_deducted': commissionDeducted,

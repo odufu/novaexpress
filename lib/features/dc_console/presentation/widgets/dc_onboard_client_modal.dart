@@ -33,6 +33,10 @@ class _DCOnboardClientModalState extends ConsumerState<DCOnboardClientModal> {
   final _bankNameController = TextEditingController(text: 'Access Bank');
   final _bankAccountNumberController = TextEditingController();
   final _bankAccountNameController = TextEditingController();
+  final _customDeliveryFeeController = TextEditingController();
+  final _customPlatformFeeController = TextEditingController();
+  final _customFailedAttemptFeeController = TextEditingController();
+  bool _showCustomFeeOverrides = false;
 
   int _currentStep = 0; // 0: Company & Depot, 1: Login Credentials, 2: Tier & Settlement
   String _tier = 'enterprise'; // 'enterprise' or 'standard_merchant'
@@ -127,6 +131,9 @@ class _DCOnboardClientModalState extends ConsumerState<DCOnboardClientModal> {
     _bankNameController.dispose();
     _bankAccountNumberController.dispose();
     _bankAccountNameController.dispose();
+    _customDeliveryFeeController.dispose();
+    _customPlatformFeeController.dispose();
+    _customFailedAttemptFeeController.dispose();
     super.dispose();
   }
 
@@ -172,6 +179,9 @@ class _DCOnboardClientModalState extends ConsumerState<DCOnboardClientModal> {
       final bankName = _bankNameController.text.trim();
       final bankAccNum = _bankAccountNumberController.text.trim();
       final bankAccName = _bankAccountNameController.text.trim();
+      final customDelivery = double.tryParse(_customDeliveryFeeController.text.trim());
+      final customPlatform = double.tryParse(_customPlatformFeeController.text.trim());
+      final customFailed = double.tryParse(_customFailedAttemptFeeController.text.trim());
 
       final client = await ref.read(dcConsoleProvider.notifier).createClient(
         companyName: compName,
@@ -188,6 +198,9 @@ class _DCOnboardClientModalState extends ConsumerState<DCOnboardClientModal> {
         bankName: bankName.isNotEmpty ? bankName : null,
         bankAccountNumber: bankAccNum.isNotEmpty ? bankAccNum : null,
         bankAccountName: bankAccName.isNotEmpty ? bankAccName : null,
+        customDeliveryFee: (customDelivery != null && customDelivery > 0) ? customDelivery : null,
+        customPlatformFee: (customPlatform != null && customPlatform > 0) ? customPlatform : null,
+        customFailedAttemptFee: (customFailed != null && customFailed > 0) ? customFailed : null,
       );
 
       if (mounted) {
@@ -481,7 +494,7 @@ Initial Password: ${_createdPassword ?? 'ClientPass2026!'}
                     controller: _companyNameController,
                     style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13.5),
                     decoration: _inputDecoration(
-                      hintText: 'e.g. Novacale Limited',
+                      hintText: 'e.g. Acme Health Products',
                       icon: Icons.store_rounded,
                       isDark: isDark,
                     ),
@@ -628,7 +641,7 @@ Initial Password: ${_createdPassword ?? 'ClientPass2026!'}
                     controller: _contactPersonController,
                     style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13.5),
                     decoration: _inputDecoration(
-                      hintText: 'Dr. Chuka Okafor',
+                      hintText: 'e.g. John Doe',
                       icon: Icons.person_rounded,
                       isDark: isDark,
                     ),
@@ -674,7 +687,7 @@ Initial Password: ${_createdPassword ?? 'ClientPass2026!'}
           keyboardType: TextInputType.emailAddress,
           style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13.5),
           decoration: InputDecoration(
-            hintText: 'client.novacale@novaexpress.ng',
+            hintText: 'client@company.com',
             hintStyle: const TextStyle(fontSize: 12.5, color: Color(0xFF94A3B8)),
             prefixIcon: const Icon(Icons.alternate_email_rounded, size: 18, color: Color(0xFF94A3B8)),
             suffixIcon: _isCheckingEmail
@@ -1053,9 +1066,138 @@ Initial Password: ${_createdPassword ?? 'ClientPass2026!'}
           controller: _bankAccountNameController,
           style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13.5),
           decoration: _inputDecoration(
-            hintText: 'Beneficiary Account Name (e.g. Novacale Limited)',
+            hintText: 'Beneficiary Account Name (e.g. Acme Health Products)',
             icon: Icons.badge_rounded,
             isDark: isDark,
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Custom Billing & Charges Overrides (Optional)
+        Container(
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: _showCustomFeeOverrides
+                  ? const Color(0xFF0D9488)
+                  : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+            ),
+          ),
+          child: Column(
+            children: [
+              InkWell(
+                onTap: () => setState(() => _showCustomFeeOverrides = !_showCustomFeeOverrides),
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.tune_rounded,
+                        size: 18,
+                        color: _showCustomFeeOverrides ? const Color(0xFF0D9488) : const Color(0xFF64748B),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Custom Merchant Tariff Overrides (Optional)',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                              ),
+                            ),
+                            Text(
+                              'Leave blank to inherit standard hub default pricing & commissions',
+                              style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(
+                        _showCustomFeeOverrides ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                        color: const Color(0xFF64748B),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (_showCustomFeeOverrides) ...[
+                const Divider(height: 1),
+                Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildLabel('Custom Delivery Fee (₦)', isDark),
+                                const SizedBox(height: 6),
+                                TextFormField(
+                                  controller: _customDeliveryFeeController,
+                                  keyboardType: TextInputType.number,
+                                  style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13),
+                                  decoration: _inputDecoration(
+                                    hintText: 'e.g. 3500 (default: DC tariff)',
+                                    icon: Icons.local_shipping_rounded,
+                                    isDark: isDark,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildLabel('Custom Platform Fee (₦)', isDark),
+                                const SizedBox(height: 6),
+                                TextFormField(
+                                  controller: _customPlatformFeeController,
+                                  keyboardType: TextInputType.number,
+                                  style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13),
+                                  decoration: _inputDecoration(
+                                    hintText: 'e.g. 500 (default: 500 flat)',
+                                    icon: Icons.hub_rounded,
+                                    isDark: isDark,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildLabel('Custom Failed Attempt Fee (₦)', isDark),
+                          const SizedBox(height: 6),
+                          TextFormField(
+                            controller: _customFailedAttemptFeeController,
+                            keyboardType: TextInputType.number,
+                            style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13),
+                            decoration: _inputDecoration(
+                              hintText: 'e.g. 500 (absorbed/billed per failed delivery attempt)',
+                              icon: Icons.cancel_presentation_rounded,
+                              isDark: isDark,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
       ],

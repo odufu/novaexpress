@@ -15,6 +15,11 @@ class StockItemEntity {
   final String name;
   final String description;
   final double price;
+  final double costPrice;
+  final String? barcode;
+  final double weightKg;
+  final int damagedCount;
+  final String? clientId;
   final String ownerName;
   final InventoryType inventoryType;
   final int totalInCustody;
@@ -33,13 +38,20 @@ class StockItemEntity {
   final String? binLocation;
   final String? lastAuditDate;
 
+  int get totalStock => totalInCustody > 0 ? totalInCustody : (availableCount + assignedCount);
+
   const StockItemEntity({
     required this.id,
     required this.sku,
     required this.name,
     required this.description,
     required this.price,
-    this.ownerName = 'Novacare Limited',
+    this.costPrice = 0.0,
+    this.barcode,
+    this.weightKg = 0.5,
+    this.damagedCount = 0,
+    this.clientId,
+    this.ownerName = '',
     this.inventoryType = InventoryType.distributedInventory,
     this.totalInCustody = 0,
     this.reservedCount = 0,
@@ -64,6 +76,10 @@ class StockItemEntity {
     name: '',
     description: '',
     price: 0,
+    costPrice: 0.0,
+    barcode: null,
+    weightKg: 0.5,
+    damagedCount: 0,
     assignedCount: 0,
     deliveredCount: 0,
     availableCount: 0,
@@ -181,6 +197,11 @@ class StockItemEntity {
     String? name,
     String? description,
     double? price,
+    String? clientId,
+    double? costPrice,
+    String? barcode,
+    double? weightKg,
+    int? damagedCount,
     String? ownerName,
     InventoryType? inventoryType,
     int? totalInCustody,
@@ -205,6 +226,11 @@ class StockItemEntity {
       name: name ?? this.name,
       description: description ?? this.description,
       price: price ?? this.price,
+      costPrice: costPrice ?? this.costPrice,
+      barcode: barcode ?? this.barcode,
+      weightKg: weightKg ?? this.weightKg,
+      damagedCount: damagedCount ?? this.damagedCount,
+      clientId: clientId ?? this.clientId,
       ownerName: ownerName ?? this.ownerName,
       inventoryType: inventoryType ?? this.inventoryType,
       totalInCustody: totalInCustody ?? this.totalInCustody,

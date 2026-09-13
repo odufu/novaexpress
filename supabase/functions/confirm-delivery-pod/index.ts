@@ -53,14 +53,19 @@ serve(async (req: Request) => {
 
     // 2. Update order status to delivered & collected
     const proofUrl = payload.photoProofUrl || payload.customerSignatureUrl || null;
+    const nowIso = new Date().toISOString();
+    const isDirectTransfer = payload.paymentType !== "pay_on_delivery" || payload.paymentMethod !== "cash";
     const { error: updateError } = await supabaseClient
       .from("orders")
       .update({
         status: "delivered",
-        payment_status: "collected",
+        payment_status: isDirectTransfer ? "paid" : "collected",
+        remittance_status: isDirectTransfer ? "direct_transfer" : "unremitted",
+        financial_settlement_status: isDirectTransfer ? "direct_transfer_settled" : "in_dc_custody",
+        delivered_at: nowIso,
         proof_of_delivery_url: proofUrl,
         delivery_notes: payload.notes || order.delivery_notes,
-        updated_at: new Date().toISOString(),
+        updated_at: nowIso,
       })
       .eq("id", payload.orderId);
 
@@ -71,23 +76,29 @@ serve(async (req: Request) => {
       );
     }
 
-    // 2b. Deduct stock quantity for the delivered product
-    if (order.product_id) {
-      const { data: prod } = await supabaseClient
-        .from("products")
-        .select("available_count, delivered_count")
-        .eq("id", order.product_id)
-        .single();
+    // 2b. Atomically adjust rider custody and record product delivery metrics
+    if (order.product_id && payload.agentId) {
+      // Calculate true physical unit quantity (handling package bundles)
+      const paidQty = typeof order.paid_quantity === "number" ? order.paid_quantity : 0;
+      const freeQty = typeof order.free_quantity === "number" ? order.free_quantity : 0;
+      const totalPhysicalQuantity = (paidQty + freeQty > 0)
+        ? (paidQty + freeQty)
+        : (order.quantity || 1);
 
-      if (prod) {
-        const qty = order.quantity || 1;
-        await supabaseClient
-          .from("products")
-          .update({
-            available_count: Math.max(0, (prod.available_count || 0) - qty),
-            delivered_count: (prod.delivered_count || 0) + qty,
-          })
-          .eq("id", order.product_id);
+      const { data: stockRpcRes, error: stockRpcErr } = await supabaseClient.rpc(
+        "fn_confirm_order_delivery_stock",
+        {
+          p_order_id: payload.orderId,
+          p_agent_id: payload.agentId,
+          p_product_id: order.product_id,
+          p_physical_quantity: totalPhysicalQuantity,
+        }
+      );
+
+      if (stockRpcErr) {
+        console.error("Warning: Failed to execute fn_confirm_order_delivery_stock:", stockRpcErr);
+      } else {
+        console.log(`Successfully updated rider custody for order ${payload.orderId}:`, stockRpcRes);
       }
     }
 

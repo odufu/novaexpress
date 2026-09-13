@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/datasources/dc_console_remote_datasource.dart';
 import '../../data/repositories/dc_console_repository_impl.dart';
 import '../../domain/repositories/dc_console_repository.dart';
@@ -69,38 +70,7 @@ final List<DCFleetDriver> defaultFleetDrivers = [
   ),
 ];
 
-final List<ClientProfile> defaultRegisteredClients = [
-  const ClientProfile(
-    id: 'c1111111-1111-4111-8111-111111111111',
-    companyName: 'Novacare Limited',
-    contactPerson: 'Dr. Kalu Okonkwo',
-    email: 'orders@novacare.ng',
-    phone: '+2348039998877',
-    address: 'Plot 102 Central Business District, Abuja',
-    city: 'Abuja',
-    state: 'Federal Capital Territory',
-    code: 'NOVACARE',
-    tier: 'enterprise',
-    closerLimit: 250,
-    isEnterprise: true,
-    totalClosersCount: 0,
-  ),
-  const ClientProfile(
-    id: '33333333-3333-4333-8333-333333333333',
-    companyName: 'Novacale Limited',
-    contactPerson: 'Dr. Chuka Okafor',
-    email: 'client.novacale@novaexpress.ng',
-    phone: '08034455667',
-    address: 'Plot 12, Commercial Avenue, Central Business District, Abuja',
-    city: 'Abuja',
-    state: 'Federal Capital Territory',
-    code: 'CLI-NOVACALE-01',
-    tier: 'enterprise',
-    closerLimit: 250,
-    isEnterprise: true,
-    totalClosersCount: 1,
-  ),
-];
+const List<ClientProfile> defaultRegisteredClients = [];
 
 class DCWarehouseBatch {
   final String id;
@@ -140,9 +110,9 @@ class DCWarehouseBatch {
     return DCWarehouseBatch(
       id: json['id']?.toString() ?? '',
       batchCode: json['batch_code']?.toString() ?? json['batchCode'] ?? 'LOT-001',
-      productName: json['product_name']?.toString() ?? json['productName'] ?? (json['products'] is Map ? json['products']['name']?.toString() : null) ?? 'Respira Detox Tea',
-      sku: json['sku']?.toString() ?? (json['products'] is Map ? json['products']['sku']?.toString() : null) ?? 'SKU-RESP-01',
-      clientName: json['client_name']?.toString() ?? json['clientName'] ?? 'NovaCare Labs',
+      productName: json['product_name']?.toString() ?? json['productName'] ?? (json['products'] is Map ? json['products']['name']?.toString() : null) ?? '',
+      sku: json['sku']?.toString() ?? (json['products'] is Map ? json['products']['sku']?.toString() : null) ?? '',
+      clientName: json['client_name']?.toString() ?? json['clientName'] ?? '',
       waybillNumber: json['waybill_number']?.toString() ?? json['waybillNumber'] ?? 'WB-001',
       initialQuantity: (json['initial_quantity'] as num?)?.toInt() ?? (json['initialQuantity'] as num?)?.toInt() ?? 100,
       currentQuantity: (json['current_quantity'] as num?)?.toInt() ?? (json['currentQuantity'] as num?)?.toInt() ?? 100,
@@ -381,6 +351,8 @@ class DCConsoleState {
       selectedDriverId: selectedDriverId ?? this.selectedDriverId,
     );
   }
+
+  String get activeDcId => activeHubId;
 
   List<DistributionCenter> get filteredDistributionCenters {
     var list = distributionCenters.isNotEmpty ? distributionCenters : defaultDistributionCenters;
@@ -636,6 +608,7 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
       await loadPayoutClaimsFromDatabase();
       await loadTransactionsFromDatabase();
       await loadClientsFromDatabase();
+      await loadWarehouseBatchesFromDatabase();
     }
   }
 
@@ -718,6 +691,32 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     }
   }
 
+  Future<void> loadWarehouseBatchesFromDatabase() async {
+    if (isTestEnvironment) return;
+
+    try {
+      final client = Supabase.instance.client;
+      final res = await client
+          .from('product_batches')
+          .select('*, products(name, sku, client_name)')
+          .order('expiry_date', ascending: true);
+
+      final List<DCWarehouseBatch> batches = [];
+      for (final row in (res as List)) {
+        final rowMap = Map<String, dynamic>.from(row as Map);
+        batches.add(DCWarehouseBatch.fromJson(rowMap));
+      }
+
+      if (batches.isNotEmpty) {
+        state = state.copyWith(warehouseBatches: batches);
+        await _storageService.cacheWarehouseBatches(batches);
+        debugPrint('[DC_CONSOLE] 📦 Loaded ${batches.length} product batches from Supabase.');
+      }
+    } catch (e) {
+      debugPrint('[DC_CONSOLE] ℹ️ Error loading product batches from Supabase: $e');
+    }
+  }
+
   Future<bool> checkClientEmailExists(String email) async {
     final cleanEmail = email.trim().toLowerCase();
     if (cleanEmail.isEmpty) return false;
@@ -727,17 +726,7 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
       return true;
     }
 
-    // 2. Check demo accounts & in-memory registered users
-    const demoAccounts = {
-      'emeka.rider@novaexpress.ng',
-      'rider.emeka@novaexpress.com',
-      'joel.odufu@novaexpress.ng',
-      'dc.supervisor@novaexpress.ng',
-      'client.novacale@novaexpress.ng',
-      'closer.amaka@novacale.ng',
-    };
-    if (demoAccounts.contains(cleanEmail)) return true;
-
+    // 2. Check in-memory registered users
     final registeredUser = AuthRemoteDataSourceImpl.getRegisteredUser(cleanEmail);
     if (registeredUser != null) return true;
 
@@ -767,6 +756,9 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     String? bankName,
     String? bankAccountNumber,
     String? bankAccountName,
+    double? customDeliveryFee,
+    double? customPlatformFee,
+    double? customFailedAttemptFee,
     dynamic authDataSource,
   }) async {
     state = state.copyWith(isLoading: true);
@@ -776,8 +768,7 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
         : 'ClientPass123!';
 
     if (state.clients.any((c) => c.email.toLowerCase() == cleanEmail) ||
-        AuthRemoteDataSourceImpl.getRegisteredUser(cleanEmail) != null ||
-        cleanEmail == 'client.novacale@novaexpress.ng') {
+        AuthRemoteDataSourceImpl.getRegisteredUser(cleanEmail) != null) {
       state = state.copyWith(isLoading: false);
       throw Exception("A user with email '$cleanEmail' already exists. Please use a unique email address.");
     }
@@ -800,6 +791,9 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
           bankName: bankName,
           bankAccountNumber: bankAccountNumber,
           bankAccountName: bankAccountName,
+          customDeliveryFee: customDeliveryFee,
+          customPlatformFee: customPlatformFee,
+          customFailedAttemptFee: customFailedAttemptFee,
           authDataSource: authDataSource,
         );
       } catch (dbErr) {
@@ -830,6 +824,12 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
           closerLimit: isEnt ? closerLimit : 0,
           isEnterprise: isEnt,
           totalClosersCount: 0,
+          bankName: bankName ?? '',
+          accountNumber: bankAccountNumber ?? '',
+          accountName: bankAccountName ?? cleanName,
+          customDeliveryFee: customDeliveryFee,
+          customPlatformFeeValue: customPlatformFee,
+          customFailedAttemptFee: customFailedAttemptFee,
           createdAt: DateTime.now(),
         );
 
@@ -1535,6 +1535,33 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     }).toList();
     state = state.copyWith(returnItems: updated);
     _storageService.cacheReturnItems(updated);
+  }
+
+  Future<Map<String, dynamic>> executeDailyMerchantSettlement({
+    required String clientId,
+    required String dcId,
+    required DateTime periodStart,
+    required DateTime periodEnd,
+    Map<String, dynamic>? customDeductions,
+  }) async {
+    final result = await _repository.generateDailyMerchantSettlement(
+      clientId: clientId,
+      dcId: dcId,
+      periodStart: periodStart,
+      periodEnd: periodEnd,
+      customDeductions: customDeductions,
+    );
+    await _initDrivers();
+    return result;
+  }
+
+  Future<Map<String, dynamic>> approveCashRemittance(String remittanceId, {String? supervisorId}) async {
+    final result = await _repository.approveCashRemittance(
+      remittanceId: remittanceId,
+      supervisorId: supervisorId,
+    );
+    await _initDrivers();
+    return result;
   }
 }
 

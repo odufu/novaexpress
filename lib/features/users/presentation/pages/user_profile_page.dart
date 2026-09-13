@@ -74,7 +74,16 @@ class UserProfilePage extends ConsumerWidget {
             if (context.canPop()) {
               context.pop();
             } else {
-              ref.read(bottomNavIndexProvider.notifier).state = 0;
+              if (user?.isDcManager == true) {
+                context.go('/dc');
+              } else if (user?.isCloser == true) {
+                context.go('/closer');
+              } else if (user?.isClientAdmin == true) {
+                context.go('/client');
+              } else {
+                ref.read(bottomNavIndexProvider.notifier).state = 0;
+                context.go('/');
+              }
             }
           },
         ),
@@ -201,16 +210,36 @@ class UserProfilePage extends ConsumerWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: AppColors.orange.withValues(alpha: 0.12),
+                            color: (user?.isDcManager == true
+                                    ? const Color(0xFF0B192C)
+                                    : (user?.isCloser == true
+                                        ? const Color(0xFF6366F1)
+                                        : (user?.isClientAdmin == true ? const Color(0xFF0D9488) : AppColors.orange)))
+                                .withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: AppColors.orange.withValues(alpha: 0.3)),
+                            border: Border.all(
+                              color: (user?.isDcManager == true
+                                      ? const Color(0xFF0B192C)
+                                      : (user?.isCloser == true
+                                          ? const Color(0xFF6366F1)
+                                          : (user?.isClientAdmin == true ? const Color(0xFF0D9488) : AppColors.orange)))
+                                  .withValues(alpha: 0.3),
+                            ),
                           ),
                           child: Text(
-                            agentCode,
+                            user?.isDcManager == true
+                                ? 'DC-HQ'
+                                : (user?.isCloser == true
+                                    ? (user?.closerCode ?? 'CLOSER')
+                                    : (user?.isClientAdmin == true ? (user?.deliveryAgentCode ?? 'MERCHANT') : agentCode)),
                             style: GoogleFonts.jetBrainsMono(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
-                              color: AppColors.orange,
+                              color: user?.isDcManager == true
+                                  ? const Color(0xFF0B192C)
+                                  : (user?.isCloser == true
+                                      ? const Color(0xFF6366F1)
+                                      : (user?.isClientAdmin == true ? const Color(0xFF0D9488) : AppColors.orange)),
                             ),
                           ),
                         ),
@@ -223,7 +252,7 @@ class UserProfilePage extends ConsumerWidget {
                             border: Border.all(color: const Color(0xFF2563EB).withValues(alpha: 0.3)),
                           ),
                           child: Text(
-                            user?.isPda == false ? 'IN-HOUSE RIDER' : 'FREELANCE PDA',
+                            user?.roleDescription.toUpperCase() ?? 'ACTIVE PERSONNEL',
                             style: GoogleFonts.jetBrainsMono(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
@@ -237,14 +266,29 @@ class UserProfilePage extends ConsumerWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.warehouse_outlined, size: 14, color: theme.colorScheme.onSurfaceVariant),
+                        Icon(
+                          user?.isDcManager == true
+                              ? Icons.admin_panel_settings_rounded
+                              : (user?.isCloser == true
+                                  ? Icons.headset_mic_rounded
+                                  : (user?.isClientAdmin == true ? Icons.storefront_rounded : Icons.warehouse_outlined)),
+                          size: 14,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                         const SizedBox(width: 4),
-                        Text(
-                          dcName,
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
-                            color: theme.colorScheme.onSurfaceVariant,
+                        Flexible(
+                          child: Text(
+                            user?.isDcManager == true
+                                ? ((user?.distributionCenterName?.isNotEmpty == true) ? user!.distributionCenterName! : 'Managing DC Operations Hub')
+                                : (user?.isCloser == true
+                                    ? (user?.clientCompanyName != null ? 'Closer for ${user!.clientCompanyName}' : 'Enterprise Telesales Team')
+                                    : (user?.isClientAdmin == true ? (user?.clientCompanyName ?? 'Merchant Portal') : dcName)),
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -254,113 +298,238 @@ class UserProfilePage extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
 
-              // 2. PERFORMANCE & OPERATIONAL KPI CARDS
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.surfaceContainer,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.1)),
-                      ),
-                      child: Column(
-                        children: [
-                          const Icon(Icons.local_shipping_outlined, color: AppColors.orange, size: 20),
-                          const SizedBox(height: 4),
-                          Text(
-                            lifetimeDrops,
-                            style: GoogleFonts.inter(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: theme.colorScheme.onSurface,
+              // 2. PERFORMANCE & OPERATIONAL KPI CARDS (ROLE-ADAPTIVE)
+              if (user?.isRider == true) ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainer,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.1)),
+                        ),
+                        child: Column(
+                          children: [
+                            const Icon(Icons.local_shipping_outlined, color: AppColors.orange, size: 20),
+                            const SizedBox(height: 4),
+                            Text(
+                              lifetimeDrops,
+                              style: GoogleFonts.inter(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.onSurface,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'LIFETIME DROPS',
-                            style: GoogleFonts.jetBrainsMono(
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.bold,
-                              color: theme.colorScheme.onSurfaceVariant,
+                            const SizedBox(height: 2),
+                            Text(
+                              'LIFETIME DROPS',
+                              style: GoogleFonts.jetBrainsMono(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.surfaceContainer,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.1)),
-                      ),
-                      child: Column(
-                        children: [
-                          const Icon(Icons.verified_outlined, color: Color(0xFF16A34A), size: 20),
-                          const SizedBox(height: 4),
-                          Text(
-                            successRateStr,
-                            style: GoogleFonts.inter(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: theme.colorScheme.onSurface,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'SUCCESS RATE',
-                            style: GoogleFonts.jetBrainsMono(
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.bold,
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.surfaceContainer,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.1)),
-                      ),
-                      child: Column(
-                        children: [
-                          const Icon(Icons.star_rounded, color: Color(0xFFF59E0B), size: 22),
-                          const SizedBox(height: 2),
-                          Text(
-                            performanceRating,
-                            style: GoogleFonts.inter(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: theme.colorScheme.onSurface,
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainer,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.1)),
+                        ),
+                        child: Column(
+                          children: [
+                            const Icon(Icons.verified_outlined, color: Color(0xFF16A34A), size: 20),
+                            const SizedBox(height: 4),
+                            Text(
+                              successRateStr,
+                              style: GoogleFonts.inter(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.onSurface,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'RATING',
-                            style: GoogleFonts.jetBrainsMono(
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.bold,
-                              color: theme.colorScheme.onSurfaceVariant,
+                            const SizedBox(height: 2),
+                            Text(
+                              'SUCCESS RATE',
+                              style: GoogleFonts.jetBrainsMono(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainer,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.1)),
+                        ),
+                        child: Column(
+                          children: [
+                            const Icon(Icons.star_rounded, color: Color(0xFFF59E0B), size: 22),
+                            const SizedBox(height: 2),
+                            Text(
+                              performanceRating,
+                              style: GoogleFonts.inter(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.onSurface,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'RATING',
+                              style: GoogleFonts.jetBrainsMono(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+              ] else ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainer,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.1)),
+                        ),
+                        child: Column(
+                          children: [
+                            Icon(
+                              user?.isDcManager == true
+                                  ? Icons.hub_rounded
+                                  : (user?.isCloser == true ? Icons.phone_forwarded_rounded : Icons.store_rounded),
+                              color: user?.isDcManager == true
+                                  ? const Color(0xFF0B192C)
+                                  : (user?.isCloser == true ? const Color(0xFF6366F1) : const Color(0xFF0D9488)),
+                              size: 20,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              user?.isDcManager == true
+                                  ? 'Active Hub'
+                                  : (user?.isCloser == true ? '50 / Day' : 'Active'),
+                              style: GoogleFonts.inter(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.onSurface,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              user?.isDcManager == true
+                                  ? 'DC STATUS'
+                                  : (user?.isCloser == true ? 'CALL TARGET' : 'ACCOUNT STATUS'),
+                              style: GoogleFonts.jetBrainsMono(
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainer,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.1)),
+                        ),
+                        child: Column(
+                          children: [
+                            const Icon(Icons.security_rounded, color: Color(0xFF16A34A), size: 20),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Verified',
+                              style: GoogleFonts.inter(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.onSurface,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'COMPLIANCE',
+                              style: GoogleFonts.jetBrainsMono(
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainer,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.1)),
+                        ),
+                        child: Column(
+                          children: [
+                            const Icon(Icons.speed_rounded, color: Color(0xFF2563EB), size: 20),
+                            const SizedBox(height: 4),
+                            Text(
+                              user?.isDcManager == true
+                                  ? 'Supervisor'
+                                  : (user?.isCloser == true ? '₦500 / Ord' : 'Direct'),
+                              style: GoogleFonts.inter(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.onSurface,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              user?.isDcManager == true
+                                  ? 'ROLE LEVEL'
+                                  : (user?.isCloser == true ? 'COMMISSION' : 'SETTLEMENT'),
+                              style: GoogleFonts.jetBrainsMono(
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+              ],
 
               // 3. PERSONAL & CONTACT INFORMATION CARD
               Container(
@@ -427,157 +596,244 @@ class UserProfilePage extends ConsumerWidget {
               ),
               const SizedBox(height: 14),
 
-              // 4. FINANCIAL COMPENSATION & BANK SETTLEMENT CARD
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: theme.cardColor,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.15)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Row(
-                            children: [
-                              const Icon(Icons.account_balance_wallet_outlined, color: Color(0xFF16A34A), size: 20),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'Compensation & Settlement Bank',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 14.5,
-                                    fontWeight: FontWeight.bold,
-                                    color: theme.colorScheme.onSurface,
+              // 4. FINANCIAL COMPENSATION & BANK SETTLEMENT CARD (ROLE-ADAPTIVE)
+              if (user?.isRider == true) ...[
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: theme.cardColor,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.15)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Row(
+                              children: [
+                                const Icon(Icons.account_balance_wallet_outlined, color: Color(0xFF16A34A), size: 20),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Compensation & Settlement Bank',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 14.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: theme.colorScheme.onSurface,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                  overflow: TextOverflow.ellipsis,
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF16A34A)),
-                          tooltip: 'Edit Settlement Bank Details',
-                          onPressed: () {
-                            if (user != null) EditProfileModal.show(context, user, initialTabIndex: 1);
-                          },
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    _ProfileDetailRow(
-                      icon: Icons.payments_outlined,
-                      label: 'Commission / Order',
-                      value: CurrencyFormatter.formatNaira(commissionRate),
-                      valueColor: const Color(0xFF16A34A),
-                    ),
-                    const SizedBox(height: 10),
-                    _ProfileDetailRow(
-                      icon: Icons.local_gas_station_outlined,
-                      label: 'Transport Allowance',
-                      value: CurrencyFormatter.formatNaira(transportAllowance),
-                      valueColor: const Color(0xFF16A34A),
-                    ),
-                    const SizedBox(height: 10),
-                    _ProfileDetailRow(
-                      icon: Icons.add_task_rounded,
-                      label: 'Total Net / Delivery',
-                      value: CurrencyFormatter.formatNaira(totalEarningPerOrder),
-                      valueColor: const Color(0xFF00522A),
-                    ),
-                    const Divider(height: 20),
-                    _ProfileDetailRow(
-                      icon: Icons.account_balance_rounded,
-                      label: 'Settlement Bank',
-                      value: bankName,
-                    ),
-                    const SizedBox(height: 10),
-                    _ProfileDetailRow(
-                      icon: Icons.credit_card_rounded,
-                      label: 'Account Number',
-                      value: bankAccountNo,
-                    ),
-                    const SizedBox(height: 10),
-                    _ProfileDetailRow(
-                      icon: Icons.person_pin_outlined,
-                      label: 'Beneficiary Name',
-                      value: bankAccountName,
-                    ),
-                  ],
+                          IconButton(
+                            icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF16A34A)),
+                            tooltip: 'Edit Settlement Bank Details',
+                            onPressed: () {
+                              if (user != null) EditProfileModal.show(context, user, initialTabIndex: 1);
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      _ProfileDetailRow(
+                        icon: Icons.payments_outlined,
+                        label: 'Commission / Order',
+                        value: CurrencyFormatter.formatNaira(commissionRate),
+                        valueColor: const Color(0xFF16A34A),
+                      ),
+                      const SizedBox(height: 10),
+                      _ProfileDetailRow(
+                        icon: Icons.local_gas_station_outlined,
+                        label: 'Transport Allowance',
+                        value: CurrencyFormatter.formatNaira(transportAllowance),
+                        valueColor: const Color(0xFF16A34A),
+                      ),
+                      const SizedBox(height: 10),
+                      _ProfileDetailRow(
+                        icon: Icons.add_task_rounded,
+                        label: 'Total Net / Delivery',
+                        value: CurrencyFormatter.formatNaira(totalEarningPerOrder),
+                        valueColor: const Color(0xFF00522A),
+                      ),
+                      const Divider(height: 20),
+                      _ProfileDetailRow(
+                        icon: Icons.account_balance_rounded,
+                        label: 'Settlement Bank',
+                        value: bankName,
+                      ),
+                      const SizedBox(height: 10),
+                      _ProfileDetailRow(
+                        icon: Icons.credit_card_rounded,
+                        label: 'Account Number',
+                        value: bankAccountNo,
+                      ),
+                      const SizedBox(height: 10),
+                      _ProfileDetailRow(
+                        icon: Icons.person_pin_outlined,
+                        label: 'Beneficiary Name',
+                        value: bankAccountName,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 14),
+                const SizedBox(height: 14),
 
-              // 5. VEHICLE & FLEET ASSET CARD
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: theme.cardColor,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.15)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Row(
-                            children: [
-                              const Icon(Icons.two_wheeler_rounded, color: Color(0xFF2563EB), size: 20),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'Vehicle & Fleet License',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 14.5,
-                                    fontWeight: FontWeight.bold,
-                                    color: theme.colorScheme.onSurface,
+                // 5. VEHICLE & FLEET ASSET CARD
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: theme.cardColor,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.15)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Row(
+                              children: [
+                                const Icon(Icons.two_wheeler_rounded, color: Color(0xFF2563EB), size: 20),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Vehicle & Fleet License',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 14.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: theme.colorScheme.onSurface,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                  overflow: TextOverflow.ellipsis,
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF2563EB)),
-                          tooltip: 'Edit Vehicle Details',
-                          onPressed: () {
-                            if (user != null) EditProfileModal.show(context, user, initialTabIndex: 2);
-                          },
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    _ProfileDetailRow(
-                      icon: Icons.directions_bike_rounded,
-                      label: 'Vehicle Asset',
-                      value: vehicle,
-                    ),
-                    const SizedBox(height: 10),
-                    _ProfileDetailRow(
-                      icon: Icons.subtitles_outlined,
-                      label: 'Plate Number',
-                      value: plateNo,
-                    ),
-                    const SizedBox(height: 10),
-                    _ProfileDetailRow(
-                      icon: Icons.shield_outlined,
-                      label: 'Safety & Helmet Verified',
-                      value: 'Compliant ✓',
-                      valueColor: const Color(0xFF16A34A),
-                    ),
-                  ],
+                          IconButton(
+                            icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF2563EB)),
+                            tooltip: 'Edit Vehicle Details',
+                            onPressed: () {
+                              if (user != null) EditProfileModal.show(context, user, initialTabIndex: 2);
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      _ProfileDetailRow(
+                        icon: Icons.directions_bike_rounded,
+                        label: 'Vehicle Asset',
+                        value: vehicle,
+                      ),
+                      const SizedBox(height: 10),
+                      _ProfileDetailRow(
+                        icon: Icons.subtitles_outlined,
+                        label: 'Plate Number',
+                        value: plateNo,
+                      ),
+                      const SizedBox(height: 10),
+                      _ProfileDetailRow(
+                        icon: Icons.shield_outlined,
+                        label: 'Safety & Helmet Verified',
+                        value: 'Compliant ✓',
+                        valueColor: const Color(0xFF16A34A),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 14),
+                const SizedBox(height: 14),
+              ] else ...[
+                // Non-Rider Settlement / Operational Card
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: theme.cardColor,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.15)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            user?.isDcManager == true ? Icons.admin_panel_settings_rounded : Icons.account_balance_wallet_outlined,
+                            color: const Color(0xFF16A34A),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              user?.isDcManager == true
+                                  ? 'Distribution Center Management Scope'
+                                  : 'Financial & Settlement Settings',
+                              style: GoogleFonts.inter(
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.onSurface,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      if (user?.isDcManager == true) ...[
+                        _ProfileDetailRow(
+                          icon: Icons.warehouse_rounded,
+                          label: 'Assigned DC Hub',
+                          value: dcName,
+                        ),
+                        const SizedBox(height: 10),
+                        _ProfileDetailRow(
+                          icon: Icons.verified_user_outlined,
+                          label: 'Management Role',
+                          value: 'Station Operations Supervisor',
+                        ),
+                        const SizedBox(height: 10),
+                        _ProfileDetailRow(
+                          icon: Icons.map_outlined,
+                          label: 'Operations Zone',
+                          value: '$cityLoc, $stateLoc',
+                        ),
+                      ] else ...[
+                        _ProfileDetailRow(
+                          icon: Icons.account_balance_rounded,
+                          label: 'Settlement Bank',
+                          value: bankName,
+                        ),
+                        const SizedBox(height: 10),
+                        _ProfileDetailRow(
+                          icon: Icons.credit_card_rounded,
+                          label: 'Account Number',
+                          value: bankAccountNo,
+                        ),
+                        const SizedBox(height: 10),
+                        _ProfileDetailRow(
+                          icon: Icons.person_pin_outlined,
+                          label: 'Account Name',
+                          value: bankAccountName,
+                        ),
+                        if (user?.isCloser == true) ...[
+                          const SizedBox(height: 10),
+                          _ProfileDetailRow(
+                            icon: Icons.monetization_on_outlined,
+                            label: 'Closing Commission',
+                            value: '₦500.00 / Delivered Order',
+                            valueColor: const Color(0xFF16A34A),
+                          ),
+                        ],
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+              ],
 
               // 6. SECURITY & PASSWORD MANAGEMENT CARD
               Container(
@@ -742,7 +998,7 @@ class UserProfilePage extends ConsumerWidget {
           ],
         ),
         content: Text(
-          'Are you sure you want to log out of the NovaExpress Rider Terminal?',
+          'Are you sure you want to log out of your NovaExpress operations account?',
           style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF64748B)),
         ),
         actions: [

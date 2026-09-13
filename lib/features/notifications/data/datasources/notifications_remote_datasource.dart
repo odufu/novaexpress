@@ -51,7 +51,7 @@ class NotificationsRemoteDataSourceImpl implements NotificationsRemoteDataSource
       final response = await _activeClient
           .from('notifications')
           .select('*')
-          .or('delivery_agent_id.eq.$resolvedAgentId,delivery_agent_id.eq.$agentId')
+          .or('delivery_agent_id.eq.$resolvedAgentId,delivery_agent_id.eq.$agentId,user_id.eq.$agentId,client_id.eq.$agentId')
           .order('created_at', ascending: false)
           .limit(40);
 

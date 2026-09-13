@@ -68,13 +68,22 @@ class LoginPage extends StatelessWidget {
                             color: Color(0xFF181C1E),
                           ),
                         ),
-                        const SizedBox(height: 4),
                         const Text(
-                          'Agent Portal Login',
+                          'Operations & Logistics Portal',
                           style: TextStyle(
                             fontSize: 14,
-                            color: Color(0xFF44474D),
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF0F172A),
                           ),
+                        ),
+                        const SizedBox(height: 2),
+                        const Text(
+                          'Single unified sign-in for DCs, Merchants, Closers & Field PDAs',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF64748B),
+                          ),
+                          textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 24),
                         const LoginForm(),

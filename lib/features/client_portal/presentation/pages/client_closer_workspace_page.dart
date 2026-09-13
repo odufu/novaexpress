@@ -31,13 +31,13 @@ class ClientCloserWorkspacePage extends ConsumerWidget {
       (c) => c.id == user?.closerId || c.email == user?.email,
       orElse: () => state.closers.isNotEmpty
           ? state.closers.first
-          : const ClientCloser(
-              id: '44444444-4444-4444-8444-444444444444',
-              clientId: '33333333-3333-4333-8333-333333333333',
-              closerCode: 'CLS-NOVA-001',
-              fullName: 'Amaka Chioma',
-              email: 'closer.amaka@novacale.ng',
-              phone: '08021122334',
+          : ClientCloser(
+              id: user?.closerId ?? '',
+              clientId: user?.clientId ?? '',
+              closerCode: user?.closerCode ?? 'CLS-001',
+              fullName: user?.fullName.isNotEmpty == true ? user!.fullName : 'Telesales Closer',
+              email: user?.email ?? '',
+              phone: user?.phone ?? '',
               dailyCallTarget: 50,
             ),
     );

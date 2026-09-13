@@ -2,6 +2,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../../core/widgets/signature_pad_modal.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../dc_console/domain/entities/distribution_center.dart';
 import '../../../dc_console/domain/entities/product_package.dart';
 import '../../../dc_console/presentation/providers/dc_console_provider.dart';
@@ -131,6 +133,29 @@ class _ClientSupplyStockModalState extends ConsumerState<ClientSupplyStockModal>
       return;
     }
 
+    final authState = ref.read(authProvider);
+    final clientState = ref.read(clientPortalProvider);
+    final senderName = authState.user?.fullName ?? (clientState.clientProfile.companyName.isNotEmpty ? clientState.clientProfile.companyName : 'Merchant Admin');
+
+    // Prompt for Merchant Digital Dispatch Signature
+    final sigResult = await SignaturePadModal.show(
+      context: context,
+      orderId: _waybillCtrl.text.trim(),
+      customerName: senderName,
+    );
+
+    if (sigResult == null || sigResult.signatureUrl.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: Color(0xFFF59E0B),
+            content: Text('Digital signature on glass is mandatory to authorize consignment dispatch.'),
+          ),
+        );
+      }
+      return;
+    }
+
     setState(() => _isSubmitting = true);
 
     try {
@@ -141,6 +166,9 @@ class _ClientSupplyStockModalState extends ConsumerState<ClientSupplyStockModal>
         dcAllocations: allocations,
         waybillNumber: _waybillCtrl.text.trim(),
         notes: _notesCtrl.text.trim().isNotEmpty ? _notesCtrl.text.trim() : null,
+        senderId: authState.user?.id,
+        senderName: senderName,
+        senderSignatureUrl: sigResult.signatureUrl,
       );
 
       if (!mounted) return;
@@ -154,11 +182,11 @@ class _ClientSupplyStockModalState extends ConsumerState<ClientSupplyStockModal>
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           content: Row(
             children: [
-              const Icon(Icons.local_shipping_rounded, color: Colors.white, size: 20),
+              const Icon(Icons.verified_user_rounded, color: Colors.white, size: 20),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Consignment of $totalAllocated units supplied to NovaExpress! Allocated to ${allocations.length} covering distribution hubs.',
+                  'Consignment of $totalAllocated units authorized & signed! Awaiting DC physical count and supervisor countersignature.',
                   style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600),
                 ),
               ),

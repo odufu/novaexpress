@@ -252,7 +252,7 @@ class ClientClosersPage extends ConsumerWidget {
                         separatorBuilder: (_, __) => Divider(height: 1, color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFF1F5F9)),
                         itemBuilder: (context, index) {
                           final closer = state.topClosersLeaderboard[index];
-                          return _buildCloserTableRow(context, closer, index + 1, currencyFormatter, isDark);
+                          return _buildCloserTableRow(context, state, closer, index + 1, currencyFormatter, isDark);
                         },
                       )
                     else
@@ -264,7 +264,7 @@ class ClientClosersPage extends ConsumerWidget {
                         separatorBuilder: (_, __) => Divider(height: 1, color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFF1F5F9)),
                         itemBuilder: (context, index) {
                           final closer = state.topClosersLeaderboard[index];
-                          return _buildCloserMobileCard(context, closer, index + 1, currencyFormatter, isDark);
+                          return _buildCloserMobileCard(context, state, closer, index + 1, currencyFormatter, isDark);
                         },
                       ),
                   ],
@@ -305,12 +305,26 @@ class ClientClosersPage extends ConsumerWidget {
 
   Widget _buildCloserTableRow(
     BuildContext context,
+    ClientPortalState state,
     ClientCloser closer,
     int rank,
     NumberFormat currencyFormatter,
     bool isDark,
   ) {
     final isTop = rank == 1;
+    final metrics = state.getCloserPerformanceMetrics(closer.id, closer.email);
+    final bookedCount = (metrics['bookedCount'] as int) > closer.totalOrdersBooked
+        ? (metrics['bookedCount'] as int)
+        : closer.totalOrdersBooked;
+    final deliveredCount = (metrics['deliveredCount'] as int) > closer.totalOrdersDelivered
+        ? (metrics['deliveredCount'] as int)
+        : closer.totalOrdersDelivered;
+    final earnedCommission = (metrics['earnedCommission'] as double) > closer.totalEarnedCommission
+        ? (metrics['earnedCommission'] as double)
+        : closer.totalEarnedCommission;
+    final successRate = bookedCount > 0
+        ? ((deliveredCount / bookedCount) * 100)
+        : closer.conversionRate;
 
     return InkWell(
       onTap: () => ClientCloserDetailModal.show(context, closer: closer),
@@ -337,6 +351,16 @@ class ClientClosersPage extends ConsumerWidget {
               ),
             ),
             const SizedBox(width: 12),
+
+            // Closer Avatar (if exists)
+            if (closer.avatarUrl != null && closer.avatarUrl!.isNotEmpty) ...[
+              CircleAvatar(
+                radius: 17,
+                backgroundColor: const Color(0xFFF37021).withValues(alpha: 0.15),
+                backgroundImage: NetworkImage(closer.avatarUrl!),
+              ),
+              const SizedBox(width: 10),
+            ],
 
             // Closer Name & Code
             Expanded(
@@ -408,17 +432,27 @@ class ClientClosersPage extends ConsumerWidget {
               ),
             ),
 
-            // Booked Orders
+            // Booked & Delivered Orders (Real-time live metrics)
             Expanded(
               flex: 2,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Orders Booked', style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8))),
+                  Text('Booked / Delivered', style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8))),
                   const SizedBox(height: 2),
-                  Text(
-                    '${closer.totalOrdersBooked} Booked',
-                    style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: const Color(0xFF10B981)),
+                  Row(
+                    children: [
+                      Text(
+                        '$bookedCount Booked',
+                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: const Color(0xFF10B981)),
+                      ),
+                      if (deliveredCount > 0) ...[
+                        Text(
+                          ' ($deliveredCount dlvd)',
+                          style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF0EA5E9)),
+                        ),
+                      ],
+                    ],
                   ),
                 ],
               ),
@@ -430,7 +464,7 @@ class ClientClosersPage extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Conversion', style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8))),
+                  Text('Success Rate', style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8))),
                   const SizedBox(height: 4),
                   Row(
                     children: [
@@ -438,7 +472,7 @@ class ClientClosersPage extends ConsumerWidget {
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(4),
                           child: LinearProgressIndicator(
-                            value: closer.conversionRate / 100,
+                            value: (successRate.clamp(0, 100)) / 100,
                             backgroundColor: isDark ? const Color(0xFF0B1021) : const Color(0xFFE2E8F0),
                             valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFF37021)),
                             minHeight: 5,
@@ -447,7 +481,7 @@ class ClientClosersPage extends ConsumerWidget {
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        '${closer.conversionRate.toStringAsFixed(0)}%',
+                        '${successRate.toStringAsFixed(0)}%',
                         style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFFF37021)),
                       ),
                     ],
@@ -465,7 +499,7 @@ class ClientClosersPage extends ConsumerWidget {
                   Text('Commission', style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8))),
                   const SizedBox(height: 2),
                   Text(
-                    currencyFormatter.format(closer.totalEarnedCommission),
+                    currencyFormatter.format(earnedCommission),
                     style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF0F172A)),
                   ),
                 ],
@@ -481,12 +515,26 @@ class ClientClosersPage extends ConsumerWidget {
 
   Widget _buildCloserMobileCard(
     BuildContext context,
+    ClientPortalState state,
     ClientCloser closer,
     int rank,
     NumberFormat currencyFormatter,
     bool isDark,
   ) {
     final isTop = rank == 1;
+    final metrics = state.getCloserPerformanceMetrics(closer.id, closer.email);
+    final bookedCount = (metrics['bookedCount'] as int) > closer.totalOrdersBooked
+        ? (metrics['bookedCount'] as int)
+        : closer.totalOrdersBooked;
+    final deliveredCount = (metrics['deliveredCount'] as int) > closer.totalOrdersDelivered
+        ? (metrics['deliveredCount'] as int)
+        : closer.totalOrdersDelivered;
+    final earnedCommission = (metrics['earnedCommission'] as double) > closer.totalEarnedCommission
+        ? (metrics['earnedCommission'] as double)
+        : closer.totalEarnedCommission;
+    final successRate = bookedCount > 0
+        ? ((deliveredCount / bookedCount) * 100)
+        : closer.conversionRate;
 
     return InkWell(
       onTap: () => ClientCloserDetailModal.show(context, closer: closer),
@@ -518,6 +566,13 @@ class ClientClosersPage extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
+                    if (closer.avatarUrl != null && closer.avatarUrl!.isNotEmpty) ...[
+                      CircleAvatar(
+                        radius: 14,
+                        backgroundImage: NetworkImage(closer.avatarUrl!),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
                     Text(
                       closer.fullName,
                       style: GoogleFonts.inter(
@@ -561,11 +616,11 @@ class ClientClosersPage extends ConsumerWidget {
                   style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
                 ),
                 Text(
-                  '${closer.totalOrdersBooked} Booked (${closer.conversionRate.toStringAsFixed(0)}%)',
+                  '$bookedCount Booked ($deliveredCount dlvd • ${successRate.toStringAsFixed(0)}%)',
                   style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF10B981)),
                 ),
                 Text(
-                  currencyFormatter.format(closer.totalEarnedCommission),
+                  currencyFormatter.format(earnedCommission),
                   style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFFF37021)),
                 ),
               ],

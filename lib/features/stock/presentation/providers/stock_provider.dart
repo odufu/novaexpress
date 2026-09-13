@@ -9,6 +9,7 @@ import '../../data/datasources/stock_remote_datasource.dart';
 import '../../data/repositories/stock_repository_impl.dart';
 import '../../domain/entities/rider_stock_allocation.dart';
 import '../../domain/entities/stock_item.dart';
+import '../../domain/entities/stock_transfer_record.dart';
 import '../../domain/repositories/stock_repository.dart';
 
 enum StockFilter {
@@ -38,9 +39,11 @@ class InboundStockRequest {
 
 class StockState {
   final bool isLoading;
+  final bool isTransfersLoading;
   final List<StockItemEntity> stockItems;
   final List<RiderStockAllocation> riderAllocations;
   final List<InboundStockRequest> inboundRequests;
+  final List<StockTransferRecord> stockTransfers;
   final String searchQuery;
   final StockFilter activeFilter;
   final String? errorMessage;
@@ -49,15 +52,23 @@ class StockState {
 
   const StockState({
     this.isLoading = true,
+    this.isTransfersLoading = false,
     this.stockItems = const [],
     this.riderAllocations = const [],
     this.inboundRequests = const [],
+    this.stockTransfers = const [],
     this.searchQuery = '',
     this.activeFilter = StockFilter.all,
     this.errorMessage,
     this.lastAuditedTime,
     this.isAuditRequired = false,
   });
+
+  List<StockTransferRecord> get pendingClientSupplies =>
+      stockTransfers.where((t) => t.isClientSupply && t.isDispatched).toList();
+
+  List<StockTransferRecord> get pendingRiderHandovers =>
+      stockTransfers.where((t) => t.isDcToRider && t.isPendingRiderAcceptance).toList();
 
   // --- Connected Stock Accounting Properties ---
 
@@ -155,9 +166,11 @@ class StockState {
 
   StockState copyWith({
     bool? isLoading,
+    bool? isTransfersLoading,
     List<StockItemEntity>? stockItems,
     List<RiderStockAllocation>? riderAllocations,
     List<InboundStockRequest>? inboundRequests,
+    List<StockTransferRecord>? stockTransfers,
     String? searchQuery,
     StockFilter? activeFilter,
     String? errorMessage,
@@ -166,9 +179,11 @@ class StockState {
   }) {
     return StockState(
       isLoading: isLoading ?? this.isLoading,
+      isTransfersLoading: isTransfersLoading ?? this.isTransfersLoading,
       stockItems: stockItems ?? this.stockItems,
       riderAllocations: riderAllocations ?? this.riderAllocations,
       inboundRequests: inboundRequests ?? this.inboundRequests,
+      stockTransfers: stockTransfers ?? this.stockTransfers,
       searchQuery: searchQuery ?? this.searchQuery,
       activeFilter: activeFilter ?? this.activeFilter,
       errorMessage: errorMessage,
@@ -255,16 +270,19 @@ class StockNotifier extends StateNotifier<StockState> {
   Future<void> _initCache() async {
     final cached = await _storageService.getCachedStockItems();
     final cachedAllocations = await _storageService.getCachedRiderStockAllocations();
+    if (!mounted) return;
     if (state.stockItems.isEmpty) {
       if (cached != null && cached.isNotEmpty) {
         state = state.copyWith(stockItems: cached);
       }
     }
+    if (!mounted) return;
     if (state.riderAllocations.isEmpty) {
       if (cachedAllocations != null && cachedAllocations.isNotEmpty) {
         state = state.copyWith(riderAllocations: cachedAllocations);
       }
     }
+    if (!mounted) return;
     state = state.copyWith(isLoading: false);
   }
 
@@ -371,6 +389,7 @@ class StockNotifier extends StateNotifier<StockState> {
         final items = await repository.getVehicleStockItems(null, targetDcId);
         final allocations = await repository.getRiderStockAllocations(null, targetDcId);
 
+        if (!mounted) return;
         state = state.copyWith(
           isLoading: false,
           stockItems: items,
@@ -381,13 +400,14 @@ class StockNotifier extends StateNotifier<StockState> {
       }
     } catch (e) {
       debugPrint('[STOCK_PROVIDER] ❌ fetchStockItems error: $e');
+      if (!mounted) return;
       final cached = await _storageService.getCachedStockItems();
       final cachedAllocations = await _storageService.getCachedRiderStockAllocations();
 
+      if (!mounted) return;
       final fallbackItems = (cached != null && cached.isNotEmpty) ? cached : state.stockItems;
       final fallbackAlloc = (cachedAllocations != null && cachedAllocations.isNotEmpty) ? cachedAllocations : state.riderAllocations;
 
-      if (!mounted) return;
       state = state.copyWith(
         isLoading: false,
         stockItems: fallbackItems,
@@ -508,7 +528,10 @@ class StockNotifier extends StateNotifier<StockState> {
     required String sku,
     required String category,
     required double price,
-    String ownerName = 'Novacare Limited',
+    double? costPrice,
+    String? barcode,
+    double? weightKg,
+    String ownerName = '',
     String? clientId,
     int initialQuantity = 0,
     int lowStockThreshold = 3,
@@ -537,6 +560,9 @@ class StockNotifier extends StateNotifier<StockState> {
         sku: sku,
         category: category,
         price: price,
+        costPrice: costPrice,
+        barcode: barcode,
+        weightKg: weightKg,
         ownerName: ownerName,
         clientId: clientId,
         stockQuantity: initialQuantity,
@@ -556,7 +582,10 @@ class StockNotifier extends StateNotifier<StockState> {
         name: name.trim(),
         description: description.trim().isNotEmpty ? description.trim() : '$name - Distributed Inventory',
         price: price,
-        ownerName: ownerName.trim().isNotEmpty ? ownerName.trim() : 'Novacare Limited',
+        costPrice: costPrice ?? 0.0,
+        barcode: barcode,
+        weightKg: weightKg ?? 0.5,
+        ownerName: ownerName.trim(),
         inventoryType: InventoryType.distributedInventory,
         totalInCustody: initialQuantity,
         assignedCount: 0,
@@ -991,6 +1020,8 @@ class StockNotifier extends StateNotifier<StockState> {
     required String riderId,
     required int quantity,
     required String reason,
+    String? destinationDcId,
+    String? condition,
     String? notes,
   }) async {
     if (quantity <= 0) {
@@ -1046,22 +1077,29 @@ class StockNotifier extends StateNotifier<StockState> {
     await _storageService.cacheRiderStockAllocations(updatedAllocations);
 
     // 3. Process backend stock return if Supabase is connected
+    String generatedReturnNumber = 'RET-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
     try {
-      await repository.processStockReturn(
-        returnNumber: 'RET-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
+      final res = await repository.processStockReturn(
+        returnNumber: generatedReturnNumber,
         orderId: 'DC-VEHICLE-RETURN',
         deliveryAgentId: riderId,
         productId: targetAlloc?.productId ?? productIdOrSku,
         quantity: quantity,
         reason: reason,
+        destinationDcId: destinationDcId,
+        condition: condition,
         notes: notes,
       );
+      if (res['returnNumber'] != null) {
+        generatedReturnNumber = res['returnNumber'].toString();
+      }
     } catch (_) {}
 
     final productName = targetAlloc?.productName ?? productIdOrSku;
     return {
       'success': true,
-      'message': 'Successfully returned $quantity units of $productName to host DC ($reason).',
+      'returnNumber': generatedReturnNumber,
+      'message': 'Successfully created return handshake $generatedReturnNumber for $quantity units of $productName ($reason).',
       'remainingInVehicle': targetAlloc?.inCustodyUnits ?? 0,
     };
   }
@@ -1180,6 +1218,8 @@ class StockNotifier extends StateNotifier<StockState> {
     required String productId,
     required int quantity,
     required String reason,
+    String? destinationDcId,
+    String? condition,
     String? notes,
   }) async {
     state = state.copyWith(isLoading: true);
@@ -1191,6 +1231,8 @@ class StockNotifier extends StateNotifier<StockState> {
         productId: productId,
         quantity: quantity,
         reason: reason,
+        destinationDcId: destinationDcId,
+        condition: condition,
         notes: notes,
       );
       await fetchStockItems(deliveryAgentId);
@@ -1372,6 +1414,233 @@ class StockNotifier extends StateNotifier<StockState> {
 
     await _storageService.cacheStockItems(updatedItems);
     await _storageService.cacheRiderStockAllocations(updatedAllocations);
+
+    // Persist audit header & line items to Supabase public.inventory_audits
+    try {
+      final List<Map<String, dynamic>> auditLineItems = [];
+      physicalCounts.forEach((prodId, physicalCount) {
+        final alloc = state.riderAllocations.firstWhere(
+          (a) => a.productId == prodId && a.riderId == riderId,
+          orElse: () => RiderStockAllocation.empty(),
+        );
+        final expected = alloc.inCustodyUnits;
+        final variance = physicalCount - expected;
+        auditLineItems.add({
+          'product_id': prodId,
+          'expected_quantity': expected,
+          'actual_quantity': physicalCount,
+          'variance': variance,
+          'variance_reason': varianceReasons?[prodId] ?? (variance == 0 ? 'Exact count match' : 'Discrepancy reported during mobile audit'),
+        });
+      });
+
+      final authUser = Supabase.instance.client.auth.currentUser;
+      final companyId = authUser?.userMetadata?['company_id']?.toString() ??
+          (authUser != null ? authUser.appMetadata['company_id']?.toString() : null) ??
+          '';
+
+      await repository.submitDetailedInventoryAudit(
+        companyId: companyId.isNotEmpty ? companyId : '00000000-0000-0000-0000-000000000000',
+        auditorId: authUser?.id ?? riderId,
+        auditType: 'rider_mobile',
+        riderId: riderId,
+        items: auditLineItems,
+        notes: notes != null && notes.isNotEmpty ? notes.values.join('; ') : 'Mobile Rider Vehicle Audit',
+      );
+    } catch (e) {
+      debugPrint('[STOCK_PROVIDER] ⚠️ submitDetailedInventoryAudit persistence notice: $e');
+    }
+  }
+
+  /// DC Supervisor accepts and restocks a rider return
+  Future<Map<String, dynamic>> receiveRiderReturn({
+    required String returnId,
+    required String dcId,
+    required String receiverId,
+    required int verifiedQuantity,
+    String condition = 'good',
+    String? notes,
+  }) async {
+    final res = await repository.receiveRiderStockReturn(
+      returnId: returnId,
+      dcId: dcId,
+      receiverId: receiverId,
+      verifiedQuantity: verifiedQuantity,
+      condition: condition,
+      notes: notes,
+    );
+    await fetchStockItems(null, dcId);
+    return res;
+  }
+
+  /// DC Supervisor queries pending rider returns
+  Future<List<Map<String, dynamic>>> fetchPendingDcReturns(String dcId) async {
+    return await repository.fetchPendingDcReturns(dcId);
+  }
+
+  /// Fetch stock transfers with joined items & dual signatures
+  Future<void> fetchStockTransfers({
+    String? dcId,
+    String? clientId,
+    String? riderId,
+    String? status,
+    String? transferType,
+  }) async {
+    state = state.copyWith(isTransfersLoading: true);
+    try {
+      final transfers = await repository.fetchStockTransfers(
+        dcId: dcId,
+        clientId: clientId,
+        riderId: riderId,
+        status: status,
+        transferType: transferType,
+      );
+      state = state.copyWith(
+        stockTransfers: transfers,
+        isTransfersLoading: false,
+      );
+    } catch (e) {
+      debugPrint('[STOCK_PROVIDER] ⚠️ fetchStockTransfers error: $e');
+      state = state.copyWith(isTransfersLoading: false);
+    }
+  }
+
+  /// Party A (Merchant/Client): Dispatches consignment to DC and signs on glass
+  Future<Map<String, dynamic>> dispatchClientSupply({
+    required String clientId,
+    required String dcId,
+    required List<Map<String, dynamic>> items,
+    String? senderId,
+    required String senderName,
+    required String senderSignatureUrl,
+    String? notes,
+  }) async {
+    try {
+      final res = await repository.dispatchClientSupply(
+        clientId: clientId,
+        dcId: dcId,
+        items: items,
+        senderId: senderId,
+        senderName: senderName,
+        senderSignatureUrl: senderSignatureUrl,
+        notes: notes,
+      );
+      // Refresh transfers
+      await fetchStockTransfers(clientId: clientId, dcId: dcId);
+      return res;
+    } catch (e) {
+      debugPrint('[STOCK_PROVIDER] ⚠️ dispatchClientSupply error: $e');
+      rethrow;
+    }
+  }
+
+  /// Party B (DC Supervisor): Inspects physical items, records discrepancies, and signs receipt
+  Future<Map<String, dynamic>> receiveClientSupply({
+    required String transferId,
+    required String receiverId,
+    required String receiverName,
+    required String receiverSignatureUrl,
+    required List<Map<String, dynamic>> verifiedItems,
+    String? notes,
+    String? dcId,
+  }) async {
+    try {
+      final res = await repository.receiveClientSupply(
+        transferId: transferId,
+        receiverId: receiverId,
+        receiverName: receiverName,
+        receiverSignatureUrl: receiverSignatureUrl,
+        verifiedItems: verifiedItems,
+        notes: notes,
+      );
+      // Refresh inventory and transfers
+      await fetchStockItems();
+      await fetchStockTransfers(dcId: dcId);
+      return res;
+    } catch (e) {
+      debugPrint('[STOCK_PROVIDER] ⚠️ receiveClientSupply error: $e');
+      rethrow;
+    }
+  }
+
+  /// Party A (DC Supervisor): Issues stock to rider with supervisor signature (reserves shelf stock)
+  Future<Map<String, dynamic>> issueDcStockToRiderWithSignature({
+    required String dcId,
+    required String riderId,
+    required List<Map<String, dynamic>> items,
+    required String senderId,
+    required String senderName,
+    required String senderSignatureUrl,
+    String? notes,
+  }) async {
+    try {
+      final res = await repository.issueDcStockToRiderWithSignature(
+        dcId: dcId,
+        riderId: riderId,
+        items: items,
+        senderId: senderId,
+        senderName: senderName,
+        senderSignatureUrl: senderSignatureUrl,
+        notes: notes,
+      );
+      // Refresh inventory and transfers
+      await fetchStockItems();
+      await fetchStockTransfers(dcId: dcId);
+      return res;
+    } catch (e) {
+      debugPrint('[STOCK_PROVIDER] ⚠️ issueDcStockToRiderWithSignature error: $e');
+      rethrow;
+    }
+  }
+
+  /// Party B (Rider): Verifies physical items in hand and signs on glass to commit to vehicle custody
+  Future<Map<String, dynamic>> acceptRiderStockHandover({
+    required String transferId,
+    required String riderId,
+    required String riderName,
+    required String riderSignatureUrl,
+    List<Map<String, dynamic>>? verifiedItems,
+    String? notes,
+  }) async {
+    try {
+      final res = await repository.acceptRiderStockHandover(
+        transferId: transferId,
+        riderId: riderId,
+        riderName: riderName,
+        riderSignatureUrl: riderSignatureUrl,
+        verifiedItems: verifiedItems,
+        notes: notes,
+      );
+      // Refresh inventory, allocations, and transfers
+      await fetchStockItems(riderId);
+      await fetchStockTransfers(riderId: riderId);
+      return res;
+    } catch (e) {
+      debugPrint('[STOCK_PROVIDER] ⚠️ acceptRiderStockHandover error: $e');
+      rethrow;
+    }
+  }
+
+  /// Party B (Rider): Rejects handover (returns units back to DC shelf)
+  Future<Map<String, dynamic>> rejectRiderStockHandover({
+    required String transferId,
+    required String riderId,
+    String? reason,
+  }) async {
+    try {
+      final res = await repository.rejectRiderStockHandover(
+        transferId: transferId,
+        riderId: riderId,
+        reason: reason,
+      );
+      // Refresh inventory and transfers
+      await fetchStockItems(riderId);
+      await fetchStockTransfers(riderId: riderId);
+      return res;
+    } catch (e) {
+      debugPrint('[STOCK_PROVIDER] ⚠️ rejectRiderStockHandover error: $e');
+      rethrow;
+    }
   }
 }
 

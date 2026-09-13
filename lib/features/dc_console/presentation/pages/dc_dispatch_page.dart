@@ -4,6 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/helpers/formatters.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
+import '../../../orders/domain/services/order_routing_service.dart';
+import '../../domain/entities/distribution_center.dart';
 import '../providers/dc_console_provider.dart';
 import '../widgets/dc_assign_order_modal.dart';
 
@@ -101,13 +103,35 @@ class DCDispatchPage extends ConsumerWidget {
     final ordersState = ref.watch(ordersProvider);
     final dcState = ref.watch(dcConsoleProvider);
 
-    final unassignedOrders = ordersState.orders.where((o) =>
+    final allDcs = dcState.distributionCenters;
+    final activeDc = allDcs.where(
+      (d) => d.id == dcState.activeHubId || d.code == dcState.activeHubCode,
+    ).firstOrNull ?? DistributionCenter(
+      id: dcState.activeHubId,
+      name: dcState.activeHubName,
+      code: dcState.activeHubCode,
+      state: dcState.isCurrentHubGrandDc ? 'Abuja (FCT)' : '',
+      city: '',
+      address: '',
+      isGrandDc: dcState.isCurrentHubGrandDc,
+      isHub: dcState.isCurrentHubGrandDc,
+    );
+
+    final hubOrders = ordersState.orders.where((o) {
+      return OrderRoutingService.doesOrderBelongToDc(
+        order: o,
+        currentDc: activeDc,
+        allDcs: allDcs,
+      );
+    }).toList();
+
+    final unassignedOrders = hubOrders.where((o) =>
       (o.deliveryAgentId == null || o.deliveryAgentId!.isEmpty) &&
       o.status != 'cancelled' &&
       o.status != 'delivered'
     ).toList();
 
-    final inTransitOrders = ordersState.orders.where((o) =>
+    final inTransitOrders = hubOrders.where((o) =>
       o.status == 'in_transit' || o.status == 'assigned'
     ).toList();
 

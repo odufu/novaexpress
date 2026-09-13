@@ -14,6 +14,9 @@ abstract class OrdersRemoteDataSource {
     required String riderName,
     required String riderCode,
   });
+  Future<void> unassignOrderFromRider({
+    required String orderId,
+  });
   Future<OrderModel> getOrderById(String orderId);
   Future<void> updateOrderStatus(
     String orderId,
@@ -62,7 +65,6 @@ abstract class OrdersRemoteDataSource {
 
 class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
   final SupabaseClient supabaseClient;
-  static final List<OrderModel> _createdOrders = [];
   static final Map<String, String> _assignedRidersByOrderId = {};
   static final Map<String, String> _assignedRiderNamesByOrderId = {};
   static final Map<String, String> _assignedRiderCodesByOrderId = {};
@@ -84,9 +86,8 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
           authOptions: const AuthClientOptions(autoRefreshToken: false),
         );
 
-        // 1. Resolve authoritative delivery_agent_id and agent_code from delivery_agents table
+        // 1. Resolve authoritative delivery_agent_id from delivery_agents table
         String targetAgentId = cleanId;
-        String? targetAgentCode;
         final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
 
         try {
@@ -99,7 +100,6 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
           if ((agentLookup as List).isNotEmpty) {
             final first = agentLookup.first;
             if (first['id'] != null) targetAgentId = first['id'].toString();
-            if (first['agent_code'] != null) targetAgentCode = first['agent_code'].toString();
           }
         } catch (_) {}
 
@@ -118,19 +118,6 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
         final list = (response as List)
             .map((item) => OrderModel.fromJson(item as Map<String, dynamic>))
             .toList();
-
-        // 3. Include any newly created/assigned orders in this session assigned to this rider
-        for (final created in _createdOrders) {
-          final isAssignedToThis = _assignedRidersByOrderId[created.id] == targetAgentId ||
-              _assignedRidersByOrderId[created.id] == cleanId ||
-              created.deliveryAgentId == targetAgentId ||
-              created.deliveryAgentId == cleanId ||
-              (targetAgentCode != null && (_assignedRiderCodesByOrderId[created.id] == targetAgentCode || created.deliveryAgentCode == targetAgentCode));
-
-          if (isAssignedToThis && !list.any((o) => o.id == created.id || o.orderNumber == created.orderNumber)) {
-            list.insert(0, created);
-          }
-        }
 
         debugPrint('[ORDERS_DATASOURCE] 🚴 Loaded ${list.length} assigned orders specifically for rider ($cleanId -> $targetAgentId).');
         return list;
@@ -186,14 +173,19 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
         } catch (_) {}
       }
       if (validProductId.isEmpty) {
-        validProductId = 'a1b2c3d4-0000-4000-8000-000000000001';
+        try {
+          final anyProd = await dbClient.from('products').select('id').limit(1).maybeSingle();
+          if (anyProd != null && anyProd['id'] != null) {
+            validProductId = anyProd['id'].toString();
+          }
+        } catch (_) {}
       }
 
       // 2. Resolve company and distribution center UUIDs
-      const companyId = '11111111-1111-4111-8111-111111111111';
-      final dcId = (insertPayload['distribution_center_id'] != null && uuidRegex.hasMatch(insertPayload['distribution_center_id'].toString()))
+      final companyId = insertPayload['company_id']?.toString() ?? '11111111-1111-4111-8111-111111111111';
+      final String? dcId = (insertPayload['distribution_center_id'] != null && uuidRegex.hasMatch(insertPayload['distribution_center_id'].toString()))
           ? insertPayload['distribution_center_id'].toString()
-          : '22222222-2222-4222-8222-222222222222';
+          : null;
 
       // 3. Resolve rider assignment UUID if present
       String? validRiderId;
@@ -226,7 +218,7 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
           : 'pending';
 
       final qty = (insertPayload['quantity'] as num?)?.toInt() ?? 1;
-      final basePrice = (insertPayload['base_price'] as num?)?.toDouble() ?? 25000.0;
+      final basePrice = (insertPayload['base_price'] as num?)?.toDouble() ?? 0.0;
       final upsell = (insertPayload['upsell_amount'] as num?)?.toDouble() ?? 0.0;
       final totalAmount = (insertPayload['total_amount'] as num?)?.toDouble() ?? ((qty * basePrice) + upsell);
 
@@ -251,6 +243,53 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
           ? (validRiderId != null ? 'assigned' : 'pending_dispatch')
           : (rawStatus ?? (validRiderId != null ? 'assigned' : 'pending_dispatch'));
 
+      // 4b. Authoritative Client Name & Company Resolution
+      String? resolvedClientName = insertPayload['client_name']?.toString() ?? insertPayload['client_company']?.toString();
+      String? resolvedClientCompany = insertPayload['client_company']?.toString() ?? insertPayload['client_name']?.toString();
+      final rawClientId = insertPayload['client_id']?.toString();
+
+      // If client_name is missing, but a specific client_id was passed, lookup the real client name
+      if ((resolvedClientName == null || resolvedClientName.isEmpty) &&
+          rawClientId != null &&
+          rawClientId.isNotEmpty) {
+        try {
+          final clientLookup = await dbClient
+              .from('clients')
+              .select('name, company_name')
+              .eq('id', rawClientId)
+              .maybeSingle();
+          if (clientLookup != null) {
+            final foundName = clientLookup['company_name']?.toString() ?? clientLookup['name']?.toString();
+            if (foundName != null && foundName.isNotEmpty) {
+              resolvedClientName = foundName;
+              resolvedClientCompany = foundName;
+            }
+          }
+        } catch (_) {}
+      }
+
+      // Also fallback to product's client_name if still empty
+      if ((resolvedClientName == null || resolvedClientName.isEmpty) &&
+          validProductId.isNotEmpty) {
+        try {
+          final prodLookup = await dbClient
+              .from('products')
+              .select('client_name, client_id')
+              .eq('id', validProductId)
+              .maybeSingle();
+          if (prodLookup != null) {
+            final pClientName = prodLookup['client_name']?.toString();
+            if (pClientName != null && pClientName.isNotEmpty) {
+              resolvedClientName = pClientName;
+              resolvedClientCompany = pClientName;
+            }
+          }
+        } catch (_) {}
+      }
+
+      resolvedClientName ??= '';
+      resolvedClientCompany ??= resolvedClientName;
+
       // 5. Construct strictly-typed database payload with only valid columns
       final sanitizedDbPayload = <String, dynamic>{
         'id': validOrderUuid,
@@ -258,13 +297,13 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
         'company_id': companyId,
         'distribution_center_id': dcId,
         'product_id': validProductId,
-        'product_name': insertPayload['product_name']?.toString() ?? 'Respira Detox Tea',
+        'product_name': insertPayload['product_name']?.toString() ?? '',
         'customer_name': insertPayload['customer_name']?.toString() ?? 'Customer',
-        'customer_phone': insertPayload['customer_phone']?.toString() ?? '08000000000',
+        'customer_phone': insertPayload['customer_phone']?.toString() ?? '',
         'customer_alt_phone': insertPayload['customer_alt_phone']?.toString(),
-        'delivery_state': insertPayload['delivery_state']?.toString() ?? 'FCT - Abuja',
-        'delivery_city': insertPayload['delivery_city']?.toString() ?? 'Abuja',
-        'delivery_address': insertPayload['delivery_address']?.toString() ?? 'Delivery Address',
+        'delivery_state': insertPayload['delivery_state']?.toString() ?? '',
+        'delivery_city': insertPayload['delivery_city']?.toString() ?? '',
+        'delivery_address': insertPayload['delivery_address']?.toString() ?? '',
         'landmark': insertPayload['landmark']?.toString(),
         'delivery_lga': insertPayload['delivery_lga']?.toString() ?? insertPayload['lga']?.toString(),
         'lga': insertPayload['lga']?.toString() ?? insertPayload['delivery_lga']?.toString(),
@@ -283,7 +322,9 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
         'agent_entitlement': (insertPayload['agent_entitlement'] as num?)?.toDouble() ?? 2500.0,
         'delivery_agent_id': validRiderId,
         'assigned_agent_id': validRiderId,
-        'client_id': insertPayload['client_id']?.toString(),
+        'client_id': rawClientId,
+        'client_name': resolvedClientName,
+        'client_company': resolvedClientCompany,
         'closer_id': insertPayload['closer_id']?.toString(),
         'closer_name': insertPayload['closer_name']?.toString(),
         'closer_code': insertPayload['closer_code']?.toString(),
@@ -374,14 +415,10 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
         ),
       );
 
-      _createdOrders.removeWhere((o) => o.id == createdModel.id || o.orderNumber == createdModel.orderNumber);
-      _createdOrders.insert(0, createdModel);
       return createdModel;
     } catch (e) {
       debugPrint('[ORDERS_DATASOURCE] ⚠️ createOrder error: $e');
-      final fallback = OrderModel.fromJson(orderData);
-      _createdOrders.insert(0, fallback);
-      return fallback;
+      return OrderModel.fromJson(orderData);
     }
   }
 
@@ -406,17 +443,52 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
             .map((item) => OrderModel.fromJson(item as Map<String, dynamic>))
             .toList();
         debugPrint('[ORDERS_DATASOURCE] 📦 Loaded ${list.length} orders from live Supabase DB.');
+
+        // 🔧 Client name enrichment: for orders with a client_id but missing/empty client_name,
+        // batch-resolve the real company name from the clients table.
+        final missingClientNameIds = list
+            .where((o) => (o.clientName.isEmpty) && o.clientId != null && o.clientId!.isNotEmpty)
+            .map((o) => o.clientId!)
+            .toSet()
+            .toList();
+
+        if (missingClientNameIds.isNotEmpty) {
+          try {
+            final clientsRes = await dbClient
+                .from('clients')
+                .select('id, name, company_name')
+                .inFilter('id', missingClientNameIds);
+
+            final clientNameMap = <String, String>{};
+            for (final c in (clientsRes as List)) {
+              final id = c['id']?.toString();
+              final name = c['company_name']?.toString() ?? c['name']?.toString();
+              if (id != null && name != null && name.isNotEmpty) {
+                clientNameMap[id] = name;
+              }
+            }
+
+            if (clientNameMap.isNotEmpty) {
+              list = list.map((order) {
+                if (order.clientName.isEmpty && order.clientId != null && clientNameMap.containsKey(order.clientId)) {
+                  final resolvedName = clientNameMap[order.clientId!]!;
+                  return OrderModel.fromEntity(order.copyWith(
+                    clientName: resolvedName,
+                    clientCompany: resolvedName,
+                  ));
+                }
+                return order;
+              }).toList();
+              debugPrint('[ORDERS_DATASOURCE] 🔧 Enriched client names for ${clientNameMap.length} clients.');
+            }
+          } catch (enrichErr) {
+            debugPrint('[ORDERS_DATASOURCE] ℹ️ Client name enrichment notice: $enrichErr');
+          }
+        }
       } catch (e) {
         debugPrint('[ORDERS_DATASOURCE] ℹ️ Supabase remote fetch notice ($e).');
       } finally {
         dbClient?.dispose();
-      }
-
-      // Merge newly created orders at the top
-      for (final created in _createdOrders) {
-        if (!list.any((o) => o.id == created.id || o.orderNumber == created.orderNumber)) {
-          list.insert(0, created);
-        }
       }
 
       // Map assigned riders from in-memory cache without overwriting terminal states or stripping fields
@@ -433,7 +505,7 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
               deliveryAgentId: model.deliveryAgentId ?? _assignedRidersByOrderId[model.id],
               deliveryAgentName: model.deliveryAgentName ?? _assignedRiderNamesByOrderId[model.id],
               deliveryAgentCode: model.deliveryAgentCode ?? _assignedRiderCodesByOrderId[model.id],
-              distributionCenterId: distributionCenterId,
+              distributionCenterId: model.distributionCenterId ?? distributionCenterId,
               status: isFinished
                   ? model.status
                   : (model.status == 'pending' || model.status == 'new' || model.status == 'unassigned'
@@ -501,22 +573,14 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
       String custName = 'Customer';
       String city = 'Abuja';
       String? matchedOrderUuid = isUuid ? orderId.trim() : null;
-      String? resolvedOrderNumber;
-
-      OrderModel? localOrderMatch;
-      for (final o in _createdOrders) {
-        if (o.id == orderId || o.orderNumber == orderId) {
-          localOrderMatch = o;
-          resolvedOrderNumber = o.orderNumber;
-          break;
-        }
-      }
+      String? matchedOrderNumber = isUuid ? null : orderId.trim();
+      String? orderCompanyId;
 
       if (isUuid) {
         try {
           final orderRow = await dbClient
               .from(SupabaseConstants.ordersTable)
-              .select('id, order_number, customer_name, delivery_city')
+              .select('id, order_number, customer_name, delivery_city, company_id')
               .eq('id', orderId.trim())
               .maybeSingle();
           if (orderRow != null) {
@@ -524,26 +588,26 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
             custName = orderRow['customer_name']?.toString() ?? custName;
             city = orderRow['delivery_city']?.toString() ?? city;
             matchedOrderUuid = orderRow['id']?.toString() ?? matchedOrderUuid;
+            if (orderRow['company_id'] != null) orderCompanyId = orderRow['company_id'].toString();
           }
         } catch (_) {}
       } else {
         // Query by order_number if known
-        final lookupNumber = resolvedOrderNumber ?? (orderId.startsWith('TRK-') ? orderId : null);
-        if (lookupNumber != null) {
-          try {
-            final orderRow = await dbClient
-                .from(SupabaseConstants.ordersTable)
-                .select('id, order_number, customer_name, delivery_city')
-                .eq('order_number', lookupNumber)
-                .maybeSingle();
-            if (orderRow != null) {
-              orderNum = orderRow['order_number']?.toString() ?? orderNum;
-              custName = orderRow['customer_name']?.toString() ?? custName;
-              city = orderRow['delivery_city']?.toString() ?? city;
-              matchedOrderUuid = orderRow['id']?.toString();
-            }
-          } catch (_) {}
-        }
+        try {
+          final orderRow = await dbClient
+              .from(SupabaseConstants.ordersTable)
+              .select('id, order_number, customer_name, delivery_city, company_id')
+              .eq('order_number', orderId.trim())
+              .maybeSingle();
+          if (orderRow != null) {
+            orderNum = orderRow['order_number']?.toString() ?? orderNum;
+            custName = orderRow['customer_name']?.toString() ?? custName;
+            city = orderRow['delivery_city']?.toString() ?? city;
+            matchedOrderUuid = orderRow['id']?.toString();
+            matchedOrderNumber = orderRow['order_number']?.toString() ?? matchedOrderNumber;
+            if (orderRow['company_id'] != null) orderCompanyId = orderRow['company_id'].toString();
+          }
+        } catch (_) {}
       }
 
       // 3. Update orders table in Supabase (status MUST be 'in_transit' for active assignment check constraint)
@@ -560,37 +624,18 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
               .from(SupabaseConstants.ordersTable)
               .update(updatePayload)
               .eq('id', matchedOrderUuid);
-        } else if (resolvedOrderNumber != null) {
+        } else if (matchedOrderNumber != null) {
           await dbClient
               .from(SupabaseConstants.ordersTable)
               .update(updatePayload)
-              .eq('order_number', resolvedOrderNumber);
-        } else if (localOrderMatch != null) {
-          // Self-heal: order was created offline or prior to trigger fix. Insert into Supabase now!
-          final newUuid = UuidHelper.generate();
-          try {
-            final insertPayload = Map<String, dynamic>.from(localOrderMatch.toJson());
-            insertPayload['id'] = newUuid;
-            insertPayload['delivery_agent_id'] = validRiderUuid;
-            insertPayload['assigned_agent_id'] = validRiderUuid;
-            insertPayload['status'] = 'in_transit';
-            insertPayload.remove('products');
-            await dbClient.from(SupabaseConstants.ordersTable).insert(insertPayload);
-            matchedOrderUuid = newUuid;
-
-            _createdOrders.removeWhere((o) => o.id == localOrderMatch!.id);
-            _createdOrders.insert(0, OrderModel.fromEntity(localOrderMatch.copyWith(id: newUuid, status: 'in_transit')));
-            _assignedRidersByOrderId[newUuid] = validRiderUuid;
-          } catch (insertErr) {
-            debugPrint('[ORDERS_DATASOURCE] ℹ️ Auto-persist local order notice: $insertErr');
-          }
+              .eq('order_number', matchedOrderNumber);
         }
       }
 
       // 4. Immediately insert real notification in database for rider
       try {
         await dbClient.from('notifications').insert({
-          'company_id': '11111111-1111-4111-8111-111111111111',
+          if (orderCompanyId != null) 'company_id': orderCompanyId,
           'delivery_agent_id': validRiderUuid,
           'category': 'delivery',
           'title': 'New Order Assigned! 📦',
@@ -613,6 +658,52 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
   }
 
   @override
+  Future<void> unassignOrderFromRider({
+    required String orderId,
+  }) async {
+    _assignedRidersByOrderId.remove(orderId);
+    _assignedRiderNamesByOrderId.remove(orderId);
+    _assignedRiderCodesByOrderId.remove(orderId);
+
+    SupabaseClient? dbClient;
+    try {
+      dbClient = SupabaseClient(
+        SupabaseConstants.supabaseUrl,
+        SupabaseConstants.supabaseServiceRoleKey,
+        authOptions: const AuthClientOptions(autoRefreshToken: false),
+      );
+
+      final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
+      final isUuid = uuidRegex.hasMatch(orderId.trim());
+
+      final updatePayload = {
+        'delivery_agent_id': null,
+        'assigned_agent_id': null,
+        'status': 'pending_dispatch',
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+
+      if (isUuid) {
+        await dbClient
+            .from(SupabaseConstants.ordersTable)
+            .update(updatePayload)
+            .eq('id', orderId.trim());
+      } else {
+        await dbClient
+            .from(SupabaseConstants.ordersTable)
+            .update(updatePayload)
+            .eq('order_number', orderId.trim());
+      }
+
+      debugPrint('[ORDERS_DATASOURCE] ✅ Order $orderId unassigned back to DC pool.');
+    } catch (e) {
+      debugPrint('[ORDERS_DATASOURCE] ℹ️ Unassign notice ($e).');
+    } finally {
+      dbClient?.dispose();
+    }
+  }
+
+  @override
   Future<OrderModel> getOrderById(String orderId) async {
     try {
       final isUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(orderId.trim());
@@ -625,19 +716,8 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
         return OrderModel.fromJson(response);
       }
 
-      for (final o in _createdOrders) {
-        if (o.id == orderId || o.orderNumber == orderId) {
-          return o;
-        }
-      }
-
       throw Exception('Order "$orderId" not found in Supabase database.');
     } catch (e) {
-      for (final o in _createdOrders) {
-        if (o.id == orderId || o.orderNumber == orderId) {
-          return o;
-        }
-      }
       rethrow;
     }
   }
@@ -801,6 +881,24 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
         isLocationVerified: true,
         notes: notes,
       );
+
+      // Attempt direct RPC deduction of rider stock in fallback
+      try {
+        final ord = await supabaseClient.from('orders').select('product_id, quantity, paid_quantity, free_quantity').eq('id', orderId).maybeSingle();
+        if (ord != null && ord['product_id'] != null) {
+          final pQty = ((ord['paid_quantity'] as num?)?.toInt() ?? 0) + ((ord['free_quantity'] as num?)?.toInt() ?? 0);
+          final physicalQty = pQty > 0 ? pQty : ((ord['quantity'] as num?)?.toInt() ?? 1);
+          await supabaseClient.rpc('fn_confirm_order_delivery_stock', params: {
+            'p_order_id': orderId,
+            'p_agent_id': agentId,
+            'p_product_id': ord['product_id'],
+            'p_physical_quantity': physicalQty,
+          });
+        }
+      } catch (rpcErr) {
+        debugPrint('[ORDERS_DATASOURCE] Fallback fn_confirm_order_delivery_stock notice: $rpcErr');
+      }
+
       return {'status': 'offline_fallback', 'error': e.toString()};
     }
   }
@@ -926,6 +1024,11 @@ class MockOrdersRemoteDataSource implements OrdersRemoteDataSource {
     required String riderId,
     required String riderName,
     required String riderCode,
+  }) async {}
+
+  @override
+  Future<void> unassignOrderFromRider({
+    required String orderId,
   }) async {}
 
   @override

@@ -10,8 +10,11 @@ import '../widgets/client_create_order_modal.dart';
 import 'client_closer_workspace_page.dart';
 import 'client_closers_page.dart';
 import 'client_dashboard_page.dart';
+import 'client_finance_page.dart';
 import 'client_orders_page.dart';
 import 'client_products_page.dart';
+import 'closer_mobile_portal_page.dart';
+import '../../../pipeline_chat/presentation/widgets/pipeline_chat_floating_action_button.dart';
 
 final clientActiveTabProvider = StateProvider<String>((ref) {
   final user = ref.watch(authProvider).user;
@@ -39,6 +42,12 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
     final state = ref.watch(clientPortalProvider);
     final authUser = ref.watch(authProvider).user;
     final isCloser = authUser?.isCloser == true;
+
+    // Route sales closer directly to dedicated mobile-first closer portal
+    if (isCloser) {
+      return const CloserMobilePortalPage();
+    }
+
     final isCollapsed = ref.watch(clientSidebarCollapsedProvider);
     final themeMode = ref.watch(themeProvider);
     final isDark = themeMode == ThemeMode.dark ||
@@ -50,6 +59,7 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
 
     return Scaffold(
       key: _scaffoldKey,
+      floatingActionButton: const PipelineChatFloatingActionButton(),
       backgroundColor: isDark ? const Color(0xFF0B1120) : const Color(0xFFF8FAFC),
       drawer: isDesktop
           ? null
@@ -117,6 +127,8 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
         return const ClientClosersPage();
       case 'orders':
         return const ClientOrdersPage();
+      case 'finance':
+        return const ClientFinancePage();
       case 'products':
         return const ClientProductsPage();
       case 'dashboard':
@@ -274,6 +286,15 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
                     icon: Icons.local_shipping_rounded,
                     badge: state.totalOrdersCount > 0 ? '${state.totalOrdersCount}' : null,
                     isSelected: activeTab == 'orders',
+                    isCollapsed: isCollapsed,
+                    isDrawer: isDrawer,
+                  ),
+                  _buildNavItem(
+                    key: 'finance',
+                    title: 'Finance & Settlements',
+                    icon: Icons.account_balance_wallet_rounded,
+                    badge: state.activeFinanceSummary.awaitingRemittance > 0 ? 'Ready' : null,
+                    isSelected: activeTab == 'finance',
                     isCollapsed: isCollapsed,
                     isDrawer: isDrawer,
                   ),
@@ -454,6 +475,8 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
         return 'Closers & Telesales Team';
       case 'orders':
         return isCloser ? 'Booked Orders Pipeline' : 'Deliveries & Customer Orders';
+      case 'finance':
+        return 'Finance & Settlements Command';
       case 'products':
         return 'Product Catalog & Deals';
       case 'dashboard':

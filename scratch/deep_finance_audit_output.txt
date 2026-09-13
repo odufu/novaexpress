@@ -1,0 +1,313 @@
+=================================================================
+1. REMOTE SUPABASE FINANCIAL SCHEMA INSPECTION (qpcafevjsrbauweuiiyq)
+=================================================================
+
+TABLE: public.remittances NOT FOUND IN OPENAPI!
+
+TABLE: public.rider_transactions (11 columns)
+   amount                        : number           | NOT NULL
+   category                      : string           | NOT NULL
+   created_at                    : string           | NULLABLE DEFAULT now()
+   delivery_agent_id             : string           | NOT NULL [FK: Note:
+This is a Foreign Key to `delivery_agents.id`.<fk table='delivery_agents' column='id'/>]
+   description                   : string           | NULLABLE
+   id                            : string           | NOT NULL DEFAULT gen_random_uuid()
+   is_credit                     : boolean          | NOT NULL DEFAULT True
+   reference                     : string           | NOT NULL
+   status                        : string           | NOT NULL DEFAULT settled
+   title                         : string           | NOT NULL
+   transaction_code              : string           | NOT NULL
+
+TABLE: public.client_settlements (25 columns)
+   charges_breakdown             : jsonb            | NULLABLE
+   client_id                     : string           | NOT NULL [FK: Note:
+This is a Foreign Key to `clients.id`.<fk table='clients' column='id'/>]
+   company_id                    : string           | NULLABLE [FK: Note:
+This is a Foreign Key to `companies.id`.<fk table='companies' column='id'/>]
+   created_at                    : string           | NULLABLE DEFAULT now()
+   destination_account_name      : string           | NULLABLE
+   destination_account_number    : string           | NULLABLE
+   destination_bank_name         : string           | NULLABLE
+   distribution_center_id        : string           | NULLABLE [FK: Note:
+This is a Foreign Key to `distribution_centers.id`.<fk table='distribution_centers' column='id'/>]
+   failed_attempt_fees_deducted  : number           | NULLABLE DEFAULT 0.0
+   gateway_fees_deducted         : number           | NULLABLE DEFAULT 0.0
+   gross_collections             : number           | NOT NULL DEFAULT 0.0
+   id                            : string           | NOT NULL DEFAULT gen_random_uuid()
+   logistics_fees_deducted       : number           | NOT NULL DEFAULT 0.0
+   net_payout_amount             : number           | NOT NULL DEFAULT 0.0
+   notes                         : string           | NULLABLE
+   other_charges_deducted        : number           | NULLABLE DEFAULT 0.0
+   payout_reference              : string           | NULLABLE
+   period_end                    : string           | NULLABLE
+   period_start                  : string           | NULLABLE
+   platform_fees_deducted        : number           | NULLABLE DEFAULT 0.0
+   proof_of_payment_url          : string           | NULLABLE
+   settled_at                    : string           | NULLABLE DEFAULT now()
+   settlement_number             : string           | NOT NULL
+   status                        : string           | NULLABLE DEFAULT completed
+   total_orders_count            : integer          | NOT NULL DEFAULT 0
+
+TABLE: public.dc_finance_settings (19 columns)
+   created_at                    : string           | NULLABLE DEFAULT now()
+   daily_settlement_cutoff_time  : string           | NULLABLE DEFAULT 22:00
+   default_client_delivery_fee   : number           | NULLABLE DEFAULT 3500.0
+   default_commission_rate       : number           | NOT NULL DEFAULT 1000.0
+   default_failed_delivery_allowance: number           | NOT NULL DEFAULT 500.0
+   default_transport_allowance   : number           | NOT NULL DEFAULT 1500.0
+   distribution_center_id        : string           | NULLABLE
+   failed_order_charge           : number           | NULLABLE DEFAULT 500.0
+   id                            : string           | NOT NULL
+   is_pos_fee_reimbursable       : boolean          | NOT NULL DEFAULT True
+   paystack_fee_absorbed_by      : string           | NULLABLE DEFAULT merchant
+   platform_fee_type             : string           | NULLABLE DEFAULT flat
+   platform_fee_value            : number           | NULLABLE DEFAULT 500.0
+   pos_charge_mode               : string           | NOT NULL DEFAULT tiered
+   pos_flat_rate                 : number           | NOT NULL DEFAULT 100.0
+   pos_max_cap_fee               : number           | NOT NULL DEFAULT 1000.0
+   pos_tier_amount               : number           | NOT NULL DEFAULT 10000.0
+   pos_tier_fee                  : number           | NOT NULL DEFAULT 150.0
+   updated_at                    : string           | NULLABLE DEFAULT now()
+
+TABLE: public.delivery_agents (35 columns)
+   agent_code                    : string           | NOT NULL
+   assigned_zones                : array            | NULLABLE
+   bank_account_name             : string           | NULLABLE
+   bank_account_number           : string           | NULLABLE
+   bank_name                     : string           | NULLABLE
+   base_salary                   : number           | NULLABLE DEFAULT 0.0
+   commission_rate               : number           | NULLABLE DEFAULT 1000.0
+   compensation_type             : string           | NULLABLE DEFAULT commission
+   covered_lgas                  : jsonb            | NULLABLE
+   created_at                    : string           | NULLABLE DEFAULT now()
+   current_cod_balance           : number           | NULLABLE DEFAULT 0.0
+   current_latitude              : number           | NULLABLE
+   current_longitude             : number           | NULLABLE
+   current_status                : string           | NULLABLE DEFAULT available
+   direct_transfer_balance       : number           | NULLABLE DEFAULT 0.0
+   distribution_center_id        : string           | NULLABLE [FK: Note:
+This is a Foreign Key to `distribution_centers.id`.<fk table='distribution_centers' column='id'/>]
+   failed_delivery_allowance     : number           | NULLABLE DEFAULT 500.0
+   fuel_allowance                : number           | NULLABLE DEFAULT 800.0
+   guarantor_name                : string           | NULLABLE DEFAULT 
+   guarantor_phone               : string           | NULLABLE DEFAULT 
+   id                            : string           | NOT NULL DEFAULT gen_random_uuid()
+   is_active                     : boolean          | NULLABLE DEFAULT True
+   is_on_duty                    : boolean          | NULLABLE DEFAULT True
+   last_location_update          : string           | NULLABLE
+   last_sync_at                  : string           | NULLABLE DEFAULT now()
+   max_active_orders             : integer          | NULLABLE DEFAULT 15
+   operating_city                : string           | NOT NULL DEFAULT Wuse 2
+   operating_state               : string           | NOT NULL DEFAULT Abuja (FCT)
+   personnel_type                : string           | NULLABLE DEFAULT pda
+   transport_allowance           : number           | NULLABLE DEFAULT 1500.0
+   updated_at                    : string           | NULLABLE DEFAULT now()
+   upsell_bonus_percent          : number           | NULLABLE DEFAULT 10.0
+   user_id                       : string           | NOT NULL [FK: Note:
+This is a Foreign Key to `users.id`.<fk table='users' column='id'/>]
+   vehicle_plate_number          : string           | NULLABLE
+   vehicle_type                  : string           | NULLABLE DEFAULT motorcycle
+
+TABLE: public.clients (25 columns)
+   account_name                  : string           | NULLABLE DEFAULT Novacale Limited
+   account_number                : string           | NULLABLE DEFAULT 1012345678
+   address                       : string           | NULLABLE
+   bank_name                     : string           | NULLABLE DEFAULT Zenith Bank
+   city                          : string           | NULLABLE DEFAULT Abuja
+   closer_limit                  : integer          | NULLABLE DEFAULT 250
+   code                          : string           | NOT NULL
+   company_id                    : string           | NOT NULL [FK: Note:
+This is a Foreign Key to `companies.id`.<fk table='companies' column='id'/>]
+   company_name                  : string           | NULLABLE
+   contact_person                : string           | NULLABLE
+   created_at                    : string           | NULLABLE DEFAULT now()
+   custom_delivery_fee           : number           | NULLABLE
+   custom_failed_attempt_fee     : number           | NULLABLE
+   custom_platform_fee           : number           | NULLABLE
+   email                         : string           | NULLABLE
+   id                            : string           | NOT NULL DEFAULT gen_random_uuid()
+   is_active                     : boolean          | NULLABLE DEFAULT True
+   is_enterprise                 : boolean          | NULLABLE DEFAULT True
+   name                          : string           | NOT NULL
+   phone                         : string           | NULLABLE
+   settlement_day                : string           | NULLABLE DEFAULT Friday
+   settlement_frequency          : string           | NULLABLE DEFAULT weekly
+   state                         : string           | NULLABLE DEFAULT Federal Capital Territory
+   tier                          : string           | NULLABLE DEFAULT enterprise
+   total_closers_count           : integer          | NULLABLE DEFAULT 0
+
+TABLE: public.orders (63 columns)
+   agent_entitlement             : number           | NULLABLE
+   assigned_agent_id             : string           | NULLABLE [FK: Note:
+This is a Foreign Key to `delivery_agents.id`.<fk table='delivery_agents' column='id'/>]
+   assignment_status             : string           | NULLABLE DEFAULT auto_assigned
+   base_price                    : number           | NOT NULL DEFAULT 0.0
+   client_company                : string           | NULLABLE DEFAULT Novacale Limited
+   client_delivery_fee           : number           | NULLABLE
+   client_id                     : string           | NULLABLE [FK: Note:
+This is a Foreign Key to `clients.id`.<fk table='clients' column='id'/>]
+   client_name                   : string           | NULLABLE DEFAULT Novacale Limited
+   closer_code                   : string           | NULLABLE
+   closer_id                     : string           | NULLABLE
+   closer_name                   : string           | NULLABLE
+   company_id                    : string           | NOT NULL [FK: Note:
+This is a Foreign Key to `companies.id`.<fk table='companies' column='id'/>]
+   created_at                    : string           | NULLABLE DEFAULT now()
+   customer_alt_phone            : string           | NULLABLE
+   customer_name                 : string           | NOT NULL
+   customer_phone                : string           | NOT NULL
+   delivered_at                  : string           | NULLABLE
+   delivery_address              : string           | NOT NULL
+   delivery_agent_id             : string           | NULLABLE [FK: Note:
+This is a Foreign Key to `delivery_agents.id`.<fk table='delivery_agents' column='id'/>]
+   delivery_city                 : string           | NOT NULL
+   delivery_lga                  : string           | NULLABLE
+   delivery_method               : string           | NULLABLE DEFAULT cash
+   delivery_notes                : string           | NULLABLE
+   delivery_state                : string           | NOT NULL
+   distribution_center_id        : string           | NULLABLE [FK: Note:
+This is a Foreign Key to `distribution_centers.id`.<fk table='distribution_centers' column='id'/>]
+   financial_settlement_status   : string           | NULLABLE DEFAULT pending_remittance
+   free_quantity                 : integer          | NOT NULL DEFAULT 0
+   fulfillment_type              : string           | NOT NULL DEFAULT distributed_inventory
+   geocoded_address              : string           | NULLABLE
+   geocoding_status              : string           | NULLABLE DEFAULT pending
+   id                            : string           | NOT NULL DEFAULT gen_random_uuid()
+   is_location_verified          : boolean          | NULLABLE DEFAULT False
+   landmark                      : string           | NULLABLE
+   latitude                      : number           | NULLABLE
+   lead_id                       : string           | NULLABLE
+   lga                           : string           | NULLABLE
+   location_confidence           : number           | NULLABLE DEFAULT 0.0
+   longitude                     : number           | NULLABLE
+   order_number                  : string           | NOT NULL
+   original_client_id            : string           | NULLABLE [FK: Note:
+This is a Foreign Key to `clients.id`.<fk table='clients' column='id'/>]
+   original_client_name          : string           | NULLABLE
+   ownership_transfer_reason     : string           | NULLABLE
+   ownership_transferred_at      : string           | NULLABLE
+   package_deal_id               : string           | NULLABLE
+   package_deal_name             : string           | NULLABLE
+   paid_quantity                 : integer          | NOT NULL DEFAULT 1
+   payment_status                : string           | NOT NULL DEFAULT pending
+   payment_type                  : string           | NOT NULL DEFAULT pay_on_delivery
+   product_id                    : string           | NULLABLE [FK: Note:
+This is a Foreign Key to `products.id`.<fk table='products' column='id'/>]
+   product_name                  : string           | NULLABLE
+   product_sku                   : string           | NULLABLE
+   proof_of_delivery_url         : string           | NULLABLE
+   quantity                      : integer          | NOT NULL DEFAULT 1
+   remittance_reference          : string           | NULLABLE
+   remittance_status             : string           | NULLABLE DEFAULT unremitted
+   remitted_at                   : string           | NULLABLE
+   reschedule_note               : string           | NULLABLE
+   routing_notes                 : string           | NULLABLE
+   scheduled_callback_at         : string           | NULLABLE
+   status                        : string           | NOT NULL DEFAULT in_transit
+   total_amount                  : number           | NOT NULL DEFAULT 0.0
+   updated_at                    : string           | NULLABLE DEFAULT now()
+   upsell_amount                 : number           | NOT NULL DEFAULT 0.0
+
+TABLE: public.companies (10 columns)
+   address                       : string           | NULLABLE
+   code                          : string           | NOT NULL
+   created_at                    : string           | NULLABLE DEFAULT now()
+   currency                      : string           | NULLABLE DEFAULT NGN
+   email                         : string           | NULLABLE
+   id                            : string           | NOT NULL DEFAULT gen_random_uuid()
+   is_active                     : boolean          | NULLABLE DEFAULT True
+   name                          : string           | NOT NULL
+   phone                         : string           | NULLABLE
+   updated_at                    : string           | NULLABLE DEFAULT now()
+
+TABLE: public.payment_gateways NOT FOUND IN OPENAPI!
+
+=================================================================
+2. REMOTE SUPABASE FINANCIAL DATA & LIVE ROWS AUDIT
+=================================================================
+
+[TABLE remittances] ERROR: HTTP 404: {"code":"PGRST205","details":null,"hint":"Perhaps you meant the table 'public.cash_remittances'","message":"Could not find the table 'public.remittances' in the schema cache"}
+
+[TABLE rider_transactions] Total Rows in DB: 7
+   Row 1: {'id': '945c5399-c35a-49b7-8940-360f32e1ed39', 'delivery_agent_id': 'efcf71a2-486c-455d-bf38-66f088f443c6', 'transaction_code': 'TXN-347098', 'title': 'Direct Transfer Delivery Credited', 'category': 'direct_transfer', 'amount': 2500.0, 'is_credit': True, 'reference': 'TRK-7609', 'status': 'settled', 'description': 'Commission (₦1000) + Transport Allowance (₦1500) credited to My Balance from direct company transfer.', 'created_at': '2026-09-08T05:12:27.098+00:00'}
+   Row 2: {'id': 'b3edb883-3ece-4fe5-8f6a-531a66c803c2', 'delivery_agent_id': 'efcf71a2-486c-455d-bf38-66f088f443c6', 'transaction_code': 'PSTK-RMT-PDA7454-384865', 'title': 'Paystack Remittance Verified', 'category': 'remittance', 'amount': 49900.0, 'is_credit': False, 'reference': 'PSTK-RMT-PDA7454-384865', 'status': 'verified', 'description': 'Instant cash remittance of ₦49900.00 verified via Paystack.', 'created_at': '2026-09-08T06:13:14.175+00:00'}
+   Row 3: {'id': '54e870bd-9179-4946-a490-65f9fc3e8a5d', 'delivery_agent_id': 'efcf71a2-486c-455d-bf38-66f088f443c6', 'transaction_code': 'PSTK-RMT-PDA7000-420083', 'title': 'Paystack Remittance Verified', 'category': 'remittance', 'amount': 146500.0, 'is_credit': False, 'reference': 'PSTK-RMT-PDA7000-420083', 'status': 'verified', 'description': 'Instant cash remittance of ₦146500.00 verified via Paystack.', 'created_at': '2026-09-08T10:24:05.646+00:00'}
+   Row 4: {'id': '77607287-828c-48aa-a29e-bdeaa5883297', 'delivery_agent_id': 'efcf71a2-486c-455d-bf38-66f088f443c6', 'transaction_code': 'PSTK-RMT-PDA7000-539200', 'title': 'Paystack Remittance Verified', 'category': 'remittance', 'amount': 51600.0, 'is_credit': False, 'reference': 'PSTK-RMT-PDA7000-539200', 'status': 'verified', 'description': 'Instant cash remittance of ₦51600.00 verified via Paystack.', 'created_at': '2026-09-10T14:57:23.217+00:00'}
+   Row 5: {'id': '5a2d4269-6dbd-43ba-81bc-de4043548a5f', 'delivery_agent_id': 'efcf71a2-486c-455d-bf38-66f088f443c6', 'transaction_code': 'PSTK-RMT-PDA7000-525603', 'title': 'Paystack Remittance Verified', 'category': 'remittance', 'amount': 51600.0, 'is_credit': False, 'reference': 'PSTK-RMT-PDA7000-525603', 'status': 'verified', 'description': 'Instant cash remittance of ₦51600.00 verified via Paystack.', 'created_at': '2026-09-10T14:57:31.48+00:00'}
+
+[TABLE client_settlements] Total Rows in DB: 1
+   Row 1: {'id': '55555555-5555-4555-8555-555555555551', 'settlement_number': 'SETTLE-NOV-2026-001', 'client_id': '33333333-3333-4333-8333-333333333333', 'company_id': '11111111-1111-4111-8111-111111111111', 'period_start': '2026-09-04T11:24:01.111274+00:00', 'period_end': '2026-09-10T11:24:01.111274+00:00', 'total_orders_count': 6, 'gross_collections': 320000.0, 'logistics_fees_deducted': 30000.0, 'net_payout_amount': 290000.0, 'destination_bank_name': 'Zenith Bank', 'destination_account_number': '1012345678', 'destination_account_name': 'Novacale Limited', 'payout_reference': 'NIP-TXN-984210984', 'proof_of_payment_url': None, 'status': 'completed', 'notes': 'Batch 01 settlement paid out via Zenith NIP to Novacale Limited corporate account.', 'settled_at': '2026-09-10T11:24:01.111274+00:00', 'created_at': '2026-09-11T11:24:01.111274+00:00', 'distribution_center_id': None, 'platform_fees_deducted': 0.0, 'gateway_fees_deducted': 0.0, 'failed_attempt_fees_deducted': 0.0, 'other_charges_deducted': 0.0, 'charges_breakdown': {}}
+
+[TABLE dc_finance_settings] Total Rows in DB: 1
+   Row 1: {'id': 'global_finance_config', 'distribution_center_id': None, 'pos_charge_mode': 'tiered', 'pos_tier_amount': 10000.0, 'pos_tier_fee': 150.0, 'pos_flat_rate': 100.0, 'pos_max_cap_fee': 1000.0, 'is_pos_fee_reimbursable': True, 'default_commission_rate': 1000.0, 'default_transport_allowance': 1500.0, 'default_failed_delivery_allowance': 500.0, 'created_at': '2026-09-07T15:14:28.166538+00:00', 'updated_at': '2026-09-07T15:14:28.166538+00:00', 'default_client_delivery_fee': 3500.0, 'platform_fee_type': 'flat', 'platform_fee_value': 500.0, 'paystack_fee_absorbed_by': 'merchant', 'failed_order_charge': 500.0, 'daily_settlement_cutoff_time': '22:00'}
+
+[TABLE delivery_agents] Total Rows in DB: 6
+   Row 1: {'id': 'b1111111-1111-4111-8111-111111111111', 'user_id': 'a1111111-1111-4111-8111-111111111111', 'distribution_center_id': '22222222-2222-4222-8222-222222222222', 'agent_code': 'PDA-7000', 'vehicle_type': 'motorcycle', 'vehicle_plate_number': 'ABJ-789-XY', 'operating_state': 'Abuja (FCT)', 'operating_city': 'Wuse 2', 'current_status': 'available', 'current_cod_balance': 53400.0, 'direct_transfer_balance': 18500.0, 'bank_name': 'Zenith Bank', 'bank_account_number': '0123456789', 'bank_account_name': 'Emeka Rider', 'is_active': True, 'last_sync_at': '2026-09-07T15:14:11.538215+00:00', 'created_at': '2026-09-07T15:14:11.538215+00:00', 'updated_at': '2026-09-07T15:14:11.538215+00:00', 'current_latitude': 9.0765, 'current_longitude': 7.4832, 'last_location_update': '2026-09-07T15:14:18.115316+00:00', 'is_on_duty': True, 'max_active_orders': 15, 'assigned_zones': [], 'personnel_type': 'pda', 'compensation_type': 'commission', 'commission_rate': 1000.0, 'transport_allowance': 1500.0, 'fuel_allowance': 800.0, 'failed_delivery_allowance': 500.0, 'base_salary': 0.0, 'upsell_bonus_percent': 10.0, 'covered_lgas': [], 'guarantor_name': '', 'guarantor_phone': ''}
+   Row 2: {'id': 'cd6b53b0-5203-48f3-ae9b-81c6a0e9e5f3', 'user_id': '4f25fbdc-5a9a-4b2d-80f3-11141bd09ae3', 'distribution_center_id': '00000000-0000-4000-8000-788825051520', 'agent_code': 'PDA-7437', 'vehicle_type': 'Motorcycle', 'vehicle_plate_number': 'ABJ-304-XY', 'operating_state': 'Abuja (FCT)', 'operating_city': 'Ado', 'current_status': 'available', 'current_cod_balance': 0.0, 'direct_transfer_balance': 0.0, 'bank_name': 'OPay', 'bank_account_number': '8085040146', 'bank_account_name': 'Joel Odufu', 'is_active': True, 'last_sync_at': '2026-09-08T01:49:33.771374+00:00', 'created_at': '2026-09-08T01:49:33.771374+00:00', 'updated_at': '2026-09-08T01:49:33.771374+00:00', 'current_latitude': None, 'current_longitude': None, 'last_location_update': None, 'is_on_duty': True, 'max_active_orders': 15, 'assigned_zones': [], 'personnel_type': 'pda', 'compensation_type': 'commission', 'commission_rate': 700, 'transport_allowance': 2300, 'fuel_allowance': 800.0, 'failed_delivery_allowance': 123, 'base_salary': 120000, 'upsell_bonus_percent': 10.0, 'covered_lgas': ['Ado', 'Agatu', 'Apa', 'Buruku', 'Gboko', 'Guma', 'Gwer East', 'Katsina-Ala', 'Konshisha', 'Kwande', 'Makurdi', 'Obi', 'Ogbadibo', 'Ohimini', 'Okpokwu', 'Tarka', 'Ushongo', 'Vandeikya', 'Otukpo'], 'guarantor_name': '', 'guarantor_phone': ''}
+   Row 3: {'id': 'e4f3b2f4-963a-48a8-879d-c108de780303', 'user_id': '7d5117ad-dee3-4fe4-a133-1fb014366fd8', 'distribution_center_id': '00000000-0000-4000-8000-788825051520', 'agent_code': 'RDR-351', 'vehicle_type': 'Motorcycle', 'vehicle_plate_number': 'ABJ-304-XY', 'operating_state': 'Abuja (FCT)', 'operating_city': 'Ado', 'current_status': 'available', 'current_cod_balance': 0.0, 'direct_transfer_balance': 0.0, 'bank_name': 'Kuda Microfinance Bank', 'bank_account_number': '2019847291', 'bank_account_name': 'Emmanuel odufu', 'is_active': True, 'last_sync_at': '2026-09-08T02:30:47.196553+00:00', 'created_at': '2026-09-08T02:30:47.196553+00:00', 'updated_at': '2026-09-08T02:30:47.196553+00:00', 'current_latitude': None, 'current_longitude': None, 'last_location_update': None, 'is_on_duty': True, 'max_active_orders': 15, 'assigned_zones': [], 'personnel_type': 'pda', 'compensation_type': 'commission', 'commission_rate': 1000.0, 'transport_allowance': 1500.0, 'fuel_allowance': 800.0, 'failed_delivery_allowance': 500.0, 'base_salary': 0.0, 'upsell_bonus_percent': 10.0, 'covered_lgas': [], 'guarantor_name': '', 'guarantor_phone': ''}
+   Row 4: {'id': 'efcf71a2-486c-455d-bf38-66f088f443c6', 'user_id': '262a7b3e-842f-46fc-8a40-3d55dd525cc8', 'distribution_center_id': '00000000-0000-4000-8000-788825051520', 'agent_code': 'PDA-7454', 'vehicle_type': 'Motorcycle', 'vehicle_plate_number': 'ABJ-304-XY', 'operating_state': 'Abuja (FCT)', 'operating_city': 'Agatu', 'current_status': 'available', 'current_cod_balance': 247200.0, 'direct_transfer_balance': 2500.0, 'bank_name': 'OPay', 'bank_account_number': '8086050434', 'bank_account_name': 'Daniel Anyanwu', 'is_active': True, 'last_sync_at': '2026-09-08T02:38:48.666955+00:00', 'created_at': '2026-09-08T02:38:48.666955+00:00', 'updated_at': '2026-09-08T02:38:48.666955+00:00', 'current_latitude': None, 'current_longitude': None, 'last_location_update': None, 'is_on_duty': True, 'max_active_orders': 15, 'assigned_zones': [], 'personnel_type': 'pda', 'compensation_type': 'commission', 'commission_rate': 1000.0, 'transport_allowance': 1500.0, 'fuel_allowance': 800.0, 'failed_delivery_allowance': 500.0, 'base_salary': 0.0, 'upsell_bonus_percent': 10.0, 'covered_lgas': [], 'guarantor_name': '', 'guarantor_phone': ''}
+   Row 5: {'id': '1dc54867-8334-4f53-a3f0-f2247daf6ada', 'user_id': 'c5367e77-075f-49e7-bc50-e4268895d4db', 'distribution_center_id': '00000000-0000-4000-8000-788825051520', 'agent_code': 'PDA-7802', 'vehicle_type': 'Motorcycle', 'vehicle_plate_number': 'ABJ-304-XY', 'operating_state': 'Abuja (FCT)', 'operating_city': 'Ado', 'current_status': 'available', 'current_cod_balance': 51400.0, 'direct_transfer_balance': 0.0, 'bank_name': 'OPay', 'bank_account_number': '808504014', 'bank_account_name': 'Shalom Samson', 'is_active': True, 'last_sync_at': '2026-09-10T15:02:23.563+00:00', 'created_at': '2026-09-10T14:01:17.450517+00:00', 'updated_at': '2026-09-10T14:01:17.450517+00:00', 'current_latitude': None, 'current_longitude': None, 'last_location_update': None, 'is_on_duty': True, 'max_active_orders': 15, 'assigned_zones': [], 'personnel_type': 'pda', 'compensation_type': 'commission', 'commission_rate': 1000.0, 'transport_allowance': 1500.0, 'fuel_allowance': 800.0, 'failed_delivery_allowance': 500.0, 'base_salary': 0.0, 'upsell_bonus_percent': 10.0, 'covered_lgas': [], 'guarantor_name': '', 'guarantor_phone': ''}
+
+[TABLE clients] Total Rows in DB: 5
+   Row 1: {'id': 'c1111111-1111-4111-8111-111111111111', 'company_id': '11111111-1111-4111-8111-111111111111', 'name': 'Novacare Limited', 'code': 'NOVACARE', 'contact_person': 'Dr. Kalu Okonkwo', 'phone': '+2348039998877', 'email': 'orders@novacare.ng', 'created_at': '2026-09-07T15:14:11.538215+00:00', 'company_name': None, 'address': None, 'city': 'Abuja', 'state': 'Federal Capital Territory', 'is_active': True, 'tier': 'enterprise', 'closer_limit': 250, 'is_enterprise': True, 'total_closers_count': 0, 'bank_name': 'Zenith Bank', 'account_number': '1012345678', 'account_name': 'Novacale Limited', 'settlement_frequency': 'weekly', 'settlement_day': 'Friday', 'custom_delivery_fee': None, 'custom_platform_fee': None, 'custom_failed_attempt_fee': None}
+   Row 2: {'id': '33333333-3333-4333-8333-333333333333', 'company_id': '11111111-1111-4111-8111-111111111111', 'name': 'Novacale Limited', 'code': 'CLI-NOVACALE-01', 'contact_person': 'Dr. Chuka Okafor', 'phone': '08034455667', 'email': 'client.novacale@novaexpress.ng', 'created_at': '2026-09-07T15:14:29.254809+00:00', 'company_name': 'Novacale Limited', 'address': 'Plot 12, Commercial Avenue, Central Business District, Abuja', 'city': 'Abuja', 'state': 'Federal Capital Territory', 'is_active': True, 'tier': 'enterprise', 'closer_limit': 250, 'is_enterprise': True, 'total_closers_count': 0, 'bank_name': 'Zenith Bank', 'account_number': '1012345678', 'account_name': 'Novacale Limited', 'settlement_frequency': 'weekly', 'settlement_day': 'Friday', 'custom_delivery_fee': None, 'custom_platform_fee': None, 'custom_failed_attempt_fee': None}
+   Row 3: {'id': '00000000-0000-4000-8000-789146682033', 'company_id': '11111111-1111-4111-8111-111111111111', 'name': 'Leafora Limited', 'code': 'CLI-LL-498', 'contact_person': 'Joel Odufu', 'phone': '08085040146', 'email': 'joel.odufu@gmail.com', 'created_at': '2026-09-11T17:11:23.521215+00:00', 'company_name': 'Leafora Limited', 'address': 'FO1, Back of Sure Start', 'city': 'Abuja', 'state': 'FCT - Abuja', 'is_active': True, 'tier': 'enterprise', 'closer_limit': 250, 'is_enterprise': True, 'total_closers_count': 0, 'bank_name': 'Zenith Bank', 'account_number': '1012345678', 'account_name': 'Novacale Limited', 'settlement_frequency': 'weekly', 'settlement_day': 'Friday', 'custom_delivery_fee': None, 'custom_platform_fee': None, 'custom_failed_attempt_fee': None}
+   Row 4: {'id': '00000000-0000-4000-8000-789183072480', 'company_id': '11111111-1111-4111-8111-111111111111', 'name': 'G-World Super Market', 'code': 'CLI-GS-494', 'contact_person': 'samuel jackson', 'phone': '08085040143', 'email': 'samuel.jackson@gmail.com', 'created_at': '2026-09-12T03:17:54.913098+00:00', 'company_name': 'G-World Super Market', 'address': '12th sabath street', 'city': 'Abuja', 'state': 'FCT - Abuja', 'is_active': True, 'tier': 'enterprise', 'closer_limit': 250, 'is_enterprise': True, 'total_closers_count': 0, 'bank_name': 'Zenith Bank', 'account_number': '1012345678', 'account_name': 'Novacale Limited', 'settlement_frequency': 'weekly', 'settlement_day': 'Friday', 'custom_delivery_fee': None, 'custom_platform_fee': None, 'custom_failed_attempt_fee': None}
+   Row 5: {'id': '00000000-0000-4000-8000-789210136365', 'company_id': '11111111-1111-4111-8111-111111111111', 'name': 'COK Best Mall', 'code': 'CLI-CB-614', 'contact_person': 'Christopher Adori', 'phone': '08085040345', 'email': 'christopher.adori@gmail.com', 'created_at': '2026-09-12T10:48:58.73249+00:00', 'company_name': 'COK Best Mall', 'address': 'Arab Raod, kubwa', 'city': 'Abuja', 'state': 'FCT - Abuja', 'is_active': True, 'tier': 'enterprise', 'closer_limit': 250, 'is_enterprise': True, 'total_closers_count': 0, 'bank_name': 'Zenith Bank', 'account_number': '1012345678', 'account_name': 'Novacale Limited', 'settlement_frequency': 'weekly', 'settlement_day': 'Friday', 'custom_delivery_fee': None, 'custom_platform_fee': None, 'custom_failed_attempt_fee': None}
+
+[TABLE orders] Total Rows in DB: 10
+   Row 1: {'id': 'd0ed71eb-a7c4-4de4-9a63-7fad0811736c', 'company_id': '11111111-1111-4111-8111-111111111111', 'order_number': 'NOV-2026-2045', 'delivery_agent_id': None, 'distribution_center_id': '00000000-0000-4000-8000-788825051520', 'client_id': '00000000-0000-4000-8000-789183072480', 'customer_name': 'Joel Odufu', 'customer_phone': '08085040146', 'customer_alt_phone': None, 'delivery_state': 'Benue', 'delivery_city': 'Otukpo', 'delivery_address': 'Back of hakimi palace', 'landmark': None, 'lga': 'Otukpo', 'latitude': None, 'longitude': None, 'fulfillment_type': 'client_package', 'product_id': 'fcbe3506-a52b-423c-8ba4-e94f17f1a8c5', 'product_name': 'G-World Hot Tea', 'quantity': 1, 'paid_quantity': 1, 'free_quantity': 0, 'base_price': 23000.0, 'upsell_amount': 0.0, 'total_amount': 23000.0, 'payment_type': 'pay_on_delivery', 'payment_status': 'pending', 'status': 'pending_dispatch', 'delivery_method': 'cash', 'client_delivery_fee': 5000.0, 'agent_entitlement': 2500.0, 'scheduled_callback_at': None, 'reschedule_note': None, 'proof_of_delivery_url': None, 'delivery_notes': '[PACKAGE_DEAL: {"id": "pkg-sku-prd-1379-3", "name": "G-World Hot Tea 3-Pack Value Deal", "quantity": 3, "price": 55200}]', 'created_at': '2026-09-12T04:23:40.303+00:00', 'updated_at': '2026-09-13T14:57:32.563468+00:00', 'geocoding_status': 'pending', 'geocoded_address': None, 'location_confidence': 0, 'is_location_verified': False, 'delivery_lga': 'Otukpo', 'assignment_status': 'pending_rider_assignment', 'routing_notes': '⚠️ Routed to Otukpo DC. Awaiting manual rider assignment for LGA: "Otukpo".', 'closer_id': None, 'closer_name': None, 'closer_code': None, 'lead_id': None, 'assigned_agent_id': None, 'remittance_status': 'unremitted', 'financial_settlement_status': 'pending_remittance', 'remittance_reference': None, 'remitted_at': None, 'delivered_at': None, 'product_sku': 'SKU-PRD-1379', 'package_deal_id': 'pkg-sku-prd-1379-1', 'package_deal_name': '1 Unit (Single)', 'client_name': 'G-World Super Market', 'client_company': 'G-World Super Market', 'original_client_id': '00000000-0000-4000-8000-789183072480', 'original_client_name': 'Novacare Limited', 'ownership_transferred_at': '2026-09-13T14:57:32.563468+00:00', 'ownership_transfer_reason': 'Testing strict package deal price locking by DC Operations'}
+   Row 2: {'id': '3dbe8d4c-cd78-443e-92ec-44b2d6efdbf0', 'company_id': '11111111-1111-4111-8111-111111111111', 'order_number': 'TRK-7954', 'delivery_agent_id': 'efcf71a2-486c-455d-bf38-66f088f443c6', 'distribution_center_id': '00000000-0000-4000-8000-788825051520', 'client_id': '33333333-3333-4333-8333-333333333333', 'customer_name': 'Samuel Agaleru', 'customer_phone': '08076756756', 'customer_alt_phone': None, 'delivery_state': 'Benue', 'delivery_city': 'Otukpo', 'delivery_address': 'hkkiwons', 'landmark': None, 'lga': 'Otukpo', 'latitude': None, 'longitude': None, 'fulfillment_type': 'distributed_inventory', 'product_id': '8d090a27-81d2-42b5-9ee5-9d0e4f695415', 'product_name': 'Grazer Herbal Detox Tea (Grazer Herbal Detox Tea 3-Pack Value Deal)', 'quantity': 3, 'paid_quantity': 3, 'free_quantity': 0, 'base_price': 50000.0, 'upsell_amount': 0.0, 'total_amount': 50000.0, 'payment_type': 'pay_on_delivery', 'payment_status': 'remitted', 'status': 'delivered', 'delivery_method': 'cash', 'client_delivery_fee': 5000.0, 'agent_entitlement': 2500.0, 'scheduled_callback_at': None, 'reschedule_note': None, 'proof_of_delivery_url': None, 'delivery_notes': '[POD Collected via Cash • Gate PIN: GT-7954 • GPS Proof: 9.07650°, 7.48320° (±4.5m)] Cash in custody. [REMITTED: PSTK-RMT-PDA7000-420083 | Amount: ₦146500]', 'created_at': '2026-09-08T09:39:24.955+00:00', 'updated_at': '2026-09-08T10:24:02.902+00:00', 'geocoding_status': 'pending', 'geocoded_address': None, 'location_confidence': 0, 'is_location_verified': False, 'delivery_lga': None, 'assignment_status': 'pending_rider_assignment', 'routing_notes': '⚠️ Routed to Otukpo DC. Awaiting manual rider assignment for LGA: "Otukpo".', 'closer_id': None, 'closer_name': None, 'closer_code': None, 'lead_id': None, 'assigned_agent_id': 'efcf71a2-486c-455d-bf38-66f088f443c6', 'remittance_status': 'remitted', 'financial_settlement_status': 'cash_remitted_verified', 'remittance_reference': 'SETTLE-NOV-2026-001', 'remitted_at': '2026-09-08T10:24:02.902+00:00', 'delivered_at': '2026-09-08T10:24:02.902+00:00', 'product_sku': None, 'package_deal_id': None, 'package_deal_name': None, 'client_name': 'Novacale Limited', 'client_company': 'Novacale Limited', 'original_client_id': None, 'original_client_name': None, 'ownership_transferred_at': None, 'ownership_transfer_reason': None}
+   Row 3: {'id': '53423457-7a74-45a5-80df-4d75d98ee974', 'company_id': '11111111-1111-4111-8111-111111111111', 'order_number': 'NOV-2026-7062', 'delivery_agent_id': 'a9282b2a-8c02-4f64-aa01-373f5983d12d', 'distribution_center_id': '00000000-0000-4000-8000-788889180011', 'client_id': '00000000-0000-4000-8000-789210136365', 'customer_name': 'Samson Joel', 'customer_phone': '08085040146', 'customer_alt_phone': None, 'delivery_state': 'Ekiti', 'delivery_city': 'Ado Ekiti', 'delivery_address': 'Kajola Ikere', 'landmark': None, 'lga': 'Ado Ekiti', 'latitude': None, 'longitude': None, 'fulfillment_type': 'client_package', 'product_id': '50facbac-0660-433d-9d66-f0be0e37cf5f', 'product_name': 'NC Pachaging', 'quantity': 5, 'paid_quantity': 5, 'free_quantity': 0, 'base_price': 55000.0, 'upsell_amount': 0.0, 'total_amount': 55000.0, 'payment_type': 'pay_on_delivery', 'payment_status': 'pending', 'status': 'in_transit', 'delivery_method': 'cash', 'client_delivery_fee': 5000.0, 'agent_entitlement': 2500.0, 'scheduled_callback_at': None, 'reschedule_note': None, 'proof_of_delivery_url': None, 'delivery_notes': '[PACKAGE_DEAL: {"id": "pkg-sku-prd-7448-5", "name": "NC Pachaging 5-Pack Mega Deal (4 + 1 Free)", "quantity": 5, "price": 55000}]', 'created_at': '2026-09-12T11:55:31.847+00:00', 'updated_at': '2026-09-12T12:02:28.668+00:00', 'geocoding_status': 'pending', 'geocoded_address': None, 'location_confidence': 0, 'is_location_verified': False, 'delivery_lga': 'Ado Ekiti', 'assignment_status': 'pending_rider_assignment', 'routing_notes': '⚠️ Routed to Ekiti State DC. Awaiting manual rider assignment for LGA: "Ado Ekiti".', 'closer_id': None, 'closer_name': None, 'closer_code': None, 'lead_id': None, 'assigned_agent_id': 'a9282b2a-8c02-4f64-aa01-373f5983d12d', 'remittance_status': 'unremitted', 'financial_settlement_status': 'pending_remittance', 'remittance_reference': None, 'remitted_at': None, 'delivered_at': None, 'product_sku': None, 'package_deal_id': 'pkg-sku-prd-7448-5', 'package_deal_name': 'NC Pachaging 5-Pack Mega Deal (4 + 1 Free)', 'client_name': 'COK Best Mall', 'client_company': 'COK Best Mall', 'original_client_id': None, 'original_client_name': None, 'ownership_transferred_at': None, 'ownership_transfer_reason': None}
+   Row 4: {'id': '57efd189-5c3a-4039-9841-bd37e4727a67', 'company_id': '11111111-1111-4111-8111-111111111111', 'order_number': 'NOV-2026-7332', 'delivery_agent_id': 'efcf71a2-486c-455d-bf38-66f088f443c6', 'distribution_center_id': '00000000-0000-4000-8000-788825051520', 'client_id': '33333333-3333-4333-8333-333333333333', 'customer_name': 'Samuel Jackson', 'customer_phone': '08085040146', 'customer_alt_phone': None, 'delivery_state': 'Benue', 'delivery_city': 'Otukpo', 'delivery_address': 'Back of redeemed church', 'landmark': None, 'lga': 'Otukpo', 'latitude': None, 'longitude': None, 'fulfillment_type': 'client_package', 'product_id': '4e52cc92-a760-4311-941c-2fdd7d9d8218', 'product_name': 'Alpha Man', 'quantity': 5, 'paid_quantity': 5, 'free_quantity': 0, 'base_price': 55000.0, 'upsell_amount': 0.0, 'total_amount': 55000.0, 'payment_type': 'pay_on_delivery', 'payment_status': 'remitted', 'status': 'delivered', 'delivery_method': 'cash', 'client_delivery_fee': 5000.0, 'agent_entitlement': 2500.0, 'scheduled_callback_at': None, 'reschedule_note': None, 'proof_of_delivery_url': 'https://qpcafevjsrbauweuiiyq.supabase.co/storage/v1/object/public/pod-proofs/pod_photo_57efd189-5c3a-4039-9841-bd37e4727a67_1788974147113.jpg', 'delivery_notes': '[POD Collected via Cash • Gate PIN: GT-7332 • GPS Proof: 9.07650°, 7.48320° (±4.5m)] Cash in custody. [REMITTED: PSTK-RMT-PDA7000-539200 | Amount: ₦51600] [REMITTED: PSTK-RMT-PDA7000-525603 | Amount: ₦51600] [REMITTED: PSTK-RMT-PDA7000-658761 | Amount: ₦51600]', 'created_at': '2026-09-09T17:59:18.001+00:00', 'updated_at': '2026-09-10T14:57:45.92+00:00', 'geocoding_status': 'pending', 'geocoded_address': None, 'location_confidence': 0, 'is_location_verified': False, 'delivery_lga': 'Otukpo', 'assignment_status': 'pending_rider_assignment', 'routing_notes': '⚠️ Routed to Otukpo DC. Awaiting manual rider assignment for LGA: "Otukpo".', 'closer_id': None, 'closer_name': None, 'closer_code': None, 'lead_id': None, 'assigned_agent_id': 'efcf71a2-486c-455d-bf38-66f088f443c6', 'remittance_status': 'remitted', 'financial_settlement_status': 'cash_remitted_verified', 'remittance_reference': 'SETTLE-NOV-2026-001', 'remitted_at': '2026-09-10T14:57:45.92+00:00', 'delivered_at': '2026-09-10T14:57:45.92+00:00', 'product_sku': None, 'package_deal_id': None, 'package_deal_name': None, 'client_name': 'Novacale Limited', 'client_company': 'Novacale Limited', 'original_client_id': None, 'original_client_name': None, 'ownership_transferred_at': None, 'ownership_transfer_reason': None}
+   Row 5: {'id': '822d2629-3cb9-409b-8548-e6e520158398', 'company_id': '11111111-1111-4111-8111-111111111111', 'order_number': 'NOV-2026-5055', 'delivery_agent_id': None, 'distribution_center_id': '00000000-0000-4000-8000-788825051520', 'client_id': '33333333-3333-4333-8333-333333333333', 'customer_name': 'Lukman Samuel', 'customer_phone': '08085040146', 'customer_alt_phone': None, 'delivery_state': 'Benue', 'delivery_city': 'Katsina-Ala', 'delivery_address': 'Back of LGEA Primary school', 'landmark': None, 'lga': 'Katsina-Ala', 'latitude': None, 'longitude': None, 'fulfillment_type': 'client_package', 'product_id': 'd4f0a76c-2393-476e-ac2c-c350f31a8a90', 'product_name': 'Respira Lungs Detox Tea', 'quantity': 2, 'paid_quantity': 2, 'free_quantity': 0, 'base_price': 36550.0, 'upsell_amount': 0.0, 'total_amount': 36550.0, 'payment_type': 'pay_on_delivery', 'payment_status': 'pending', 'status': 'pending_dispatch', 'delivery_method': 'cash', 'client_delivery_fee': 5000.0, 'agent_entitlement': 2500.0, 'scheduled_callback_at': None, 'reschedule_note': None, 'proof_of_delivery_url': None, 'delivery_notes': '[PACKAGE_DEAL: {"id": "pkg-sku-95708-2", "name": "Respira Lungs Detox Tea 2-Pack Special Deal", "quantity": 2, "price": 36550}]', 'created_at': '2026-09-10T15:23:49.26+00:00', 'updated_at': '2026-09-10T14:23:49.407354+00:00', 'geocoding_status': 'pending', 'geocoded_address': None, 'location_confidence': 0, 'is_location_verified': False, 'delivery_lga': 'Katsina-Ala', 'assignment_status': 'pending_rider_assignment', 'routing_notes': '⚠️ Routed to Otukpo DC. Awaiting manual rider assignment for LGA: "Katsina-Ala".', 'closer_id': None, 'closer_name': None, 'closer_code': None, 'lead_id': None, 'assigned_agent_id': None, 'remittance_status': 'unremitted', 'financial_settlement_status': 'pending_remittance', 'remittance_reference': None, 'remitted_at': None, 'delivered_at': None, 'product_sku': None, 'package_deal_id': None, 'package_deal_name': None, 'client_name': 'Novacale Limited', 'client_company': 'Novacale Limited', 'original_client_id': None, 'original_client_name': None, 'ownership_transferred_at': None, 'ownership_transfer_reason': None}
+
+[TABLE companies] Total Rows in DB: 1
+   Row 1: {'id': '11111111-1111-4111-8111-111111111111', 'name': 'NovaExpress Logistics Limited', 'code': 'NOVEXPS', 'email': 'operations@novaexpress.ng', 'phone': '+2348000000000', 'address': 'Plot 102 Central Business District, Abuja, Nigeria', 'currency': 'NGN', 'is_active': True, 'created_at': '2026-09-07T15:14:11.538215+00:00', 'updated_at': '2026-09-07T15:14:11.538215+00:00'}
+
+[TABLE payment_gateways] ERROR: HTTP 404: {"code":"PGRST205","details":null,"hint":"Perhaps you meant the table 'public.payout_claims'","message":"Could not find the table 'public.payment_gateways' in the schema cache"}
+
+=================================================================
+3. REMOTE FINANCIAL RPCs DETAILED PARAMETERS & RETURNS
+=================================================================
+
+RPC: calculate_remittance_transfer_fee
+   Arg: args -> {"description": "Calculates dynamic remittance transfer charge: \u20a6100 per \u20a65,000 block (e.g. \u20a65,000 -> \u20a6100, \u20a65,200 -> \u20a6200, \u20a635,000 -> \u20a6700).", "properties": {"p_amount": {"format": "numeric", "type": "number"}}, "required": ["p_amount"], "type": "object"}
+   Arg: None -> {}
+   Return 200: {}
+
+RPC: confirm_delivery_pod
+   Arg: args -> {"properties": {"p_agent_id": {"format": "uuid", "type": "string"}, "p_amount": {"format": "numeric", "type": "number"}, "p_notes": {"format": "text", "type": "string"}, "p_order_id": {"format": "uuid", "type": "string"}, "p_payment_type": {"format": "character varying", "type": "string"}, "p_proof_url": {"format": "text", "type": "string"}}, "required": ["p_order_id", "p_agent_id", "p_payment_type", "p_amount"], "type": "object"}
+   Arg: None -> {}
+   Return 200: {}
+
+RPC: decrement_driver_entitlement
+   Arg: args -> {"properties": {"p_amount": {"format": "numeric", "type": "number"}, "p_driver_id": {"format": "uuid", "type": "string"}}, "required": ["p_driver_id", "p_amount"], "type": "object"}
+   Arg: None -> {}
+   Return 200: {}
+
+RPC: fn_approve_cash_remittance
+   Arg: args -> {"properties": {"p_remittance_id": {"format": "uuid", "type": "string"}, "p_supervisor_id": {"format": "uuid", "type": "string"}}, "required": ["p_remittance_id"], "type": "object"}
+   Arg: None -> {}
+   Return 200: {}
+
+RPC: fn_calculate_merchant_asset_custody
+   Arg: args -> {"properties": {"p_client_id": {"format": "uuid", "type": "string"}, "p_dc_id": {"format": "uuid", "type": "string"}}, "required": ["p_client_id"], "type": "object"}
+   Arg: None -> {}
+   Return 200: {}
+
+RPC: fn_generate_merchant_daily_settlement
+   Arg: args -> {"properties": {"p_client_id": {"format": "uuid", "type": "string"}, "p_custom_deductions": {"format": "jsonb"}, "p_dc_id": {"format": "uuid", "type": "string"}, "p_period_end": {"format": "timestamp with time zone", "type": "string"}, "p_period_start": {"format": "timestamp with time zone", "type": "string"}}, "required": ["p_client_id", "p_dc_id", "p_period_start", "p_period_end"], "type": "object"}
+   Arg: None -> {}
+   Return 200: {}
+
+RPC: log_delivery_failure
+   Arg: args -> {"properties": {"p_agent_id": {"format": "uuid", "type": "string"}, "p_notes": {"format": "text", "type": "string"}, "p_order_id": {"format": "uuid", "type": "string"}, "p_reason_code": {"format": "character varying", "type": "string"}, "p_reschedule_time": {"format": "timestamp with time zone", "type": "string"}}, "required": ["p_order_id", "p_agent_id", "p_reason_code"], "type": "object"}
+   Arg: None -> {}
+   Return 200: {}
+
+RPC: update_driver_compensation
+   Arg: args -> {"properties": {"p_agent_id": {"format": "text", "type": "string"}, "p_base_salary": {"format": "numeric", "type": "number"}, "p_commission_rate": {"format": "numeric", "type": "number"}, "p_compensation_type": {"format": "text", "type": "string"}, "p_covered_lgas": {"format": "jsonb"}, "p_dc_id": {"format": "text", "type": "string"}, "p_failed_allowance": {"format": "numeric", "type": "number"}, "p_personnel_type": {"format": "text", "type": "string"}, "p_transport_allowance": {"format": "numeric", "type": "number"}}, "required": ["p_agent_id", "p_commission_rate", "p_transport_allowance", "p_failed_allowance", "p_base_salary", "p_personnel_type", "p_compensation_type"], "type": "object"}
+   Arg: None -> {}
+   Return 200: {}
+

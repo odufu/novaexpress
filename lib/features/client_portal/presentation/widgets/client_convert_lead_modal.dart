@@ -55,9 +55,11 @@ class _ClientConvertLeadModalState extends ConsumerState<ClientConvertLeadModal>
   }
 
   void _initProductAndPackage() {
+    final clientProducts = ref.read(clientPortalProvider).products;
     final catalog = ref.read(productCatalogProvider);
-    if (catalog.products.isNotEmpty) {
-      _selectedProduct = catalog.products.first;
+    final available = clientProducts.isNotEmpty ? clientProducts : catalog.products;
+    if (available.isNotEmpty) {
+      _selectedProduct = available.first;
       final packages = catalog.getPackagesForProduct(_selectedProduct!.name);
       if (packages.isNotEmpty) {
         // Try to match lead's packageInterest
@@ -125,9 +127,9 @@ class _ClientConvertLeadModalState extends ConsumerState<ClientConvertLeadModal>
 
       final order = await ref.read(clientPortalProvider.notifier).convertLeadToOrder(
         lead: updatedLead,
-        productId: _selectedProduct?.id ?? 'prod-grazer-01',
-        productName: _selectedProduct?.name ?? 'Grazer Tea',
-        packageName: _selectedPackage?.packageName ?? '2 Packs Promo Deal',
+        productId: _selectedProduct?.id ?? 'prod-${DateTime.now().millisecondsSinceEpoch}',
+        productName: _selectedProduct?.name ?? 'Standard Product',
+        packageName: _selectedPackage?.packageName ?? 'Standard Package Deal',
         quantity: _quantity,
         totalAmount: _price,
         paymentType: _paymentType,
@@ -395,31 +397,70 @@ class _ClientConvertLeadModalState extends ConsumerState<ClientConvertLeadModal>
                 // Product Selection with ProductImageWidget
                 Text('Ordered Product', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: const Color(0xFF334155))),
                 const SizedBox(height: 6),
-                DropdownButtonFormField<CatalogProduct>(
-                  value: _selectedProduct,
-                  isExpanded: true,
-                  items: catalog.products.map((p) {
-                    return DropdownMenuItem(
-                      value: p,
-                      child: Row(
-                        children: [
-                          ProductImageWidget(imageUrl: p.imageUrl, width: 28, height: 28, borderRadius: 6),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text('${p.name} (₦${p.defaultUnitPrice.toStringAsFixed(0)})', overflow: TextOverflow.ellipsis),
+                Builder(
+                  builder: (context) {
+                    final rawProducts = ref.watch(clientPortalProvider).products.isNotEmpty
+                        ? ref.watch(clientPortalProvider).products
+                        : catalog.products;
+
+                    final seenIds = <String>{};
+                    final seenSkus = <String>{};
+                    final distinctProducts = <CatalogProduct>[];
+                    for (final p in rawProducts) {
+                      final idKey = p.id.trim();
+                      final skuKey = p.sku.trim().toUpperCase();
+                      if (idKey.isNotEmpty && seenIds.contains(idKey)) continue;
+                      if (skuKey.isNotEmpty && seenSkus.contains(skuKey)) continue;
+                      if (idKey.isNotEmpty) seenIds.add(idKey);
+                      if (skuKey.isNotEmpty) seenSkus.add(skuKey);
+                      distinctProducts.add(p);
+                    }
+
+                    if (_selectedProduct != null) {
+                      final hasSelected = distinctProducts.any((p) => p == _selectedProduct);
+                      if (!hasSelected) {
+                        distinctProducts.insert(0, _selectedProduct!);
+                      }
+                    }
+
+                    CatalogProduct? effectiveProduct;
+                    if (_selectedProduct != null) {
+                      effectiveProduct = distinctProducts.cast<CatalogProduct?>().firstWhere(
+                        (p) => p != null && p == _selectedProduct,
+                        orElse: () => null,
+                      );
+                    }
+                    if (effectiveProduct == null && distinctProducts.isNotEmpty) {
+                      effectiveProduct = distinctProducts.first;
+                    }
+
+                    return DropdownButtonFormField<CatalogProduct>(
+                      value: effectiveProduct,
+                      isExpanded: true,
+                      items: distinctProducts.map((p) {
+                        return DropdownMenuItem<CatalogProduct>(
+                          value: p,
+                          child: Row(
+                            children: [
+                              ProductImageWidget(imageUrl: p.imageUrl, width: 28, height: 28, borderRadius: 6),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text('${p.name} (₦${p.defaultUnitPrice.toStringAsFixed(0)})', overflow: TextOverflow.ellipsis),
+                              ),
+                            ],
                           ),
-                        ],
+                        );
+                      }).toList(),
+                      onChanged: _onProductChanged,
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
                       ),
                     );
-                  }).toList(),
-                  onChanged: _onProductChanged,
-                  decoration: InputDecoration(
-                    filled: true,
-                    fillColor: const Color(0xFFF8FAFC),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-                  ),
+                  },
                 ),
                 const SizedBox(height: 14),
 
@@ -427,42 +468,63 @@ class _ClientConvertLeadModalState extends ConsumerState<ClientConvertLeadModal>
                 Text('Commercial Package Deal', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: const Color(0xFF334155))),
                 const SizedBox(height: 6),
                 if (packages.isNotEmpty)
-                  DropdownButtonFormField<ProductPackage>(
-                    value: _selectedPackage,
-                    isExpanded: true,
-                    items: packages.map((pkg) {
-                      return DropdownMenuItem(
-                        value: pkg,
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Text('${pkg.packageName} (${pkg.quantity} Units)', overflow: TextOverflow.ellipsis),
-                            ),
-                            if (pkg.freeQuantity > 0) ...[
-                              const SizedBox(width: 4),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFDCFCE7),
-                                  borderRadius: BorderRadius.circular(4),
+                  Builder(
+                    builder: (context) {
+                      final seenPkgIds = <String>{};
+                      final distinctPackages = <ProductPackage>[];
+                      for (final pkg in packages) {
+                        if (seenPkgIds.contains(pkg.id)) continue;
+                        seenPkgIds.add(pkg.id);
+                        distinctPackages.add(pkg);
+                      }
+
+                      ProductPackage? effectivePackage;
+                      if (_selectedPackage != null) {
+                        effectivePackage = distinctPackages.cast<ProductPackage?>().firstWhere(
+                          (pkg) => pkg != null && pkg == _selectedPackage,
+                          orElse: () => null,
+                        );
+                      }
+                      if (effectivePackage == null && distinctPackages.isNotEmpty) {
+                        effectivePackage = distinctPackages.first;
+                      }
+
+                      return DropdownButtonFormField<ProductPackage>(
+                        value: effectivePackage,
+                        isExpanded: true,
+                        items: distinctPackages.map((pkg) {
+                          return DropdownMenuItem<ProductPackage>(
+                            value: pkg,
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text('${pkg.packageName} (${pkg.quantity} Units)', overflow: TextOverflow.ellipsis),
                                 ),
-                                child: Text('+${pkg.freeQuantity} FREE', style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.bold, color: const Color(0xFF166534))),
-                              ),
-                            ],
-                            const SizedBox(width: 8),
-                            Text('₦${pkg.packagePrice.toStringAsFixed(0)}', style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: const Color(0xFF10B981))),
-                          ],
+                                if (pkg.freeQuantity > 0) ...[
+                                  const SizedBox(width: 4),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFDCFCE7),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text('+${pkg.freeQuantity} FREE', style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.bold, color: const Color(0xFF166534))),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: _onPackageChanged,
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
                         ),
                       );
-                    }).toList(),
-                    onChanged: _onPackageChanged,
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: const Color(0xFFF8FAFC),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-                    ),
+                    },
                   ),
                 const SizedBox(height: 14),
 

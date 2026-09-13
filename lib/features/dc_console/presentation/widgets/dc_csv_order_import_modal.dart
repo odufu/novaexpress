@@ -50,6 +50,7 @@ class ParsedCsvOrderRow {
   });
 
   Map<String, dynamic> toOrderPayload({
+    String? distributionCenterId,
     String? overrideRiderId,
     String? overrideRiderName,
     String? overrideRiderCode,
@@ -78,6 +79,8 @@ class ParsedCsvOrderRow {
       'client_name': clientName,
       'delivery_notes': notes ?? 'CSV Bulk Import',
       'fulfillment_type': 'distributed_inventory',
+      if (distributionCenterId != null && distributionCenterId.isNotEmpty)
+        'distribution_center_id': distributionCenterId,
       if (finalRiderId != null && finalRiderId.isNotEmpty) 'delivery_agent_id': finalRiderId,
       if (finalRiderName != null && finalRiderName.isNotEmpty) 'delivery_agent_name': finalRiderName,
       if (finalRiderCode != null && finalRiderCode.isNotEmpty) 'delivery_agent_code': finalRiderCode,
@@ -108,9 +111,9 @@ class _DCCsvOrderImportModalState extends ConsumerState<DCCsvOrderImportModal> {
   String? _selectedBulkRiderCode;
 
   static const String sampleCsvTemplate = '''order_number,customer_name,customer_phone,delivery_address,delivery_city,delivery_state,product_name,quantity,total_amount,payment_type,client_name,notes
-ORD-NOV-901,Alhaji Bello Hassan,08031122334,14 Aminu Kano Crescent,Wuse 2,FCT - Abuja,Respira Detox Tea,2,50000,pay_on_delivery,Novacare Limited,Call before arrival
-ORD-NOV-902,Mrs. Blessing Okafor,08055667788,22 Gana Street,Maitama,FCT - Abuja,Grazer Weight Loss,1,20000,prepaid,Novacare Limited,Leave with security if absent
-ORD-NOV-903,Engr. Tunde Bakare,08099887766,8 Adetokunbo Ademola,Wuse 2,FCT - Abuja,Respira Lungs Detox,1,25000,pay_on_delivery,HealthPlus Direct,Call at the gate''';
+ORD-001,Alhaji Bello Hassan,08031122334,14 Aminu Kano Crescent,Wuse 2,FCT - Abuja,Herbal Detox Tea,2,50000,pay_on_delivery,Universal Health Ltd,Call before arrival
+ORD-002,Mrs. Blessing Okafor,08055667788,22 Gana Street,Maitama,FCT - Abuja,Wellness Bundle,1,20000,prepaid,Universal Health Ltd,Leave with security if absent
+ORD-003,Engr. Tunde Bakare,08099887766,8 Adetokunbo Ademola,Wuse 2,FCT - Abuja,Lungs Formula,1,25000,pay_on_delivery,HealthPlus Direct,Call at the gate''';
 
   @override
   void dispose() {
@@ -304,13 +307,13 @@ ORD-NOV-903,Engr. Tunde Bakare,08099887766,8 Adetokunbo Ademola,Wuse 2,FCT - Abu
         final rawPhone = getCol(idxPhone);
         final rawAltPhone = getCol(idxAltPhone);
         final rawAddress = getCol(idxAddress);
-        final rawCity = getCol(idxCity, 'Wuse 2');
-        final rawState = getCol(idxState, 'FCT - Abuja');
-        final rawProduct = getCol(idxProduct, 'Respira Detox Tea');
+        final rawCity = getCol(idxCity);
+        final rawState = getCol(idxState);
+        final rawProduct = getCol(idxProduct);
         final rawQtyStr = getCol(idxQty, '1');
-        final rawAmountStr = getCol(idxAmount, '25000');
+        final rawAmountStr = getCol(idxAmount, '0');
         final rawPaymentTypeStr = getCol(idxPaymentType, 'pay_on_delivery').toLowerCase();
-        final rawClient = getCol(idxClient, 'Novacare Limited');
+        final rawClient = getCol(idxClient);
         final rawNotes = getCol(idxNotes);
         final rawRider = getCol(idxRider);
 
@@ -390,8 +393,10 @@ ORD-NOV-903,Engr. Tunde Bakare,08099887766,8 Adetokunbo Ademola,Wuse 2,FCT - Abu
       _isImporting = true;
     });
 
+    final activeHubId = ref.read(dcConsoleProvider).activeHubId;
     final List<Map<String, dynamic>> payloads = validRows.map((r) {
       return r.toOrderPayload(
+        distributionCenterId: activeHubId,
         overrideRiderId: _selectedBulkRiderId,
         overrideRiderName: _selectedBulkRiderName,
         overrideRiderCode: _selectedBulkRiderCode,
@@ -411,7 +416,8 @@ ORD-NOV-903,Engr. Tunde Bakare,08099887766,8 Adetokunbo Ademola,Wuse 2,FCT - Abu
 
     if (importedCount > 0) {
       // Reload DC orders
-      ref.read(ordersProvider.notifier).loadDcOrders('22222222-2222-4222-8222-222222222222');
+      final activeHubId = ref.read(dcConsoleProvider).activeHubId;
+      ref.read(ordersProvider.notifier).loadDcOrders(activeHubId);
 
       Navigator.of(context).pop();
 

@@ -447,9 +447,13 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> with Single
                     const Icon(Icons.edit_note_rounded, color: AppColors.orange, size: 24),
                     const SizedBox(width: 8),
                     Text(
-                      'EDIT RIDER PROFILE',
+                      widget.user.isDcManager
+                          ? 'EDIT DC SUPERVISOR PROFILE'
+                          : (widget.user.isCloser
+                              ? 'EDIT TELESALES CLOSER PROFILE'
+                              : (widget.user.isClientAdmin ? 'EDIT MERCHANT PROFILE' : 'EDIT RIDER PROFILE')),
                       style: GoogleFonts.inter(
-                        fontSize: 17,
+                        fontSize: 16,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 0.5,
                       ),
@@ -472,10 +476,13 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> with Single
             indicatorColor: AppColors.orange,
             indicatorWeight: 3,
             labelStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
-            tabs: const [
-              Tab(text: 'Personal', icon: Icon(Icons.person_outline_rounded, size: 18)),
-              Tab(text: 'Settlement Bank', icon: Icon(Icons.account_balance_wallet_outlined, size: 18)),
-              Tab(text: 'Vehicle & Fleet', icon: Icon(Icons.two_wheeler_rounded, size: 18)),
+            tabs: [
+              const Tab(text: 'Personal & DP', icon: Icon(Icons.person_outline_rounded, size: 18)),
+              const Tab(text: 'Settlement Bank', icon: Icon(Icons.account_balance_wallet_outlined, size: 18)),
+              if (widget.user.isRider)
+                const Tab(text: 'Vehicle & Fleet', icon: Icon(Icons.two_wheeler_rounded, size: 18))
+              else
+                const Tab(text: 'Region & Hub', icon: Icon(Icons.map_rounded, size: 18)),
             ],
           ),
           const Divider(height: 1),
@@ -678,61 +685,106 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> with Single
                     ),
                   ),
 
-                  // Tab 3: Vehicle & Fleet License
+                  // Tab 3: Vehicle & Fleet License (or Operations Region & Hub for non-riders)
                   SingleChildScrollView(
                     padding: const EdgeInsets.all(20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'VEHICLE SPECIFICATIONS',
-                          style: GoogleFonts.jetBrainsMono(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF64748B), letterSpacing: 0.8),
-                        ),
-                        const SizedBox(height: 8),
-                        DropdownButtonFormField<String>(
-                          initialValue: vehicleTypes.contains(_vehicleTypeController.text) ? _vehicleTypeController.text : vehicleTypes.first,
-                          decoration: const InputDecoration(
-                            labelText: 'Vehicle Category',
-                            prefixIcon: Icon(Icons.directions_bike_rounded, size: 18),
+                        if (widget.user.isRider) ...[
+                          Text(
+                            'VEHICLE SPECIFICATIONS',
+                            style: GoogleFonts.jetBrainsMono(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF64748B), letterSpacing: 0.8),
                           ),
-                          items: vehicleTypes.map((v) => DropdownMenuItem(value: v, child: Text(v, style: const TextStyle(fontSize: 13.5)))).toList(),
-                          onChanged: (val) {
-                            if (val != null) {
-                              _vehicleTypeController.text = val;
-                            }
-                          },
-                        ),
-                        const SizedBox(height: 14),
+                          const SizedBox(height: 8),
+                          DropdownButtonFormField<String>(
+                            initialValue: vehicleTypes.contains(_vehicleTypeController.text) ? _vehicleTypeController.text : vehicleTypes.first,
+                            decoration: const InputDecoration(
+                              labelText: 'Vehicle Category',
+                              prefixIcon: Icon(Icons.directions_bike_rounded, size: 18),
+                            ),
+                            items: vehicleTypes.map((v) => DropdownMenuItem(value: v, child: Text(v, style: const TextStyle(fontSize: 13.5)))).toList(),
+                            onChanged: (val) {
+                              if (val != null) {
+                                _vehicleTypeController.text = val;
+                              }
+                            },
+                          ),
+                          const SizedBox(height: 14),
 
-                        TextFormField(
-                          controller: _plateNoController,
-                          decoration: const InputDecoration(
-                            labelText: 'Vehicle Registration / Plate Number',
-                            prefixIcon: Icon(Icons.subtitles_outlined, size: 18),
+                          TextFormField(
+                            controller: _plateNoController,
+                            decoration: const InputDecoration(
+                              labelText: 'Vehicle Registration / Plate Number',
+                              prefixIcon: Icon(Icons.subtitles_outlined, size: 18),
+                            ),
+                            validator: (v) => (widget.user.isRider && (v == null || v.trim().isEmpty)) ? 'Plate number is required' : null,
                           ),
-                          validator: (v) => v == null || v.trim().isEmpty ? 'Plate number is required' : null,
-                        ),
-                        const SizedBox(height: 16),
+                          const SizedBox(height: 16),
 
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.verified_user_rounded, color: Color(0xFF16A34A), size: 20),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  'Safety gear & fleet verification is logged in parent DC inventory.',
-                                  style: GoogleFonts.inter(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.verified_user_rounded, color: Color(0xFF16A34A), size: 20),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    'Safety gear & fleet verification is logged in parent DC inventory.',
+                                    style: GoogleFonts.inter(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
+                        ] else ...[
+                          Text(
+                            'OPERATIONS JURISDICTION & HUB',
+                            style: GoogleFonts.jetBrainsMono(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF64748B), letterSpacing: 0.8),
+                          ),
+                          const SizedBox(height: 8),
+                          TextFormField(
+                            controller: _stateController,
+                            decoration: const InputDecoration(
+                              labelText: 'State / Territory',
+                              prefixIcon: Icon(Icons.map_rounded, size: 18),
+                            ),
+                            validator: (v) => v == null || v.trim().isEmpty ? 'State is required' : null,
+                          ),
+                          const SizedBox(height: 14),
+                          TextFormField(
+                            controller: _cityController,
+                            decoration: const InputDecoration(
+                              labelText: 'City / Primary Operations Hub Area',
+                              prefixIcon: Icon(Icons.location_city_rounded, size: 18),
+                            ),
+                            validator: (v) => v == null || v.trim().isEmpty ? 'City is required' : null,
+                          ),
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.admin_panel_settings_rounded, color: Color(0xFF16A34A), size: 20),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    'Role jurisdiction and hub permissions are synchronized with the central NovaExpress logistics network.',
+                                    style: GoogleFonts.inter(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),

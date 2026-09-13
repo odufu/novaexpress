@@ -109,6 +109,8 @@ class RemittanceEntity {
   final String destinationBankName;
   final String destinationAccountNumber;
   final String destinationAccountName;
+  final String? distributionCenterId;
+  final String? distributionCenterName;
   final String? notes;
   final List<RemittanceOrderItem> associatedOrders;
   final DateTime createdAt;
@@ -119,6 +121,8 @@ class RemittanceEntity {
     this.referenceNumber = 'REM-00482',
     this.companyId = '',
     this.deliveryAgentId = '',
+    this.distributionCenterId,
+    this.distributionCenterName,
     this.amount = 0.0,
     this.grossCollections = 0.0,
     this.commissionDeducted = 0.0,
@@ -149,6 +153,82 @@ class RemittanceEntity {
     required this.createdAt,
     this.verifiedAt,
   });
+
+  RemittanceEntity copyWith({
+    String? id,
+    String? referenceNumber,
+    String? companyId,
+    String? deliveryAgentId,
+    String? distributionCenterId,
+    String? distributionCenterName,
+    double? amount,
+    double? grossCollections,
+    double? commissionDeducted,
+    double? transportAllowanceDeducted,
+    double? failedStipendsDeducted,
+    double? posFee,
+    String? paymentMethod,
+    String? depositReceiptUrl,
+    String? status,
+    String? verifiedByUserId,
+    String? verifiedByName,
+    double? discrepancyAmount,
+    String? discrepancyReason,
+    double? expectedAmount,
+    bool? isPartial,
+    String? paystackChannel,
+    String? paystackBank,
+    String? paystackAuthCode,
+    DateTime? paystackPaidAt,
+    String? payerEmail,
+    String? payerName,
+    String? gatewayResponse,
+    String? destinationBankName,
+    String? destinationAccountNumber,
+    String? destinationAccountName,
+    String? notes,
+    List<RemittanceOrderItem>? associatedOrders,
+    DateTime? createdAt,
+    DateTime? verifiedAt,
+  }) {
+    return RemittanceEntity(
+      id: id ?? this.id,
+      referenceNumber: referenceNumber ?? this.referenceNumber,
+      companyId: companyId ?? this.companyId,
+      deliveryAgentId: deliveryAgentId ?? this.deliveryAgentId,
+      distributionCenterId: distributionCenterId ?? this.distributionCenterId,
+      distributionCenterName: distributionCenterName ?? this.distributionCenterName,
+      amount: amount ?? this.amount,
+      grossCollections: grossCollections ?? this.grossCollections,
+      commissionDeducted: commissionDeducted ?? this.commissionDeducted,
+      transportAllowanceDeducted: transportAllowanceDeducted ?? this.transportAllowanceDeducted,
+      failedStipendsDeducted: failedStipendsDeducted ?? this.failedStipendsDeducted,
+      posFee: posFee ?? this.posFee,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
+      depositReceiptUrl: depositReceiptUrl ?? this.depositReceiptUrl,
+      status: status ?? this.status,
+      verifiedByUserId: verifiedByUserId ?? this.verifiedByUserId,
+      verifiedByName: verifiedByName ?? this.verifiedByName,
+      discrepancyAmount: discrepancyAmount ?? this.discrepancyAmount,
+      discrepancyReason: discrepancyReason ?? this.discrepancyReason,
+      expectedAmount: expectedAmount ?? this.expectedAmount,
+      isPartial: isPartial ?? this.isPartial,
+      paystackChannel: paystackChannel ?? this.paystackChannel,
+      paystackBank: paystackBank ?? this.paystackBank,
+      paystackAuthCode: paystackAuthCode ?? this.paystackAuthCode,
+      paystackPaidAt: paystackPaidAt ?? this.paystackPaidAt,
+      payerEmail: payerEmail ?? this.payerEmail,
+      payerName: payerName ?? this.payerName,
+      gatewayResponse: gatewayResponse ?? this.gatewayResponse,
+      destinationBankName: destinationBankName ?? this.destinationBankName,
+      destinationAccountNumber: destinationAccountNumber ?? this.destinationAccountNumber,
+      destinationAccountName: destinationAccountName ?? this.destinationAccountName,
+      notes: notes ?? this.notes,
+      associatedOrders: associatedOrders ?? this.associatedOrders,
+      createdAt: createdAt ?? this.createdAt,
+      verifiedAt: verifiedAt ?? this.verifiedAt,
+    );
+  }
 
   int get ordersCount => associatedOrders.length;
   int get deliveredOrdersCount => associatedOrders.where((o) => o.isDelivered).length;

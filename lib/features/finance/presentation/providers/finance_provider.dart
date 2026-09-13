@@ -13,6 +13,7 @@ import '../../domain/entities/remittance.dart';
 import '../../domain/entities/transaction_item.dart';
 import '../../domain/repositories/finance_repository.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
+import '../../../dc_console/presentation/providers/dc_console_provider.dart';
 
 final financeRemoteDataSourceProvider = Provider<FinanceRemoteDataSource>((ref) {
   try {
@@ -96,6 +97,12 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
   String? _lastAgentId;
   RealtimeChannel? _realtimeChannel;
 
+  String _getRemittanceScopeKey([String? id]) {
+    final clean = (id != null && id.isNotEmpty) ? id.trim() : (_lastAgentId?.trim() ?? '');
+    if (clean.isEmpty) return 'remittances';
+    return 'remittances_$clean';
+  }
+
   FinanceNotifier(this._repository, {LocalStorageService? storageService, Ref? ref})
       : _storageService = storageService ?? LocalStorageServiceImpl(),
         _ref = ref,
@@ -104,16 +111,28 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
     _initRealtimeSubscription();
     if (_ref != null) {
       _ref.listen<AuthState>(authProvider, (previous, next) {
-        final nextAgentId = next.user?.deliveryAgentId ?? next.user?.distributionCenterId ?? next.user?.id;
-        if (nextAgentId != null && nextAgentId.isNotEmpty && nextAgentId != _lastAgentId) {
-          loadRemittances(nextAgentId);
+        if (previous?.user != null && next.user != null && previous!.user!.id != next.user!.id) {
+          final role = next.user?.role.toLowerCase() ?? '';
+          final isRider = role.contains('rider') || role.contains('agent') || role.contains('driver') || next.user?.isPda == true;
+          final nextTargetId = isRider
+              ? (next.user?.deliveryAgentId ?? next.user?.id)
+              : (next.user?.distributionCenterId ?? next.user?.id);
+          if (nextTargetId != null && nextTargetId.isNotEmpty) {
+            loadRemittances(nextTargetId);
+          }
+        }
+      });
+      _ref.listen<DCConsoleState>(dcConsoleProvider, (previous, next) {
+        if (next.activeHubId.isNotEmpty && next.activeHubId != _lastAgentId && previous?.activeHubId != next.activeHubId) {
+          loadRemittances(next.activeHubId);
         }
       });
     }
   }
 
   Future<void> _initCache() async {
-    final cachedRem = await _storageService.getCachedRemittances();
+    final scopeKey = _getRemittanceScopeKey(_lastAgentId);
+    final cachedRem = await _storageService.getCachedRemittances(scopeKey);
     final cachedTxns = await _storageService.getCachedTransactions();
     if ((cachedRem != null && cachedRem.isNotEmpty) || (cachedTxns != null && cachedTxns.isNotEmpty)) {
       state = state.copyWith(
@@ -160,8 +179,11 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
     try {
       String? targetId = _lastAgentId;
       if ((targetId == null || targetId.isEmpty) && _ref != null) {
+        final dcState = _ref.read(dcConsoleProvider);
         final user = _ref.read(authProvider).user;
-        targetId = user?.deliveryAgentId ?? user?.distributionCenterId ?? user?.id;
+        targetId = dcState.activeHubId.isNotEmpty
+            ? dcState.activeHubId
+            : (user?.deliveryAgentId ?? user?.distributionCenterId ?? user?.id);
       }
       if (targetId == null || targetId.isEmpty) return;
 
@@ -187,15 +209,33 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
       }
 
       if (hasChanges && mounted) {
-        debugPrint('[FINANCE_PROVIDER] ⚡ Auto-synced ${finalItems.length} remittances in real time.');
+        debugPrint('[FINANCE_PROVIDER] ⚡ Auto-synced ${finalItems.length} remittances in real time for $targetId.');
         state = state.copyWith(remittances: finalItems);
-        await _storageService.cacheRemittances(finalItems);
+        final scopeKey = _getRemittanceScopeKey(targetId);
+        await _storageService.cacheRemittances(finalItems, scopeKey);
       }
     } catch (_) {}
   }
 
   Future<void> fetchRemittances([String? agentId]) async {
     await loadRemittances(agentId);
+  }
+
+  Future<List<RemittanceEntity>> loadDcRemittances(String dcId) async {
+    final cleanId = dcId.trim();
+    if (cleanId.isEmpty) return [];
+    final scopeKey = _getRemittanceScopeKey(cleanId);
+    final cached = await _storageService.getCachedRemittances(scopeKey);
+    try {
+      final remoteItems = await _repository.getAgentRemittances(cleanId);
+      final finalItems = List<RemittanceEntity>.from(remoteItems);
+      finalItems.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      await _storageService.cacheRemittances(finalItems, scopeKey);
+      return finalItems;
+    } catch (e) {
+      debugPrint('[FINANCE_PROVIDER] ⚠️ loadDcRemittances error for $cleanId: $e');
+      return cached ?? [];
+    }
   }
 
   Future<void> loadRemittances([String? agentId]) async {
@@ -206,13 +246,23 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
       if (role.contains('rider') || role.contains('agent') || role.contains('driver') || user?.isPda == true) {
         targetAgentId = user?.deliveryAgentId ?? user?.id;
       } else {
-        targetAgentId = user?.distributionCenterId ?? user?.id;
+        final dcState = _ref.read(dcConsoleProvider);
+        targetAgentId = dcState.activeHubId.isNotEmpty
+            ? dcState.activeHubId
+            : (user?.distributionCenterId ?? user?.id);
       }
     }
     if (targetAgentId == null || targetAgentId.isEmpty) {
       return;
     }
     _lastAgentId = targetAgentId;
+    final scopeKey = _getRemittanceScopeKey(targetAgentId);
+
+    // Fast-path: Load scoped cached remittances immediately to prevent blank UI
+    final cached = await _storageService.getCachedRemittances(scopeKey);
+    if (cached != null && cached.isNotEmpty && mounted) {
+      state = state.copyWith(remittances: cached);
+    }
 
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
@@ -227,8 +277,8 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
         remittances: finalItems,
         transactions: txns,
       );
-      _storageService.cacheRemittances(finalItems);
-      _storageService.cacheTransactions(txns);
+      await _storageService.cacheRemittances(finalItems, scopeKey);
+      await _storageService.cacheTransactions(txns);
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
@@ -261,6 +311,7 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
     required String paymentMethod,
     String? agentId,
     String? companyId,
+    String? distributionCenterId,
     double grossCollections = 0.0,
     double commissionDeducted = 0.0,
     double transportAllowanceDeducted = 0.0,
@@ -287,6 +338,7 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
       final newRemittance = await _repository.submitRemittance(
         agentId: targetAgentId,
         companyId: targetCompanyId,
+        distributionCenterId: distributionCenterId,
         amount: amount,
         paymentMethod: paymentMethod,
         grossCollections: grossCollections,
@@ -312,7 +364,8 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
         remittances: updated,
       );
 
-      await _storageService.cacheRemittances(updated);
+      final scopeKey = _getRemittanceScopeKey(distributionCenterId ?? targetAgentId);
+      await _storageService.cacheRemittances(updated, scopeKey);
       if (_ref != null) {
         final orderStatusToSet = newRemittance.isVerified ? 'remitted' : 'remittance_pending';
         for (final ao in associatedOrders) {

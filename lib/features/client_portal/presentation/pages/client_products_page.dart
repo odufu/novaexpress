@@ -8,6 +8,7 @@ import '../../../dc_console/domain/entities/product_package.dart';
 import '../../../dc_console/presentation/providers/product_catalog_provider.dart';
 import '../providers/client_portal_provider.dart';
 import '../widgets/client_add_product_modal.dart';
+import '../widgets/client_consignments_modal.dart';
 import '../widgets/client_create_order_modal.dart';
 import '../widgets/client_product_detail_modal.dart';
 import '../widgets/client_supply_stock_modal.dart';
@@ -49,6 +50,10 @@ class _ClientProductsPageState extends ConsumerState<ClientProductsPage> {
     ClientAddProductModal.show(context);
   }
 
+  void _showConsignmentsDialog() {
+    ClientConsignmentsModal.show(context);
+  }
+
   void _openProductDetail(CatalogProduct product, {int initialTabIndex = 0}) {
     ClientProductDetailModal.show(context, product: product, initialTabIndex: initialTabIndex);
   }
@@ -62,7 +67,7 @@ class _ClientProductsPageState extends ConsumerState<ClientProductsPage> {
         (themeMode == ThemeMode.system &&
             MediaQuery.of(context).platformBrightness == Brightness.dark);
 
-    final rawProducts = catalogState.products.isNotEmpty ? catalogState.products : state.products;
+    final rawProducts = state.products;
 
     // Precompute product sales & metrics map for fast access and sorting
     final Map<String, _ProductMetrics> metricsMap = {};
@@ -283,20 +288,40 @@ class _ClientProductsPageState extends ConsumerState<ClientProductsPage> {
             ],
           ),
         ),
-        ElevatedButton.icon(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFFF37021),
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            elevation: 0,
-          ),
-          onPressed: _showAddProductDialog,
-          icon: const Icon(Icons.add_rounded, size: 18),
-          label: Text(
-            'Add Product',
-            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700),
-          ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF10B981),
+                side: const BorderSide(color: Color(0xFF10B981)),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: _showConsignmentsDialog,
+              icon: const Icon(Icons.assignment_turned_in_rounded, size: 18),
+              label: Text(
+                'Consignments & Waybills',
+                style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700),
+              ),
+            ),
+            const SizedBox(width: 10),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFF37021),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                elevation: 0,
+              ),
+              onPressed: _showAddProductDialog,
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: Text(
+                'Add Product',
+                style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -826,16 +851,17 @@ class _ClientProductsPageState extends ConsumerState<ClientProductsPage> {
                                 borderRadius: BorderRadius.circular(7),
                                 child: ProductImageWidget(
                                   imageUrl: product.imageUrl,
-                                  width: 44,
-                                  height: 44,
+                                  width: 38,
+                                  height: 38,
                                   fit: BoxFit.cover,
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 180),
-                              child: Column(
+                            const SizedBox(width: 10),
+                            Flexible(
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(maxWidth: 165),
+                                child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
@@ -885,10 +911,11 @@ class _ClientProductsPageState extends ConsumerState<ClientProductsPage> {
                                 ],
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
+                  ),
 
                     // Column 2: Retail Price
                     DataCell(

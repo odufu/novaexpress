@@ -99,13 +99,71 @@ class _DCAssignOrderModalState extends ConsumerState<DCAssignOrderModal> {
     await _dispatchToRider(_selectedDriverId!, _selectedDriverName!, _selectedDriverCode!);
   }
 
+  Future<void> _unassignOrder() async {
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    final success = await ref.read(ordersProvider.notifier).unassignOrderFromRider(widget.order.id);
+
+    if (!mounted) return;
+
+    setState(() {
+      _isSubmitting = false;
+    });
+
+    if (success) {
+      Navigator.of(context).pop(true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Order #${widget.order.orderNumber} unassigned and returned to DC pool!',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFFF37021),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to unassign order. Please try again.'),
+          backgroundColor: Color(0xFFDC2626),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final dcState = ref.watch(dcConsoleProvider);
     final stockState = ref.watch(stockProvider);
-    final allDrivers = [...dcState.drivers];
+
+    // Strict DC Scoping: Only allow riders belonging to the DC governing this order
+    final orderDcId = widget.order.distributionCenterId?.trim();
+    final List<DCFleetDriver> scopedDrivers;
+    if (orderDcId != null && orderDcId.isNotEmpty) {
+      scopedDrivers = dcState.drivers.where((d) {
+        return d.distributionCenterId == orderDcId ||
+            (orderDcId == '22222222-2222-4222-8222-222222222222' &&
+                (d.distributionCenterId == null ||
+                    d.distributionCenterId!.isEmpty ||
+                    d.distributionCenterId == '22222222-2222-4222-8222-222222222222'));
+      }).toList();
+    } else {
+      scopedDrivers = [...dcState.dcDrivers];
+    }
+    final allDrivers = scopedDrivers.isNotEmpty ? scopedDrivers : [...dcState.dcDrivers];
 
     // Order by lightest workload first
     allDrivers.sort((a, b) => a.totalAssignedOrders.compareTo(b.totalAssignedOrders));
@@ -421,7 +479,10 @@ class _DCAssignOrderModalState extends ConsumerState<DCAssignOrderModal> {
 
                   final availableCustodyUnits = (totalCustodyUnits - activeReservedUnits).clamp(0, 999999);
                   final hasStockInVehicle = totalCustodyUnits > 0;
-                  final hasSufficientStock = widget.order.isClientPackage || availableCustodyUnits >= widget.order.quantity;
+                  final requiredUnits = widget.order.totalPhysicalQuantity > 0
+                      ? widget.order.totalPhysicalQuantity
+                      : widget.order.quantity;
+                  final hasSufficientStock = availableCustodyUnits >= requiredUnits;
 
                   final activeCount = driver.totalAssignedOrders;
                   final isLightWorkload = activeCount == 0;
@@ -437,7 +498,7 @@ class _DCAssignOrderModalState extends ConsumerState<DCAssignOrderModal> {
                             content: Text(
                               totalCustodyUnits == 0
                                   ? '⚠️ Cannot dispatch: ${driver.name} does not hold "${widget.order.productName}" in vehicle custody. Please allocate stock first.'
-                                  : '⚠️ Insufficient Stock: ${driver.name} only holds $availableCustodyUnits available unit(s) of "${widget.order.productName}" (${widget.order.quantity} required).',
+                                  : '⚠️ Insufficient Stock: ${driver.name} only holds $availableCustodyUnits available physical unit(s) of "${widget.order.productName}" ($requiredUnits physical units required).',
                             ),
                             backgroundColor: const Color(0xFFEF4444),
                             behavior: SnackBarBehavior.floating,
@@ -682,6 +743,22 @@ class _DCAssignOrderModalState extends ConsumerState<DCAssignOrderModal> {
                   const SizedBox(width: 12),
                   Row(
                     children: [
+                      if (!widget.order.isUnassigned) ...[
+                        OutlinedButton.icon(
+                          onPressed: _isSubmitting ? null : _unassignOrder,
+                          icon: const Icon(Icons.person_remove_rounded, size: 14, color: Color(0xFFDC2626)),
+                          label: const Text(
+                            'Unassign Rider',
+                            style: TextStyle(color: Color(0xFFDC2626), fontSize: 11.5, fontWeight: FontWeight.bold),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFFDC2626)),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
                       OutlinedButton(
                         onPressed: () => Navigator.of(context).pop(),
                         style: OutlinedButton.styleFrom(

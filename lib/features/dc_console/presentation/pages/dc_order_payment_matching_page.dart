@@ -10,6 +10,8 @@ import '../../../finance/domain/entities/remittance.dart';
 import '../../../finance/presentation/providers/finance_provider.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
+import '../../../orders/domain/services/order_routing_service.dart';
+import '../../domain/entities/distribution_center.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
 import '../providers/dc_console_provider.dart';
 import '../widgets/dc_contact_rider_modal.dart';
@@ -40,7 +42,10 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final user = ref.read(authProvider).user;
-      final activeDcId = user?.distributionCenterId ?? '22222222-2222-4222-8222-222222222222';
+      final dcState = ref.read(dcConsoleProvider);
+      final activeDcId = dcState.activeHubId.isNotEmpty
+          ? dcState.activeHubId
+          : (user?.distributionCenterId ?? '22222222-2222-4222-8222-222222222222');
       ref.read(ordersProvider.notifier).loadDcOrders(activeDcId);
       ref.read(financeProvider.notifier).loadRemittances(activeDcId);
       ref.read(dcConsoleProvider.notifier).loadDriversFromDatabase();
@@ -357,10 +362,15 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
             grossAmount: gross,
             commissionAmount: commission,
             transportAllowance: transport,
+            failedStipends: rem.failedStipendsDeducted,
             posFee: pos,
             netAmount: net,
             orders: matchingOrders,
             paymentMethod: rem.paymentMethod.isNotEmpty ? rem.paymentMethod : 'paystack',
+            depositReceiptUrl: rem.depositReceiptUrl,
+            verifiedByName: rem.verifiedByName,
+            verifiedAt: rem.verifiedAt,
+            notes: rem.notes,
           ),
         );
       }
@@ -546,8 +556,41 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 768;
 
-    final allOrders = ordersState.orders;
-    final allRemittances = financeState.remittances;
+    final allDcs = dcState.distributionCenters;
+    final activeDc = allDcs.where(
+      (d) => d.id == dcState.activeHubId || d.code == dcState.activeHubCode,
+    ).firstOrNull ?? DistributionCenter(
+      id: dcState.activeHubId,
+      name: dcState.activeHubName,
+      code: dcState.activeHubCode,
+      state: dcState.isCurrentHubGrandDc ? 'Abuja (FCT)' : '',
+      city: '',
+      address: '',
+      isGrandDc: dcState.isCurrentHubGrandDc,
+      isHub: dcState.isCurrentHubGrandDc,
+    );
+
+    ref.listen<DCConsoleState>(dcConsoleProvider, (previous, next) {
+      if (previous?.activeHubId != next.activeHubId && next.activeHubId.isNotEmpty) {
+        ref.read(ordersProvider.notifier).loadDcOrders(next.activeHubId);
+        ref.read(financeProvider.notifier).loadRemittances(next.activeHubId);
+      }
+    });
+
+    final allOrders = ordersState.orders.where((o) {
+      return OrderRoutingService.doesOrderBelongToDc(
+        order: o,
+        currentDc: activeDc,
+        allDcs: allDcs,
+      );
+    }).toList();
+    final dcRiderIds = dcState.drivers.map((d) => d.id).toSet();
+    final allRemittances = financeState.remittances.where((r) {
+      if (r.distributionCenterId != null && r.distributionCenterId!.isNotEmpty) {
+        return r.distributionCenterId == activeDc.id;
+      }
+      return dcRiderIds.contains(r.deliveryAgentId);
+    }).toList();
 
     // Fast Single-Pass Processing
     final allLifecycleItems = _buildRemittanceLifecycleItems(allOrders, allRemittances, dcState);

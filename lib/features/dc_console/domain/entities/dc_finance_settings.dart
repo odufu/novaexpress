@@ -15,6 +15,14 @@ class DCFinanceSettings {
   final String settlementAccountName; // 'NovaExpress Logistics Limited'
   final bool autoReconcileWebhooks; // true
 
+  // Merchant Billing & Daily 10:00 PM Closeout Settings
+  final double defaultClientDeliveryFee; // e.g. 3500.0
+  final String platformFeeType; // 'flat' or 'percent'
+  final double platformFeeValue; // e.g. 500.0 or 2.5
+  final String paystackFeeAbsorbedBy; // 'merchant', 'company', 'shared'
+  final double failedOrderCharge; // e.g. 500.0
+  final String dailySettlementCutoffTime; // e.g. '22:00'
+
   const DCFinanceSettings({
     this.posChargeMode = 'dynamic',
     this.posFlatRate = 350.0,
@@ -31,6 +39,12 @@ class DCFinanceSettings {
     this.settlementAccountNumber = '0098234123',
     this.settlementAccountName = 'NovaExpress Logistics Limited',
     this.autoReconcileWebhooks = true,
+    this.defaultClientDeliveryFee = 3500.0,
+    this.platformFeeType = 'flat',
+    this.platformFeeValue = 500.0,
+    this.paystackFeeAbsorbedBy = 'merchant',
+    this.failedOrderCharge = 500.0,
+    this.dailySettlementCutoffTime = '22:00',
   });
 
   /// Computes POS transfer fee for an amount based on current settings
@@ -69,6 +83,12 @@ class DCFinanceSettings {
     String? settlementAccountNumber,
     String? settlementAccountName,
     bool? autoReconcileWebhooks,
+    double? defaultClientDeliveryFee,
+    String? platformFeeType,
+    double? platformFeeValue,
+    String? paystackFeeAbsorbedBy,
+    double? failedOrderCharge,
+    String? dailySettlementCutoffTime,
   }) {
     return DCFinanceSettings(
       posChargeMode: posChargeMode ?? this.posChargeMode,
@@ -86,6 +106,12 @@ class DCFinanceSettings {
       settlementAccountNumber: settlementAccountNumber ?? this.settlementAccountNumber,
       settlementAccountName: settlementAccountName ?? this.settlementAccountName,
       autoReconcileWebhooks: autoReconcileWebhooks ?? this.autoReconcileWebhooks,
+      defaultClientDeliveryFee: defaultClientDeliveryFee ?? this.defaultClientDeliveryFee,
+      platformFeeType: platformFeeType ?? this.platformFeeType,
+      platformFeeValue: platformFeeValue ?? this.platformFeeValue,
+      paystackFeeAbsorbedBy: paystackFeeAbsorbedBy ?? this.paystackFeeAbsorbedBy,
+      failedOrderCharge: failedOrderCharge ?? this.failedOrderCharge,
+      dailySettlementCutoffTime: dailySettlementCutoffTime ?? this.dailySettlementCutoffTime,
     );
   }
 
@@ -108,6 +134,12 @@ class DCFinanceSettings {
       settlementAccountNumber: json['settlement_account_number']?.toString() ?? '0098234123',
       settlementAccountName: json['settlement_account_name']?.toString() ?? 'NovaExpress Logistics Limited',
       autoReconcileWebhooks: json['auto_reconcile_webhooks'] ?? json['autoReconcileWebhooks'] ?? true,
+      defaultClientDeliveryFee: (json['default_client_delivery_fee'] as num?)?.toDouble() ?? 3500.0,
+      platformFeeType: json['platform_fee_type']?.toString() ?? 'flat',
+      platformFeeValue: (json['platform_fee_value'] as num?)?.toDouble() ?? 500.0,
+      paystackFeeAbsorbedBy: json['paystack_fee_absorbed_by']?.toString() ?? 'merchant',
+      failedOrderCharge: (json['failed_order_charge'] as num?)?.toDouble() ?? 500.0,
+      dailySettlementCutoffTime: json['daily_settlement_cutoff_time']?.toString() ?? '22:00',
     );
   }
 
@@ -129,6 +161,12 @@ class DCFinanceSettings {
       'settlement_account_number': settlementAccountNumber,
       'settlement_account_name': settlementAccountName,
       'auto_reconcile_webhooks': autoReconcileWebhooks,
+      'default_client_delivery_fee': defaultClientDeliveryFee,
+      'platform_fee_type': platformFeeType,
+      'platform_fee_value': platformFeeValue,
+      'paystack_fee_absorbed_by': paystackFeeAbsorbedBy,
+      'failed_order_charge': failedOrderCharge,
+      'daily_settlement_cutoff_time': dailySettlementCutoffTime,
     };
   }
 }

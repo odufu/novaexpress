@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/services/location_lookup_service.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../dc_console/domain/entities/product_package.dart';
 import '../../../dc_console/presentation/providers/dc_console_provider.dart';
 import '../../../dc_console/presentation/providers/product_catalog_provider.dart';
@@ -116,9 +117,11 @@ class _ClientCreateOrderModalState extends ConsumerState<ClientCreateOrderModal>
   }
 
   void _initDefaultProduct() {
-    final catalog = ref.read(productCatalogProvider);
-    if (catalog.products.isNotEmpty) {
-      _selectedProduct = catalog.products.first;
+    final clientProducts = ref.read(clientPortalProvider).products;
+    final available = clientProducts.isNotEmpty ? clientProducts : ref.read(productCatalogProvider).products;
+    if (available.isNotEmpty) {
+      _selectedProduct = available.first;
+      final catalog = ref.read(productCatalogProvider);
       final pkgs = catalog.getPackagesForProduct(_selectedProduct!.name);
       if (pkgs.isNotEmpty) {
         _selectedPackage = pkgs.first;
@@ -191,6 +194,12 @@ class _ClientCreateOrderModalState extends ConsumerState<ClientCreateOrderModal>
     setState(() => _isSubmitting = true);
     try {
       final isAutoAssign = _dispatchMode == 'auto_assign';
+      final authUser = ref.read(authProvider).user;
+      final isCloser = authUser?.isCloser == true;
+      final closerId = isCloser ? (authUser?.closerId ?? authUser?.id) : null;
+      final closerName = isCloser ? authUser?.fullName : null;
+      final closerCode = isCloser ? authUser?.closerCode : null;
+
       final order = await ref.read(clientPortalProvider.notifier).createOrder(
         customerName: _customerNameController.text.trim(),
         customerPhone: _customerPhoneController.text.trim(),
@@ -200,14 +209,17 @@ class _ClientCreateOrderModalState extends ConsumerState<ClientCreateOrderModal>
         deliveryState: _selectedState,
         deliveryLga: _selectedLga!,
         deliveryAddress: _addressController.text.trim(),
-        productId: _selectedProduct?.id ?? 'prod-grazer-01',
-        productName: _selectedProduct?.name ?? 'Grazer Tea',
+        productId: _selectedProduct?.id ?? 'prod-${DateTime.now().millisecondsSinceEpoch}',
+        productName: _selectedProduct?.name ?? 'Standard Product',
         quantity: _quantity,
         totalAmount: _price,
         packageId: _selectedPackage?.id,
         packageName: _selectedPackage?.packageName,
         paymentType: _paymentType,
         autoAssignRider: isAutoAssign,
+        closerId: closerId,
+        closerName: closerName,
+        closerCode: closerCode,
         notes: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
       );
 
@@ -351,17 +363,63 @@ class _ClientCreateOrderModalState extends ConsumerState<ClientCreateOrderModal>
                     const SizedBox(height: 12),
 
                     // Product Selector
-                    DropdownButtonFormField<CatalogProduct>(
-                      value: _selectedProduct,
-                      decoration: _inputDecoration('Product Name', prefixIcon: Icons.shopping_bag_outlined),
-                      items: catalog.products.map((p) {
-                        return DropdownMenuItem(
-                          value: p,
-                          child: Text('${p.name} (₦${p.defaultUnitPrice.toStringAsFixed(0)} / unit)'),
+                    Builder(
+                      builder: (context) {
+                        final rawProducts = ref.watch(clientPortalProvider).products.isNotEmpty 
+                            ? ref.watch(clientPortalProvider).products 
+                            : catalog.products;
+
+                        // Deduplicate products by SKU and ID
+                        final seenIds = <String>{};
+                        final seenSkus = <String>{};
+                        final distinctProducts = <CatalogProduct>[];
+                        for (final p in rawProducts) {
+                          final idKey = p.id.trim();
+                          final skuKey = p.sku.trim().toUpperCase();
+                          if (idKey.isNotEmpty && seenIds.contains(idKey)) continue;
+                          if (skuKey.isNotEmpty && seenSkus.contains(skuKey)) continue;
+                          if (idKey.isNotEmpty) seenIds.add(idKey);
+                          if (skuKey.isNotEmpty) seenSkus.add(skuKey);
+                          distinctProducts.add(p);
+                        }
+
+                        // If _selectedProduct was supplied and not found in distinctProducts, include it
+                        if (_selectedProduct != null) {
+                          final hasSelected = distinctProducts.any((p) => p == _selectedProduct);
+                          if (!hasSelected) {
+                            distinctProducts.insert(0, _selectedProduct!);
+                          }
+                        }
+
+                        // Determine effective selected product
+                        CatalogProduct? effectiveProduct;
+                        if (_selectedProduct != null) {
+                          effectiveProduct = distinctProducts.cast<CatalogProduct?>().firstWhere(
+                            (p) => p != null && p == _selectedProduct,
+                            orElse: () => null,
+                          );
+                        }
+                        if (effectiveProduct == null && distinctProducts.isNotEmpty) {
+                          effectiveProduct = distinctProducts.first;
+                        }
+
+                        return DropdownButtonFormField<CatalogProduct>(
+                          value: effectiveProduct,
+                          decoration: _inputDecoration('Product Name', prefixIcon: Icons.shopping_bag_outlined),
+                          items: distinctProducts.map((p) {
+                            return DropdownMenuItem<CatalogProduct>(
+                              value: p,
+                              child: Text('${p.name} (₦${p.defaultUnitPrice.toStringAsFixed(0)} / unit)'),
+                            );
+                          }).toList(),
+                          onChanged: (p) {
+                            if (p != null) {
+                              _onProductChanged(p);
+                            }
+                          },
+                          validator: (v) => v == null ? 'Please select a product' : null,
                         );
-                      }).toList(),
-                      onChanged: _onProductChanged,
-                      validator: (v) => v == null ? 'Please select a product' : null,
+                      },
                     ),
 
                     const SizedBox(height: 14),

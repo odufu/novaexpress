@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../auth/data/datasources/auth_remote_datasource.dart';
+import '../../../auth/data/models/user_model.dart';
 import '../../data/repositories/client_portal_repository_impl.dart';
 import '../../domain/repositories/client_portal_repository.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -14,7 +16,152 @@ import '../../../stock/presentation/providers/stock_provider.dart';
 import '../../../dc_console/domain/entities/distribution_center.dart';
 import '../../domain/entities/client_closer.dart';
 import '../../domain/entities/client_profile.dart';
+import '../../domain/entities/client_settlement.dart';
 import '../../domain/entities/customer_lead.dart';
+
+/// Financial metrics summary per product or aggregate
+class ClientProductFinanceSummary {
+  final String productName;
+  final String productSku;
+  final int totalOrders;
+  final int deliveredOrders;
+  final int inTransitOrders;
+  final int pendingOrders;
+  final int failedOrders;
+  final int unitsDelivered;
+  final double grossDeliveredValue;
+  final double moneyOutside; // COD active in transit / out for delivery / assigned
+  final double awaitingRemittance; // Delivered COD collected in DC custody awaiting client payout
+  final double remittedToBank; // Settled payout batches + prepaid direct transfers
+  final double logisticsDeliveryFees; // Client delivery fee deductions
+  final double netRealizedRevenue; // Gross Delivered - Logistics Fees (Net Cash Remittance)
+  final double failedOrdersLoss; // Order value of failed / returned orders
+  final double deliverySuccessRate;
+  // Commercial & Accounting Profitability
+  final double costPrice;
+  final double cogs; // Cost of Goods Sold (delivered units * costPrice)
+  final double commercialGrossProfit; // netRealizedRevenue - cogs
+  final double profitMarginPercentage; // (commercialGrossProfit / grossDeliveredValue) * 100
+
+  const ClientProductFinanceSummary({
+    required this.productName,
+    required this.productSku,
+    required this.totalOrders,
+    required this.deliveredOrders,
+    required this.inTransitOrders,
+    required this.pendingOrders,
+    required this.failedOrders,
+    required this.unitsDelivered,
+    required this.grossDeliveredValue,
+    required this.moneyOutside,
+    required this.awaitingRemittance,
+    required this.remittedToBank,
+    required this.logisticsDeliveryFees,
+    required this.netRealizedRevenue,
+    required this.failedOrdersLoss,
+    required this.deliverySuccessRate,
+    this.costPrice = 0.0,
+    this.cogs = 0.0,
+    this.commercialGrossProfit = 0.0,
+    this.profitMarginPercentage = 0.0,
+  });
+
+  static ClientProductFinanceSummary calculate({
+    required List<OrderEntity> orders,
+    String productName = 'All Products',
+    String productSku = 'ALL',
+    double costPrice = 0.0,
+    double? cogsOverride,
+  }) {
+    int delivered = 0;
+    int inTransit = 0;
+    int pending = 0;
+    int failed = 0;
+    int units = 0;
+    double gross = 0.0;
+    double moneyOutside = 0.0;
+    double awaitingRemittance = 0.0;
+    double remitted = 0.0;
+    double fees = 0.0;
+    double failedLoss = 0.0;
+
+    for (final o in orders) {
+      final s = o.status.toLowerCase();
+      final isDelivered = o.isDelivered;
+      final isFailed = o.isFailed;
+      final isInTransit = s == 'in_transit' || s == 'out_for_delivery' || s == 'accepted';
+      final isPending = s == 'pending_dispatch' ||
+          s == 'created' ||
+          s == 'assigned' ||
+          s == 'pending_rider_assignment' ||
+          s == 'pending_dc_assignment';
+
+      if (isDelivered) {
+        delivered++;
+        final orderUnits = (o.paidQuantity + o.freeQuantity > 0)
+            ? (o.paidQuantity + o.freeQuantity)
+            : (o.quantity > 0 ? o.quantity : 1);
+        units += orderUnits;
+        gross += o.totalAmount;
+        fees += o.clientDeliveryFee;
+
+        // Net proceeds from this order owed to client
+        final double netOrderProceeds = o.totalAmount - o.clientDeliveryFee;
+
+        // Order is settled to client bank when finalized in daily settlement batch
+        final fs = o.financialSettlementStatus.toLowerCase();
+        final rs = o.remittanceStatus.toLowerCase();
+        final isSettledToClient = fs == 'client_settled' || fs == 'settled' || rs == 'remitted' || rs == 'cleared';
+
+        if (isSettledToClient) {
+          remitted += netOrderProceeds;
+        } else {
+          // Awaiting 10:00 PM Daily Settlement Closeout (Both COD in DC vault & Direct Paystack transfers)
+          awaitingRemittance += netOrderProceeds;
+        }
+      } else if (isInTransit || isPending) {
+        if (isInTransit) inTransit++;
+        if (isPending) pending++;
+        if (o.isCashPod) {
+          moneyOutside += o.totalAmount;
+        }
+      } else if (isFailed) {
+        failed++;
+        failedLoss += o.totalAmount;
+      }
+    }
+
+    final netRealized = gross - fees;
+    final totalCogs = cogsOverride ?? (units * costPrice);
+    final commercialProfit = netRealized - totalCogs;
+    final margin = gross > 0 ? (commercialProfit / gross) * 100.0 : 0.0;
+    final completed = delivered + failed;
+    final successRate = completed > 0 ? (delivered / completed) * 100.0 : 100.0;
+
+    return ClientProductFinanceSummary(
+      productName: productName,
+      productSku: productSku,
+      totalOrders: orders.length,
+      deliveredOrders: delivered,
+      inTransitOrders: inTransit,
+      pendingOrders: pending,
+      failedOrders: failed,
+      unitsDelivered: units,
+      grossDeliveredValue: gross,
+      moneyOutside: moneyOutside,
+      awaitingRemittance: awaitingRemittance > 0 ? awaitingRemittance : 0.0,
+      remittedToBank: remitted > 0 ? remitted : 0.0,
+      logisticsDeliveryFees: fees,
+      netRealizedRevenue: netRealized > 0 ? netRealized : 0.0,
+      failedOrdersLoss: failedLoss,
+      deliverySuccessRate: successRate,
+      costPrice: costPrice,
+      cogs: totalCogs,
+      commercialGrossProfit: commercialProfit,
+      profitMarginPercentage: margin,
+    );
+  }
+}
 
 class ClientPortalState {
   final ClientProfile clientProfile;
@@ -23,6 +170,8 @@ class ClientPortalState {
   final List<ProductPackage> packages;
   final List<ClientCloser> closers;
   final List<CustomerLead> leads;
+  final List<ClientSettlement> settlements;
+  final Map<String, dynamic> assetCustodyData;
   final bool isLoading;
   final String? errorMessage;
   final String searchQuery;
@@ -30,6 +179,8 @@ class ClientPortalState {
   final String? selectedStateFilter;
   final String selectedCloserFilter; // 'all' or closer ID
   final String selectedLeadStatusFilter; // 'all', 'new_lead', 'calling', 'call_back', 'confirmed', 'order_created'
+  final String selectedFinanceProductFilter; // 'all' or specific product name
+  final String selectedFinanceTimeFilter; // 'all_time', 'month', 'week', 'today'
 
   const ClientPortalState({
     required this.clientProfile,
@@ -38,6 +189,8 @@ class ClientPortalState {
     this.packages = const [],
     this.closers = const [],
     this.leads = const [],
+    this.settlements = const [],
+    this.assetCustodyData = const {},
     this.isLoading = false,
     this.errorMessage,
     this.searchQuery = '',
@@ -45,6 +198,8 @@ class ClientPortalState {
     this.selectedStateFilter,
     this.selectedCloserFilter = 'all',
     this.selectedLeadStatusFilter = 'all',
+    this.selectedFinanceProductFilter = 'all',
+    this.selectedFinanceTimeFilter = 'all_time',
   });
 
   ClientPortalState copyWith({
@@ -54,6 +209,8 @@ class ClientPortalState {
     List<ProductPackage>? packages,
     List<ClientCloser>? closers,
     List<CustomerLead>? leads,
+    List<ClientSettlement>? settlements,
+    Map<String, dynamic>? assetCustodyData,
     bool? isLoading,
     String? errorMessage,
     String? searchQuery,
@@ -61,6 +218,8 @@ class ClientPortalState {
     String? selectedStateFilter,
     String? selectedCloserFilter,
     String? selectedLeadStatusFilter,
+    String? selectedFinanceProductFilter,
+    String? selectedFinanceTimeFilter,
   }) {
     return ClientPortalState(
       clientProfile: clientProfile ?? this.clientProfile,
@@ -69,6 +228,8 @@ class ClientPortalState {
       packages: packages ?? this.packages,
       closers: closers ?? this.closers,
       leads: leads ?? this.leads,
+      settlements: settlements ?? this.settlements,
+      assetCustodyData: assetCustodyData ?? this.assetCustodyData,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: errorMessage,
       searchQuery: searchQuery ?? this.searchQuery,
@@ -76,6 +237,8 @@ class ClientPortalState {
       selectedStateFilter: selectedStateFilter ?? this.selectedStateFilter,
       selectedCloserFilter: selectedCloserFilter ?? this.selectedCloserFilter,
       selectedLeadStatusFilter: selectedLeadStatusFilter ?? this.selectedLeadStatusFilter,
+      selectedFinanceProductFilter: selectedFinanceProductFilter ?? this.selectedFinanceProductFilter,
+      selectedFinanceTimeFilter: selectedFinanceTimeFilter ?? this.selectedFinanceTimeFilter,
     );
   }
 
@@ -143,6 +306,47 @@ class ClientPortalState {
     final sorted = List<ClientCloser>.from(closers);
     sorted.sort((a, b) => b.totalOrdersBooked.compareTo(a.totalOrdersBooked));
     return sorted;
+  }
+
+  List<OrderEntity> getOrdersForCloser(String closerId, [String? closerEmail]) {
+    final cleanId = closerId.trim().toLowerCase();
+    final cleanEmail = closerEmail?.trim().toLowerCase();
+    return orders.where((o) {
+      if (cleanId.isNotEmpty && (o.closerId?.toLowerCase() == cleanId || o.closerCode?.toLowerCase() == cleanId)) return true;
+      if (cleanEmail != null && cleanEmail.isNotEmpty && o.closerName?.toLowerCase() == cleanEmail) return true;
+      return false;
+    }).toList();
+  }
+
+  Map<String, dynamic> getCloserPerformanceMetrics(String closerId, [String? closerEmail]) {
+    final closerOrders = getOrdersForCloser(closerId, closerEmail);
+    final totalBooked = closerOrders.length;
+    final deliveredOrders = closerOrders.where((o) => o.isDelivered).toList();
+    final deliveredCount = deliveredOrders.length;
+    final inTransitCount = closerOrders.where((o) {
+      final s = o.status.toLowerCase();
+      return o.isAssignedInTransit || s == 'in_transit' || s == 'out_for_delivery' || s == 'accepted';
+    }).length;
+    final pendingCount = closerOrders.where((o) => !o.isDelivered && !o.isFailed && !o.isAssignedInTransit && o.status.toLowerCase() != 'in_transit' && o.status.toLowerCase() != 'out_for_delivery').length;
+    final failedCount = closerOrders.where((o) => o.isFailed).length;
+    final successRate = totalBooked > 0 ? (deliveredCount / totalBooked) * 100.0 : 0.0;
+    final grossSales = deliveredOrders.fold(0.0, (sum, o) => sum + o.totalAmount);
+    final closer = closers.where((c) => c.id == closerId || (closerEmail != null && c.email.toLowerCase() == closerEmail.toLowerCase())).firstOrNull;
+    final commissionRate = closer?.commissionRate ?? 500.0;
+    final earnedCommission = deliveredCount * commissionRate;
+
+    return {
+      'totalBooked': totalBooked,
+      'bookedCount': totalBooked,
+      'deliveredCount': deliveredCount,
+      'inTransitCount': inTransitCount,
+      'pendingCount': pendingCount,
+      'failedCount': failedCount,
+      'successRate': successRate,
+      'grossSales': grossSales,
+      'earnedCommission': earnedCommission,
+      'orders': closerOrders,
+    };
   }
 
   List<OrderEntity> get filteredOrders {
@@ -224,6 +428,89 @@ class ClientPortalState {
       return true;
     }).toList();
   }
+
+  // --- Financial Intelligence & Settlement Getters ---
+
+  List<OrderEntity> get timeFilteredOrders {
+    if (selectedFinanceTimeFilter == 'all_time') return orders;
+    final now = DateTime.now();
+    return orders.where((o) {
+      final date = o.deliveredAt ?? o.createdAt;
+      if (selectedFinanceTimeFilter == 'today') {
+        return date.year == now.year && date.month == now.month && date.day == now.day;
+      }
+      if (selectedFinanceTimeFilter == 'week') {
+        final diff = now.difference(date).inDays;
+        return diff <= 7;
+      }
+      if (selectedFinanceTimeFilter == 'month') {
+        return date.year == now.year && date.month == now.month;
+      }
+      return true;
+    }).toList();
+  }
+
+  List<OrderEntity> get financeOrders {
+    final base = timeFilteredOrders;
+    if (selectedFinanceProductFilter == 'all') return base;
+    final q = selectedFinanceProductFilter.toLowerCase().trim();
+    return base.where((o) {
+      final matchName = o.productName.toLowerCase().contains(q);
+      final matchSku = o.productSku != null && o.productSku!.toLowerCase().contains(q);
+      return matchName || matchSku;
+    }).toList();
+  }
+
+  ClientProductFinanceSummary get activeFinanceSummary {
+    double totalCogs = 0.0;
+    for (final o in financeOrders.where((o) => o.isDelivered)) {
+      final p = products.where(
+        (prod) => prod.name.toLowerCase() == o.productName.toLowerCase() ||
+                  (o.productSku != null && prod.sku.toLowerCase() == o.productSku!.toLowerCase()),
+      ).firstOrNull;
+      final cost = p?.costPrice ?? 0.0;
+      final units = (o.paidQuantity + o.freeQuantity > 0)
+          ? (o.paidQuantity + o.freeQuantity)
+          : (o.quantity > 0 ? o.quantity : 1);
+      totalCogs += (units * cost);
+    }
+
+    return ClientProductFinanceSummary.calculate(
+      orders: financeOrders,
+      productName: selectedFinanceProductFilter == 'all' ? 'All Products (Company Total)' : selectedFinanceProductFilter,
+      productSku: selectedFinanceProductFilter == 'all' ? 'ALL' : '',
+      cogsOverride: totalCogs,
+    );
+  }
+
+  List<ClientProductFinanceSummary> get perProductFinanceSummaries {
+    final base = timeFilteredOrders;
+    final List<ClientProductFinanceSummary> list = [];
+    final seen = <String>{};
+
+    for (final p in products) {
+      if (seen.contains(p.name.toLowerCase())) continue;
+      seen.add(p.name.toLowerCase());
+
+      final pOrders = base.where((o) {
+        final matchName = o.productName.trim().toLowerCase() == p.name.trim().toLowerCase() ||
+            o.productName.toLowerCase().contains(p.name.toLowerCase());
+        final matchSku = o.productSku != null &&
+            o.productSku!.trim().isNotEmpty &&
+            p.sku.isNotEmpty &&
+            o.productSku!.trim().toLowerCase() == p.sku.trim().toLowerCase();
+        return matchName || matchSku;
+      }).toList();
+
+      list.add(ClientProductFinanceSummary.calculate(
+        orders: pOrders,
+        productName: p.name,
+        productSku: p.sku.isNotEmpty ? p.sku : 'SKU-${p.name.substring(0, math.min(4, p.name.length)).toUpperCase()}',
+        costPrice: p.costPrice,
+      ));
+    }
+    return list;
+  }
 }
 
 class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
@@ -235,30 +522,29 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         super(
           ClientPortalState(
             clientProfile: const ClientProfile(
-              id: '33333333-3333-4333-8333-333333333333',
-              companyName: 'Novacale Limited',
-              contactPerson: 'Dr. Chuka Okafor',
-              email: 'client.novacale@novaexpress.ng',
-              phone: '08034455667',
-              address: 'Plot 12, Commercial Avenue, Central Business District, Abuja',
-              city: 'Abuja',
-              state: 'Federal Capital Territory',
-              code: 'CLI-NOVACALE-01',
-              tier: 'enterprise',
-              closerLimit: 250,
-              isEnterprise: true,
+              id: '',
+              companyName: '',
+              contactPerson: '',
+              email: '',
+              phone: '',
+              address: '',
+              city: '',
+              state: '',
+              code: '',
+              tier: 'standard',
+              closerLimit: 0,
+              isEnterprise: false,
             ),
           ),
         ) {
     loadClientData();
     _ref.listen<OrdersState>(ordersProvider, (previous, next) {
       if (next.orders.isEmpty) return;
-      final companyName = state.clientProfile.companyName.toLowerCase();
+      final companyName = state.clientProfile.companyName.trim().toLowerCase();
       final clientId = state.clientProfile.id;
       final matchingOrders = next.orders.where((o) =>
-          (o.clientName.toLowerCase().contains(companyName)) ||
           (o.clientId != null && o.clientId == clientId) ||
-          o.productName.toLowerCase().contains('grazer')).toList();
+          (o.clientName.trim().isNotEmpty && o.clientName.trim().toLowerCase() == companyName)).toList();
       if (matchingOrders.isNotEmpty) {
         final merged = [...matchingOrders];
         for (final existing in state.orders) {
@@ -305,40 +591,57 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
     state = state.copyWith(selectedLeadStatusFilter: status);
   }
 
+  void setFinanceProductFilter(String filter) {
+    state = state.copyWith(selectedFinanceProductFilter: filter);
+  }
+
+  void setFinanceTimeFilter(String timeFilter) {
+    state = state.copyWith(selectedFinanceTimeFilter: timeFilter);
+  }
+
+  /// Exports settlement statement CSV content for the client
+  String generateSettlementCsv() {
+    final buffer = StringBuffer();
+    buffer.writeln('Settlement Number,Period Start,Period End,Orders Count,Gross Collections (NGN),Logistics Deductions (NGN),Net Payout (NGN),Bank Name,Account Number,Account Name,Status,Settled Date');
+    for (final s in state.settlements) {
+      buffer.writeln('${s.settlementNumber},${s.periodStart.toIso8601String().split('T').first},${s.periodEnd.toIso8601String().split('T').first},${s.totalOrdersCount},${s.grossCollections.toStringAsFixed(2)},${s.logisticsFeesDeducted.toStringAsFixed(2)},${s.netPayoutAmount.toStringAsFixed(2)},${s.destinationBankName},"${s.destinationAccountNumber}","${s.destinationAccountName}",${s.status},${s.settledAt.toIso8601String()}');
+    }
+    return buffer.toString();
+  }
+
   /// Initial load and sync of client data
   Future<void> loadClientData() async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
       final user = _ref.read(authProvider).user;
-      final clientId = user?.clientId ?? '33333333-3333-4333-8333-333333333333';
-      final companyName = user?.clientCompanyName ?? 'Novacale Limited';
+      final clientId = user?.clientId ?? '';
+      final companyName = user?.clientCompanyName ?? (user?.fullName.isNotEmpty == true ? user!.fullName : '');
 
-      // 1. Fetch live products and packages from ProductCatalogProvider
+      // 1. Fetch live products and packages strictly scoped for this client
       final catalogState = _ref.read(productCatalogProvider);
-      final clientProducts = catalogState.products.where((p) =>
-          p.clientName.toLowerCase() == companyName.toLowerCase() ||
-          p.name.toLowerCase().contains('grazer')).toList();
+      final clientProducts = catalogState.products.where((p) {
+        if (p.clientId != null && p.clientId == clientId) return true;
+        if (p.clientName.trim().isNotEmpty && p.clientName.trim().toLowerCase() == companyName.trim().toLowerCase()) return true;
+        return false;
+      }).toList();
 
       List<ProductPackage> allPackages = [];
-      for (final p in (clientProducts.isNotEmpty ? clientProducts : catalogState.products)) {
+      for (final p in clientProducts) {
         allPackages.addAll(catalogState.getPackagesForProduct(p.name));
       }
 
-      // 2. Fetch all orders from OrdersProvider and filter for this client
+      // 2. Fetch all orders from OrdersProvider strictly scoped for this client
       final ordersState = _ref.read(ordersProvider);
-      List<OrderEntity> clientOrders = ordersState.orders.where((o) =>
-          (o.clientName.toLowerCase().contains(companyName.toLowerCase())) ||
-          (o.clientId != null && o.clientId == clientId) ||
-          o.productName.toLowerCase().contains('grazer')).toList();
-
-      // If no orders yet, seed a rich initial sample set for Novacale Limited
-      if (clientOrders.isEmpty) {
-        clientOrders = _generateSeedOrders(clientId, companyName);
-      }
+      List<OrderEntity> clientOrders = ordersState.orders.where((o) {
+        if (o.clientId != null && o.clientId == clientId) return true;
+        if (o.clientName.trim().isNotEmpty && o.clientName.trim().toLowerCase() == companyName.trim().toLowerCase()) return true;
+        return false;
+      }).toList();
 
       // 3. Fetch Closers and Leads via Repository
       List<ClientCloser> clientClosers = [];
       List<CustomerLead> clientLeads = [];
+      List<ClientSettlement> clientSettlements = [];
 
       try {
         final closersRes = await _repository.getClosers(clientId);
@@ -350,40 +653,82 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         if (leadsRes.isNotEmpty) {
           clientLeads = leadsRes;
         }
+
+        final settlementsRes = await _repository.getClientSettlements(clientId);
+        if (settlementsRes.isNotEmpty) {
+          clientSettlements = settlementsRes;
+        }
       } catch (dbErr) {
-        debugPrint('[CLIENT_PORTAL] ℹ️ Closers/leads sync notice: $dbErr');
+        debugPrint('[CLIENT_PORTAL] ℹ️ Closers/leads/settlements sync notice: $dbErr');
       }
 
-      // Fallback seed data if offline or freshly initialised
-      if (clientClosers.isEmpty) {
-        clientClosers = _generateSeedClosers(clientId);
-      }
-      if (clientLeads.isEmpty) {
-        clientLeads = _generateSeedLeads(clientId, clientClosers.first.id);
+      Map<String, dynamic> custodyData = {};
+      try {
+        final custodyRes = await _repository.getMerchantAssetCustody(clientId);
+        if (custodyRes.isNotEmpty) {
+          custodyData = custodyRes;
+        }
+      } catch (_) {}
+
+      // 4. Fetch Client Profile with Bank Account details
+      ClientProfile profileToUse;
+      try {
+        final remoteProfile = await _repository.getClientProfile(clientId);
+        if (remoteProfile != null) {
+          profileToUse = remoteProfile.copyWith(
+            totalClosersCount: clientClosers.length,
+          );
+        } else {
+          profileToUse = ClientProfile(
+            id: clientId,
+            companyName: companyName,
+            contactPerson: user?.fullName ?? '',
+            email: user?.email ?? '',
+            phone: user?.phone ?? '',
+            address: '',
+            city: '',
+            state: '',
+            code: 'CLI-01',
+            tier: 'standard',
+            closerLimit: 0,
+            isEnterprise: false,
+            totalClosersCount: clientClosers.length,
+            bankName: '',
+            accountNumber: '',
+            accountName: companyName,
+          );
+        }
+      } catch (_) {
+        profileToUse = ClientProfile(
+          id: clientId,
+          companyName: companyName,
+          contactPerson: user?.fullName ?? '',
+          email: user?.email ?? '',
+          phone: user?.phone ?? '',
+          address: '',
+          city: '',
+          state: '',
+          code: 'CLI-01',
+          tier: 'standard',
+          closerLimit: 0,
+          isEnterprise: false,
+          totalClosersCount: clientClosers.length,
+          bankName: '',
+          accountNumber: '',
+          accountName: companyName,
+        );
       }
 
       if (!mounted) return;
       state = state.copyWith(
-        clientProfile: ClientProfile(
-          id: clientId,
-          companyName: companyName,
-          contactPerson: user?.fullName.isNotEmpty == true ? user!.fullName : 'Dr. Chuka Okafor',
-          email: user?.email.isNotEmpty == true ? user!.email : 'client.novacale@novaexpress.ng',
-          phone: user?.phone.isNotEmpty == true ? user!.phone : '08034455667',
-          address: 'Plot 12, Commercial Avenue, Central Business District, Abuja',
-          city: 'Abuja',
-          state: 'Federal Capital Territory',
-          code: 'CLI-NOVACALE-01',
-          tier: 'enterprise',
-          closerLimit: 250,
-          isEnterprise: true,
-          totalClosersCount: clientClosers.length,
-        ),
-        products: clientProducts.isNotEmpty ? clientProducts : catalogState.products,
+        clientProfile: profileToUse,
+        products: clientProducts,
         packages: allPackages,
         orders: clientOrders,
         closers: clientClosers,
         leads: clientLeads,
+        settlements: clientSettlements,
+        assetCustodyData: custodyData,
         isLoading: false,
       );
     } catch (e) {
@@ -399,6 +744,8 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
     required String fullName,
     required String email,
     required String phone,
+    String? password,
+    String? avatarUrl,
     int dailyCallTarget = 50,
     double commissionRate = 500.0,
   }) async {
@@ -415,6 +762,8 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
           fullName: fullName.trim(),
           email: email.trim(),
           phone: phone.trim(),
+          password: password,
+          avatarUrl: avatarUrl,
           dailyCallTarget: dailyCallTarget,
           commissionRate: commissionRate,
         );
@@ -430,21 +779,47 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
           fullName: fullName.trim(),
           email: email.trim(),
           phone: phone.trim(),
+          avatarUrl: avatarUrl,
           dailyCallTarget: dailyCallTarget,
           commissionRate: commissionRate,
           isActive: true,
           createdAt: DateTime.now(),
         );
+
+        if (password != null && password.trim().isNotEmpty) {
+          final fallbackUser = UserModel(
+            id: fallbackId,
+            authUserId: fallbackId,
+            email: email.trim().toLowerCase(),
+            firstName: fullName.trim().split(' ').first,
+            lastName: fullName.trim().split(' ').skip(1).join(' '),
+            phone: phone.trim(),
+            role: 'closer',
+            clientId: state.clientProfile.id,
+            closerId: fallbackId,
+            closerCode: closerCode,
+            avatarUrl: avatarUrl,
+          );
+          AuthRemoteDataSourceImpl.registerUserInMemory(fallbackUser, password.trim());
+        }
       }
 
       final updatedClosers = [newCloser, ...state.closers];
-      state = state.copyWith(closers: updatedClosers, isLoading: false);
+      final updatedProfile = state.clientProfile.copyWith(
+        totalClosersCount: state.clientProfile.totalClosersCount + 1,
+      );
+      state = state.copyWith(
+        closers: updatedClosers,
+        clientProfile: updatedProfile,
+        isLoading: false,
+      );
       return newCloser;
     } catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
       rethrow;
     }
   }
+
 
   /// Activate or Deactivate an Employee / Closer
   Future<void> toggleCloserStatus(String closerId, bool isActive) async {
@@ -481,19 +856,24 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
     try {
       final closer = state.closers.firstWhere((c) => c.id == closerId);
 
-      // Async update in Repository
-      Future.microtask(() async {
-        try {
-          await _repository.resetCloserPassword(
-            closerId: closerId,
-            userId: closer.userId,
-            newPassword: newPassword,
-          );
-          debugPrint('[CLIENT_PORTAL] ✅ Password reset for closer ${closer.closerCode} (${closer.email})');
-        } catch (dbErr) {
-          debugPrint('[CLIENT_PORTAL] ℹ️ Reset password notice: $dbErr');
+      // In-memory sync immediately for offline/test reliability
+      if (closer.email.isNotEmpty) {
+        final registered = AuthRemoteDataSourceImpl.getRegisteredUser(closer.email);
+        if (registered != null) {
+          AuthRemoteDataSourceImpl.registerUserInMemory(registered, newPassword);
         }
-      });
+      }
+
+      try {
+        await _repository.resetCloserPassword(
+          closerId: closerId,
+          userId: closer.userId,
+          newPassword: newPassword,
+        );
+        debugPrint('[CLIENT_PORTAL] ✅ Password reset for closer ${closer.closerCode} (${closer.email})');
+      } catch (dbErr) {
+        debugPrint('[CLIENT_PORTAL] ℹ️ Reset password notice: $dbErr');
+      }
 
       state = state.copyWith(isLoading: false);
     } catch (e) {
@@ -692,17 +1072,27 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
       notes: notes ?? lead.callNotes,
     );
 
-    // 2. Update lead status in local state
-    final updatedLeads = state.leads.map((l) {
-      if (l.id == lead.id) {
-        return l.copyWith(
-          status: 'order_created',
-          convertedOrderId: createdOrder.id,
-          lastCalledAt: DateTime.now(),
-        );
-      }
-      return l;
-    }).toList();
+    // 2. Update lead status in local state (safely upserting in case state refreshed during order creation)
+    final containsLead = state.leads.any((l) => l.id == lead.id);
+    final updatedLeads = containsLead
+        ? state.leads.map((l) {
+            if (l.id == lead.id) {
+              return l.copyWith(
+                status: 'order_created',
+                convertedOrderId: createdOrder.id,
+                lastCalledAt: DateTime.now(),
+              );
+            }
+            return l;
+          }).toList()
+        : [
+            lead.copyWith(
+              status: 'order_created',
+              convertedOrderId: createdOrder.id,
+              lastCalledAt: DateTime.now(),
+            ),
+            ...state.leads,
+          ];
 
     // 3. Update closer performance counts
     final updatedClosers = state.closers.map((c) {
@@ -799,16 +1189,17 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         createdAt: DateTime.now(),
       );
 
-      // 2. Execute 2-Tier Automated Dispatch Engine
+      // 2. Execute 2-Tier Automated Dispatch Engine with live rider stock allocations
+      final riderAllocations = _ref.read(stockProvider).riderAllocations;
       final routingResult = OrderRoutingService.routeOrder(
         order: provisionalOrder,
         distributionCenters: allDcs,
         drivers: allDrivers,
-        stockAllocations: const [],
+        stockAllocations: riderAllocations,
       );
 
-      final String assignedDcId = routingResult.distributionCenter?.id ??
-          (allDcs.isNotEmpty ? allDcs.firstWhere((dc) => dc.isHub, orElse: () => allDcs.first).id : '22222222-2222-4222-8222-222222222222');
+      final String? assignedDcId = routingResult.distributionCenter?.id ??
+          (allDcs.isNotEmpty ? allDcs.firstWhere((dc) => dc.isHub, orElse: () => allDcs.first).id : null);
       final String assignedDcName = routingResult.distributionCenter?.name ?? dcState.activeHubName;
 
       String? assignedDriverId;
@@ -947,6 +1338,10 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
     required String name,
     required String sku,
     required double unitPrice,
+    double? costPrice,
+    String? barcode,
+    double? weightKg,
+    int? lowStockThreshold,
     String category = 'Health & Wellness',
     String? description,
     String? imageUrl,
@@ -975,14 +1370,18 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
       };
 
       // 2. Register into central DC Inventory (StockProvider)
-      await _ref.read(stockProvider.notifier).addNewProduct(
+      final stockItem = await _ref.read(stockProvider.notifier).addNewProduct(
         name: cleanName,
         sku: cleanSku,
         category: category,
         price: unitPrice,
+        costPrice: costPrice,
+        barcode: barcode,
+        weightKg: weightKg,
         ownerName: clientCompany,
         clientId: clientId,
         initialQuantity: 0,
+        lowStockThreshold: lowStockThreshold ?? 10,
         description: description ?? '',
         imageAsset: imageUrl,
         coveringStates: coveringStates,
@@ -991,9 +1390,14 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
 
       // 3. Register into Master Commercial Catalog with auto-built packages
       final newProd = await _ref.read(productCatalogProvider.notifier).registerNewProduct(
+        id: stockItem.id,
         name: cleanName,
         sku: cleanSku,
         baseUnitPrice: unitPrice,
+        costPrice: costPrice,
+        barcode: barcode,
+        weightKg: weightKg,
+        lowStockThreshold: lowStockThreshold ?? 10,
         category: category,
         clientName: clientCompany,
         clientId: clientId,
@@ -1022,27 +1426,46 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
     required Map<String, int> dcAllocations, // { dcId: units }
     String? waybillNumber,
     String? notes,
+    String? senderId,
+    String? senderName,
+    String? senderSignatureUrl,
   }) async {
     state = state.copyWith(isLoading: true);
     try {
+      final clientId = state.clientProfile.id;
       final clientCompany = state.clientProfile.companyName;
-      final resolvedWaybill = waybillNumber?.trim().isNotEmpty == true
-          ? waybillNumber!.trim()
-          : 'WAYBILL-${sku.trim().toUpperCase()}-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+      final resolvedSenderName = senderName ?? (state.clientProfile.companyName.isNotEmpty ? state.clientProfile.companyName : 'Merchant Admin');
 
-      int totalUnitsSupplied = 0;
       for (final entry in dcAllocations.entries) {
         final dcId = entry.key;
         final qty = entry.value;
         if (qty > 0) {
-          totalUnitsSupplied += qty;
-          await _ref.read(stockProvider.notifier).receiveStock(
-            productIdOrSku: sku.trim(),
-            quantity: qty,
-            waybillNumber: resolvedWaybill,
-            distributionCenterId: dcId,
-            supplierName: clientCompany,
-          );
+          if (senderSignatureUrl != null && senderSignatureUrl.isNotEmpty) {
+            await _ref.read(stockProvider.notifier).dispatchClientSupply(
+              clientId: clientId,
+              dcId: dcId,
+              items: [
+                {
+                  'product_id': productId,
+                  'quantity': qty,
+                  'notes': notes,
+                }
+              ],
+              senderId: senderId,
+              senderName: resolvedSenderName,
+              senderSignatureUrl: senderSignatureUrl,
+              notes: notes,
+            );
+          } else {
+            // Legacy fallback if no signature
+            await _ref.read(stockProvider.notifier).receiveStock(
+              productIdOrSku: sku.trim(),
+              quantity: qty,
+              waybillNumber: waybillNumber,
+              distributionCenterId: dcId,
+              supplierName: clientCompany,
+            );
+          }
         }
       }
 
@@ -1050,16 +1473,11 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
       await _ref.read(productCatalogProvider.notifier).reloadCatalog();
       final activeHub = _ref.read(dcConsoleProvider).activeHubId;
       await _ref.read(stockProvider.notifier).fetchStockItems(null, activeHub);
+      if (clientId.isNotEmpty) {
+        await _ref.read(stockProvider.notifier).fetchStockTransfers(clientId: clientId);
+      }
 
-      // Update local client products stock count
-      final updatedProducts = state.products.map((p) {
-        if (p.id == productId || p.sku.toUpperCase() == sku.trim().toUpperCase() || p.name.toLowerCase() == productName.trim().toLowerCase()) {
-          return p.copyWith(totalStockAcrossHubs: p.totalStockAcrossHubs + totalUnitsSupplied);
-        }
-        return p;
-      }).toList();
-
-      state = state.copyWith(products: updatedProducts, isLoading: false);
+      state = state.copyWith(isLoading: false);
     } catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
       rethrow;
@@ -1080,6 +1498,7 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
     state = state.copyWith(isLoading: true);
     try {
       final pkg = _ref.read(productCatalogProvider.notifier).addPackageToProduct(
+        productId: productId,
         productName: productName,
         packageName: packageName,
         quantity: quantity,
@@ -1087,6 +1506,7 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         freeQuantity: freeQuantity,
         packagePrice: packagePrice,
         clientName: state.clientProfile.companyName,
+        clientId: state.clientProfile.id,
         description: description,
       );
 
@@ -1223,230 +1643,13 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
     return importOrdersCsv(sampleBatch);
   }
 
-  String _generateUuid() {
-    final random = math.Random();
-    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
-    bytes[6] = (bytes[6] & 0x0f) | 0x40;
-    bytes[8] = (bytes[8] & 0x3f) | 0x80;
-    final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+  static String _generateUuid() {
+    final random = math.Random.secure();
+    final values = List<int>.generate(16, (i) => random.nextInt(256));
+    values[6] = (values[6] & 0x0f) | 0x40; // RFC4122 v4
+    values[8] = (values[8] & 0x3f) | 0x80; // RFC4122 variant
+    final hex = values.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
     return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20, 32)}';
-  }
-
-  List<ClientCloser> _generateSeedClosers(String clientId) {
-    return [
-      ClientCloser(
-        id: '44444444-4444-4444-8444-444444444444',
-        clientId: clientId,
-        closerCode: 'CLS-NOVA-001',
-        fullName: 'Amaka Chioma',
-        email: 'closer.amaka@novacale.ng',
-        phone: '08021122334',
-        dailyCallTarget: 50,
-        totalLeadsAssigned: 45,
-        totalLeadsConfirmed: 38,
-        totalOrdersBooked: 34,
-        totalOrdersDelivered: 31,
-        commissionRate: 500.0,
-      ),
-      ClientCloser(
-        id: '44444444-4444-4444-8444-444444444445',
-        clientId: clientId,
-        closerCode: 'CLS-NOVA-002',
-        fullName: 'Ibrahim Musa',
-        email: 'ibrahim.musa@novacale.ng',
-        phone: '08035566778',
-        dailyCallTarget: 50,
-        totalLeadsAssigned: 40,
-        totalLeadsConfirmed: 32,
-        totalOrdersBooked: 29,
-        totalOrdersDelivered: 26,
-        commissionRate: 500.0,
-      ),
-      ClientCloser(
-        id: '44444444-4444-4444-8444-444444444446',
-        clientId: clientId,
-        closerCode: 'CLS-NOVA-003',
-        fullName: 'Funke Adeleke',
-        email: 'funke.adeleke@novacale.ng',
-        phone: '08078899001',
-        dailyCallTarget: 40,
-        totalLeadsAssigned: 35,
-        totalLeadsConfirmed: 28,
-        totalOrdersBooked: 25,
-        totalOrdersDelivered: 22,
-        commissionRate: 500.0,
-      ),
-    ];
-  }
-
-  List<CustomerLead> _generateSeedLeads(String clientId, String defaultCloserId) {
-    return [
-      CustomerLead(
-        id: '55555555-5555-4555-8555-000000000001',
-        clientId: clientId,
-        assignedCloserId: defaultCloserId,
-        assignedCloserName: 'Amaka Chioma',
-        customerName: 'Chief Emmanuel Adeleke',
-        customerPhone: '08033221144',
-        customerAddress: 'Plot 14, Ahmadu Bello Way, Area 11, Garki',
-        deliveryState: 'Federal Capital Territory',
-        deliveryLga: 'Abuja Municipal (AMAC)',
-        productInterest: 'Grazer Tea',
-        packageInterest: '2 Packs Promo Deal',
-        status: 'new_lead',
-        callNotes: 'Interested in 2-pack promo. Prefers morning delivery.',
-      ),
-      CustomerLead(
-        id: '55555555-5555-4555-8555-000000000002',
-        clientId: clientId,
-        assignedCloserId: defaultCloserId,
-        assignedCloserName: 'Amaka Chioma',
-        customerName: 'Mrs. Folashade Bakare',
-        customerPhone: '08055667788',
-        customerAddress: 'Flat 4B, Hillview Estate, Guzape',
-        deliveryState: 'Federal Capital Territory',
-        deliveryLga: 'Abuja Municipal (AMAC)',
-        productInterest: 'Grazer Tea',
-        packageInterest: '3 Packs Family Bundle',
-        status: 'calling',
-        callNotes: 'Requested call back around 2 PM to confirm delivery address.',
-      ),
-      CustomerLead(
-        id: '55555555-5555-4555-8555-000000000003',
-        clientId: clientId,
-        assignedCloserId: defaultCloserId,
-        assignedCloserName: 'Amaka Chioma',
-        customerName: 'Alhaji Bello Usman',
-        customerPhone: '08099887766',
-        customerAddress: 'No. 8, Bompai Road, Fagge',
-        deliveryState: 'Kano State',
-        deliveryLga: 'Fagge',
-        productInterest: 'Grazer Tea',
-        packageInterest: '5 Packs Mega Saver (Buy 4 Get 1 Free)',
-        status: 'confirmed',
-        callNotes: 'Ready for immediate dispatch to Kano depot.',
-      ),
-    ];
-  }
-
-  List<OrderEntity> _generateSeedOrders(String clientId, String companyName) {
-    final now = DateTime.now();
-    return [
-      OrderEntity(
-        id: 'ord-client-001',
-        orderNumber: 'NOV-2026-8801',
-        customerName: 'Amina Mohammed',
-        customerPhone: '08031122334',
-        deliveryAddress: 'House 14, 4th Avenue, Gwarinpa Estate',
-        deliveryCity: 'Abuja Municipal (AMAC)',
-        deliveryState: 'Federal Capital Territory',
-        lga: 'Abuja Municipal (AMAC)',
-        status: 'in_transit',
-        paymentStatus: 'pending',
-        paymentType: 'Pay on Delivery (POS/Cash)',
-        totalAmount: 35000.0,
-        basePrice: 35000.0,
-        upsellAmount: 0.0,
-        quantity: 2,
-        productName: 'Grazer Tea',
-        packageDealName: '2 Packs Promo Deal',
-        deliveryAgentId: 'b1111111-1111-4111-8111-111111111111',
-        deliveryAgentName: 'Emeka Rider (PDA-7000)',
-        deliveryAgentPhone: '08012345678',
-        distributionCenterId: '22222222-2222-4222-8222-222222222222',
-        distributionCenterName: 'Wuse Central Distribution Hub',
-        clientName: companyName,
-        clientId: clientId,
-        closerId: '44444444-4444-4444-8444-444444444444',
-        closerName: 'Amaka Chioma',
-        closerCode: 'CLS-NOVA-001',
-        createdAt: now.subtract(const Duration(hours: 3)),
-      ),
-      OrderEntity(
-        id: 'ord-client-002',
-        orderNumber: 'NOV-2026-8802',
-        customerName: 'Chinedu Eze',
-        customerPhone: '08059988776',
-        deliveryAddress: 'Plot 45, Adetokunbo Ademola Crescent, Wuse II',
-        deliveryCity: 'Abuja Municipal (AMAC)',
-        deliveryState: 'Federal Capital Territory',
-        lga: 'Abuja Municipal (AMAC)',
-        status: 'delivered',
-        paymentStatus: 'paid',
-        paymentType: 'Direct Bank Transfer',
-        totalAmount: 50000.0,
-        basePrice: 50000.0,
-        upsellAmount: 0.0,
-        quantity: 3,
-        productName: 'Grazer Tea',
-        packageDealName: '3 Packs Family Bundle',
-        deliveryAgentId: 'b1111111-1111-4111-8111-111111111111',
-        deliveryAgentName: 'Emeka Rider (PDA-7000)',
-        deliveryAgentPhone: '08012345678',
-        distributionCenterId: '22222222-2222-4222-8222-222222222222',
-        distributionCenterName: 'Wuse Central Distribution Hub',
-        clientName: companyName,
-        clientId: clientId,
-        closerId: '44444444-4444-4444-8444-444444444444',
-        closerName: 'Amaka Chioma',
-        closerCode: 'CLS-NOVA-001',
-        createdAt: now.subtract(const Duration(days: 1)),
-      ),
-      OrderEntity(
-        id: 'ord-client-003',
-        orderNumber: 'NOV-2026-8803',
-        customerName: 'Fatima Bello',
-        customerPhone: '07034455667',
-        deliveryAddress: 'Block B, Federal Housing Estate, Kubwa',
-        deliveryCity: 'Bwari',
-        deliveryState: 'Federal Capital Territory',
-        lga: 'Bwari',
-        status: 'assigned',
-        paymentStatus: 'pending',
-        paymentType: 'Pay on Delivery (Cash)',
-        totalAmount: 22000.0,
-        basePrice: 22000.0,
-        upsellAmount: 0.0,
-        quantity: 1,
-        productName: 'Grazer Tea',
-        packageDealName: '1 Pack (Standard Retail)',
-        deliveryAgentId: 'b2222222-2222-4222-8222-222222222222',
-        deliveryAgentName: 'Musa Garba (RDR-102)',
-        deliveryAgentPhone: '08023456789',
-        distributionCenterId: '22222222-2222-4222-8222-222222222222',
-        distributionCenterName: 'Wuse Central Distribution Hub',
-        clientName: companyName,
-        clientId: clientId,
-        closerId: '44444444-4444-4444-8444-444444444445',
-        closerName: 'Ibrahim Musa',
-        closerCode: 'CLS-NOVA-002',
-        createdAt: now.subtract(const Duration(hours: 5)),
-      ),
-      OrderEntity(
-        id: 'ord-client-004',
-        orderNumber: 'NOV-2026-8804',
-        customerName: 'Oluwaseun Adeyemi',
-        customerPhone: '08123344556',
-        deliveryAddress: 'No 8, Hospital Road, Gwagwalada',
-        deliveryCity: 'Gwagwalada',
-        deliveryState: 'Federal Capital Territory',
-        lga: 'Gwagwalada',
-        status: 'pending_dispatch',
-        paymentStatus: 'pending',
-        paymentType: 'Paystack Card Checkout',
-        totalAmount: 55000.0,
-        basePrice: 55000.0,
-        upsellAmount: 0.0,
-        quantity: 5,
-        productName: 'Grazer Tea',
-        packageDealName: '5 Packs Mega Saver (Buy 4 Get 1 Free)',
-        distributionCenterId: 'dc-gwag-002',
-        distributionCenterName: 'Gwagwalada Regional Depot',
-        clientName: companyName,
-        clientId: clientId,
-        createdAt: now.subtract(const Duration(minutes: 30)),
-      ),
-    ];
   }
 }
 
@@ -1458,3 +1661,4 @@ final clientPortalProvider = StateNotifierProvider<ClientPortalNotifier, ClientP
   final repository = ref.watch(clientPortalRepositoryProvider);
   return ClientPortalNotifier(ref, repository: repository);
 });
+

@@ -14,7 +14,19 @@ class ClientProfile {
   final bool isEnterprise;
   final int totalClosersCount;
   final bool isActive;
+  final String bankName;
+  final String accountNumber;
+  final String accountName;
+  final String settlementFrequency;
+  final String settlementDay;
   final DateTime? createdAt;
+  final double? customDeliveryFee;
+  final String? customPlatformFeeType;
+  final double? customPlatformFeeValue;
+  final String? customPaystackFeeAbsorbedBy;
+  final double? customFailedAttemptFee;
+
+  double? get customPlatformFee => customPlatformFeeValue;
 
   const ClientProfile({
     required this.id,
@@ -23,22 +35,30 @@ class ClientProfile {
     required this.email,
     required this.phone,
     required this.address,
-    this.city = 'Abuja',
-    this.state = 'Federal Capital Territory',
-    this.code = 'CLI-01',
-    this.tier = 'enterprise',
-    this.closerLimit = 250,
-    this.isEnterprise = true,
+    this.city = '',
+    this.state = '',
+    this.code = '',
+    this.tier = 'standard_merchant',
+    this.closerLimit = 0,
+    this.isEnterprise = false,
     this.totalClosersCount = 0,
     this.isActive = true,
+    this.bankName = '',
+    this.accountNumber = '',
+    this.accountName = '',
+    this.settlementFrequency = 'weekly',
+    this.settlementDay = 'Friday',
     this.createdAt,
+    this.customDeliveryFee,
+    this.customPlatformFeeType,
+    this.customPlatformFeeValue,
+    this.customPaystackFeeAbsorbedBy,
+    this.customFailedAttemptFee,
   });
 
   factory ClientProfile.fromJson(Map<String, dynamic> json) {
     final isEnt = json['is_enterprise'] == true ||
-        json['tier']?.toString().toLowerCase() == 'enterprise' ||
-        (json['company_name']?.toString().toLowerCase().contains('novacale') ?? false) ||
-        (json['name']?.toString().toLowerCase().contains('novacale') ?? false);
+        json['tier']?.toString().toLowerCase() == 'enterprise';
 
     int closersCount = 0;
     if (json['client_closers'] is List) {
@@ -47,22 +67,40 @@ class ClientProfile {
       closersCount = (json['total_closers_count'] as num?)?.toInt() ?? 0;
     }
 
+    final resolvedCompany = json['company_name']?.toString() ?? json['name']?.toString() ?? '';
+    final resolvedContact = json['contact_person']?.toString() ??
+        json['contact_name']?.toString() ??
+        json['manager_name']?.toString() ??
+        '';
+    final resolvedEmail = json['email']?.toString() ?? '';
+
     return ClientProfile(
       id: json['id']?.toString() ?? '',
-      companyName: json['company_name']?.toString() ?? json['name']?.toString() ?? 'Novacale Limited',
-      contactPerson: json['contact_person']?.toString() ?? 'Dr. Chuka Okafor',
-      email: json['email']?.toString() ?? 'client.novacale@novaexpress.ng',
-      phone: json['phone']?.toString() ?? json['phone_number']?.toString() ?? '08034455667',
-      address: json['address']?.toString() ?? 'Plot 12, Commercial Avenue, Central Business District, Abuja',
-      city: json['city']?.toString() ?? 'Abuja',
-      state: json['state']?.toString() ?? 'Federal Capital Territory',
-      code: json['code']?.toString() ?? 'CLI-NOVACALE-01',
+      companyName: resolvedCompany,
+      contactPerson: resolvedContact,
+      email: resolvedEmail,
+      phone: json['phone']?.toString() ?? json['phone_number']?.toString() ?? '',
+      address: json['address']?.toString() ?? '',
+      city: json['city']?.toString() ?? '',
+      state: json['state']?.toString() ?? '',
+      code: json['code']?.toString() ?? '',
       tier: json['tier']?.toString() ?? (isEnt ? 'enterprise' : 'standard_merchant'),
       closerLimit: (json['closer_limit'] as num?)?.toInt() ?? (isEnt ? 250 : 0),
       isEnterprise: isEnt,
       totalClosersCount: closersCount,
       isActive: json['is_active'] == true || json['is_active'] == 1,
+      bankName: json['bank_name']?.toString() ?? '',
+      accountNumber: json['account_number']?.toString() ?? '',
+      accountName: json['account_name']?.toString() ?? resolvedCompany,
+      settlementFrequency: json['settlement_frequency']?.toString() ?? 'weekly',
+      settlementDay: json['settlement_day']?.toString() ?? 'Friday',
       createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'].toString()) : null,
+      customDeliveryFee: (json['custom_delivery_fee'] as num?)?.toDouble(),
+      customPlatformFeeType: json['custom_platform_fee_type']?.toString(),
+      customPlatformFeeValue: (json['custom_platform_fee_value'] as num?)?.toDouble() ??
+          (json['custom_platform_fee'] as num?)?.toDouble(),
+      customPaystackFeeAbsorbedBy: json['custom_paystack_fee_absorbed_by']?.toString(),
+      customFailedAttemptFee: (json['custom_failed_attempt_fee'] as num?)?.toDouble(),
     );
   }
 
@@ -82,7 +120,18 @@ class ClientProfile {
       'is_enterprise': isEnterprise,
       'total_closers_count': totalClosersCount,
       'is_active': isActive,
+      'bank_name': bankName,
+      'account_number': accountNumber,
+      'account_name': accountName,
+      'settlement_frequency': settlementFrequency,
+      'settlement_day': settlementDay,
       'created_at': createdAt?.toIso8601String(),
+      'custom_delivery_fee': customDeliveryFee,
+      'custom_platform_fee_type': customPlatformFeeType,
+      'custom_platform_fee_value': customPlatformFeeValue,
+      'custom_platform_fee': customPlatformFee,
+      'custom_paystack_fee_absorbed_by': customPaystackFeeAbsorbedBy,
+      'custom_failed_attempt_fee': customFailedAttemptFee,
     };
   }
 
@@ -101,7 +150,17 @@ class ClientProfile {
     bool? isEnterprise,
     int? totalClosersCount,
     bool? isActive,
+    String? bankName,
+    String? accountNumber,
+    String? accountName,
+    String? settlementFrequency,
+    String? settlementDay,
     DateTime? createdAt,
+    double? customDeliveryFee,
+    String? customPlatformFeeType,
+    double? customPlatformFeeValue,
+    String? customPaystackFeeAbsorbedBy,
+    double? customFailedAttemptFee,
   }) {
     return ClientProfile(
       id: id ?? this.id,
@@ -118,7 +177,17 @@ class ClientProfile {
       isEnterprise: isEnterprise ?? this.isEnterprise,
       totalClosersCount: totalClosersCount ?? this.totalClosersCount,
       isActive: isActive ?? this.isActive,
+      bankName: bankName ?? this.bankName,
+      accountNumber: accountNumber ?? this.accountNumber,
+      accountName: accountName ?? this.accountName,
+      settlementFrequency: settlementFrequency ?? this.settlementFrequency,
+      settlementDay: settlementDay ?? this.settlementDay,
       createdAt: createdAt ?? this.createdAt,
+      customDeliveryFee: customDeliveryFee ?? this.customDeliveryFee,
+      customPlatformFeeType: customPlatformFeeType ?? this.customPlatformFeeType,
+      customPlatformFeeValue: customPlatformFeeValue ?? this.customPlatformFeeValue,
+      customPaystackFeeAbsorbedBy: customPaystackFeeAbsorbedBy ?? this.customPaystackFeeAbsorbedBy,
+      customFailedAttemptFee: customFailedAttemptFee ?? this.customFailedAttemptFee,
     );
   }
 }

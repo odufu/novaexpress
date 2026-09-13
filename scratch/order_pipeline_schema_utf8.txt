@@ -1,0 +1,332 @@
+=== 1. ALL TABLES IN REMOTE OPENAPI ===
+- agent_inventory
+- cash_remittances
+- client_closers
+- client_packages
+- client_settlements
+- clients
+- companies
+- customer_leads
+- dc_finance_settings
+- delivery_agents
+- distribution_centers
+- inventory_audit_items
+- inventory_audits
+- monnify_transactions
+- monnify_virtual_accounts
+- notifications
+- order_activities
+- order_conversation_messages
+- order_conversations
+- orders
+- payout_claims
+- payout_requests
+- paystack_transactions
+- paystack_virtual_accounts
+- product_batches
+- product_packages
+- products
+- remittance_orders
+- rider_transactions
+- stock_handovers
+- stock_request_items
+- stock_requests
+- stock_returns
+- stock_transfer_items
+- stock_transfers
+- users
+- warehouses
+
+=== 2. DETAILED SCHEMAS FOR ORDER PIPELINE TABLES ===
+
+TABLE: orders (64 columns)
+   agent_entitlement               : number          | def:                      
+   assigned_agent_id               : string          | def:                       [FK]
+   assignment_status               : string          | def: auto_assigned        
+   base_price                      : number          | def: 0.0                  
+   client_company                  : string          | def: Novacale Limited     
+   client_delivery_fee             : number          | def:                      
+   client_id                       : string          | def:                       [FK]
+   client_name                     : string          | def: Novacale Limited     
+   closer_code                     : string          | def:                      
+   closer_id                       : string          | def:                      
+   closer_name                     : string          | def:                      
+   company_id                      : string          | def:                       [FK]
+   created_at                      : string          | def: now()                
+   customer_alt_phone              : string          | def:                      
+   customer_name                   : string          | def:                      
+   customer_phone                  : string          | def:                      
+   delivered_at                    : string          | def:                      
+   delivery_address                : string          | def:                      
+   delivery_agent_id               : string          | def:                       [FK]
+   delivery_city                   : string          | def:                      
+   delivery_lga                    : string          | def:                      
+   delivery_method                 : string          | def: cash                 
+   delivery_notes                  : string          | def:                      
+   delivery_state                  : string          | def:                      
+   distribution_center_id          : string          | def:                       [FK]
+   financial_settlement_status     : string          | def: pending_remittance   
+   free_quantity                   : integer         | def: 0                    
+   fulfillment_type                : string          | def: distributed_inventory 
+   geocoded_address                : string          | def:                      
+   geocoding_status                : string          | def: pending              
+   id                              : string          | def: gen_random_uuid()    
+   is_location_verified            : boolean         | def: False                
+   landmark                        : string          | def:                      
+   latitude                        : number          | def:                      
+   lead_id                         : string          | def:                      
+   lga                             : string          | def:                      
+   location_confidence             : number          | def: 0.0                  
+   longitude                       : number          | def:                      
+   order_number                    : string          | def:                      
+   original_client_id              : string          | def:                       [FK]
+   original_client_name            : string          | def:                      
+   ownership_transfer_reason       : string          | def:                      
+   ownership_transferred_at        : string          | def:                      
+   package_deal_id                 : string          | def:                      
+   package_deal_name               : string          | def:                      
+   paid_quantity                   : integer         | def: 1                    
+   payment_method                  : string          | def: cash                 
+   payment_status                  : string          | def: pending              
+   payment_type                    : string          | def: pay_on_delivery      
+   product_id                      : string          | def:                       [FK]
+   product_name                    : string          | def:                      
+   product_sku                     : string          | def:                      
+   proof_of_delivery_url           : string          | def:                      
+   quantity                        : integer         | def: 1                    
+   remittance_reference            : string          | def:                      
+   remittance_status               : string          | def: unremitted           
+   remitted_at                     : string          | def:                      
+   reschedule_note                 : string          | def:                      
+   routing_notes                   : string          | def:                      
+   scheduled_callback_at           : string          | def:                      
+   status                          : string          | def: in_transit           
+   total_amount                    : number          | def: 0.0                  
+   updated_at                      : string          | def: now()                
+   upsell_amount                   : number          | def: 0.0                  
+
+TABLE: order_items NOT IN OPENAPI DEFINITIONS!
+
+TABLE: order_activities (6 columns)
+   activity_type                   : string          | def:                      
+   created_at                      : string          | def: now()                
+   id                              : string          | def: gen_random_uuid()    
+   notes                           : string          | def:                      
+   order_id                        : string          | def:                       [FK]
+   user_id                         : string          | def:                       [FK]
+
+TABLE: package_deals NOT IN OPENAPI DEFINITIONS!
+
+TABLE: client_package_deals NOT IN OPENAPI DEFINITIONS!
+
+TABLE: distribution_centers (21 columns)
+   address                         : string          | def:                      
+   city                            : string          | def:                      
+   code                            : string          | def:                      
+   company_id                      : string          | def:                       [FK]
+   contact_email                   : string          | def:                      
+   contact_phone                   : string          | def:                      
+   created_at                      : string          | def: now()                
+   id                              : string          | def: gen_random_uuid()    
+   is_active                       : boolean         | def: True                 
+   is_grand_dc                     : boolean         | def: False                
+   is_hub                          : boolean         | def: False                
+   is_primary_dc                   : boolean         | def: False                
+   latitude                        : number          | def:                      
+   longitude                       : number          | def:                      
+   manager_name                    : string          | def:                      
+   name                            : string          | def:                      
+   operating_zones                 : jsonb           | def:                      
+   parent_dc_id                    : string          | def:                       [FK]
+   state                           : string          | def:                      
+   storage_capacity_units          : integer         | def: 25000                
+   updated_at                      : string          | def: now()                
+
+TABLE: delivery_agents (35 columns)
+   agent_code                      : string          | def:                      
+   assigned_zones                  : array           | def:                      
+   bank_account_name               : string          | def:                      
+   bank_account_number             : string          | def:                      
+   bank_name                       : string          | def:                      
+   base_salary                     : number          | def: 0.0                  
+   commission_rate                 : number          | def: 1000.0               
+   compensation_type               : string          | def: commission           
+   covered_lgas                    : jsonb           | def:                      
+   created_at                      : string          | def: now()                
+   current_cod_balance             : number          | def: 0.0                  
+   current_latitude                : number          | def:                      
+   current_longitude               : number          | def:                      
+   current_status                  : string          | def: available            
+   direct_transfer_balance         : number          | def: 0.0                  
+   distribution_center_id          : string          | def:                       [FK]
+   failed_delivery_allowance       : number          | def: 500.0                
+   fuel_allowance                  : number          | def: 800.0                
+   guarantor_name                  : string          | def:                      
+   guarantor_phone                 : string          | def:                      
+   id                              : string          | def: gen_random_uuid()    
+   is_active                       : boolean         | def: True                 
+   is_on_duty                      : boolean         | def: True                 
+   last_location_update            : string          | def:                      
+   last_sync_at                    : string          | def: now()                
+   max_active_orders               : integer         | def: 15                   
+   operating_city                  : string          | def: Wuse 2               
+   operating_state                 : string          | def: Abuja (FCT)          
+   personnel_type                  : string          | def: pda                  
+   transport_allowance             : number          | def: 1500.0               
+   updated_at                      : string          | def: now()                
+   upsell_bonus_percent            : number          | def: 10.0                 
+   user_id                         : string          | def:                       [FK]
+   vehicle_plate_number            : string          | def:                      
+   vehicle_type                    : string          | def: motorcycle           
+
+TABLE: clients (25 columns)
+   account_name                    : string          | def: Novacale Limited     
+   account_number                  : string          | def: 1012345678           
+   address                         : string          | def:                      
+   bank_name                       : string          | def: Zenith Bank          
+   city                            : string          | def: Abuja                
+   closer_limit                    : integer         | def: 250                  
+   code                            : string          | def:                      
+   company_id                      : string          | def:                       [FK]
+   company_name                    : string          | def:                      
+   contact_person                  : string          | def:                      
+   created_at                      : string          | def: now()                
+   custom_delivery_fee             : number          | def:                      
+   custom_failed_attempt_fee       : number          | def:                      
+   custom_platform_fee             : number          | def:                      
+   email                           : string          | def:                      
+   id                              : string          | def: gen_random_uuid()    
+   is_active                       : boolean         | def: True                 
+   is_enterprise                   : boolean         | def: True                 
+   name                            : string          | def:                      
+   phone                           : string          | def:                      
+   settlement_day                  : string          | def: Friday               
+   settlement_frequency            : string          | def: weekly               
+   state                           : string          | def: Federal Capital Territory 
+   tier                            : string          | def: enterprise           
+   total_closers_count             : integer         | def: 0                    
+
+TABLE: products (25 columns)
+   available_count                 : integer         | def: 0                    
+   barcode                         : string          | def:                      
+   base_price                      : number          | def: 0.0                  
+   category                        : string          | def:                      
+   client_id                       : string          | def:                       [FK]
+   client_name                     : string          | def: Novacale Limited     
+   company_id                      : string          | def:                       [FK]
+   cost_price                      : number          | def: 0.0                  
+   covering_states                 : array           | def:                      
+   created_at                      : string          | def: now()                
+   damaged_count                   : integer         | def: 0                    
+   dc_stocks                       : jsonb           | def:                      
+   delivered_count                 : integer         | def: 0                    
+   description                     : string          | def:                      
+   id                              : string          | def: gen_random_uuid()    
+   image_url                       : string          | def:                      
+   in_transit_count                : integer         | def: 0                    
+   is_active                       : boolean         | def: True                 
+   low_stock_threshold             : integer         | def: 5                    
+   name                            : string          | def:                      
+   reorder_level                   : integer         | def: 5                    
+   sku                             : string          | def:                      
+   stock_quantity                  : integer         | def: 0                    
+   updated_at                      : string          | def: now()                
+   weight_kg                       : number          | def: 0.5                  
+
+TABLE: chat_messages NOT IN OPENAPI DEFINITIONS!
+
+TABLE: messages NOT IN OPENAPI DEFINITIONS!
+
+TABLE: conversations NOT IN OPENAPI DEFINITIONS!
+
+TABLE: order_chats NOT IN OPENAPI DEFINITIONS!
+
+TABLE: notifications (9 columns)
+   action_route                    : string          | def:                      
+   category                        : string          | def: system               
+   company_id                      : string          | def:                       [FK]
+   created_at                      : string          | def: now()                
+   delivery_agent_id               : string          | def:                       [FK]
+   id                              : string          | def: gen_random_uuid()    
+   is_read                         : boolean         | def: False                
+   message                         : string          | def:                      
+   title                           : string          | def:                      
+
+TABLE: customer_follow_ups NOT IN OPENAPI DEFINITIONS!
+
+TABLE: order_status_history NOT IN OPENAPI DEFINITIONS!
+
+TABLE: order_notes NOT IN OPENAPI DEFINITIONS!
+
+TABLE: order_tracking NOT IN OPENAPI DEFINITIONS!
+
+=== 3. ALL STORED PROCEDURES / RPCs ===
+
+RPC: auto_dispatch_order
+   Parameters: p_max_distance_km: number, p_order_id: string
+
+RPC: auto_dispatch_order_by_state_lga
+   Parameters: p_order_id: string
+
+RPC: calculate_haversine_distance_km
+   Parameters: p_lat1: number, p_lat2: number, p_lon1: number, p_lon2: number
+
+RPC: calculate_remittance_transfer_fee
+   Parameters: p_amount: number
+
+RPC: confirm_delivery_pod
+   Parameters: p_agent_id: string, p_amount: number, p_notes: string, p_order_id: string, p_payment_type: string, p_proof_url: string
+
+RPC: decrement_driver_entitlement
+   Parameters: p_amount: number, p_driver_id: string
+
+RPC: find_closest_available_rider
+   Parameters: p_distribution_center_id: string, p_max_distance_km: number, p_order_lat: number, p_order_lng: number
+
+RPC: fn_approve_cash_remittance
+   Parameters: p_remittance_id: string, p_supervisor_id: string
+
+RPC: fn_calculate_merchant_asset_custody
+   Parameters: p_client_id: string, p_dc_id: string
+
+RPC: fn_confirm_order_delivery_stock
+   Parameters: p_agent_id: string, p_order_id: string, p_physical_quantity: integer, p_product_id: string
+
+RPC: fn_dispatch_client_supply
+   Parameters: p_client_id: string, p_dc_id: string, p_items: jsonb, p_notes: string, p_sender_id: string, p_sender_name: string, p_sender_signature_url: string
+
+RPC: fn_generate_merchant_daily_settlement
+   Parameters: p_client_id: string, p_custom_deductions: jsonb, p_dc_id: string, p_period_end: string, p_period_start: string
+
+RPC: fn_issue_dc_stock_to_rider
+   Parameters: p_dc_id: string, p_items: jsonb, p_notes: string, p_rider_id: string, p_sender_id: string, p_sender_name: string, p_sender_signature_url: string
+
+RPC: fn_mark_conversation_read
+   Parameters: p_conversation_id: string, p_role: string
+
+RPC: fn_receive_client_supply
+   Parameters: p_notes: string, p_receiver_id: string, p_receiver_name: string, p_receiver_signature_url: string, p_transfer_id: string, p_verified_items: jsonb
+
+RPC: fn_receive_rider_stock_return
+   Parameters: p_condition: string, p_dc_id: string, p_notes: string, p_receiver_id: string, p_return_id: string, p_verified_quantity: integer
+
+RPC: fn_rider_accept_stock_handover
+   Parameters: p_notes: string, p_rider_id: string, p_rider_name: string, p_rider_signature_url: string, p_transfer_id: string, p_verified_items: jsonb
+
+RPC: fn_rider_reject_stock_handover
+   Parameters: p_reason: string, p_rider_id: string, p_transfer_id: string
+
+RPC: log_delivery_failure
+   Parameters: p_agent_id: string, p_notes: string, p_order_id: string, p_reason_code: string, p_reschedule_time: string
+
+RPC: record_verified_gate_pin
+   Parameters: p_geocoded_address: string, p_latitude: number, p_longitude: number, p_order_id: string
+
+RPC: transfer_order_product_and_ownership
+   Parameters: p_actor_name: string, p_actor_role: string, p_new_base_price: number, p_new_free_quantity: integer, p_new_package_deal_id: string, p_new_package_name: string, p_new_paid_quantity: integer, p_new_product_id: string, p_new_quantity: integer, p_new_total_amount: number, p_order_id: string, p_transfer_reason: string
+
+RPC: update_driver_compensation
+   Parameters: p_agent_id: string, p_base_salary: number, p_commission_rate: number, p_compensation_type: string, p_covered_lgas: jsonb, p_dc_id: string, p_failed_allowance: number, p_personnel_type: string, p_transport_allowance: number
+
+RPC: update_rider_gps_telemetry
+   Parameters: p_agent_id: string, p_latitude: number, p_longitude: number

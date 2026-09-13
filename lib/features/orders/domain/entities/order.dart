@@ -20,9 +20,9 @@ class OrderEntity {
   final String paymentType; // 'pay_on_delivery' | 'prepaid'
   final String paymentStatus;
   final String fulfillmentType; // 'distributed_inventory' | 'client_package'
-  final String? clientId; // e.g. 'cli-novacale-001'
-  final String clientName; // e.g. 'Dr. Chuka Okafor'
-  final String clientCompany; // e.g. 'Novacale Limited'
+  final String? clientId;
+  final String clientName;
+  final String clientCompany;
   final String? clientPhone;
   final String? clientEmail;
   final String? packageDealId; // e.g. 'pkg-alpha-02'
@@ -86,8 +86,8 @@ class OrderEntity {
     required this.paymentStatus,
     this.fulfillmentType = 'distributed_inventory',
     this.clientId,
-    this.clientName = 'Novacale Limited',
-    this.clientCompany = 'Novacale Limited',
+    this.clientName = '',
+    this.clientCompany = '',
     this.clientPhone,
     this.clientEmail,
     this.packageDealId,
@@ -224,6 +224,10 @@ class OrderEntity {
     if (isRemitted) return false;
     return remittanceStatus.toLowerCase() == 'pending_verification';
   }
+
+  String? get merchantId => clientId;
+  String get paymentMethod => isDirectTransfer ? 'direct_transfer' : (isPod ? 'cash' : paymentType);
+  String get financeSettlementStatus => financialSettlementStatus;
 
   double get netMerchantSettlement {
     final net = totalAmount - agentEntitlement - transportFee;
@@ -418,6 +422,7 @@ Kindly tap the "📎" attach button below and share your *Current Location / Liv
     double? clientDeliveryFee,
     double? agentEntitlement,
     String? deliveryNotes,
+    bool clearAssignment = false,
     String? deliveryAgentId,
     String? deliveryAgentName,
     String? deliveryAgentCode,
@@ -483,10 +488,10 @@ Kindly tap the "📎" attach button below and share your *Current Location / Liv
       clientDeliveryFee: clientDeliveryFee ?? this.clientDeliveryFee,
       agentEntitlement: agentEntitlement ?? this.agentEntitlement,
       deliveryNotes: deliveryNotes ?? this.deliveryNotes,
-      deliveryAgentId: deliveryAgentId ?? this.deliveryAgentId,
-      deliveryAgentName: deliveryAgentName ?? this.deliveryAgentName,
-      deliveryAgentCode: deliveryAgentCode ?? this.deliveryAgentCode,
-      deliveryAgentPhone: deliveryAgentPhone ?? this.deliveryAgentPhone,
+      deliveryAgentId: clearAssignment ? null : (deliveryAgentId ?? this.deliveryAgentId),
+      deliveryAgentName: clearAssignment ? null : (deliveryAgentName ?? this.deliveryAgentName),
+      deliveryAgentCode: clearAssignment ? null : (deliveryAgentCode ?? this.deliveryAgentCode),
+      deliveryAgentPhone: clearAssignment ? null : (deliveryAgentPhone ?? this.deliveryAgentPhone),
       distributionCenterId: distributionCenterId ?? this.distributionCenterId,
       distributionCenterName: distributionCenterName ?? this.distributionCenterName,
       latitude: latitude ?? this.latitude,

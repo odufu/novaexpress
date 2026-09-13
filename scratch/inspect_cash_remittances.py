@@ -1,0 +1,83 @@
+import json
+import sys
+import urllib.request
+import urllib.error
+
+sys.stdout.reconfigure(encoding='utf-8')
+
+SUPABASE_URL = "https://qpcafevjsrbauweuiiyq.supabase.co"
+SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFwY2FmZXZqc3JiYXV3ZXVpaXlxIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4ODc4NjM2NCwiZXhwIjoyMTA0MzYyMzY0fQ.RM1BJWKYWnhI7kkDVACqAxDj8U9shpWxQX8h8_K7UiU"
+
+headers = {
+    "apikey": SERVICE_KEY,
+    "Authorization": f"Bearer {SERVICE_KEY}",
+    "Content-Type": "application/json",
+    "Prefer": "count=exact"
+}
+
+def get_openapi():
+    req = urllib.request.Request(f"{SUPABASE_URL}/rest/v1/?apikey={SERVICE_KEY}", headers={"apikey": SERVICE_KEY})
+    with urllib.request.urlopen(req) as resp:
+        return json.loads(resp.read().decode('utf-8'))
+
+def query_table(table, params="select=*&limit=5"):
+    url = f"{SUPABASE_URL}/rest/v1/{table}?{params}"
+    req = urllib.request.Request(url, headers=headers)
+    try:
+        with urllib.request.urlopen(req) as resp:
+            content_range = resp.headers.get("Content-Range")
+            total_count = content_range.split("/")[-1] if content_range and "/" in content_range else "unknown"
+            rows = json.loads(resp.read().decode('utf-8'))
+            return {"count": total_count, "rows": rows, "error": None}
+    except urllib.error.HTTPError as e:
+        body = e.read().decode('utf-8')
+        return {"count": 0, "rows": [], "error": f"HTTP {e.code}: {body}"}
+    except Exception as e:
+        return {"count": 0, "rows": [], "error": str(e)}
+
+def main():
+    spec = get_openapi()
+    defs = spec.get("definitions", {})
+
+    target_tables = [
+        "cash_remittances",
+        "remittance_orders",
+        "payout_requests",
+        "payout_claims",
+        "paystack_transactions",
+        "monnify_transactions"
+    ]
+
+    with open("scratch/cash_remittances_audit.txt", "w", encoding="utf-8") as out:
+        out.write("=== FINANCIAL TABLES SCHEMA AUDIT ===\n\n")
+        for table in target_tables:
+            table_def = defs.get(table)
+            if not table_def:
+                out.write(f"TABLE {table} NOT FOUND!\n\n")
+                continue
+            props = table_def.get("properties", {})
+            required = table_def.get("required", [])
+            out.write(f"TABLE: {table} ({len(props)} columns)\n")
+            for col_name, col_meta in sorted(props.items()):
+                col_type = col_meta.get("type", col_meta.get("format", "unknown"))
+                is_req = "NOT NULL" if col_name in required else "NULLABLE"
+                default_val = f" DEFAULT {col_meta.get('default')}" if "default" in col_meta else ""
+                fk_desc = f" [FK: {col_meta.get('description')}]" if col_meta.get("description") and "Foreign Key" in col_meta.get("description") else ""
+                out.write(f"   {col_name:<30}: {col_type:<16} | {is_req}{default_val}{fk_desc}\n")
+            out.write("\n")
+
+        out.write("=== FINANCIAL LIVE ROWS DATA ===\n\n")
+        for table in target_tables:
+            data = query_table(table, params="select=*&limit=5")
+            if data["error"]:
+                out.write(f"[{table}] ERROR: {data['error']}\n\n")
+            else:
+                out.write(f"[{table}] Total Rows: {data['count']}\n")
+                for i, row in enumerate(data["rows"], 1):
+                    out.write(f"   Row {i}: {row}\n")
+                out.write("\n")
+
+    print("Completed dumping cash_remittances_audit.txt")
+
+if __name__ == "__main__":
+    main()

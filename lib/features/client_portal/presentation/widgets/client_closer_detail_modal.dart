@@ -564,6 +564,12 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
                         colors: [Color(0xFFF37021), Color(0xFFFF9554)],
                       ),
                       shape: BoxShape.circle,
+                      image: (_currentCloser.avatarUrl != null && _currentCloser.avatarUrl!.isNotEmpty)
+                          ? DecorationImage(
+                              image: NetworkImage(_currentCloser.avatarUrl!),
+                              fit: BoxFit.cover,
+                            )
+                          : null,
                       boxShadow: [
                         BoxShadow(
                           color: const Color(0xFFF37021).withValues(alpha: 0.3),
@@ -573,12 +579,14 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
                       ],
                     ),
                     alignment: Alignment.center,
-                    child: Text(
-                      _currentCloser.fullName.isNotEmpty
-                          ? _currentCloser.fullName.split(' ').map((n) => n.isNotEmpty ? n[0] : '').take(2).join()
-                          : 'CL',
-                      style: GoogleFonts.inter(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
-                    ),
+                    child: (_currentCloser.avatarUrl == null || _currentCloser.avatarUrl!.isEmpty)
+                        ? Text(
+                            _currentCloser.fullName.isNotEmpty
+                                ? _currentCloser.fullName.split(' ').map((n) => n.isNotEmpty ? n[0] : '').take(2).join()
+                                : 'CL',
+                            style: GoogleFonts.inter(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
+                          )
+                        : null,
                   ),
                   Positioned(
                     right: 0,
@@ -1380,7 +1388,13 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
                 _buildDivider(isDark),
                 _buildDetailRow('Direct Phone Number', _currentCloser.phone, isDark),
                 _buildDivider(isDark),
-                _buildDetailRow('Assigned Company', 'Novacare Limited (Enterprise Client)', isDark),
+                _buildDetailRow(
+                  'Assigned Company',
+                  ref.watch(clientPortalProvider).clientProfile.companyName.isNotEmpty
+                      ? ref.watch(clientPortalProvider).clientProfile.companyName
+                      : 'Merchant Client',
+                  isDark,
+                ),
                 _buildDivider(isDark),
                 _buildDetailRow('Commission per Converted Order', currencyFormatter.format(_currentCloser.commissionRate), isDark),
                 _buildDivider(isDark),

@@ -1,4 +1,5 @@
 import '../../../client_portal/domain/entities/client_profile.dart';
+import '../../../client_portal/domain/entities/client_settlement.dart';
 import '../entities/dc_finance_settings.dart';
 import '../entities/dc_fleet_driver.dart';
 import '../entities/dc_payout_claim.dart';
@@ -93,6 +94,36 @@ abstract class DCConsoleRepository {
     String? bankName,
     String? bankAccountNumber,
     String? bankAccountName,
+    double? customDeliveryFee,
+    double? customPlatformFee,
+    double? customFailedAttemptFee,
     dynamic authDataSource,
+  });
+
+  /// Approves a cash remittance submission and liquidates rider COD debt atomically
+  Future<Map<String, dynamic>> approveCashRemittance({
+    required String remittanceId,
+    String? supervisorId,
+  });
+
+  /// Generates the Daily 10:00 PM Merchant Settlement batch atomically
+  Future<Map<String, dynamic>> generateDailyMerchantSettlement({
+    required String clientId,
+    required String dcId,
+    required DateTime periodStart,
+    required DateTime periodEnd,
+    Map<String, dynamic>? customDeductions,
+  });
+
+  /// Fetches client settlement history for the DC
+  Future<List<ClientSettlement>> fetchDcClientSettlements({
+    required String dcId,
+    String? clientId,
+  });
+
+  /// Fetches merchant asset custody breakdown (liquid cash & in-kind inventory)
+  Future<Map<String, dynamic>> fetchMerchantAssetCustody({
+    required String clientId,
+    String? dcId,
   });
 }

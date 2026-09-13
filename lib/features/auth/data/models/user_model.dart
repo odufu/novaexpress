@@ -45,15 +45,15 @@ class UserModel extends UserEntity {
             : 'Abuja (FCT)');
 
     final isClientRole = json['role'] == 'client' || json['role'] == 'merchant';
-    final resolvedClientName = json['client_company_name'] ?? json['company_name'] ?? (isClientRole ? 'Novacale Limited' : null);
+    final resolvedClientName = json['client_company_name'] ?? json['company_name'] ?? (isClientRole ? (json['business_name'] ?? 'Client Merchant') : null);
 
     return UserModel(
       id: json['id'] ?? '',
       authUserId: json['auth_user_id'],
       email: json['email'] ?? '',
-      firstName: json['first_name'] ?? (isClientRole ? 'Chuka' : 'Field'),
-      lastName: json['last_name'] ?? (isClientRole ? 'Okafor (Novacale)' : 'Agent'),
-      phone: json['phone'] ?? json['phone_number'] ?? '08031234567',
+      firstName: json['first_name'] ?? (isClientRole ? 'Merchant' : 'Field'),
+      lastName: json['last_name'] ?? (isClientRole ? 'Admin' : 'Agent'),
+      phone: json['phone'] ?? json['phone_number'] ?? '',
       role: json['role'] ?? 'delivery_agent',
       companyId: json['company_id'] ?? '11111111-1111-4111-8111-111111111111',
       deliveryAgentId: deliveryAgentId ?? json['delivery_agent_id'],
@@ -73,14 +73,14 @@ class UserModel extends UserEntity {
       vehiclePlateNumber: json['vehicle_plate_number'] ?? 'ABJ-894-XA',
       operatingState: stateVal,
       operatingCity: json['operating_city'] ?? 'Wuse II',
-      bankName: json['bank_name'] ?? 'First Bank of Nigeria',
-      bankAccountNumber: json['bank_account_number'] ?? '3081294821',
-      bankAccountName: json['bank_account_name'] ?? (json['first_name'] != null ? '${json['first_name']} ${json['last_name'] ?? ""}'.trim() : 'Field Agent Logistics'),
+      bankName: json['bank_name'] ?? '',
+      bankAccountNumber: json['bank_account_number'] ?? '',
+      bankAccountName: json['bank_account_name'] ?? (json['first_name'] != null ? '${json['first_name']} ${json['last_name'] ?? ""}'.trim() : ''),
       agentStatus: json['current_status'] ?? json['status'] ?? 'available',
-      clientId: json['client_id'] ?? (isClientRole ? (json['id'] ?? '33333333-3333-4333-8333-333333333333') : null),
+      clientId: json['client_id'] ?? (isClientRole ? json['id'] : null),
       clientCompanyName: resolvedClientName,
       closerId: json['closer_id'] ?? (json['role'] == 'closer' ? json['id'] : null),
-      closerCode: json['closer_code'] ?? (json['role'] == 'closer' ? 'CLS-NOVA-001' : null),
+      closerCode: json['closer_code'] ?? (json['role'] == 'closer' ? 'CLS-001' : null),
       avatarUrl: json['avatar_url']?.toString() ??
           json['photo_url']?.toString() ??
           json['profile_photo_url']?.toString() ??

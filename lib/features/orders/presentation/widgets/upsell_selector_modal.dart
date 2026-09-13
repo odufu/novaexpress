@@ -39,58 +39,7 @@ class UpsellSelectorModal extends ConsumerWidget {
     final isDark = theme.brightness == Brightness.dark;
     final selectedItem = ref.watch(selectedUpsellItemProvider);
 
-    final defaultItems = availableStock.isNotEmpty
-        ? availableStock
-        : [
-            const StockItemEntity(
-              id: 'stk-001',
-              sku: 'SKU-RSP01',
-              name: 'Respira Detox Tea (Extra Box)',
-              ownerName: 'Novacare Limited',
-              inventoryType: InventoryType.distributedInventory,
-              description: 'Herbal lung cleanse & digestive tea.',
-              price: 10000.0,
-              assignedCount: 20,
-              deliveredCount: 2,
-              returnedCount: 0,
-              totalInCustody: 18,
-              reservedCount: 4,
-              availableCount: 14,
-              category: 'Herbal Detox',
-            ),
-            const StockItemEntity(
-              id: 'stk-002',
-              sku: 'SKU-GRZ02',
-              name: 'Grazer Colon Cleanse Tea',
-              ownerName: 'Novacare Limited',
-              inventoryType: InventoryType.distributedInventory,
-              description: 'Botanical digestive and colon detox.',
-              price: 15000.0,
-              assignedCount: 15,
-              deliveredCount: 1,
-              returnedCount: 0,
-              totalInCustody: 12,
-              reservedCount: 2,
-              availableCount: 10,
-              category: 'Digestive Care',
-            ),
-            const StockItemEntity(
-              id: 'stk-003',
-              sku: 'SKU-SLM03',
-              name: 'SlimFit Herbal Metabolism Pack',
-              ownerName: 'Novacare Limited',
-              inventoryType: InventoryType.distributedInventory,
-              description: 'Natural metabolism booster tea blend.',
-              price: 12500.0,
-              assignedCount: 10,
-              deliveredCount: 1,
-              returnedCount: 0,
-              totalInCustody: 8,
-              reservedCount: 1,
-              availableCount: 7,
-              category: 'Weight Management',
-            ),
-          ];
+    final defaultItems = availableStock;
 
     return Container(
       decoration: BoxDecoration(

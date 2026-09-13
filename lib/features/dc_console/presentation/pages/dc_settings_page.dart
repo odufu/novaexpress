@@ -87,13 +87,21 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
   late TextEditingController _accountNumberController;
   late TextEditingController _accountNameController;
 
+  // Controllers for Merchant Billing & Order Charges
+  late TextEditingController _clientDeliveryFeeController;
+  late TextEditingController _platformFeeValueController;
+  late TextEditingController _failedOrderChargeController;
+  late TextEditingController _dailyCutoffTimeController;
+  String _platformFeeType = 'flat';
+  String _paystackFeeAbsorbedBy = 'merchant';
+
   // Interactive Simulator Controller
   final TextEditingController _simAmountController = TextEditingController(text: '35000');
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
 
     final settings = ref.read(dcConsoleProvider).financeSettings;
 
@@ -111,6 +119,13 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
     _bankNameController = TextEditingController(text: settings.settlementBankName);
     _accountNumberController = TextEditingController(text: settings.settlementAccountNumber);
     _accountNameController = TextEditingController(text: settings.settlementAccountName);
+
+    _clientDeliveryFeeController = TextEditingController(text: settings.defaultClientDeliveryFee.toInt().toString());
+    _platformFeeValueController = TextEditingController(text: settings.platformFeeValue.toInt().toString());
+    _failedOrderChargeController = TextEditingController(text: settings.failedOrderCharge.toInt().toString());
+    _dailyCutoffTimeController = TextEditingController(text: settings.dailySettlementCutoffTime);
+    _platformFeeType = settings.platformFeeType;
+    _paystackFeeAbsorbedBy = settings.paystackFeeAbsorbedBy;
 
     _simAmountController.addListener(() {
       final parsed = double.tryParse(_simAmountController.text.replaceAll(',', '')) ?? 0.0;
@@ -133,6 +148,10 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
     _bankNameController.dispose();
     _accountNumberController.dispose();
     _accountNameController.dispose();
+    _clientDeliveryFeeController.dispose();
+    _platformFeeValueController.dispose();
+    _failedOrderChargeController.dispose();
+    _dailyCutoffTimeController.dispose();
     _simAmountController.dispose();
     super.dispose();
   }
@@ -161,6 +180,12 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
           settlementAccountNumber: _accountNumberController.text.trim(),
           settlementAccountName: _accountNameController.text.trim(),
           autoReconcileWebhooks: draft.autoReconcile,
+          defaultClientDeliveryFee: double.tryParse(_clientDeliveryFeeController.text) ?? 3500.0,
+          platformFeeType: _platformFeeType,
+          platformFeeValue: double.tryParse(_platformFeeValueController.text) ?? 500.0,
+          paystackFeeAbsorbedBy: _paystackFeeAbsorbedBy,
+          failedOrderCharge: double.tryParse(_failedOrderChargeController.text) ?? 500.0,
+          dailySettlementCutoffTime: _dailyCutoffTimeController.text.trim().isNotEmpty ? _dailyCutoffTimeController.text.trim() : '22:00',
         );
 
         ref.read(dcConsoleProvider.notifier).updateFinanceSettings(updated);
@@ -177,7 +202,7 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  '✅ Finance & POS Remittance Rules successfully saved and applied.',
+                  '✅ Finance & Settlement Rules successfully saved and applied.',
                   style: GoogleFonts.inter(fontWeight: FontWeight.w600),
                 ),
               ),
@@ -204,6 +229,14 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
     _commissionRateController.text = defaults.defaultCommissionRate.toInt().toString();
     _transportAllowanceController.text = defaults.defaultTransportAllowance.toInt().toString();
     _failedStipendController.text = defaults.defaultFailedStipend.toInt().toString();
+    _clientDeliveryFeeController.text = defaults.defaultClientDeliveryFee.toInt().toString();
+    _platformFeeValueController.text = defaults.platformFeeValue.toInt().toString();
+    _failedOrderChargeController.text = defaults.failedOrderCharge.toInt().toString();
+    _dailyCutoffTimeController.text = defaults.dailySettlementCutoffTime;
+    setState(() {
+      _platformFeeType = defaults.platformFeeType;
+      _paystackFeeAbsorbedBy = defaults.paystackFeeAbsorbedBy;
+    });
 
     ref.read(dcConsoleProvider.notifier).updateFinanceSettings(defaults);
 
@@ -255,6 +288,7 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
                   tabs: const [
                     Tab(icon: Icon(Icons.payments_outlined, size: 16), text: 'Finance & POS Rules'),
                     Tab(icon: Icon(Icons.handshake_outlined, size: 16), text: 'Rider Entitlements'),
+                    Tab(icon: Icon(Icons.receipt_long_outlined, size: 16), text: 'Merchant Billing & Charges'),
                     Tab(icon: Icon(Icons.account_balance_outlined, size: 16), text: 'Settlement Accounts'),
                     Tab(icon: Icon(Icons.tune_rounded, size: 16), text: 'Automation & Webhooks'),
                   ],
@@ -270,6 +304,7 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
                   children: [
                     _buildFinanceAndPosTab(isDark, isMobile),
                     _buildEntitlementsTab(isDark, isMobile),
+                    _buildMerchantBillingTab(isDark, isMobile),
                     _buildSettlementBankTab(isDark, isMobile),
                     _buildAutomationTab(isDark, isMobile),
                   ],
@@ -1063,6 +1098,301 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
           ),
         ],
       ),
+    );
+  }
+
+  // ==========================================
+  // TAB 3: MERCHANT BILLING & ORDER CHARGES
+  // ==========================================
+  Widget _buildMerchantBillingTab(bool isDark, bool isMobile) {
+    final clientDeliveryFee = double.tryParse(_clientDeliveryFeeController.text) ?? 3500.0;
+    final platformFeeVal = double.tryParse(_platformFeeValueController.text) ?? 500.0;
+
+    // Simulation calculation with sample ₦35,000 order
+    const sampleOrderGross = 35000.0;
+    final calculatedPlatformFee = _platformFeeType == 'percent'
+        ? (sampleOrderGross * (platformFeeVal / 100.0))
+        : platformFeeVal;
+    final calculatedGatewayFee = _paystackFeeAbsorbedBy == 'company'
+        ? 0.0
+        : (_paystackFeeAbsorbedBy == 'shared'
+            ? (sampleOrderGross * 0.015).clamp(0.0, 2000.0) / 2.0
+            : (sampleOrderGross * 0.015).clamp(0.0, 2000.0));
+    final sampleNetRemittance = (sampleOrderGross - clientDeliveryFee - calculatedPlatformFee - calculatedGatewayFee).clamp(0.0, double.infinity);
+
+    return ListView(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      children: [
+        // 1. Merchant Logistics & Delivery Fee
+        Container(
+          padding: EdgeInsets.all(isMobile ? 14 : 18),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2563EB).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.local_shipping_outlined, color: Color(0xFF2563EB), size: 18),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Standard Logistics Delivery Fee', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold)),
+                        Text('Base fee deducted from client sales revenue per delivered order.', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              _buildInputField(
+                label: 'Default Delivery Fee (₦ / order)',
+                controller: _clientDeliveryFeeController,
+                hint: '3500',
+                isDark: isDark,
+                helper: 'Standard fee applied when merchant has no custom rate override.',
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
+        // 2. Platform Commission & Surcharges
+        Container(
+          padding: EdgeInsets.all(isMobile ? 14 : 18),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF37021).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.percent_rounded, color: Color(0xFFF37021), size: 18),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Platform Commission Charge', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold)),
+                        Text('Operational margin earned by NovaExpress per completed order.', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Commission Structure',
+                          style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w600, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: _platformFeeType,
+                              isExpanded: true,
+                              dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                              items: const [
+                                DropdownMenuItem(value: 'flat', child: Text('Flat Rate (₦)')),
+                                DropdownMenuItem(value: 'percent', child: Text('Percentage (%)')),
+                              ],
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setState(() => _platformFeeType = val);
+                                }
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 3,
+                    child: _buildInputField(
+                      label: _platformFeeType == 'flat' ? 'Fee Amount (₦)' : 'Fee Percentage (%)',
+                      controller: _platformFeeValueController,
+                      hint: _platformFeeType == 'flat' ? '500' : '2.5',
+                      isDark: isDark,
+                      helper: _platformFeeType == 'flat' ? 'Fixed fee per delivered order' : '% of order retail total',
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _buildInputField(
+                label: 'Failed Delivery Surcharge (₦ / failed drop)',
+                controller: _failedOrderChargeController,
+                hint: '500',
+                isDark: isDark,
+                helper: 'Administrative return handling fee charged for rejected or customer-unavailable deliveries.',
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
+        // 3. Payment Gateway & Daily Closeout Schedule
+        Container(
+          padding: EdgeInsets.all(isMobile ? 14 : 18),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.account_balance_wallet_outlined, color: Color(0xFF10B981), size: 18),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Gateway Absorption & 10:00 PM Cutoff', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold)),
+                        Text('Payment gateway fees allocation and scheduled daily batch closeout time.', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Paystack Fee Allocation Policy',
+                    style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w600, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _paystackFeeAbsorbedBy,
+                        isExpanded: true,
+                        dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                        items: const [
+                          DropdownMenuItem(value: 'merchant', child: Text('Merchant / Client (Deducted from Daily Settlement)')),
+                          DropdownMenuItem(value: 'company', child: Text('Company / NovaExpress (Absorbed)')),
+                          DropdownMenuItem(value: 'shared', child: Text('Shared 50/50 Split')),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() => _paystackFeeAbsorbedBy = val);
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _buildInputField(
+                label: 'Daily Remittance Closeout Cutoff Time (24h Format)',
+                controller: _dailyCutoffTimeController,
+                hint: '22:00',
+                isDark: isDark,
+                helper: 'Default 22:00 (10:00 PM WAT). Orders delivered before cutoff are batched for daily payout.',
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
+        // 4. Live Settlement Policy Simulator
+        Container(
+          padding: EdgeInsets.all(isMobile ? 14 : 18),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.calculate_rounded, color: Color(0xFF10B981), size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Daily 10:00 PM Merchant Settlement Preview (Sample Order: ₦35,000)',
+                      style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  _buildSimMetricPill('Gross Sales', CurrencyFormatter.formatNaira(sampleOrderGross), const Color(0xFF2563EB)),
+                  _buildSimMetricPill('Delivery Fee', '-${CurrencyFormatter.formatNaira(clientDeliveryFee)}', const Color(0xFFEF4444)),
+                  _buildSimMetricPill('Platform Fee', '-${CurrencyFormatter.formatNaira(calculatedPlatformFee)}', const Color(0xFFF59E0B)),
+                  _buildSimMetricPill('Gateway Fee', '-${CurrencyFormatter.formatNaira(calculatedGatewayFee)}', const Color(0xFF8B5CF6)),
+                  _buildSimMetricPill('Net Merchant Payout', CurrencyFormatter.formatNaira(sampleNetRemittance), const Color(0xFF10B981), isBold: true),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

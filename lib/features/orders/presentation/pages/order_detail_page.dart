@@ -171,7 +171,14 @@ class OrderDetailPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final ordersState = ref.watch(ordersProvider);
+    final authState = ref.watch(authProvider);
+    final currentUser = authState.user;
+    final isDc = currentUser?.isDcManager == true;
+    final isCloser = currentUser?.isCloser == true;
+    final isClientAdmin = currentUser?.isClientAdmin == true;
+    final isRider = currentUser?.isRider == true || (!isDc && !isCloser && !isClientAdmin);
 
     OrderEntity? matchedOrder;
     for (final o in ordersState.orders) {
@@ -288,7 +295,14 @@ class OrderDetailPage extends ConsumerWidget {
         elevation: 0.5,
         leading: IconButton(
           icon: Icon(Icons.arrow_back_rounded, color: theme.colorScheme.onSurface),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              final user = ref.read(authProvider).user;
+              context.go(user?.homeConsoleRoute ?? '/');
+            }
+          },
         ),
         title: Text(
           'ORDER DETAILS',
@@ -1074,8 +1088,9 @@ class OrderDetailPage extends ConsumerWidget {
             ),
             const SizedBox(height: 24),
 
-            // 7. Dynamic Contextual Action Buttons (Strictly tailored to status)
-            if (order.status == 'accepted' || order.status == 'pending' || order.status == 'assigned' || order.status == 'unassigned') ...[
+            // 7. Dynamic Contextual Action Area (Rider Trip Execution vs DC / Merchant / Closer Management)
+            if (isRider) ...[
+              if (order.status == 'accepted' || order.status == 'pending' || order.status == 'assigned' || order.status == 'unassigned') ...[
               // Context: Ready for departure / intake
               SizedBox(
                 width: double.infinity,
@@ -1332,6 +1347,90 @@ class OrderDetailPage extends ConsumerWidget {
                 ),
               ),
             ],
+          ] else ...[
+            // Non-rider consoles: DC Operations Supervisor, Client Merchant, or Sales Closer
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        isDc ? Icons.warehouse_rounded : (isCloser ? Icons.headset_mic_rounded : Icons.storefront_rounded),
+                        size: 20,
+                        color: isDc ? const Color(0xFF0B192C) : (isCloser ? const Color(0xFF6366F1) : const Color(0xFF0D9488)),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        isDc
+                            ? 'DC OPERATIONS SUPERVISION'
+                            : (isCloser ? 'TELESALES CLOSER TRACKING' : 'MERCHANT ORDER GOVERNANCE'),
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.8,
+                          color: isDark ? Colors.white70 : const Color(0xFF475569),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    isDc
+                        ? 'This order is managed under DC jurisdiction. Operating rider: ${(order.deliveryAgentCode?.isNotEmpty == true) ? order.deliveryAgentCode! : "Unassigned"}. Physical Stock items are governed by handling DC custody.'
+                        : (isCloser
+                            ? 'Order booked for client ${order.clientName.isNotEmpty ? order.clientName : "Merchant"}. Closer code: ${order.closerCode ?? "CLS-01"}. Status: ${order.status.toUpperCase()}.'
+                            : 'Order placed with ${order.clientName.isNotEmpty ? order.clientName : "Merchant Store"}. Live logistics status: ${order.status.toUpperCase()}.'),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: theme.colorScheme.onSurfaceVariant,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 46,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isDc
+                            ? const Color(0xFF0B192C)
+                            : (isCloser ? const Color(0xFF6366F1) : const Color(0xFF0D9488)),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        elevation: 0,
+                      ),
+                      onPressed: () {
+                        if (isDc) {
+                          context.go('/dc/orders');
+                        } else if (isCloser) {
+                          context.go('/closer');
+                        } else {
+                          context.go('/client/orders');
+                        }
+                      },
+                      icon: const Icon(Icons.arrow_back_rounded, size: 18),
+                      label: Text(
+                        isDc
+                            ? 'RETURN TO DC OPERATIONS'
+                            : (isCloser ? 'RETURN TO CLOSER WORKSPACE' : 'RETURN TO MERCHANT PORTAL'),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
             const SizedBox(height: 24),
           ],
         ),

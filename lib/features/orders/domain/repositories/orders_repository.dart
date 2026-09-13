@@ -10,6 +10,9 @@ abstract class OrdersRepository {
     required String riderName,
     required String riderCode,
   });
+  Future<void> unassignOrderFromRider({
+    required String orderId,
+  });
   Future<OrderEntity> getOrderById(String orderId);
   Future<void> updateOrderStatus(
     String orderId,

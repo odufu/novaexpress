@@ -8,11 +8,14 @@ import '../../../orders/domain/entities/order.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
 import '../../../stock/presentation/providers/stock_provider.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
+import '../../domain/entities/distribution_center.dart';
+import '../../../orders/domain/services/order_routing_service.dart';
 import '../providers/dc_console_provider.dart';
 import '../widgets/dc_create_order_modal.dart';
 import '../widgets/dc_order_detail_modal.dart';
 import '../widgets/dc_csv_order_import_modal.dart';
 import '../widgets/dc_assign_order_modal.dart';
+import '../../../pipeline_chat/presentation/widgets/order_pipeline_chat_sheet.dart';
 
 final dcOrdersDateFilterProvider = StateProvider.autoDispose<String>((ref) => 'all_time');
 final dcOrdersCustomDateRangeProvider = StateProvider.autoDispose<DateTimeRange?>((ref) => null);
@@ -124,7 +127,29 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
       }
     });
 
-    final dateFilteredOrders = _filterOrdersByDate(ordersState.orders, activeDateFilter, customRange, singleDate);
+    final allDcs = dcState.distributionCenters;
+    final activeDc = allDcs.where(
+      (d) => d.id == dcState.activeHubId || d.code == dcState.activeHubCode,
+    ).firstOrNull ?? DistributionCenter(
+      id: dcState.activeHubId,
+      name: dcState.activeHubName,
+      code: dcState.activeHubCode,
+      state: dcState.isCurrentHubGrandDc ? 'Abuja (FCT)' : '',
+      city: '',
+      address: '',
+      isGrandDc: dcState.isCurrentHubGrandDc,
+      isHub: dcState.isCurrentHubGrandDc,
+    );
+
+    final hubScopedOrders = ordersState.orders.where((order) {
+      return OrderRoutingService.doesOrderBelongToDc(
+        order: order,
+        currentDc: activeDc,
+        allDcs: allDcs,
+      );
+    }).toList();
+
+    final dateFilteredOrders = _filterOrdersByDate(hubScopedOrders, activeDateFilter, customRange, singleDate);
 
     final unassignedOrders = dateFilteredOrders.where((o) {
       final isUnassigned = o.deliveryAgentId == null || o.deliveryAgentId!.isEmpty;
@@ -709,7 +734,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
 
       // 5. Client Filter
       if (masterClient != 'all') {
-        final client = o.clientName.isNotEmpty ? o.clientName : 'Novacare';
+        final client = o.clientName.isNotEmpty ? o.clientName : 'Unassigned Client';
         if (!client.toLowerCase().contains(masterClient.toLowerCase())) return false;
       }
 
@@ -1518,7 +1543,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Text(order.clientName.isNotEmpty ? order.clientName : 'Novacale', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
+                              Text(order.clientName.isNotEmpty ? order.clientName : (order.clientId != null && order.clientId!.length > 8 ? 'Client ${order.clientId!.substring(0, 8)}' : 'Client Merchant'), style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
                               if (order.packageDealName != null && order.packageDealName!.isNotEmpty)
                                 Text('🏷️ ${order.packageDealName}', style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF0D9488))),
                             ],
@@ -1565,6 +1590,11 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
                               ),
                               const SizedBox(width: 6),
                             ],
+                            IconButton(
+                              icon: const Icon(Icons.chat_bubble_outline_rounded, size: 16, color: Color(0xFF0D9488)),
+                              tooltip: 'Pipeline Chat & Incident Audit',
+                              onPressed: () => OrderPipelineChatSheet.showForOrder(context, order),
+                            ),
                             IconButton(
                               icon: const Icon(Icons.visibility_outlined, size: 16, color: Color(0xFF2563EB)),
                               tooltip: 'View Order Details & Audit Trail',
@@ -1738,6 +1768,17 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
                                 child: const Text('Assign', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
                               ),
                             const SizedBox(width: 6),
+                            OutlinedButton.icon(
+                              onPressed: () => OrderPipelineChatSheet.showForOrder(context, order),
+                              icon: const Icon(Icons.chat_bubble_outline_rounded, size: 13, color: Color(0xFF0D9488)),
+                              label: const Text('Chat', style: TextStyle(fontSize: 11, color: Color(0xFF0D9488))),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                side: const BorderSide(color: Color(0xFF0D9488)),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
                             OutlinedButton(
                               onPressed: () => showDialog(context: context, builder: (ctx) => DCOrderDetailModal(order: order)),
                               style: OutlinedButton.styleFrom(
@@ -1895,7 +1936,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
       final stockNotifier = ref.read(stockProvider.notifier);
       final stockState = ref.read(stockProvider);
 
-      final eligibleDrivers = dcState.drivers.where((d) {
+      final eligibleDrivers = dcState.dcDrivers.where((d) {
         final avail = stockNotifier.getRiderAvailableStock(
           riderId: d.id,
           riderCode: d.driverCode,

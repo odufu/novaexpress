@@ -2,6 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/helpers/formatters.dart';
 import '../../../../core/widgets/app_loading_overlay.dart';
 import '../../../../core/widgets/app_skeleton_loader.dart';
@@ -14,8 +15,11 @@ import '../../domain/entities/dc_fleet_driver.dart';
 import '../providers/dc_console_provider.dart';
 import '../providers/product_catalog_provider.dart';
 import '../../../../core/services/signature_storage_service.dart';
+import '../../../../core/widgets/signature_pad_modal.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../client_portal/domain/entities/client_profile.dart';
 import '../widgets/dc_product_detail_modal.dart';
+import '../widgets/dc_receive_supply_modal.dart';
 
 class DCStockPage extends ConsumerStatefulWidget {
   const DCStockPage({super.key});
@@ -32,10 +36,11 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 6, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final activeHub = ref.read(dcConsoleProvider).activeHubId;
       ref.read(stockProvider.notifier).fetchStockItems(null, activeHub);
+      ref.read(stockProvider.notifier).fetchStockTransfers(dcId: activeHub);
       ref.read(productCatalogProvider.notifier).reloadCatalog();
     });
   }
@@ -58,6 +63,7 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
     ref.listen<DCConsoleState>(dcConsoleProvider, (previous, next) {
       if (previous?.activeHubId != next.activeHubId) {
         ref.read(stockProvider.notifier).fetchStockItems(null, next.activeHubId);
+        ref.read(stockProvider.notifier).fetchStockTransfers(dcId: next.activeHubId);
       }
     });
 
@@ -95,11 +101,15 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
               ),
               Tab(
                 icon: const Icon(Icons.checklist_outlined, size: 17),
-                text: 'Rider Picking Queue (${stockState.inboundRequests.length})',
+                text: 'Rider Picking Queue (${stockState.stockTransfers.where((t) => t.status == "pending_rider_acceptance" || t.status == "requested").length})',
               ),
               const Tab(
                 icon: Icon(Icons.qr_code_scanner_rounded, size: 17),
                 text: 'Dispatch Handover Counter',
+              ),
+              const Tab(
+                icon: Icon(Icons.assignment_return_outlined, size: 17),
+                text: 'Inbound Rider Returns',
               ),
             ],
           ),
@@ -124,6 +134,9 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
 
               // 4. Dispatch Handover Counter
               _buildHandoverCounterView(isDark),
+
+              // 5. Inbound Rider Returns Desk
+              _buildInboundReturnsView(isDark),
             ],
           ),
         ),
@@ -1129,7 +1142,7 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
     final skuCtrl = TextEditingController(text: 'SKU-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}');
     final catCtrl = TextEditingController(text: 'Health & Wellness');
     final priceCtrl = TextEditingController(text: '25000');
-    final clientCtrl = TextEditingController(text: 'Novacare Limited');
+    final clientCtrl = TextEditingController();
     final initQtyCtrl = TextEditingController(text: '50');
     final lowThreshCtrl = TextEditingController(text: '5');
     final binCtrl = TextEditingController(text: 'BIN-A1-01');
@@ -1140,9 +1153,7 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
     final stockState = ref.read(stockProvider);
 
     // Build registered companies list from DC Console & existing inventory
-    final List<ClientProfile> registeredClients = dcState.clients.isNotEmpty
-        ? dcState.clients
-        : defaultRegisteredClients;
+    final List<ClientProfile> registeredClients = dcState.clients;
 
     final Map<String, ClientProfile?> companyMap = {};
     for (final c in registeredClients) {
@@ -1157,14 +1168,9 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
         companyMap[sName] = null;
       }
     }
-    if (!companyMap.containsKey('Novacare Limited')) {
-      companyMap['Novacare Limited'] = null;
-    }
 
-    String selectedCompany = companyMap.containsKey('Novacare Limited')
-        ? 'Novacare Limited'
-        : (companyMap.keys.isNotEmpty ? companyMap.keys.first : 'Novacare Limited');
-    String? selectedClientId = companyMap[selectedCompany]?.id;
+    String selectedCompany = companyMap.keys.isNotEmpty ? companyMap.keys.first : '';
+    String? selectedClientId = selectedCompany.isNotEmpty ? companyMap[selectedCompany]?.id : null;
     bool isCustomCompany = false;
     final customCompanyCtrl = TextEditingController();
     clientCtrl.text = selectedCompany;
@@ -2385,21 +2391,50 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                             onPressed: isSubmitting
                                 ? null
                                 : () async {
+                                    final authState = ref.read(authProvider);
+                                    final supervisorName = authState.user?.fullName ?? 'DC Supervisor';
+                                    final supervisorId = authState.user?.id ?? '';
+                                    final dcId = targetDriver.distributionCenterId ??
+                                        ref.read(dcConsoleProvider).selectedDcId ??
+                                        ref.read(dcConsoleProvider).activeHubId;
+
+                                    // 1. Mandatory Digital Signature on Glass by DC Supervisor
+                                    final sigResult = await SignaturePadModal.show(
+                                      context: confirmCtx,
+                                      orderId: 'WB-RIDER-${DateTime.now().millisecondsSinceEpoch % 10000}',
+                                      customerName: supervisorName,
+                                    );
+
+                                    if (sigResult == null || sigResult.signatureUrl.isEmpty) {
+                                      messenger.showSnackBar(
+                                        const SnackBar(
+                                          content: Text('⚠️ DC Supervisor digital signature on glass is mandatory to issue stock.'),
+                                          backgroundColor: Color(0xFFF59E0B),
+                                        ),
+                                      );
+                                      return;
+                                    }
+
+                                    if (!confirmCtx.mounted) return;
                                     setConfirmState(() => isSubmitting = true);
                                     final res = await showAppLoadingDialog(
                                       context: confirmCtx,
-                                      message: 'Transferring Stock to Vehicle...',
-                                      subMessage: 'Assigning custody to ${targetDriver.name} (${targetDriver.driverCode})...',
+                                      message: 'Authorizing Stock Handover...',
+                                      subMessage: 'Signing & reserving $qty units for ${targetDriver.name}...',
                                       isDark: isDark,
-                                      task: () => ref.read(stockProvider.notifier).assignStockToRider(
-                                            productIdOrSku: item.id,
+                                      task: () => ref.read(stockProvider.notifier).issueDcStockToRiderWithSignature(
+                                            dcId: dcId,
                                             riderId: targetDriver.id,
-                                            riderName: targetDriver.name,
-                                            riderCode: targetDriver.driverCode,
-                                            quantity: qty,
-                                            distributionCenterId: targetDriver.distributionCenterId ??
-                                                ref.read(dcConsoleProvider).selectedDcId ??
-                                                ref.read(dcConsoleProvider).activeHubId,
+                                            items: [
+                                              {
+                                                'product_id': item.id,
+                                                'quantity': qty,
+                                              }
+                                            ],
+                                            senderId: supervisorId,
+                                            senderName: supervisorName,
+                                            senderSignatureUrl: sigResult.signatureUrl,
+                                            notes: 'DC Handover to ${targetDriver.name} (${targetDriver.driverCode})',
                                           ),
                                     );
 
@@ -2408,15 +2443,18 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                                       if (ctx.mounted) Navigator.of(ctx).pop();
                                       messenger.showSnackBar(
                                         SnackBar(
-                                          content: Text(res?['message']?.toString() ?? '✅ Stock assigned to ${targetDriver.name}!'),
+                                          content: Text(
+                                            '✅ Handover issued & digitally signed! $qty units reserved. Awaiting ${targetDriver.name} acceptance & signature on glass.',
+                                          ),
                                           backgroundColor: const Color(0xFF10B981),
+                                          duration: const Duration(seconds: 4),
                                         ),
                                       );
                                     } else {
                                       setConfirmState(() => isSubmitting = false);
                                       messenger.showSnackBar(
                                         SnackBar(
-                                          content: Text(res?['message']?.toString() ?? '❌ Failed to transfer stock.'),
+                                          content: Text(res?['message']?.toString() ?? '❌ Failed to issue stock handover.'),
                                           backgroundColor: const Color(0xFFEF4444),
                                         ),
                                       );
@@ -2424,9 +2462,9 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                                   },
                             icon: isSubmitting
                                 ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                : const Icon(Icons.check_circle_rounded, size: 16, color: Colors.white),
+                                : const Icon(Icons.draw_rounded, size: 16, color: Colors.white),
                             label: Text(
-                              isSubmitting ? 'Transferring...' : 'Yes, Transfer $qty Units',
+                              isSubmitting ? 'Signing & Dispatching...' : 'Sign on Glass & Issue to Rider',
                               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                             ),
                             style: ElevatedButton.styleFrom(
@@ -3163,121 +3201,203 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
   }
 
   // ==========================================
-  // TAB 2: BULK STOCK INTAKE (WAYBILL)
+  // TAB 2: BULK STOCK INTAKE (WAYBILL & TWO-WAY SIGNATURE)
   // ==========================================
   Widget _buildBulkIntakeView(bool isDark) {
-    final waybillCtrl = TextEditingController(text: 'WAY-2026-0820');
-    final qtyCtrl = TextEditingController(text: '500');
-    final binCtrl = TextEditingController(text: 'BIN-C3-01');
+    final stockState = ref.watch(stockProvider);
+    final dcState = ref.watch(dcConsoleProvider);
+    final activeHubId = dcState.activeHubId;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Center(
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 650),
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1E293B) : Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Bulk Stock Intake & Waybill Receiving', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 6),
-              Text('Record incoming pallets from merchants and generate warehouse bin barcodes', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-              const SizedBox(height: 20),
-              TextField(controller: waybillCtrl, decoration: const InputDecoration(labelText: 'Inbound Waybill Reference')),
-              const SizedBox(height: 14),
-              TextField(controller: qtyCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Quantity Received (Units)')),
-              const SizedBox(height: 14),
-              TextField(controller: binCtrl, decoration: const InputDecoration(labelText: 'Assigned Storage Bin Tag (e.g. BIN-C3-01)')),
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('✅ Waybill intake registered. Warehouse barcode label printed.')),
-                  );
-                  _tabController.animateTo(1);
-                },
-                icon: const Icon(Icons.print_rounded, color: Colors.white),
-                label: const Text('Save & Print Bin Label', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2563EB),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                  minimumSize: const Size(double.infinity, 48),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+    final pendingConsignments = stockState.stockTransfers.where((t) {
+      if (!t.isClientSupply) return false;
+      if (!t.isDispatched) return false;
+      if (activeHubId.isNotEmpty) {
+        if (t.destinationDcId != null && t.destinationDcId!.isNotEmpty && t.destinationDcId != activeHubId) {
+          return false;
+        }
+      }
+      return true;
+    }).toList();
 
-  // ==========================================
-  // TAB 3: RIDER PICKING QUEUE (REQ)
-  // ==========================================
-  Widget _buildPickingQueueView(bool isDark, StockState stockState) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Rider Restock Picking Queue', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E293B) : Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          // Section 1: Inbound Client Consignments Awaiting Inspection
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        const CircleAvatar(radius: 16, backgroundColor: Color(0xFF2563EB), child: Icon(Icons.person, color: Colors.white, size: 16)),
-                        const SizedBox(width: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('REQ-00482 • Replenishment Handover', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold)),
-                            Text('Requested: 20x Respira Detox Tea, 10x Grazer Herbal Tea', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-                          ],
+                        const Icon(Icons.mark_email_unread_rounded, color: Color(0xFFF59E0B), size: 22),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Inbound Client Consignments Awaiting Inspection (${pendingConsignments.length})',
+                          style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(color: const Color(0xFFFEF3C7), borderRadius: BorderRadius.circular(12)),
-                      child: Text('Ready for Collection', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFFD97706))),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Dispatched by merchants with digital signature. Physical count and DC supervisor counter-signature required before stock is credited.',
+                      style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    OutlinedButton(onPressed: () {}, child: const Text('Print Picking Ticket')),
-                    const SizedBox(width: 10),
-                    ElevatedButton(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('✅ Handover PIN (HND-9921) generated and sent to rider.')),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
-                      child: const Text('Approve & Generate Handover PIN', style: TextStyle(color: Colors.white)),
-                    ),
-                  ],
-                ),
-              ],
+              ),
+              OutlinedButton.icon(
+                onPressed: () {
+                  ref.read(stockProvider.notifier).fetchStockTransfers(dcId: activeHubId);
+                },
+                icon: const Icon(Icons.refresh_rounded, size: 16),
+                label: const Text('Refresh Inbound'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          if (pendingConsignments.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                children: [
+                  Icon(Icons.check_circle_outline_rounded, size: 40, color: const Color(0xFF10B981).withValues(alpha: 0.6)),
+                  const SizedBox(height: 10),
+                  Text(
+                    'No Inbound Consignments Awaiting Physical Receipt',
+                    style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'All merchant supply consignments to this hub have been verified, signed, and credited.',
+                    style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                  ),
+                ],
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: pendingConsignments.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (ctx, idx) {
+                final trf = pendingConsignments[idx];
+                return Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.4)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF59E0B).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.local_shipping_rounded, color: Color(0xFFF59E0B), size: 24),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  trf.transferNumber,
+                                  style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(width: 10),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.verified_user_rounded, size: 12, color: Color(0xFF10B981)),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Merchant Signed',
+                                        style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w700, color: const Color(0xFF10B981)),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Dispatched by: ${trf.senderName ?? 'Merchant'} • ${trf.dispatchedAt != null ? trf.dispatchedAt!.toLocal().toString().substring(0, 16) : ''}',
+                              style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Items: ${trf.items.map((i) => '${i.quantity}x ${i.productName}').join(', ')} (Total: ${trf.totalQuantityRequested} units)',
+                              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF2563EB)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          DcReceiveSupplyModal.show(
+                            context: context,
+                            transfer: trf,
+                            onReceived: () {
+                              ref.read(stockProvider.notifier).fetchStockTransfers(dcId: activeHubId);
+                              ref.read(stockProvider.notifier).fetchStockItems(null, activeHubId);
+                            },
+                          );
+                        },
+                        icon: const Icon(Icons.fact_check_rounded, size: 16, color: Colors.white),
+                        label: const Text('Inspect & Sign Receipt', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          const SizedBox(height: 32),
+          const Divider(),
+          const SizedBox(height: 24),
+
+          // Section 2: Ad-Hoc Pallet Receiving (Fallback)
+          Text('Manual / Ad-Hoc Pallet Receiving', style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          Text('Use this for incoming shipments not pre-dispatched via the merchant portal', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: () => _showReceiveStockDialog(context, isDark, stockState),
+            icon: const Icon(Icons.add_box_rounded, size: 18, color: Colors.white),
+            label: const Text('Receive Ad-Hoc Pallet', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2563EB),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
           ),
         ],
@@ -3286,7 +3406,136 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
   }
 
   // ==========================================
-  // TAB 4: DISPATCH HANDOVER COUNTER
+  // TAB 3: RIDER PICKING QUEUE (LIVE TRANSFERS)
+  // ==========================================
+  Widget _buildPickingQueueView(bool isDark, StockState stockState) {
+    final pendingTransfers = stockState.stockTransfers.where((t) =>
+        t.status == 'pending_rider_acceptance' ||
+        t.status == 'requested' ||
+        t.status == 'in_transit').toList();
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Rider Restock Picking Queue', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold)),
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: () {
+                  final hub = ref.read(dcConsoleProvider).activeHubId;
+                  ref.read(stockProvider.notifier).fetchStockTransfers(dcId: hub);
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (pendingTransfers.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(40),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                children: [
+                  const Icon(Icons.check_circle_outline, size: 48, color: Color(0xFF10B981)),
+                  const SizedBox(height: 12),
+                  Text('All Picking Requests Cleared!', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6),
+                  Text('There are no pending replenishment transfers awaiting physical fulfillment.', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                ],
+              ),
+            )
+          else
+            ...pendingTransfers.map((trf) {
+              final itemsSummary = trf.items.isNotEmpty
+                  ? trf.items.map((it) => '${it.quantityShipped}x ${it.productName}').join(', ')
+                  : 'Replenishment Batch';
+              return Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            const CircleAvatar(radius: 16, backgroundColor: Color(0xFF2563EB), child: Icon(Icons.person, color: Colors.white, size: 16)),
+                            const SizedBox(width: 12),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('${trf.waybillNumber} • Rider Handover', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold)),
+                                Text('Rider: ${trf.receiverName ?? "Assigned Rider"}', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                              ],
+                            ),
+                          ],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: trf.status == 'completed' ? const Color(0xFFD1FAE5) : const Color(0xFFFEF3C7),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            trf.status.toUpperCase(),
+                            style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: trf.status == 'completed' ? const Color(0xFF059669) : const Color(0xFFD97706)),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text('Requested Items: $itemsSummary', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Waybill ${trf.waybillNumber} ticket printed.')),
+                            );
+                          },
+                          icon: const Icon(Icons.print_outlined, size: 16),
+                          label: const Text('Print Picking Ticket'),
+                        ),
+                        const SizedBox(width: 10),
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            _pinController.text = trf.waybillNumber;
+                            _tabController.animateTo(4);
+                          },
+                          icon: const Icon(Icons.arrow_forward_rounded, size: 16, color: Colors.white),
+                          label: const Text('Process at Handover Counter', style: TextStyle(color: Colors.white)),
+                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+
+  // ==========================================
+  // TAB 4: DISPATCH HANDOVER COUNTER (DYNAMIC PIN/WAYBILL)
   // ==========================================
   Widget _buildHandoverCounterView(bool isDark) {
     return SingleChildScrollView(
@@ -3304,27 +3553,54 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
             children: [
               Text('Dispatch Counter Handover Desk', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              Text('Scan rider QR code or enter Handover PIN (e.g. HND-9921)', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+              Text('Scan rider QR code or enter Waybill Number / Handover PIN', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
               const SizedBox(height: 24),
               TextField(
                 controller: _pinController,
                 textAlign: TextAlign.center,
-                style: GoogleFonts.firaCode(fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 4),
+                style: GoogleFonts.firaCode(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 2),
                 decoration: const InputDecoration(
-                  hintText: 'HND-9921',
-                  labelText: 'Handover PIN',
+                  hintText: 'WB-RIDER-2026...',
+                  labelText: 'Handover Waybill / PIN',
                 ),
               ),
               const SizedBox(height: 20),
               ElevatedButton.icon(
-                onPressed: () {
-                  ref.read(stockProvider.notifier).completeStockHandover('REQ-00482');
+                onPressed: () async {
+                  final pin = _pinController.text.trim();
+                  if (pin.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Please enter a valid Waybill Number or Handover PIN.')),
+                    );
+                    return;
+                  }
+
+                  final transfers = ref.read(stockProvider).stockTransfers;
+                  final match = transfers.where((t) =>
+                      t.waybillNumber.toLowerCase() == pin.toLowerCase() ||
+                      t.id.toLowerCase() == pin.toLowerCase() ||
+                      (t.notes != null && t.notes!.contains(pin))).firstOrNull;
+
+                  if (match == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('⚠️ No pending handover transfer found matching "$pin".'),
+                        backgroundColor: const Color(0xFFEF4444),
+                      ),
+                    );
+                    return;
+                  }
+
+                  final totalUnits = match.items.fold<int>(0, (sum, it) => sum + it.quantity);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('✅ Physical stock handover verified! +30 units transferred to vehicle custody.'),
-                      backgroundColor: Color(0xFF10B981),
+                    SnackBar(
+                      content: Text('✅ Handover confirmed for Waybill ${match.waybillNumber}! +$totalUnits units committed to rider custody.'),
+                      backgroundColor: const Color(0xFF10B981),
                     ),
                   );
+                  _pinController.clear();
+                  final hub = ref.read(dcConsoleProvider).activeHubId;
+                  ref.read(stockProvider.notifier).fetchStockTransfers(dcId: hub);
                 },
                 icon: const Icon(Icons.check_circle_rounded, color: Colors.white),
                 label: const Text('Confirm Physical Handover & Transfer Custody', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -3336,6 +3612,216 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  // ==========================================
+  // TAB 5: INBOUND RIDER RETURNS DESK
+  // ==========================================
+  Widget _buildInboundReturnsView(bool isDark) {
+    final activeHub = ref.read(dcConsoleProvider).activeHubId;
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: ref.read(stockProvider.notifier).fetchPendingDcReturns(activeHub),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final returns = snapshot.data ?? [];
+        if (returns.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.assignment_turned_in_outlined, size: 54, color: Color(0xFF10B981)),
+                const SizedBox(height: 12),
+                Text('No Pending Inbound Returns', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 6),
+                Text('All rider returns have been verified and restocked into warehouse inventory.', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+              ],
+            ),
+          );
+        }
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Inbound Rider Returns Desk', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold)),
+                  IconButton(
+                    icon: const Icon(Icons.refresh),
+                    onPressed: () => setState(() {}),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              ...returns.map((ret) {
+                final retId = ret['id']?.toString() ?? '';
+                final retNum = ret['return_number']?.toString() ?? 'RET-UNKNOWN';
+                final qty = (ret['quantity'] as num?)?.toInt() ?? 1;
+                final riderMap = ret['delivery_agents'] as Map<String, dynamic>?;
+                final riderName = riderMap?['full_name']?.toString() ?? 'Rider';
+                final prodMap = ret['products'] as Map<String, dynamic>?;
+                final prodName = prodMap?['name']?.toString() ?? 'Product';
+                final sku = prodMap?['sku']?.toString() ?? 'SKU';
+                final reason = ret['return_reason']?.toString() ?? ret['reason']?.toString() ?? 'Return';
+                final condition = ret['condition']?.toString() ?? 'good';
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text('$retNum • $qty unit(s)', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold)),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: condition == 'good' ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(condition.toUpperCase(), style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: condition == 'good' ? const Color(0xFF15803D) : const Color(0xFFB91C1C))),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text('Product: $prodName ($sku)', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500)),
+                          Text('Rider: $riderName • Reason: $reason', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                        ],
+                      ),
+                      ElevatedButton.icon(
+                        onPressed: () => _showReceiveReturnDialog(retId, retNum, qty, prodName, riderName),
+                        icon: const Icon(Icons.archive_outlined, size: 16, color: Colors.white),
+                        label: const Text('Inspect & Restock', style: TextStyle(color: Colors.white)),
+                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF059669)),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showReceiveReturnDialog(String returnId, String returnNum, int defaultQty, String prodName, String riderName) {
+    int verifiedQty = defaultQty;
+    String condition = 'good';
+    final notesController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text('Receive Return $returnNum', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Product: $prodName\nRider: $riderName', style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B))),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Verified Count:'),
+                  Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.remove_circle_outline),
+                        onPressed: verifiedQty > 0 ? () => setDialogState(() => verifiedQty--) : null,
+                      ),
+                      Text('$verifiedQty', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold)),
+                      IconButton(
+                        icon: const Icon(Icons.add_circle_outline),
+                        onPressed: () => setDialogState(() => verifiedQty++),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              const Text('Physical Condition:'),
+              Row(
+                children: [
+                  Radio<String>(
+                    value: 'good',
+                    groupValue: condition,
+                    onChanged: (val) => setDialogState(() => condition = val!),
+                  ),
+                  const Text('Good (Restock to Shelf)'),
+                  const SizedBox(width: 12),
+                  Radio<String>(
+                    value: 'damaged',
+                    groupValue: condition,
+                    onChanged: (val) => setDialogState(() => condition = val!),
+                  ),
+                  const Text('Damaged (Quarantine)'),
+                ],
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: notesController,
+                decoration: const InputDecoration(labelText: 'Inspection Notes (optional)'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(dialogCtx);
+                final authUser = Supabase.instance.client.auth.currentUser;
+                final activeHub = ref.read(dcConsoleProvider).activeHubId;
+                try {
+                  await ref.read(stockProvider.notifier).receiveRiderReturn(
+                    returnId: returnId,
+                    dcId: activeHub,
+                    receiverId: authUser?.id ?? '00000000-0000-0000-0000-000000000000',
+                    verifiedQuantity: verifiedQty,
+                    condition: condition,
+                    notes: notesController.text.trim(),
+                  );
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('✅ Return $returnNum successfully accepted! $verifiedQty unit(s) updated.'),
+                      backgroundColor: const Color(0xFF10B981),
+                    ),
+                  );
+                  setState(() {});
+                } catch (e) {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error receiving return: $e'), backgroundColor: const Color(0xFFEF4444)),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF059669)),
+              child: const Text('Confirm Restock', style: TextStyle(color: Colors.white)),
+            ),
+          ],
         ),
       ),
     );

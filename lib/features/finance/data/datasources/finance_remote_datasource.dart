@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/supabase_constants.dart';
@@ -9,6 +10,7 @@ abstract class FinanceRemoteDataSource {
   Future<RemittanceModel> submitRemittance({
     required String agentId,
     required String companyId,
+    String? distributionCenterId,
     required double amount,
     required String paymentMethod,
     double grossCollections = 0.0,
@@ -76,13 +78,43 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     final dbClient = _getAuthDbClient();
     try {
       final cleanId = agentId.trim();
-      final isAllOrDc = cleanId.isEmpty || cleanId == 'all' || cleanId == '22222222-2222-4222-8222-222222222222';
+      if (cleanId.isEmpty) return [];
 
       var query = dbClient.from(SupabaseConstants.cashRemittancesTable).select();
-      if (!isAllOrDc) {
+      if (cleanId == 'all') {
+        final response = await query.order('created_at', ascending: false);
+        return (response as List).map((item) => RemittanceModel.fromJson(item)).toList();
+      }
+
+      // Check if cleanId matches a distribution center
+      final dcCheck = await dbClient
+          .from('distribution_centers')
+          .select('id')
+          .eq('id', cleanId)
+          .maybeSingle();
+
+      if (dcCheck != null) {
+        // Query remittances directly assigned to this DC or to any riders attached to this DC
+        final ridersRes = await dbClient
+            .from('delivery_agents')
+            .select('id')
+            .eq('distribution_center_id', cleanId);
+        final riderIds = (ridersRes as List)
+            .map((r) => r['id']?.toString() ?? '')
+            .where((id) => id.isNotEmpty)
+            .toList();
+
+        if (riderIds.isNotEmpty) {
+          final inList = riderIds.map((id) => '"$id"').join(',');
+          query = query.or('distribution_center_id.eq.$cleanId,delivery_agent_id.in.($inList)');
+        } else {
+          query = query.eq('distribution_center_id', cleanId);
+        }
+      } else {
+        // cleanId is an agent / rider ID
         final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
         final validAgentUuid = uuidRegex.hasMatch(cleanId) ? cleanId : SupabaseConstants.defaultDeliveryAgentId;
-        query = query.eq('delivery_agent_id', validAgentUuid);
+        query = query.or('delivery_agent_id.eq.$validAgentUuid,distribution_center_id.eq.$cleanId');
       }
 
       final response = await query.order('created_at', ascending: false);
@@ -103,6 +135,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
   Future<RemittanceModel> submitRemittance({
     required String agentId,
     required String companyId,
+    String? distributionCenterId,
     required double amount,
     required String paymentMethod,
     double grossCollections = 0.0,
@@ -143,6 +176,20 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
           ? companyId
           : '11111111-1111-4111-8111-111111111111';
 
+      String? resolvedDcId = distributionCenterId;
+      if (resolvedDcId == null || resolvedDcId.isEmpty) {
+        try {
+          final agentRow = await dbClient
+              .from('delivery_agents')
+              .select('distribution_center_id')
+              .eq('id', validAgentUuid)
+              .maybeSingle();
+          if (agentRow != null && agentRow['distribution_center_id'] != null) {
+            resolvedDcId = agentRow['distribution_center_id'].toString();
+          }
+        } catch (_) {}
+      }
+
       final backendPaymentMethod = isPaystack
           ? 'paystack'
           : (paymentMethod == 'cash_to_dc'
@@ -153,10 +200,12 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       final insertData = <String, dynamic>{
         'company_id': validCompanyUuid,
         'delivery_agent_id': validAgentUuid,
+        if (resolvedDcId != null && resolvedDcId.isNotEmpty) 'distribution_center_id': resolvedDcId,
         'amount': amount,
         'gross_collections': grossCollections > 0 ? grossCollections : amount,
         'commission_deducted': commissionDeducted,
         'transport_allowance_deducted': transportAllowanceDeducted,
+        'failed_stipends_deducted': failedStipendsDeducted,
         'pos_fee': posFee,
         'expected_amount': (expectedAmount != null && expectedAmount > 0) ? expectedAmount : amount,
         'discrepancy_amount': actualDiscrepancy ?? 0.0,
@@ -170,6 +219,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       };
       if (isPaystack) {
         insertData['verified_at'] = DateTime.now().toIso8601String();
+        insertData['is_verified'] = true;
       }
 
       final response = await dbClient
@@ -180,6 +230,17 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
 
       final remId = response['id']?.toString() ?? 'rem-${DateTime.now().millisecondsSinceEpoch}';
       debugPrint('[FINANCE_DATASOURCE] ✅ Successfully created cash_remittance in Supabase: $remId (Ref: $ref)');
+
+      // If instant paystack remittance, atomically clear rider COD balance & update orders
+      if (isPaystack) {
+        try {
+          await dbClient.rpc('fn_approve_cash_remittance', params: {
+            'p_remittance_id': remId,
+          });
+        } catch (rpcErr) {
+          debugPrint('[FINANCE_DATASOURCE] ℹ️ fn_approve_cash_remittance notice: $rpcErr');
+        }
+      }
 
       // Update associated orders in Supabase using proper remittance statuses
       final orderIds = associatedOrders.map((o) => o.orderId).where((id) => id.isNotEmpty).toList();
@@ -201,6 +262,22 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
           debugPrint('[FINANCE_DATASOURCE] 📋 Marked order $oId payment_status as ${actualIsPartial ? "collected" : "remitted"} in Supabase DB.');
         } catch (ordErr) {
           debugPrint('[FINANCE_DATASOURCE] ℹ️ order update notice: $ordErr');
+        }
+      }
+
+      // Link associated orders into public.remittance_orders relational table
+      if (associatedOrders.isNotEmpty) {
+        final orderLinks = associatedOrders.map((o) => {
+          'cash_remittance_id': remId,
+          'order_id': o.orderId,
+          'order_amount': o.cashCollected,
+          'payment_type': o.paymentType.isNotEmpty ? o.paymentType : 'pay_on_delivery',
+        }).toList();
+        try {
+          await dbClient.from('remittance_orders').insert(orderLinks);
+          debugPrint('[FINANCE_DATASOURCE] 🔗 Linked ${orderLinks.length} orders into remittance_orders.');
+        } catch (roErr) {
+          debugPrint('[FINANCE_DATASOURCE] ℹ️ remittance_orders insert notice: $roErr');
         }
       }
 
@@ -260,20 +337,82 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
   }) async {
     final dbClient = _getAuthDbClient();
     try {
-      final response = await dbClient.from('payout_claims').insert({
-        'delivery_agent_id': agentId,
+      final cleanAgentId = agentId.trim();
+      if (cleanAgentId.isEmpty) {
+        throw Exception('Invalid agent ID provided for payout request.');
+      }
+
+      // 1. Verify agent record and balance
+      final agentRes = await dbClient
+          .from('delivery_agents')
+          .select('id, company_id, distribution_center_id, direct_transfer_balance')
+          .eq('id', cleanAgentId)
+          .maybeSingle();
+
+      if (agentRes == null) {
+        throw Exception('Delivery agent not found: $cleanAgentId');
+      }
+
+      final double currentBalance = (agentRes['direct_transfer_balance'] as num?)?.toDouble() ?? 0.0;
+      if (amount > currentBalance) {
+        throw Exception(
+          'Insufficient direct transfer balance. Available: ₦${currentBalance.toStringAsFixed(2)}, Requested: ₦${amount.toStringAsFixed(2)}',
+        );
+      }
+
+      final String? companyId = agentRes['company_id']?.toString();
+      final String? dcId = agentRes['distribution_center_id']?.toString();
+
+      // 2. Generate unique payout sequence number (PO-YYYYMMDD-XXXX)
+      final now = DateTime.now();
+      final dateStr = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
+      final randomSuffix = (1000 + Random().nextInt(9000)).toString();
+      final payoutNumber = 'PO-$dateStr-$randomSuffix';
+
+      // 3. Insert into authoritative public.payout_requests table
+      final insertData = {
+        'payout_number': payoutNumber,
+        'delivery_agent_id': cleanAgentId,
+        if (companyId != null && companyId.isNotEmpty) 'company_id': companyId,
+        if (dcId != null && dcId.isNotEmpty) 'distribution_center_id': dcId,
         'amount': amount,
-        'bank_name': bankName,
-        'account_number': accountNumber,
-        'account_name': accountName,
-        'notes': notes,
+        'bank_name': bankName.trim(),
+        'account_number': accountNumber.trim(),
+        'account_name': accountName.trim(),
+        'notes': notes?.trim(),
         'status': 'pending',
-        'created_at': DateTime.now().toIso8601String(),
-      }).select().single();
+        'created_at': now.toIso8601String(),
+        'updated_at': now.toIso8601String(),
+      };
+
+      final response = await dbClient
+          .from('payout_requests')
+          .insert(insertData)
+          .select()
+          .single();
+
+      debugPrint('[FINANCE_DATASOURCE] ✅ Payout request created successfully: $payoutNumber (ID: ${response['id']})');
+
+      // 4. Record pending withdrawal in rider_transactions
+      try {
+        await dbClient.from('rider_transactions').insert({
+          'delivery_agent_id': cleanAgentId,
+          'transaction_code': payoutNumber,
+          'title': 'Balance Payout Requested',
+          'category': 'payout',
+          'amount': amount,
+          'is_credit': false,
+          'reference': payoutNumber,
+          'status': 'pending',
+          'description': 'Withdrawal requested to $bankName ($accountNumber). Awaiting DC approval.',
+          'created_at': now.toIso8601String(),
+        });
+      } catch (_) {}
 
       return {'status': 'success', 'data': response};
     } catch (e) {
-      return {'status': 'offline_fallback', 'message': e.toString()};
+      debugPrint('[FINANCE_DATASOURCE] ❌ requestPayout error: $e');
+      rethrow;
     }
   }
 
@@ -282,14 +421,17 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     final dbClient = _getAuthDbClient();
     try {
       final cleanId = agentId.trim();
+      if (cleanId.isEmpty) return [];
+
       final response = await dbClient
-          .from('payout_claims')
+          .from('payout_requests')
           .select()
           .eq('delivery_agent_id', cleanId)
           .order('created_at', ascending: false);
 
       return (response as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[FINANCE_DATASOURCE] ❌ getPayoutRequests error: $e');
       return [];
     }
   }

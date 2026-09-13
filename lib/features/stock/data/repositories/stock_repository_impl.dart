@@ -1,5 +1,6 @@
 import '../../domain/entities/rider_stock_allocation.dart';
 import '../../domain/entities/stock_item.dart';
+import '../../domain/entities/stock_transfer_record.dart';
 import '../../domain/repositories/stock_repository.dart';
 import '../datasources/stock_remote_datasource.dart';
 
@@ -19,6 +20,9 @@ class StockRepositoryImpl implements StockRepository {
     required String sku,
     required String category,
     required double price,
+    double? costPrice,
+    String? barcode,
+    double? weightKg,
     String? description,
     String? ownerName,
     int stockQuantity = 0,
@@ -36,6 +40,9 @@ class StockRepositoryImpl implements StockRepository {
       sku: sku,
       category: category,
       price: price,
+      costPrice: costPrice,
+      barcode: barcode,
+      weightKg: weightKg,
       description: description,
       ownerName: ownerName,
       stockQuantity: stockQuantity,
@@ -145,6 +152,8 @@ class StockRepositoryImpl implements StockRepository {
     required String productId,
     required int quantity,
     required String reason,
+    String? destinationDcId,
+    String? condition,
     String? notes,
   }) async {
     return await remoteDataSource.processStockReturn(
@@ -154,6 +163,8 @@ class StockRepositoryImpl implements StockRepository {
       productId: productId,
       quantity: quantity,
       reason: reason,
+      destinationDcId: destinationDcId,
+      condition: condition,
       notes: notes,
     );
   }
@@ -195,6 +206,166 @@ class StockRepositoryImpl implements StockRepository {
       totalPhysicalCounted: totalPhysicalCounted,
       totalSystemExpected: totalSystemExpected,
       discrepancyCount: discrepancyCount,
+      notes: notes,
+    );
+  }
+
+  @override
+  Future<Map<String, dynamic>> dispatchClientSupply({
+    required String clientId,
+    required String dcId,
+    required List<Map<String, dynamic>> items,
+    String? senderId,
+    required String senderName,
+    required String senderSignatureUrl,
+    String? notes,
+  }) async {
+    return await remoteDataSource.dispatchClientSupply(
+      clientId: clientId,
+      dcId: dcId,
+      items: items,
+      senderId: senderId,
+      senderName: senderName,
+      senderSignatureUrl: senderSignatureUrl,
+      notes: notes,
+    );
+  }
+
+  @override
+  Future<Map<String, dynamic>> receiveClientSupply({
+    required String transferId,
+    required String receiverId,
+    required String receiverName,
+    required String receiverSignatureUrl,
+    required List<Map<String, dynamic>> verifiedItems,
+    String? notes,
+  }) async {
+    return await remoteDataSource.receiveClientSupply(
+      transferId: transferId,
+      receiverId: receiverId,
+      receiverName: receiverName,
+      receiverSignatureUrl: receiverSignatureUrl,
+      verifiedItems: verifiedItems,
+      notes: notes,
+    );
+  }
+
+  @override
+  Future<Map<String, dynamic>> issueDcStockToRiderWithSignature({
+    required String dcId,
+    required String riderId,
+    required List<Map<String, dynamic>> items,
+    required String senderId,
+    required String senderName,
+    required String senderSignatureUrl,
+    String? notes,
+  }) async {
+    return await remoteDataSource.issueDcStockToRiderWithSignature(
+      dcId: dcId,
+      riderId: riderId,
+      items: items,
+      senderId: senderId,
+      senderName: senderName,
+      senderSignatureUrl: senderSignatureUrl,
+      notes: notes,
+    );
+  }
+
+  @override
+  Future<Map<String, dynamic>> acceptRiderStockHandover({
+    required String transferId,
+    required String riderId,
+    required String riderName,
+    required String riderSignatureUrl,
+    List<Map<String, dynamic>>? verifiedItems,
+    String? notes,
+  }) async {
+    return await remoteDataSource.acceptRiderStockHandover(
+      transferId: transferId,
+      riderId: riderId,
+      riderName: riderName,
+      riderSignatureUrl: riderSignatureUrl,
+      verifiedItems: verifiedItems,
+      notes: notes,
+    );
+  }
+
+  @override
+  Future<Map<String, dynamic>> rejectRiderStockHandover({
+    required String transferId,
+    required String riderId,
+    String? reason,
+  }) async {
+    return await remoteDataSource.rejectRiderStockHandover(
+      transferId: transferId,
+      riderId: riderId,
+      reason: reason,
+    );
+  }
+
+  @override
+  Future<List<StockTransferRecord>> fetchStockTransfers({
+    String? dcId,
+    String? clientId,
+    String? riderId,
+    String? status,
+    String? transferType,
+  }) async {
+    return await remoteDataSource.fetchStockTransfers(
+      dcId: dcId,
+      clientId: clientId,
+      riderId: riderId,
+      status: status,
+      transferType: transferType,
+    );
+  }
+
+  @override
+  Future<StockTransferRecord?> getStockTransferById(String transferId) async {
+    return await remoteDataSource.getStockTransferById(transferId);
+  }
+
+  @override
+  Future<Map<String, dynamic>> receiveRiderStockReturn({
+    required String returnId,
+    required String dcId,
+    required String receiverId,
+    required int verifiedQuantity,
+    String condition = 'good',
+    String? notes,
+  }) async {
+    return await remoteDataSource.receiveRiderStockReturn(
+      returnId: returnId,
+      dcId: dcId,
+      receiverId: receiverId,
+      verifiedQuantity: verifiedQuantity,
+      condition: condition,
+      notes: notes,
+    );
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> fetchPendingDcReturns(String dcId) async {
+    return await remoteDataSource.fetchPendingDcReturns(dcId);
+  }
+
+  @override
+  Future<Map<String, dynamic>> submitDetailedInventoryAudit({
+    required String companyId,
+    required String auditorId,
+    required String auditType,
+    required List<Map<String, dynamic>> items,
+    String? dcId,
+    String? riderId,
+    String? notes,
+  }) async {
+    return await remoteDataSource.submitDetailedInventoryAudit(
+      companyId: companyId,
+      auditorId: auditorId,
+      auditType: auditType,
+      items: items,
+      dcId: dcId,
+      riderId: riderId,
       notes: notes,
     );
   }

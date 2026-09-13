@@ -4,6 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/helpers/formatters.dart';
 import '../../../finance/presentation/providers/finance_provider.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
+import '../../../orders/domain/services/order_routing_service.dart';
+import '../../domain/entities/distribution_center.dart';
 import '../providers/dc_console_provider.dart';
 import '../widgets/dc_driver_manifest_table.dart';
 import '../widgets/dc_city_map_widget.dart';
@@ -21,9 +23,31 @@ class DCDashboardPage extends ConsumerWidget {
     final ordersState = ref.watch(ordersProvider);
     final financeState = ref.watch(financeProvider);
 
-    final inTransitCount = ordersState.orders.where((o) => o.status == 'in_transit' || o.status == 'assigned').length;
-    final unassignedCount = ordersState.orders.where((o) => (o.deliveryAgentId == null || o.deliveryAgentId!.isEmpty) && o.status != 'delivered' && o.status != 'cancelled' && o.status != 'failed').length;
-    final pendingReturnsCount = ordersState.orders.where((o) => o.status == 'failed' || o.status == 'call_back').length;
+    final allDcs = dcState.distributionCenters;
+    final activeDc = allDcs.where(
+      (d) => d.id == dcState.activeHubId || d.code == dcState.activeHubCode,
+    ).firstOrNull ?? DistributionCenter(
+      id: dcState.activeHubId,
+      name: dcState.activeHubName,
+      code: dcState.activeHubCode,
+      state: dcState.isCurrentHubGrandDc ? 'Abuja (FCT)' : '',
+      city: '',
+      address: '',
+      isGrandDc: dcState.isCurrentHubGrandDc,
+      isHub: dcState.isCurrentHubGrandDc,
+    );
+
+    final hubOrders = ordersState.orders.where((o) {
+      return OrderRoutingService.doesOrderBelongToDc(
+        order: o,
+        currentDc: activeDc,
+        allDcs: allDcs,
+      );
+    }).toList();
+
+    final inTransitCount = hubOrders.where((o) => o.status == 'in_transit' || o.status == 'assigned').length;
+    final unassignedCount = hubOrders.where((o) => (o.deliveryAgentId == null || o.deliveryAgentId!.isEmpty) && o.status != 'delivered' && o.status != 'cancelled' && o.status != 'failed').length;
+    final pendingReturnsCount = hubOrders.where((o) => o.status == 'failed' || o.status == 'call_back').length;
     final pendingRemittance = financeState.totalPendingRemittance;
 
     return SingleChildScrollView(

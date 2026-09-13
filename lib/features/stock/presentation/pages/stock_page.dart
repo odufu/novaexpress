@@ -10,6 +10,7 @@ import '../../../../core/widgets/product_image_widget.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../notifications/presentation/providers/notifications_provider.dart';
 import '../widgets/return_stock_modal.dart';
+import '../widgets/stock_barcode_search_modal.dart';
 import '../../domain/entities/stock_item.dart';
 import '../providers/stock_provider.dart';
 
@@ -31,6 +32,11 @@ class _StockPageState extends ConsumerState<StockPage> {
       final agentId = user?.deliveryAgentId ?? user?.id;
       if (agentId != null && agentId.isNotEmpty) {
         ref.read(stockProvider.notifier).fetchStockItems(agentId);
+        ref.read(stockProvider.notifier).fetchStockTransfers(
+              riderId: agentId,
+              status: 'pending_rider_acceptance',
+              transferType: 'dc_to_rider',
+            );
       } else {
         ref.read(stockProvider.notifier).fetchStockItems();
       }
@@ -57,6 +63,11 @@ class _StockPageState extends ConsumerState<StockPage> {
       final newAgentId = next.user?.deliveryAgentId ?? next.user?.id ?? '';
       if (newAgentId.isNotEmpty) {
         stockNotifier.fetchStockItems(newAgentId);
+        stockNotifier.fetchStockTransfers(
+          riderId: newAgentId,
+          status: 'pending_rider_acceptance',
+          transferType: 'dc_to_rider',
+        );
       }
     });
 
@@ -197,6 +208,13 @@ class _StockPageState extends ConsumerState<StockPage> {
       body: RefreshIndicator(
         onRefresh: () async {
           await stockNotifier.fetchStockItems(agentId);
+          if (agentId.isNotEmpty) {
+            await stockNotifier.fetchStockTransfers(
+              riderId: agentId,
+              status: 'pending_rider_acceptance',
+              transferType: 'dc_to_rider',
+            );
+          }
         },
         color: AppColors.primary,
         child: SingleChildScrollView(
@@ -215,6 +233,98 @@ class _StockPageState extends ConsumerState<StockPage> {
                 ),
               ),
               const SizedBox(height: 14),
+
+              // Pending Stock Handover Cards
+              if (stockState.pendingRiderHandovers.isNotEmpty) ...[
+                ...stockState.pendingRiderHandovers.map((trf) => Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: isDark
+                          ? [const Color(0xFF1E3A8A), const Color(0xFF1E293B)]
+                          : [const Color(0xFFEFF6FF), Colors.white],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFF3B82F6), width: 1.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF3B82F6).withValues(alpha: 0.15),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.draw_rounded, color: Color(0xFF3B82F6), size: 20),
+                              const SizedBox(width: 8),
+                              Text(
+                                'HANDOVER AWAITING ACCEPTANCE',
+                                style: GoogleFonts.jetBrainsMono(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: const Color(0xFF3B82F6),
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF3B82F6),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Text(
+                              'SIGNATURE REQUIRED',
+                              style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '${trf.totalQuantityRequested} units issued by ${trf.senderName ?? 'DC Supervisor'} (${trf.transferNumber})',
+                        style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Items: ${trf.items.map((i) => '${i.quantity}x ${i.productName}').join(', ')}',
+                        style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2563EB),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          onPressed: () {
+                            context.push('/stock/handover/${trf.id}');
+                          },
+                          icon: const Icon(Icons.verified_rounded, size: 18),
+                          label: const Text(
+                            'Count & Sign Acceptance on Glass',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )),
+              ],
 
               // Search Bar with Barcode Scanner
               Container(
@@ -251,7 +361,7 @@ class _StockPageState extends ConsumerState<StockPage> {
                       ),
                       tooltip: 'Scan Barcode',
                       onPressed: () {
-                        context.push('/orders/scan');
+                        StockBarcodeSearchModal.show(context);
                       },
                     ),
                     border: InputBorder.none,
@@ -645,7 +755,7 @@ class _StockPageState extends ConsumerState<StockPage> {
                       child: _ProductInventoryCard(
                         item: item,
                         onViewDetails: () {
-                          context.push('/stock/details/${item.name}');
+                          context.push('/stock/details/${item.name}', extra: item);
                         },
                       ),
                     );

@@ -178,46 +178,53 @@ class _DCRemittanceDetailModalState extends ConsumerState<DCRemittanceDetailModa
 
     setState(() => _isProcessing = true);
     try {
-      // 1. Submit/Verify in finance provider
+      final activeDcId = ref.read(dcConsoleProvider).activeDcId;
       final user = ref.read(authProvider).user;
-      final activeCompanyId = user?.companyId ?? user?.distributionCenterId ?? '22222222-2222-4222-8222-222222222222';
-      final activeDcId = user?.distributionCenterId ?? '22222222-2222-4222-8222-222222222222';
+      final resolvedCompanyId = user?.companyId ?? (user?.distributionCenterId ?? activeDcId);
 
-      await ref.read(financeProvider.notifier).submitRemittance(
-        agentId: rem.riderId,
-        companyId: activeCompanyId,
-        amount: rem.netAmount,
-        paymentMethod: 'cash_to_dc',
-        grossCollections: rem.grossAmount,
-        commissionDeducted: rem.commissionAmount,
-        transportAllowanceDeducted: rem.transportAllowance,
-        failedStipendsDeducted: rem.failedStipends,
-        posFee: rem.posFee,
-        referenceNumber: rem.referenceNumber,
-        notes: 'Cleared and verified into DC Treasury by supervisor',
-        associatedOrders: rem.orders.map((o) => RemittanceOrderItem(
-          orderId: o.id,
-          orderNumber: o.orderNumber,
-          customerName: o.customerName,
-          status: o.status,
-          paymentType: o.paymentType,
-          cashCollected: o.totalAmount,
-          date: o.createdAt,
-        )).toList(),
-      );
+      if (!rem.id.startsWith('batch-') && !rem.id.startsWith('dt-')) {
+        // Direct atomic approval of cash_remittances row via PostgreSQL RPC fn_approve_cash_remittance
+        await ref.read(dcConsoleProvider.notifier).approveCashRemittance(rem.id);
+      } else {
+        // Submit open batch and approve it atomically
+        await ref.read(financeProvider.notifier).submitRemittance(
+          agentId: rem.riderId,
+          companyId: resolvedCompanyId,
+          amount: rem.netAmount,
+          paymentMethod: 'cash_to_dc',
+          grossCollections: rem.grossAmount,
+          commissionDeducted: rem.commissionAmount,
+          transportAllowanceDeducted: rem.transportAllowance,
+          failedStipendsDeducted: rem.failedStipends,
+          posFee: rem.posFee,
+          referenceNumber: rem.referenceNumber,
+          notes: 'Cleared and verified into DC Treasury by supervisor',
+          associatedOrders: rem.orders.map((o) => RemittanceOrderItem(
+            orderId: o.id,
+            orderNumber: o.orderNumber,
+            customerName: o.customerName,
+            status: o.status,
+            paymentType: o.paymentType,
+            cashCollected: o.totalAmount,
+            date: o.createdAt,
+          )).toList(),
+        );
+      }
 
-      // 2. Mark all contained orders as remitted in ordersProvider
+      // Mark orders as remitted/cleared in local state
       for (final order in rem.orders) {
         await ref.read(ordersProvider.notifier).updateOrderPaymentStatus(
           orderId: order.id,
           paymentStatus: 'collected',
-          remittanceStatus: 'remitted',
+          remittanceStatus: 'cleared',
         );
       }
 
-      // 3. Reload live DC state
-      await ref.read(ordersProvider.notifier).loadDcOrders(activeDcId);
-      await ref.read(financeProvider.notifier).loadRemittances(activeDcId);
+      // Reload live DC & Finance state
+      if (activeDcId.isNotEmpty) {
+        await ref.read(ordersProvider.notifier).loadDcOrders(activeDcId);
+        await ref.read(financeProvider.notifier).loadRemittances(activeDcId);
+      }
 
       if (mounted) {
         navigator.pop();

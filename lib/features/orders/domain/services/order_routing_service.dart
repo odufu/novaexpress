@@ -230,4 +230,88 @@ class OrderRoutingService {
     final currentCustody = driverAllocations.fold<int>(0, (sum, a) => sum + a.inCustodyUnits);
     return currentCustody >= requiredQty;
   }
+
+  /// Determines whether a given order belongs to [currentDc].
+  ///
+  /// Business Rules:
+  /// 1. Regional DC (Dedicated, non-Grand DC, e.g. Otukpo DC):
+  ///    - An order belongs to this Regional DC if:
+  ///      a) order.distributionCenterId matches currentDc.id or currentDc.code, OR
+  ///      b) order.distributionCenterId is null/empty AND currentDc covers the order's state & LGA.
+  ///    - An order NEVER belongs to this Regional DC if:
+  ///      - It is assigned to a different DC, OR
+  ///      - Its delivery location (State / LGA) is outside this Regional DC's coverage.
+  ///
+  /// 2. Grand DC (Primary Hub Headquarters, e.g. Wuse Central / Abuja Main DC):
+  ///    - If an active dedicated Regional DC exists in [allDcs] that handles the order's State / LGA
+  ///      (e.g. Otukpo DC covering Benue):
+  ///      -> The order belongs to that Regional DC and MUST NOT show in the Grand DC!
+  ///    - The order DOES show in the Grand DC if:
+  ///      a) It targets the Grand DC's own geographic jurisdiction (e.g. Abuja / FCT), OR
+  ///      b) There is NO dedicated regional DC configured in [allDcs] to handle that State / LGA
+  ///         (unrouted/orphan orders escalate to Grand DC HQ for manual triage).
+  static bool doesOrderBelongToDc({
+    required OrderEntity order,
+    required DistributionCenter currentDc,
+    required List<DistributionCenter> allDcs,
+  }) {
+    final orderDcId = order.distributionCenterId?.trim() ?? '';
+    final orderState = order.deliveryState.trim();
+    final orderLga = (order.deliveryLga ?? order.lga ?? '').trim();
+
+    // Find Grand DC if available
+    final grandDc = allDcs.where((d) => d.isGrandDc && d.isActive).firstOrNull ??
+        allDcs.where((d) => d.isHub && d.isActive).firstOrNull;
+    final grandDcId = grandDc?.id ?? '22222222-2222-4222-8222-222222222222';
+    final grandDcCode = grandDc?.code ?? 'DC-WUSE-01';
+
+    // 1. Regional DC (Dedicated, non-Grand DC, e.g. Otukpo DC)
+    if (!currentDc.isGrandDc) {
+      // A. Explicit assignment to this Regional DC
+      if (orderDcId.isNotEmpty &&
+          (orderDcId == currentDc.id || orderDcId == currentDc.code)) {
+        return true;
+      }
+
+      // B. If assigned to another regional DC, it belongs to that other DC
+      if (orderDcId.isNotEmpty &&
+          orderDcId != currentDc.id &&
+          orderDcId != currentDc.code &&
+          orderDcId != grandDcId &&
+          orderDcId != grandDcCode) {
+        return false;
+      }
+
+      // C. Unassigned or tagged with Grand DC fallback:
+      // Does this regional DC cover the order's State & LGA?
+      return currentDc.coversLocation(stateName: orderState, lgaName: orderLga);
+    }
+
+    // 2. Grand DC (Hub Headquarters, e.g. Abuja Main DC)
+    // Check if there is an active, dedicated Regional DC covering this order's destination
+    final dedicatedRegionalDc = allDcs.where((dc) {
+      if (dc.id == currentDc.id || dc.isGrandDc || !dc.isActive) return false;
+      // If order is explicitly tagged to this regional DC
+      if (orderDcId.isNotEmpty && (orderDcId == dc.id || orderDcId == dc.code)) {
+        return true;
+      }
+      // Or if this regional DC covers the order's State and LGA
+      return dc.coversLocation(stateName: orderState, lgaName: orderLga);
+    }).firstOrNull;
+
+    if (dedicatedRegionalDc != null) {
+      // A dedicated regional DC exists and handles this order -> MUST NOT show in Grand DC!
+      return false;
+    }
+
+    // If order was explicitly assigned to another DC that is not this Grand DC
+    if (orderDcId.isNotEmpty &&
+        orderDcId != currentDc.id &&
+        orderDcId != currentDc.code) {
+      return false;
+    }
+
+    // Order targets Grand DC's own territory (e.g. Abuja) OR has no dedicated DC anywhere
+    return true;
+  }
 }

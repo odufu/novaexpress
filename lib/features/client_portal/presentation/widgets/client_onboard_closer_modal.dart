@@ -19,6 +19,8 @@ class _ClientOnboardCloserModalState extends ConsumerState<ClientOnboardCloserMo
   final _phoneController = TextEditingController();
   final _targetController = TextEditingController(text: '50');
   final _commissionController = TextEditingController(text: '500');
+  final _passwordController = TextEditingController(text: 'Closer123!');
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -27,6 +29,7 @@ class _ClientOnboardCloserModalState extends ConsumerState<ClientOnboardCloserMo
     _phoneController.dispose();
     _targetController.dispose();
     _commissionController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -40,11 +43,13 @@ class _ClientOnboardCloserModalState extends ConsumerState<ClientOnboardCloserMo
       final phone = _phoneController.text.trim();
       final target = int.tryParse(_targetController.text.trim()) ?? 50;
       final commission = double.tryParse(_commissionController.text.trim()) ?? 500.0;
+      final password = _passwordController.text.trim().isNotEmpty ? _passwordController.text.trim() : 'Closer123!';
 
       final closer = await ref.read(clientPortalProvider.notifier).createCloser(
         fullName: name,
         email: email,
         phone: phone,
+        password: password,
         dailyCallTarget: target,
         commissionRate: commission,
       );
@@ -184,7 +189,7 @@ class _ClientOnboardCloserModalState extends ConsumerState<ClientOnboardCloserMo
                           controller: _emailController,
                           keyboardType: TextInputType.emailAddress,
                           decoration: InputDecoration(
-                            hintText: 'chinelo@novacale.ng',
+                            hintText: 'closer@company.com',
                             prefixIcon: const Icon(Icons.alternate_email_rounded, size: 20, color: Color(0xFF94A3B8)),
                             filled: true,
                             fillColor: const Color(0xFFF8FAFC),
@@ -296,6 +301,53 @@ class _ClientOnboardCloserModalState extends ConsumerState<ClientOnboardCloserMo
                             ],
                           );
                   },
+                ),
+                const SizedBox(height: 16),
+
+                // Closer Login Password
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Closer Initial Password', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF334155))),
+                        TextButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              _passwordController.text = 'Closer${DateTime.now().millisecond}!2026';
+                            });
+                          },
+                          icon: const Icon(Icons.shuffle_rounded, size: 14, color: Color(0xFFF37021)),
+                          label: Text('Generate', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFF37021))),
+                          style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    TextFormField(
+                      controller: _passwordController,
+                      obscureText: _obscurePassword,
+                      decoration: InputDecoration(
+                        hintText: 'Closer123!',
+                        prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20, color: Color(0xFF94A3B8)),
+                        suffixIcon: IconButton(
+                          icon: Icon(_obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 20, color: const Color(0xFF94A3B8)),
+                          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                        ),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                      ),
+                      validator: (v) => (v == null || v.trim().length < 6) ? 'Password must be at least 6 characters' : null,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'The sales closer will log in using their email and this password.',
+                      style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 24),
 

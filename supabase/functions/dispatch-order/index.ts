@@ -102,14 +102,18 @@ serve(async (req: Request) => {
 
     // FALLBACK A: No DC matches State/LGA -> Escalate to Grand DC
     if (!matchedDc) {
-      const targetDc = grandDc || (allDcs && allDcs[0]) || { id: "dc-hq-fallback", name: "Grand DC National HQ" };
-      const dispatchNotes = `🚨 Escalated to Grand DC (${targetDc.name}). No DC configured for State: "${deliveryState}", LGA: "${deliveryLga}".`;
+      const targetDc = grandDc || (allDcs && allDcs.length > 0 ? allDcs[0] : null);
+      const targetDcId = targetDc ? targetDc.id : null;
+      const targetDcName = targetDc ? targetDc.name : "Grand Distribution Hub";
+      const dispatchNotes = targetDc
+        ? `🚨 Escalated to Grand DC (${targetDcName}). No DC configured for State: "${deliveryState}", LGA: "${deliveryLga}".`
+        : `🚨 Unrouted. No Distribution Centers configured in system.`;
 
-      if (orderId) {
+      if (orderId && targetDcId) {
         await supabase
           .from("orders")
           .update({
-            distribution_center_id: targetDc.id,
+            distribution_center_id: targetDcId,
             assigned_agent_id: null,
             status: "pending_dispatch",
             assignment_status: "pending_dc_assignment",
@@ -123,8 +127,8 @@ serve(async (req: Request) => {
         JSON.stringify({
           success: true,
           status: "pending_dc_assignment",
-          distributionCenterId: targetDc.id,
-          distributionCenterName: targetDc.name,
+          distributionCenterId: targetDcId,
+          distributionCenterName: targetDcName,
           isGrandDc: true,
           assignedAgentId: null,
           routingNotes: dispatchNotes,
@@ -138,7 +142,7 @@ serve(async (req: Request) => {
       .from("delivery_agents")
       .select("*, users(first_name, last_name, phone_number, email)")
       .eq("is_active", true)
-      .eq("current_status", "active");
+      .in("current_status", ["available", "active", "on_duty"]);
 
     if (driverErr) {
       throw new Error(`Failed to load fleet riders: ${driverErr.message}`);
@@ -175,6 +179,7 @@ serve(async (req: Request) => {
           .from("orders")
           .update({
             distribution_center_id: matchedDc.id,
+            delivery_agent_id: matchedDriver.id,
             assigned_agent_id: matchedDriver.id,
             status: "assigned",
             assignment_status: "auto_assigned",
@@ -183,6 +188,20 @@ serve(async (req: Request) => {
             updated_at: new Date().toISOString(),
           })
           .eq("id", orderId);
+
+        // Emit instant notification to rider
+        try {
+          await supabase.from("notifications").insert({
+            company_id: orderRecord?.company_id || "11111111-1111-4111-8111-111111111111",
+            delivery_agent_id: matchedDriver.id,
+            title: "New Order Assigned! 📦",
+            message: `Order #${orderRecord?.order_number || orderId} has been dispatched to your manifest.`,
+            category: "delivery",
+            action_route: "/orders",
+            is_read: false,
+            created_at: new Date().toISOString(),
+          });
+        } catch (_) {}
       }
 
       return new Response(
@@ -208,6 +227,7 @@ serve(async (req: Request) => {
         .from("orders")
         .update({
           distribution_center_id: matchedDc.id,
+          delivery_agent_id: null,
           assigned_agent_id: null,
           status: "pending_dispatch",
           assignment_status: "pending_rider_assignment",

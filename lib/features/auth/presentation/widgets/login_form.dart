@@ -7,7 +7,6 @@ import '../providers/auth_provider.dart';
 
 final loginObscurePasswordProvider = StateProvider.autoDispose<bool>((ref) => true);
 final loginRememberMeProvider = StateProvider.autoDispose<bool>((ref) => true);
-final loginSelectedRoleProvider = StateProvider.autoDispose<String>((ref) => 'rider');
 
 class LoginForm extends ConsumerStatefulWidget {
   const LoginForm({super.key});
@@ -20,67 +19,30 @@ class _LoginFormState extends ConsumerState<LoginForm> {
   final _formKey = GlobalKey<FormState>();
   final _agentIdController = TextEditingController(text: 'emeka.rider@novaexpress.ng');
   final _passwordController = TextEditingController(text: 'Password123!');
-  String? _roleMismatchError;
-
-  @override
-  void initState() {
-    super.initState();
-    _agentIdController.addListener(_onFieldEdited);
-    _passwordController.addListener(_onFieldEdited);
-  }
-
-  void _onFieldEdited() {
-    if (_roleMismatchError != null && mounted) {
-      setState(() {
-        _roleMismatchError = null;
-      });
-    }
-  }
+  String? _selectedDemoRole;
 
   @override
   void dispose() {
-    _agentIdController.removeListener(_onFieldEdited);
-    _passwordController.removeListener(_onFieldEdited);
     _agentIdController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
-  void _selectRole(String role) {
-    if (mounted) {
-      setState(() {
-        _roleMismatchError = null;
-      });
-    }
-    ref.read(loginSelectedRoleProvider.notifier).state = role;
-    if (role == 'rider') {
-      _agentIdController.text = 'emeka.rider@novaexpress.ng';
-      _passwordController.text = 'Password123!';
-    } else if (role == 'client') {
-      _agentIdController.text = 'client.novacale@novaexpress.ng';
-      _passwordController.text = 'ClientPass123!';
-    } else if (role == 'closer') {
-      _agentIdController.text = 'closer.amaka@novacale.ng';
-      _passwordController.text = 'CloserPass123!';
-    } else {
-      _agentIdController.text = 'dc.supervisor@novaexpress.ng';
-      _passwordController.text = 'Password123!';
-    }
+  void _quickFill(String roleKey, String email, String password) {
+    setState(() {
+      _selectedDemoRole = roleKey;
+      _agentIdController.text = email;
+      _passwordController.text = password;
+    });
   }
 
   void _submit() async {
-    debugPrint('[AUTH_UI] 🚀 "Sign In" button tapped. Running form validation...');
+    debugPrint('[AUTH_UI] 🚀 Single unified login submitted. Running validation...');
     if (_formKey.currentState!.validate()) {
-      if (mounted) {
-        setState(() {
-          _roleMismatchError = null;
-        });
-      }
       final email = _agentIdController.text.trim();
       final password = _passwordController.text;
       final rememberMe = ref.read(loginRememberMeProvider);
-      final selectedRole = ref.read(loginSelectedRoleProvider);
-      debugPrint('[AUTH_UI] 📝 Form valid. Dispatching login request for: "$email", SelectedPortal=$selectedRole, RememberMe=$rememberMe');
+      debugPrint('[AUTH_UI] 📝 Form valid. Dispatching login request for: "$email", RememberMe=$rememberMe');
 
       final success = await ref.read(authProvider.notifier).login(email, password);
 
@@ -93,41 +55,12 @@ class _LoginFormState extends ConsumerState<LoginForm> {
         final authUser = ref.read(authProvider).user;
         if (authUser == null) return;
 
-        // Verify that the account's assigned role matches the selected role portal
-        bool roleMatches = false;
-        if (selectedRole == 'rider') {
-          roleMatches = authUser.isRider;
-        } else if (selectedRole == 'dc_manager') {
-          roleMatches = authUser.isDcManager;
-        } else if (selectedRole == 'client') {
-          roleMatches = authUser.isClientAdmin;
-        } else if (selectedRole == 'closer') {
-          roleMatches = authUser.isCloser;
-        }
-
-        if (!roleMatches) {
-          debugPrint('[AUTH_UI] 🛑 Access Denied: User role "${authUser.role}" does not match selected portal "$selectedRole"');
-          // Logout to clear the session immediately
-          await ref.read(authProvider.notifier).logout();
-          if (mounted) {
-            setState(() {
-              _roleMismatchError = 'Access Denied: This account is registered as a ${authUser.roleDescription}. You can only log in under the ${authUser.roleDescription} tab.';
-            });
-          }
-          return;
-        }
+        debugPrint('[AUTH_UI] 🔑 User authenticated successfully: "${authUser.email}", Role: "${authUser.role}", Name: "${authUser.fullName}"');
 
         try {
-          if (authUser.isClientAdmin || authUser.isCloser) {
-            debugPrint('[AUTH_UI] 🛍️ Navigating Merchant/Client to Client Portal (/client)...');
-            context.go('/client');
-          } else if (authUser.isDcManager) {
-            debugPrint('[AUTH_UI] 🏢 Navigating DC Manager to DC Operations Console (/dc)...');
-            context.go('/dc');
-          } else {
-            debugPrint('[AUTH_UI] 🚚 Navigating Delivery Agent (${authUser.firstName} ${authUser.lastName}) to PDA Dashboard (/)...');
-            context.go('/');
-          }
+          final targetRoute = authUser.homeConsoleRoute;
+          debugPrint('[AUTH_UI] 🚀 Directing ${authUser.roleDescription} to designated console: $targetRoute');
+          context.go(targetRoute);
         } catch (routerErr) {
           debugPrint('[AUTH_UI] ℹ️ Router navigation notice ($routerErr)');
         }
@@ -142,19 +75,18 @@ class _LoginFormState extends ConsumerState<LoginForm> {
     final authState = ref.watch(authProvider);
     final obscurePassword = ref.watch(loginObscurePasswordProvider);
     final rememberMe = ref.watch(loginRememberMeProvider);
-    final selectedRole = ref.watch(loginSelectedRoleProvider);
 
     return Form(
       key: _formKey,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Quick Test Account Selector Ribbon
+          // Quick Autofill Demo Credentials Bar
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
               color: const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(12),
               border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
             child: Column(
@@ -163,102 +95,72 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Expanded(
-                      child: Text(
-                        'TEST LOGIN SELECTOR',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.6,
-                          color: const Color(0xFF64748B),
-                        ),
+                    Text(
+                      'QUICK TEST AUTOFILL',
+                      style: GoogleFonts.inter(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.6,
+                        color: const Color(0xFF64748B),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF2563EB).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        'Auto-fills Credentials',
-                        style: GoogleFonts.inter(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: const Color(0xFF2563EB),
-                        ),
+                    Text(
+                      'Role routes automatically upon login',
+                      style: GoogleFonts.inter(
+                        fontSize: 10,
+                        color: const Color(0xFF94A3B8),
+                        fontStyle: FontStyle.italic,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
-
-                // Card 1: Delivery Agent (PDA Rider)
-                _buildRoleCard(
-                  roleKey: 'rider',
-                  title: 'Field Delivery Agent (PDA)',
-                  subtitle: 'Parent DC: Wuse Distribution Center (DC-WUSE-01)',
-                  tag: 'PDA Mobile View',
-                  icon: Icons.two_wheeler_rounded,
-                  activeColor: AppColors.orange,
-                  isSelected: selectedRole == 'rider',
-                  onTap: () => _selectRole('rider'),
-                ),
-
                 const SizedBox(height: 8),
-
-                // Card 2: DC Operations Supervisor (Console Mode)
-                _buildRoleCard(
-                  roleKey: 'dc_manager',
-                  title: 'DC Operations Supervisor',
-                  subtitle: 'Managing DC: Wuse Distribution Center (DC-WUSE-01)',
-                  tag: 'DC Console Mode',
-                  icon: Icons.admin_panel_settings_rounded,
-                  activeColor: const Color(0xFF0B192C),
-                  isSelected: selectedRole == 'dc_manager',
-                  onTap: () => _selectRole('dc_manager'),
-                ),
-
-                const SizedBox(height: 8),
-
-                // Card 3: E-Commerce Merchant Admin
-                _buildRoleCard(
-                  roleKey: 'client',
-                  title: 'E-Commerce Merchant Admin',
-                  subtitle: 'Client: Novacale Limited (Executive Console)',
-                  tag: 'Client Admin',
-                  icon: Icons.storefront_rounded,
-                  activeColor: const Color(0xFF0D9488),
-                  isSelected: selectedRole == 'client',
-                  onTap: () => _selectRole('client'),
-                ),
-
-                const SizedBox(height: 8),
-
-                // Card 4: Enterprise Telesales Closer
-                _buildRoleCard(
-                  roleKey: 'closer',
-                  title: 'Enterprise Telesales Closer',
-                  subtitle: 'Amaka Chioma • Novacale Limited (CLS-NOVA-001)',
-                  tag: 'Lead Dialer & Orders',
-                  icon: Icons.headset_mic_rounded,
-                  activeColor: const Color(0xFF6366F1),
-                  isSelected: selectedRole == 'closer',
-                  onTap: () => _selectRole('closer'),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _buildAutofillChip(
+                      label: 'Field Rider (PDA)',
+                      roleKey: 'rider',
+                      icon: Icons.two_wheeler_rounded,
+                      color: AppColors.orange,
+                      onTap: () => _quickFill('rider', 'emeka.rider@novaexpress.ng', 'Password123!'),
+                    ),
+                    _buildAutofillChip(
+                      label: 'DC Supervisor',
+                      roleKey: 'dc_manager',
+                      icon: Icons.admin_panel_settings_rounded,
+                      color: const Color(0xFF0B192C),
+                      onTap: () => _quickFill('dc_manager', 'dc.supervisor@novaexpress.ng', 'Password123!'),
+                    ),
+                    _buildAutofillChip(
+                      label: 'Merchant Admin',
+                      roleKey: 'client',
+                      icon: Icons.storefront_rounded,
+                      color: const Color(0xFF0D9488),
+                      onTap: () => _quickFill('client', 'client.novacale@novaexpress.ng', 'ClientPass123!'),
+                    ),
+                    _buildAutofillChip(
+                      label: 'Telesales Closer',
+                      roleKey: 'closer',
+                      icon: Icons.headset_mic_rounded,
+                      color: const Color(0xFF6366F1),
+                      onTap: () => _quickFill('closer', 'closer.amaka@novacale.ng', 'CloserPass123!'),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 18),
 
-          if (_roleMismatchError != null || authState.errorMessage != null) ...[
+          if (authState.errorMessage != null) ...[
             Container(
               padding: const EdgeInsets.all(12),
               margin: const EdgeInsets.only(bottom: 16),
               decoration: BoxDecoration(
-                color: AppColors.danger.withValues(alpha: 0.15),
+                color: AppColors.danger.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
               ),
@@ -268,7 +170,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      _roleMismatchError ?? authState.errorMessage!,
+                      authState.errorMessage!,
                       style: const TextStyle(color: AppColors.danger, fontSize: 13),
                     ),
                   ),
@@ -277,12 +179,12 @@ class _LoginFormState extends ConsumerState<LoginForm> {
             ),
           ],
 
-          // Agent ID / Email Field
+          // Email / Agent ID Field
           const Text(
-            'Account Email / Agent ID',
+            'Account Email or Agent ID',
             style: TextStyle(
               fontWeight: FontWeight.bold,
-              fontSize: 14,
+              fontSize: 13.5,
               color: Color(0xFF181C1E),
             ),
           ),
@@ -291,27 +193,27 @@ class _LoginFormState extends ConsumerState<LoginForm> {
             controller: _agentIdController,
             style: const TextStyle(color: Color(0xFF181C1E), fontSize: 14),
             decoration: InputDecoration(
-              hintText: 'Enter your Account Email or Agent ID',
-              hintStyle: const TextStyle(color: Color(0xFF75777E), fontSize: 14),
+              hintText: 'e.g. name@novaexpress.ng or PDA-7000',
+              hintStyle: const TextStyle(color: Color(0xFF75777E), fontSize: 13.5),
               filled: true,
-              fillColor: const Color(0xFFF7FAFC),
+              fillColor: const Color(0xFFF8FAFC),
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              prefixIcon: const Icon(Icons.badge_outlined, color: Color(0xFF75777E)),
+              prefixIcon: const Icon(Icons.badge_outlined, color: Color(0xFF64748B), size: 20),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFFC5C6CE)),
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFFC5C6CE)),
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(10),
                 borderSide: const BorderSide(color: AppColors.navy, width: 2),
               ),
             ),
             validator: (val) {
-              if (val == null || val.isEmpty) return 'Please enter your account email or ID';
+              if (val == null || val.trim().isEmpty) return 'Please enter your account email or agent ID';
               return null;
             },
           ),
@@ -322,7 +224,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
             'Password',
             style: TextStyle(
               fontWeight: FontWeight.bold,
-              fontSize: 14,
+              fontSize: 13.5,
               color: Color(0xFF181C1E),
             ),
           ),
@@ -332,31 +234,32 @@ class _LoginFormState extends ConsumerState<LoginForm> {
             obscureText: obscurePassword,
             style: const TextStyle(color: Color(0xFF181C1E), fontSize: 14),
             decoration: InputDecoration(
-              hintText: 'Enter your Password',
-              hintStyle: const TextStyle(color: Color(0xFF75777E), fontSize: 14),
+              hintText: 'Enter your password',
+              hintStyle: const TextStyle(color: Color(0xFF75777E), fontSize: 13.5),
               filled: true,
-              fillColor: const Color(0xFFF7FAFC),
+              fillColor: const Color(0xFFF8FAFC),
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF75777E)),
+              prefixIcon: const Icon(Icons.lock_outline_rounded, color: Color(0xFF64748B), size: 20),
               suffixIcon: IconButton(
                 icon: Icon(
                   obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                  color: const Color(0xFF75777E),
+                  color: const Color(0xFF64748B),
+                  size: 20,
                 ),
                 onPressed: () {
                   ref.read(loginObscurePasswordProvider.notifier).state = !obscurePassword;
                 },
               ),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFFC5C6CE)),
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFFC5C6CE)),
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(10),
                 borderSide: const BorderSide(color: AppColors.navy, width: 2),
               ),
             ),
@@ -385,7 +288,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                       child: Checkbox(
                         value: rememberMe,
                         activeColor: AppColors.orange,
-                        side: const BorderSide(color: Color(0xFFC5C6CE), width: 1.5),
+                        side: const BorderSide(color: Color(0xFFCBD5E1), width: 1.5),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(4),
                         ),
@@ -398,7 +301,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                     const Text(
                       'Remember me',
                       style: TextStyle(
-                        color: Color(0xFF44474D),
+                        color: Color(0xFF475569),
                         fontSize: 13,
                       ),
                     ),
@@ -418,23 +321,20 @@ class _LoginFormState extends ConsumerState<LoginForm> {
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 22),
 
-          // Sign In Button
+          // Single Unified Sign In Button
           SizedBox(
             width: double.infinity,
             height: 50,
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: selectedRole == 'dc_manager'
-                    ? const Color(0xFF0B192C)
-                    : (selectedRole == 'client'
-                        ? const Color(0xFF0D9488)
-                        : (selectedRole == 'closer' ? const Color(0xFF6366F1) : AppColors.orange)),
+                backgroundColor: const Color(0xFF0F172A), // Deep professional navy
                 foregroundColor: Colors.white,
-                elevation: 1,
+                elevation: 2,
+                shadowColor: Colors.black.withValues(alpha: 0.2),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(12),
                 ),
               ),
               onPressed: authState.isLoading ? null : _submit,
@@ -446,35 +346,17 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                     )
                   : Row(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Flexible(
-                          child: Text(
-                            selectedRole == 'dc_manager'
-                                ? 'Sign In to DC Console'
-                                : (selectedRole == 'client'
-                                    ? 'Sign In to Client Portal'
-                                    : (selectedRole == 'closer'
-                                        ? 'Sign In as Telesales Closer'
-                                        : 'Sign In to PDA App')),
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            overflow: TextOverflow.ellipsis,
+                        Text(
+                          'Sign In to Assigned Workspace',
+                          style: GoogleFonts.inter(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.3,
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Icon(
-                          selectedRole == 'dc_manager'
-                              ? Icons.dashboard_rounded
-                              : (selectedRole == 'client'
-                                  ? Icons.storefront_rounded
-                                  : (selectedRole == 'closer'
-                                      ? Icons.headset_mic_rounded
-                                      : Icons.arrow_forward_rounded)),
-                          size: 18,
-                        ),
+                        const Icon(Icons.arrow_forward_rounded, size: 18),
                       ],
                     ),
             ),
@@ -484,101 +366,40 @@ class _LoginFormState extends ConsumerState<LoginForm> {
     );
   }
 
-  Widget _buildRoleCard({
+  Widget _buildAutofillChip({
+    required String label,
     required String roleKey,
-    required String title,
-    required String subtitle,
-    required String tag,
     required IconData icon,
-    required Color activeColor,
-    required bool isSelected,
+    required Color color,
     required VoidCallback onTap,
   }) {
+    final isSelected = _selectedDemoRole == roleKey;
     return Material(
-      color: isSelected ? Colors.white : const Color(0xFFF8FAFC),
-      borderRadius: BorderRadius.circular(12),
+      color: isSelected ? color.withValues(alpha: 0.15) : Colors.white,
+      borderRadius: BorderRadius.circular(8),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: isSelected ? activeColor : const Color(0xFFCBD5E1),
-              width: isSelected ? 2 : 1,
+              color: isSelected ? color : const Color(0xFFCBD5E1),
+              width: isSelected ? 1.5 : 1,
             ),
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: activeColor.withValues(alpha: 0.12),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]
-                : [],
           ),
           child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: isSelected ? activeColor.withValues(alpha: 0.12) : const Color(0xFFE2E8F0),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  icon,
-                  size: 18,
-                  color: isSelected ? activeColor : const Color(0xFF64748B),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            title,
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: const Color(0xFF0F172A),
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: isSelected ? activeColor : const Color(0xFFE2E8F0),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            tag,
-                            style: GoogleFonts.inter(
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
-                              color: isSelected ? Colors.white : const Color(0xFF64748B),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: GoogleFonts.inter(
-                        fontSize: 10.5,
-                        color: const Color(0xFF64748B),
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+              Icon(icon, size: 14, color: isSelected ? color : const Color(0xFF64748B)),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                  color: isSelected ? color : const Color(0xFF334155),
                 ),
               ),
             ],

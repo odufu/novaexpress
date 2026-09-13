@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/helpers/formatters.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../dc_console/presentation/providers/dc_console_provider.dart';
 import '../../domain/entities/stock_item.dart';
 import '../providers/stock_provider.dart';
 
@@ -99,6 +100,8 @@ class ReturnStockModal extends ConsumerStatefulWidget {
 
 class _ReturnStockModalState extends ConsumerState<ReturnStockModal> {
   final TextEditingController _notesCtrl = TextEditingController();
+  String? _selectedDcId;
+  String _selectedCondition = 'good'; // 'good' or 'damaged'
 
   final List<String> _reasons = [
     'End of Day Unsold Hub Drop-off',
@@ -115,6 +118,14 @@ class _ReturnStockModalState extends ConsumerState<ReturnStockModal> {
       if (widget.preselectedItem != null) {
         ref.read(returnStockDraftProvider.notifier).selectItem(widget.preselectedItem);
       }
+      final authUser = ref.read(authProvider).user;
+      final dcState = ref.read(dcConsoleProvider);
+      setState(() {
+        _selectedDcId = authUser?.distributionCenterId ?? dcState.activeHubId;
+        if ((_selectedDcId == null || _selectedDcId!.isEmpty) && dcState.distributionCenters.isNotEmpty) {
+          _selectedDcId = dcState.distributionCenters.first.id;
+        }
+      });
     });
   }
 
@@ -343,6 +354,96 @@ class _ReturnStockModalState extends ConsumerState<ReturnStockModal> {
                         ),
                         const SizedBox(height: 16),
 
+                        // Destination DC Selector
+                        Text('Destination Distribution Center *', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12.5)),
+                        const SizedBox(height: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: _selectedDcId,
+                              isExpanded: true,
+                              dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                              hint: Text('Select DC Dock', style: GoogleFonts.inter(fontSize: 12.5)),
+                              items: ref.watch(dcConsoleProvider).distributionCenters.map((dc) {
+                                return DropdownMenuItem<String>(
+                                  value: dc.id,
+                                  child: Text('${dc.name} (${dc.city})', style: GoogleFonts.inter(fontSize: 12.5)),
+                                );
+                              }).toList(),
+                              onChanged: (val) {
+                                if (val != null) setState(() => _selectedDcId = val);
+                              },
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Stock Physical Condition
+                        Text('Physical Condition *', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12.5)),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: InkWell(
+                                onTap: () => setState(() => _selectedCondition = 'good'),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 10),
+                                  decoration: BoxDecoration(
+                                    color: _selectedCondition == 'good'
+                                        ? const Color(0xFF10B981).withValues(alpha: 0.15)
+                                        : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: _selectedCondition == 'good' ? const Color(0xFF10B981) : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.check_circle_rounded, size: 15, color: _selectedCondition == 'good' ? const Color(0xFF10B981) : Colors.grey),
+                                      const SizedBox(width: 6),
+                                      Text('Good / Restock', style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold, color: _selectedCondition == 'good' ? const Color(0xFF10B981) : null)),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: InkWell(
+                                onTap: () => setState(() => _selectedCondition = 'damaged'),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 10),
+                                  decoration: BoxDecoration(
+                                    color: _selectedCondition == 'damaged'
+                                        ? const Color(0xFFEF4444).withValues(alpha: 0.15)
+                                        : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: _selectedCondition == 'damaged' ? const Color(0xFFEF4444) : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.warning_rounded, size: 15, color: _selectedCondition == 'damaged' ? const Color(0xFFEF4444) : Colors.grey),
+                                      const SizedBox(width: 6),
+                                      Text('Damaged / Quarantine', style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold, color: _selectedCondition == 'damaged' ? const Color(0xFFEF4444) : null)),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+
                         // Return Reason
                         Text('Reason for Return *', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12.5)),
                         const SizedBox(height: 6),
@@ -381,7 +482,7 @@ class _ReturnStockModalState extends ConsumerState<ReturnStockModal> {
                           controller: _notesCtrl,
                           maxLines: 2,
                           decoration: const InputDecoration(
-                            hintText: 'e.g. Returned to Supervisor Emeka at Lekki Hub',
+                            hintText: 'e.g. Returned to Supervisor Emeka at Lekki Hub dock',
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -445,22 +546,31 @@ class _ReturnStockModalState extends ConsumerState<ReturnStockModal> {
                     : () async {
                         ref.read(returnStockDraftProvider.notifier).setSubmitting(true);
                         final item = currentItem!;
+                        final allDcs = ref.read(dcConsoleProvider).distributionCenters;
+                        final targetDc = allDcs.where((d) => d.id == _selectedDcId).firstOrNull;
+                        final dcName = targetDc?.name ?? 'Assigned Hub';
+
                         final res = await ref.read(stockProvider.notifier).returnStockToDC(
                               productIdOrSku: item.id,
                               riderId: riderId,
                               quantity: draft.returnQuantity,
                               reason: draft.returnReason,
+                              destinationDcId: _selectedDcId,
+                              condition: _selectedCondition,
                               notes: _notesCtrl.text.trim(),
                             );
 
                         if (context.mounted) {
                           ref.read(returnStockDraftProvider.notifier).setSubmitting(false);
                           Navigator.of(context).pop();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              backgroundColor: const Color(0xFF10B981),
-                              content: Text(res['message']?.toString() ?? 'Stock returned successfully!'),
-                            ),
+                          final returnCode = res['returnNumber']?.toString() ?? 'RET-PENDING';
+                          _showHandshakeReceipt(
+                            context,
+                            returnCode,
+                            item.name,
+                            draft.returnQuantity,
+                            dcName,
+                            isDark,
                           );
                         }
                       },
@@ -476,6 +586,68 @@ class _ReturnStockModalState extends ConsumerState<ReturnStockModal> {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showHandshakeReceipt(
+    BuildContext context,
+    String returnNumber,
+    String productName,
+    int qty,
+    String dcName,
+    bool isDark,
+  ) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 24),
+            const SizedBox(width: 10),
+            Text('Return Handshake Created', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Text(
+              'Present this Return Code to the DC dock supervisor upon arrival to confirm physical intake:',
+              style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEA580C).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFEA580C), width: 1.5),
+              ),
+              child: Text(
+                returnNumber,
+                style: GoogleFonts.inter(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  color: const Color(0xFFEA580C),
+                  letterSpacing: 2,
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text('$qty units of $productName → $dcName', style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13)),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEA580C)),
+            child: const Text('Got It', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),

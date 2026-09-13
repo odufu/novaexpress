@@ -21,12 +21,14 @@ import '../../features/orders/presentation/pages/scan_to_collect_page.dart';
 import '../../features/stock/presentation/pages/inventory_audit_page.dart';
 import '../../features/stock/presentation/pages/process_returns_page.dart';
 import '../../features/stock/presentation/pages/request_stock_page.dart';
+import '../../features/stock/domain/entities/stock_item.dart';
 import '../../features/stock/presentation/pages/stock_details_grazer_page.dart';
 import '../../features/stock/presentation/pages/stock_handover_page.dart';
 import '../../features/stock/presentation/pages/stock_history_page.dart';
 import '../../features/users/presentation/pages/user_profile_page.dart';
 import '../../features/dc_console/presentation/pages/dc_console_layout.dart';
 import '../../features/client_portal/presentation/pages/client_portal_layout.dart';
+import '../../features/client_portal/presentation/pages/closer_mobile_portal_page.dart';
 import '../../presentation/presentation_root.dart';
 
 class RouterRefreshNotifier extends ChangeNotifier {
@@ -39,7 +41,9 @@ class RouterRefreshNotifier extends ChangeNotifier {
         if (previous?.isAuthenticated != next.isAuthenticated ||
             previous?.user?.role != next.user?.role ||
             previous?.user?.isClient != next.user?.isClient ||
-            previous?.user?.isDcManager != next.user?.isDcManager) {
+            previous?.user?.isDcManager != next.user?.isDcManager ||
+            previous?.user?.isCloser != next.user?.isCloser ||
+            previous?.user?.isClientAdmin != next.user?.isClientAdmin) {
           notifyListeners();
         }
       },
@@ -79,41 +83,63 @@ final routerProvider = Provider<GoRouter>((ref) {
         return '/login';
       }
       if (isAuthenticated) {
-        final isClient = authState.user?.isClient == true;
-        final isDc = authState.user?.isDcManager == true;
+        final user = authState.user;
+        final isDc = user?.isDcManager == true;
+        final isCloser = user?.isCloser == true;
+        final isClientAdmin = user?.isClientAdmin == true;
+        final isRider = user?.isRider == true || (!isDc && !isCloser && !isClientAdmin);
 
+        // Canonical home console path based strictly on the user's role
+        final String homePath = user?.homeConsoleRoute ?? (isDc
+            ? '/dc'
+            : (isCloser
+                ? '/closer'
+                : (isClientAdmin ? '/client' : '/')));
+
+        // 1. If currently on login or forgot-password, redirect immediately to assigned console
         if (isLoggingIn) {
-          if (isClient) {
-            debugPrint('[AUTH_ROUTER] 🛍️ Authenticated Merchant/Client -> Redirecting to /client');
-            return '/client';
-          }
-          if (isDc) {
-            debugPrint('[AUTH_ROUTER] 🏢 Authenticated DC Manager -> Redirecting to /dc');
-            return '/dc';
-          }
-          debugPrint('[AUTH_ROUTER] ✅ Authenticated Rider user -> Redirecting to /');
-          return '/';
+          debugPrint('[AUTH_ROUTER] 🎯 Authenticated ${user?.roleDescription ?? user?.role} -> Directing to designated console: $homePath');
+          return homePath;
         }
 
-        if (state.matchedLocation == '/') {
-          if (isClient) {
-            debugPrint('[AUTH_ROUTER] 🛍️ Authenticated Merchant on root path -> Redirecting to /client');
-            return '/client';
-          }
-          if (isDc) {
-            debugPrint('[AUTH_ROUTER] 🏢 Authenticated DC Manager on root path -> Redirecting to /dc');
-            return '/dc';
+        // 2. Strict Console Isolation: Distribution Center Console (/dc/**)
+        if (state.matchedLocation.startsWith('/dc')) {
+          if (!isDc) {
+            debugPrint('[AUTH_ROUTER] 🛑 Access Denied: User role "${user?.role}" cannot access DC Console -> Redirecting to $homePath');
+            return homePath;
           }
         }
 
-        if (state.matchedLocation.startsWith('/client') && !isClient && authState.user != null) {
-          if (isDc) return '/dc';
-          return '/';
+        // 3. Strict Console Isolation: Client Merchant Portal (/client/**)
+        if (state.matchedLocation.startsWith('/client')) {
+          if (!isClientAdmin) {
+            debugPrint('[AUTH_ROUTER] 🛑 Access Denied: User role "${user?.role}" cannot access Client Merchant Portal -> Redirecting to $homePath');
+            return homePath;
+          }
         }
 
-        if (state.matchedLocation.startsWith('/dc') && !isDc && authState.user != null) {
-          if (isClient) return '/client';
-          return '/';
+        // 4. Strict Console Isolation: Telesales Closer Portal (/closer/**)
+        if (state.matchedLocation.startsWith('/closer')) {
+          if (!isCloser) {
+            debugPrint('[AUTH_ROUTER] 🛑 Access Denied: User role "${user?.role}" cannot access Closer Portal -> Redirecting to $homePath');
+            return homePath;
+          }
+        }
+
+        // 5. Strict Console Isolation: Field Delivery Agent (Rider) Routes
+        // Only Riders can access root ('/'), rider orders list ('/orders'), scanner, POD confirmation, failure reporting, stock, and remittance
+        final isRiderOnlyPath = state.matchedLocation == '/' ||
+            state.matchedLocation == '/orders' ||
+            state.matchedLocation.startsWith('/orders/scan') ||
+            state.matchedLocation.endsWith('/deliver-pod') ||
+            state.matchedLocation.endsWith('/log-failure') ||
+            state.matchedLocation.startsWith('/stock') ||
+            state.matchedLocation.startsWith('/cash') ||
+            state.matchedLocation.startsWith('/finance');
+
+        if (isRiderOnlyPath && !isRider) {
+          debugPrint('[AUTH_ROUTER] 🛑 Access Denied: Role "${user?.role}" cannot access Rider route "${state.matchedLocation}" -> Redirecting to $homePath');
+          return homePath;
         }
       }
       return null;
@@ -138,6 +164,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/',
         builder: (context, state) => const MainBottomNavShell(),
+      ),
+      GoRoute(
+        path: '/closer',
+        builder: (context, state) => const CloserMobilePortalPage(),
       ),
       GoRoute(
         path: '/client',
@@ -231,8 +261,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/stock/details/:name',
         builder: (context, state) {
-          final name = state.pathParameters['name'] ?? 'Respira Detox Tea';
-          return StockDetailsGrazerPage(productName: name);
+          final name = state.pathParameters['name'] ?? '';
+          final stockItem = state.extra is StockItemEntity ? state.extra as StockItemEntity : null;
+          return StockDetailsGrazerPage(
+            productName: name,
+            stockItem: stockItem,
+          );
         },
       ),
       GoRoute(

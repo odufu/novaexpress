@@ -1,5 +1,6 @@
 import '../entities/client_closer.dart';
 import '../entities/client_profile.dart';
+import '../entities/client_settlement.dart';
 import '../entities/customer_lead.dart';
 
 abstract class ClientPortalRepository {
@@ -9,6 +10,8 @@ abstract class ClientPortalRepository {
     required String fullName,
     required String email,
     required String phone,
+    String? password,
+    String? avatarUrl,
     int dailyCallTarget = 50,
     double commissionRate = 500.0,
   });
@@ -64,4 +67,10 @@ abstract class ClientPortalRepository {
 
   /// Fetches client profile details
   Future<ClientProfile?> getClientProfile(String clientId);
+
+  /// Fetches client settlement history
+  Future<List<ClientSettlement>> getClientSettlements(String clientId);
+
+  /// Fetches live merchant asset custody breakdown (liquid cash & in-kind inventory)
+  Future<Map<String, dynamic>> getMerchantAssetCustody(String clientId);
 }

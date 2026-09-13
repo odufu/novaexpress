@@ -61,6 +61,7 @@ class InventoryAuditPage extends ConsumerStatefulWidget {
 
 class _InventoryAuditPageState extends ConsumerState<InventoryAuditPage> {
   late Map<String, TextEditingController> _notesControllers;
+  bool _isSubmitting = false;
 
   static const List<String> _reasonOptions = [
     'Damaged in Transit',
@@ -384,6 +385,21 @@ class _InventoryAuditPageState extends ConsumerState<InventoryAuditPage> {
                                   }
                                 },
                               ),
+                              const SizedBox(height: 8),
+                              TextField(
+                                controller: _notesControllers[item.id],
+                                style: GoogleFonts.inter(fontSize: 12),
+                                decoration: InputDecoration(
+                                  isDense: true,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                  hintText: 'Additional notes or audit explanation (optional)',
+                                  hintStyle: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: const BorderSide(color: Color(0xFFFECDD3)),
+                                  ),
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -400,44 +416,78 @@ class _InventoryAuditPageState extends ConsumerState<InventoryAuditPage> {
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
-                onPressed: () {
-                  final user = ref.read(authProvider).user;
-                  final agentId = user?.deliveryAgentId ?? user?.id ?? '';
-                  final physical = ref.read(inventoryAuditPhysicalCountsProvider);
-                  final reasons = ref.read(inventoryAuditVarianceReasonsProvider);
+                onPressed: _isSubmitting
+                    ? null
+                    : () async {
+                        setState(() => _isSubmitting = true);
+                        try {
+                          final user = ref.read(authProvider).user;
+                          final agentId = user?.deliveryAgentId ?? user?.id ?? '';
+                          final physical = ref.read(inventoryAuditPhysicalCountsProvider);
+                          final reasons = ref.read(inventoryAuditVarianceReasonsProvider);
+                          final notesMap = <String, String>{};
+                          for (final entry in _notesControllers.entries) {
+                            final txt = entry.value.text.trim();
+                            if (txt.isNotEmpty) {
+                              notesMap[entry.key] = txt;
+                            }
+                          }
 
-                  ref.read(stockProvider.notifier).submitRiderStockAudit(
-                        riderId: agentId,
-                        physicalCounts: physical,
-                        varianceReasons: reasons,
-                      );
+                          await ref.read(stockProvider.notifier).submitRiderStockAudit(
+                                riderId: agentId,
+                                physicalCounts: physical,
+                                varianceReasons: reasons,
+                                notes: notesMap,
+                              );
 
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Stock Reconciliation Completed & Synced with DC Operations!',
-                        style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.bold),
-                      ),
-                      backgroundColor: const Color(0xFF16A34A),
-                    ),
-                  );
+                          if (!context.mounted) return;
 
-                  if (context.mounted) {
-                    Navigator.of(context).maybePop();
-                  }
-                },
+                          final auditRefCode = 'AUD-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Stock Reconciliation Logged (Ref: $auditRefCode) & Synced with DC Operations!',
+                                style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.bold),
+                              ),
+                              backgroundColor: const Color(0xFF16A34A),
+                              duration: const Duration(seconds: 4),
+                            ),
+                          );
+
+                          if (context.mounted) {
+                            Navigator.of(context).maybePop();
+                          }
+                        } catch (e) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Failed to submit audit: $e'),
+                              backgroundColor: const Color(0xFFEF4444),
+                            ),
+                          );
+                        } finally {
+                          if (mounted) setState(() => _isSubmitting = false);
+                        }
+                      },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: Text(
-                  'Submit Stock Reconciliation',
-                  style: GoogleFonts.inter(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
+                child: _isSubmitting
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : Text(
+                        'Submit Stock Reconciliation',
+                        style: GoogleFonts.inter(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
               ),
             ),
           ],

@@ -87,4 +87,12 @@ class UserEntity {
     if (isClientAdmin) return 'E-Commerce Merchant Admin';
     return 'Field Delivery Agent (PDA)';
   }
+
+  /// Canonical console route strictly governed by the user's operational role
+  String get homeConsoleRoute {
+    if (isDcManager) return '/dc';
+    if (isCloser) return '/closer';
+    if (isClientAdmin) return '/client';
+    return '/';
+  }
 }

@@ -1,7 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/supabase_constants.dart';
+import '../../../auth/data/datasources/auth_remote_datasource.dart';
+import '../../../auth/data/models/user_model.dart';
 import '../../domain/entities/client_closer.dart';
 import '../../domain/entities/client_profile.dart';
+import '../../domain/entities/client_settlement.dart';
 import '../../domain/entities/customer_lead.dart';
 
 abstract class ClientPortalRemoteDataSource {
@@ -10,6 +14,8 @@ abstract class ClientPortalRemoteDataSource {
     required String fullName,
     required String email,
     required String phone,
+    String? password,
+    String? avatarUrl,
     int dailyCallTarget = 50,
     double commissionRate = 500.0,
   });
@@ -37,20 +43,28 @@ abstract class ClientPortalRemoteDataSource {
     int? totalOrdersBooked,
   });
   Future<ClientProfile?> fetchClientProfile(String clientId);
+  Future<void> updateClientProfile(ClientProfile profile);
+  Future<List<ClientSettlement>> fetchClientSettlements(String clientId);
+  Future<Map<String, dynamic>> fetchMerchantAssetCustody(String clientId);
 }
 
 class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
-  final SupabaseClient? _client;
+  final SupabaseClient? _customClient;
 
-  ClientPortalRemoteDataSourceImpl([SupabaseClient? client]) : _client = client;
+  ClientPortalRemoteDataSourceImpl([this._customClient]);
 
   SupabaseClient _getAdminClient() {
-    if (_client != null) return _client;
+    final custom = _customClient;
+    if (custom != null) return custom;
     return SupabaseClient(
       SupabaseConstants.supabaseUrl,
       SupabaseConstants.supabaseServiceRoleKey,
-      authOptions: const AuthClientOptions(autoRefreshToken: false),
     );
+  }
+
+  String _generateUuid() {
+    final now = DateTime.now().microsecondsSinceEpoch.toRadixString(16).padLeft(12, '0');
+    return 'c105e000-0000-4000-8000-$now'.substring(0, 36);
   }
 
   @override
@@ -59,10 +73,13 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
     required String fullName,
     required String email,
     required String phone,
+    String? password,
+    String? avatarUrl,
     int dailyCallTarget = 50,
     double commissionRate = 500.0,
   }) async {
     final cleanEmail = email.trim().toLowerCase();
+    final rawPassword = (password != null && password.trim().isNotEmpty) ? password.trim() : 'Closer123!';
     final adminDb = _getAdminClient();
 
     try {
@@ -78,39 +95,80 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
       }
 
       final closerId = _generateUuid();
-      final closerCode = 'CLS-NOVA-${DateTime.now().millisecond.toString().padLeft(3, '0')}';
+      final closerCode = 'CLS-${DateTime.now().millisecond.toString().padLeft(3, '0')}';
+
+      // 2. Provision Supabase Auth User with confirmed status so closer can sign in directly
+      String authUserId = closerId;
+      try {
+        final authRes = await adminDb.auth.admin.createUser(
+          AdminUserAttributes(
+            email: cleanEmail,
+            password: rawPassword,
+            emailConfirm: true,
+            userMetadata: {
+              'role': 'closer',
+              'client_id': clientId,
+              'full_name': fullName.trim(),
+            },
+          ),
+        );
+        if (authRes.user != null) {
+          authUserId = authRes.user!.id;
+        }
+      } catch (authErr) {
+        debugPrint('[CLIENT_PORTAL] ℹ️ Supabase auth.admin.createUser notice: $authErr');
+      }
 
       final newCloser = ClientCloser(
         id: closerId,
         clientId: clientId,
+        userId: authUserId,
         closerCode: closerCode,
         fullName: fullName.trim(),
         email: cleanEmail,
         phone: phone.trim(),
+        avatarUrl: avatarUrl,
         dailyCallTarget: dailyCallTarget,
         commissionRate: commissionRate,
         isActive: true,
         createdAt: DateTime.now(),
       );
 
-      // 2. Create Closer record
+      // 3. Create Closer record
       await adminDb.from('client_closers').insert(newCloser.toJson());
 
-      // 3. Create User account for closer login
+      // 4. Create User account for closer login
       final nameParts = fullName.trim().split(' ');
       final fName = nameParts.isNotEmpty ? nameParts.first : 'Closer';
       final lName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
 
       await adminDb.from('users').insert({
-        'id': closerId,
-        'company_id': '11111111-1111-4111-8111-111111111111',
+        'id': authUserId,
+        'client_id': clientId,
         'email': cleanEmail,
         'phone_number': phone.trim(),
         'first_name': fName,
         'last_name': lName,
         'role': 'closer',
+        if (avatarUrl != null && avatarUrl.isNotEmpty) 'avatar_url': avatarUrl,
         'is_active': true,
       });
+
+      // 5. Register in-memory session for immediate local/test authentication
+      final closerUser = UserModel(
+        id: authUserId,
+        authUserId: authUserId,
+        email: cleanEmail,
+        firstName: fName,
+        lastName: lName,
+        phone: phone.trim(),
+        role: 'closer',
+        clientId: clientId,
+        closerId: closerId,
+        closerCode: closerCode,
+        avatarUrl: avatarUrl,
+      );
+      AuthRemoteDataSourceImpl.registerUserInMemory(closerUser, rawPassword);
 
       return newCloser;
     } finally {
@@ -198,6 +256,17 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
           'updated_at': DateTime.now().toIso8601String(),
         }).eq('id', closerId);
       }
+
+      try {
+        final closerRes = await adminDb.from('client_closers').select('email').eq('id', closerId).maybeSingle();
+        final email = closerRes?['email']?.toString();
+        if (email != null && email.isNotEmpty) {
+          final registered = AuthRemoteDataSourceImpl.getRegisteredUser(email);
+          if (registered != null) {
+            AuthRemoteDataSourceImpl.registerUserInMemory(registered, newPassword);
+          }
+        }
+      } catch (_) {}
     } finally {
       adminDb.dispose();
     }
@@ -312,9 +381,54 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
     }
   }
 
-  String _generateUuid() {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final r = (now % 1000000000000).toString().padLeft(12, '0');
-    return '00000000-0000-4000-8000-$r';
+  @override
+  Future<void> updateClientProfile(ClientProfile profile) async {
+    final adminDb = _getAdminClient();
+    try {
+      await adminDb
+          .from('clients')
+          .update(profile.toJson())
+          .eq('id', profile.id);
+    } finally {
+      adminDb.dispose();
+    }
+  }
+
+  @override
+  Future<List<ClientSettlement>> fetchClientSettlements(String clientId) async {
+    final adminDb = _getAdminClient();
+    try {
+      final response = await adminDb
+          .from('client_settlements')
+          .select('*')
+          .eq('client_id', clientId)
+          .order('settled_at', ascending: false);
+
+      return (response as List).map((item) => ClientSettlement.fromJson(item)).toList();
+    } catch (_) {
+      return [];
+    } finally {
+      adminDb.dispose();
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> fetchMerchantAssetCustody(String clientId) async {
+    final adminDb = _getAdminClient();
+    try {
+      final response = await adminDb.rpc('fn_calculate_merchant_asset_custody', params: {
+        'p_client_id': clientId,
+      });
+
+      return Map<String, dynamic>.from(response as Map);
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] ❌ fetchMerchantAssetCustody error: $e');
+      return {
+        'success': false,
+        'error': e.toString(),
+      };
+    } finally {
+      adminDb.dispose();
+    }
   }
 }

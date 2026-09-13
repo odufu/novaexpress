@@ -49,6 +49,7 @@ class MockTestFinanceNotifier extends StateNotifier<FinanceState> implements Fin
   Future<bool> submitRemittance({
     String? agentId,
     String? companyId,
+    String? distributionCenterId,
     required double amount,
     required String paymentMethod,
     double grossCollections = 0.0,

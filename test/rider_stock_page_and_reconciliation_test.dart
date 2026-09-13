@@ -85,6 +85,8 @@ class FakeStockRepository implements StockRepository {
     required String productId,
     required int quantity,
     required String reason,
+    String? destinationDcId,
+    String? condition,
     String? notes,
   }) async {
     await updateRiderStockCustody(

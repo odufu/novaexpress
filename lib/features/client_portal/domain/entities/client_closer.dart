@@ -13,6 +13,7 @@ class ClientCloser {
   final int totalOrdersBooked;
   final int totalOrdersDelivered;
   final double commissionRate;
+  final String? avatarUrl;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -31,6 +32,7 @@ class ClientCloser {
     this.totalOrdersBooked = 0,
     this.totalOrdersDelivered = 0,
     this.commissionRate = 500.0,
+    this.avatarUrl,
     this.createdAt,
     this.updatedAt,
   });
@@ -61,6 +63,7 @@ class ClientCloser {
       totalOrdersBooked: (json['total_orders_booked'] as num?)?.toInt() ?? 0,
       totalOrdersDelivered: (json['total_orders_delivered'] as num?)?.toInt() ?? 0,
       commissionRate: (json['commission_rate'] as num?)?.toDouble() ?? 500.0,
+      avatarUrl: json['avatar_url']?.toString(),
       createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'].toString()) : null,
       updatedAt: json['updated_at'] != null ? DateTime.tryParse(json['updated_at'].toString()) : null,
     );
@@ -82,6 +85,7 @@ class ClientCloser {
       'total_orders_booked': totalOrdersBooked,
       'total_orders_delivered': totalOrdersDelivered,
       'commission_rate': commissionRate,
+      'avatar_url': avatarUrl,
       'created_at': createdAt?.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
     };
@@ -102,6 +106,7 @@ class ClientCloser {
     int? totalOrdersBooked,
     int? totalOrdersDelivered,
     double? commissionRate,
+    String? avatarUrl,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -120,6 +125,7 @@ class ClientCloser {
       totalOrdersBooked: totalOrdersBooked ?? this.totalOrdersBooked,
       totalOrdersDelivered: totalOrdersDelivered ?? this.totalOrdersDelivered,
       commissionRate: commissionRate ?? this.commissionRate,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

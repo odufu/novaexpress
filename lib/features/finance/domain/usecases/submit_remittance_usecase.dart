@@ -9,6 +9,7 @@ class SubmitRemittanceUseCase {
   Future<RemittanceEntity> call({
     required String agentId,
     required String companyId,
+    String? distributionCenterId,
     required double amount,
     required String paymentMethod,
     double grossCollections = 0.0,
@@ -26,6 +27,7 @@ class SubmitRemittanceUseCase {
     return repository.submitRemittance(
       agentId: agentId,
       companyId: companyId,
+      distributionCenterId: distributionCenterId,
       amount: amount,
       paymentMethod: paymentMethod,
       grossCollections: grossCollections,

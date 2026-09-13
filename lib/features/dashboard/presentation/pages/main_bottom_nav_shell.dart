@@ -7,6 +7,7 @@ import '../../../finance/presentation/pages/cash_page.dart';
 import '../../../orders/presentation/pages/orders_list_page.dart';
 import '../../../stock/presentation/pages/stock_page.dart';
 import '../../../users/presentation/pages/user_profile_page.dart';
+import '../../../pipeline_chat/presentation/widgets/pipeline_chat_floating_action_button.dart';
 import 'pda_home_page.dart';
 
 class MainBottomNavShell extends ConsumerStatefulWidget {
@@ -44,6 +45,7 @@ class _MainBottomNavShellState extends ConsumerState<MainBottomNavShell>
 
     return Scaffold(
       extendBody: false,
+      floatingActionButton: const PipelineChatFloatingActionButton(),
       body: IndexedStack(
         index: currentIndex,
         children: _pages,

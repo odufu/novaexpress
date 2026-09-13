@@ -1,0 +1,156 @@
+=== FINANCIAL TABLES SCHEMA AUDIT ===
+
+TABLE: cash_remittances (34 columns)
+   amount                        : number           | NOT NULL
+   commission_deducted           : number           | NULLABLE DEFAULT 0.0
+   company_id                    : string           | NOT NULL [FK: Note:
+This is a Foreign Key to `companies.id`.<fk table='companies' column='id'/>]
+   created_at                    : string           | NULLABLE DEFAULT now()
+   delivery_agent_id             : string           | NOT NULL [FK: Note:
+This is a Foreign Key to `delivery_agents.id`.<fk table='delivery_agents' column='id'/>]
+   deposit_receipt_url           : string           | NULLABLE
+   destination_account_name      : string           | NULLABLE DEFAULT NovaExpress Logistics Limited
+   destination_account_number    : string           | NULLABLE DEFAULT 0123456789
+   destination_bank_name         : string           | NULLABLE DEFAULT GTBank
+   discrepancy_amount            : number           | NULLABLE DEFAULT 0.0
+   discrepancy_reason            : string           | NULLABLE
+   distribution_center_id        : string           | NULLABLE [FK: Note:
+This is a Foreign Key to `distribution_centers.id`.<fk table='distribution_centers' column='id'/>]
+   expected_amount               : number           | NULLABLE
+   failed_stipends_deducted      : number           | NULLABLE DEFAULT 0.0
+   gateway_response              : string           | NULLABLE DEFAULT Approved / Successful
+   gross_collections             : number           | NULLABLE DEFAULT 0.0
+   id                            : string           | NOT NULL DEFAULT gen_random_uuid()
+   is_partial                    : boolean          | NULLABLE DEFAULT False
+   notes                         : string           | NULLABLE
+   payer_email                   : string           | NULLABLE
+   payer_name                    : string           | NULLABLE
+   payment_method                : string           | NOT NULL DEFAULT bank_transfer
+   paystack_auth_code            : string           | NULLABLE
+   paystack_bank                 : string           | NULLABLE DEFAULT Titan Trust Bank / Paystack
+   paystack_channel              : string           | NULLABLE DEFAULT bank_transfer
+   paystack_paid_at              : string           | NULLABLE
+   pos_fee                       : number           | NULLABLE DEFAULT 0.0
+   reference_number              : string           | NOT NULL
+   status                        : string           | NOT NULL DEFAULT submitted
+   transport_allowance_deducted  : number           | NULLABLE DEFAULT 0.0
+   updated_at                    : string           | NULLABLE DEFAULT now()
+   verified_at                   : string           | NULLABLE
+   verified_by_name              : string           | NULLABLE
+   verified_by_user_id           : string           | NULLABLE [FK: Note:
+This is a Foreign Key to `users.id`.<fk table='users' column='id'/>]
+
+TABLE: remittance_orders (5 columns)
+   cash_remittance_id            : string           | NOT NULL [FK: Note:
+This is a Foreign Key to `cash_remittances.id`.<fk table='cash_remittances' column='id'/>]
+   id                            : string           | NOT NULL DEFAULT gen_random_uuid()
+   order_amount                  : number           | NOT NULL
+   order_id                      : string           | NOT NULL [FK: Note:
+This is a Foreign Key to `orders.id`.<fk table='orders' column='id'/>]
+   payment_type                  : string           | NOT NULL DEFAULT pay_on_delivery
+
+TABLE: payout_requests (20 columns)
+   account_name                  : string           | NOT NULL
+   account_number                : string           | NOT NULL
+   amount                        : number           | NOT NULL
+   approved_at                   : string           | NULLABLE
+   approved_by                   : string           | NULLABLE [FK: Note:
+This is a Foreign Key to `users.id`.<fk table='users' column='id'/>]
+   bank_name                     : string           | NOT NULL
+   company_id                    : string           | NULLABLE
+   created_at                    : string           | NULLABLE DEFAULT now()
+   dc_notes                      : string           | NULLABLE
+   delivery_agent_id             : string           | NOT NULL [FK: Note:
+This is a Foreign Key to `delivery_agents.id`.<fk table='delivery_agents' column='id'/>]
+   disbursement_ref              : string           | NULLABLE
+   distribution_center_id        : string           | NULLABLE
+   id                            : string           | NOT NULL DEFAULT gen_random_uuid()
+   notes                         : string           | NULLABLE
+   payout_number                 : string           | NOT NULL
+   rejection_reason              : string           | NULLABLE
+   reviewed_at                   : string           | NULLABLE
+   reviewed_by_user_id           : string           | NULLABLE
+   status                        : string           | NOT NULL DEFAULT pending
+   updated_at                    : string           | NULLABLE DEFAULT now()
+
+TABLE: payout_claims (16 columns)
+   account_name                  : string           | NULLABLE
+   account_number                : string           | NULLABLE
+   amount                        : number           | NULLABLE
+   bank_name                     : string           | NULLABLE
+   company_id                    : string           | NULLABLE
+   created_at                    : string           | NULLABLE
+   delivery_agent_id             : string           | NULLABLE [FK: Note:
+This is a Foreign Key to `delivery_agents.id`.<fk table='delivery_agents' column='id'/>]
+   distribution_center_id        : string           | NULLABLE
+   id                            : string           | NULLABLE
+   notes                         : string           | NULLABLE
+   payout_number                 : string           | NULLABLE
+   rejection_reason              : string           | NULLABLE
+   reviewed_at                   : string           | NULLABLE
+   reviewed_by_user_id           : string           | NULLABLE
+   status                        : string           | NULLABLE
+   updated_at                    : string           | NULLABLE
+
+TABLE: paystack_transactions (16 columns)
+   amount                        : number           | NOT NULL
+   channel                       : string           | NULLABLE DEFAULT dedicated_nuban
+   created_at                    : string           | NOT NULL DEFAULT now()
+   currency                      : string           | NOT NULL DEFAULT NGN
+   delivery_agent_id             : string           | NULLABLE [FK: Note:
+This is a Foreign Key to `delivery_agents.id`.<fk table='delivery_agents' column='id'/>]
+   distribution_center_id        : string           | NULLABLE [FK: Note:
+This is a Foreign Key to `distribution_centers.id`.<fk table='distribution_centers' column='id'/>]
+   id                            : string           | NOT NULL DEFAULT gen_random_uuid()
+   order_id                      : string           | NULLABLE [FK: Note:
+This is a Foreign Key to `orders.id`.<fk table='orders' column='id'/>]
+   payer_email                   : string           | NULLABLE
+   payer_name                    : string           | NULLABLE
+   paystack_response             : jsonb            | NULLABLE
+   reference                     : string           | NOT NULL
+   remittance_id                 : string           | NULLABLE [FK: Note:
+This is a Foreign Key to `cash_remittances.id`.<fk table='cash_remittances' column='id'/>]
+   transaction_type              : string           | NOT NULL
+   verification_status           : string           | NOT NULL DEFAULT verified
+   virtual_account_id            : string           | NULLABLE [FK: Note:
+This is a Foreign Key to `paystack_virtual_accounts.id`.<fk table='paystack_virtual_accounts' column='id'/>]
+
+TABLE: monnify_transactions (11 columns)
+   amount_paid                   : number           | NOT NULL
+   created_at                    : string           | NULLABLE DEFAULT now()
+   id                            : string           | NOT NULL DEFAULT gen_random_uuid()
+   order_id                      : string           | NOT NULL [FK: Note:
+This is a Foreign Key to `orders.id`.<fk table='orders' column='id'/>]
+   payer_account_number          : string           | NULLABLE
+   payer_bank                    : string           | NULLABLE
+   payer_name                    : string           | NULLABLE
+   transaction_reference         : string           | NOT NULL
+   verification_status           : string           | NULLABLE DEFAULT verified
+   virtual_account_id            : string           | NULLABLE [FK: Note:
+This is a Foreign Key to `monnify_virtual_accounts.id`.<fk table='monnify_virtual_accounts' column='id'/>]
+   webhook_payload               : jsonb            | NULLABLE
+
+=== FINANCIAL LIVE ROWS DATA ===
+
+[cash_remittances] Total Rows: 6
+   Row 1: {'id': '05f38799-0d8b-45a8-a7ad-b560567dc653', 'company_id': '11111111-1111-4111-8111-111111111111', 'delivery_agent_id': 'efcf71a2-486c-455d-bf38-66f088f443c6', 'reference_number': 'PSTK-RMT-PDA7000-525603', 'amount': 51600.0, 'gross_collections': 55000.0, 'commission_deducted': 1000.0, 'transport_allowance_deducted': 1500.0, 'pos_fee': 900.0, 'payment_method': 'paystack', 'destination_bank_name': 'GTBank', 'destination_account_number': '0123456789', 'destination_account_name': 'NovaExpress Logistics Limited', 'status': 'verified', 'deposit_receipt_url': None, 'verified_by_user_id': None, 'verified_by_name': None, 'verified_at': '2026-09-10T14:57:29.671+00:00', 'notes': '[PAYSTACK] Ref: PSTK-RMT-PDA7000-525603 [Orders: NOV-2026-7332] - Auto-verified instant remittance. [Discrepancy: ₦0 ] ', 'created_at': '2026-09-10T14:57:29.671+00:00', 'updated_at': '2026-09-10T13:57:29.529595+00:00', 'distribution_center_id': '00000000-0000-4000-8000-788825051520', 'is_partial': False, 'expected_amount': 51600.0, 'discrepancy_amount': 0.0, 'discrepancy_reason': None, 'paystack_channel': 'bank_transfer', 'paystack_bank': 'Titan Trust Bank / Paystack', 'paystack_auth_code': None, 'paystack_paid_at': None, 'payer_email': None, 'payer_name': None, 'gateway_response': 'Approved / Successful', 'failed_stipends_deducted': 0.0}
+   Row 2: {'id': '4d7c85d3-4040-4d26-aa34-20d6f7abfe83', 'company_id': '11111111-1111-4111-8111-111111111111', 'delivery_agent_id': 'efcf71a2-486c-455d-bf38-66f088f443c6', 'reference_number': 'PSTK-RMT-PDA7454-384865', 'amount': 49900.0, 'gross_collections': 55000.0, 'commission_deducted': 1000.0, 'transport_allowance_deducted': 1500.0, 'pos_fee': 1100.0, 'payment_method': 'paystack', 'destination_bank_name': 'GTBank', 'destination_account_number': '0123456789', 'destination_account_name': 'NovaExpress Logistics Limited', 'status': 'verified', 'deposit_receipt_url': None, 'verified_by_user_id': None, 'verified_by_name': None, 'verified_at': '2026-09-08T06:03:16.374188+00:00', 'notes': '[PAYSTACK] Ref: PSTK-RMT-PDA7454-384865 [Orders: TRK-6919] - Auto-verified instant remittance. [Discrepancy: ₦0 ] ', 'created_at': '2026-09-08T06:13:12.259+00:00', 'updated_at': '2026-09-08T05:13:13.876823+00:00', 'distribution_center_id': '00000000-0000-4000-8000-788825051520', 'is_partial': False, 'expected_amount': 49900.0, 'discrepancy_amount': 0.0, 'discrepancy_reason': None, 'paystack_channel': 'bank_transfer', 'paystack_bank': 'Titan Trust Bank / Paystack', 'paystack_auth_code': None, 'paystack_paid_at': None, 'payer_email': None, 'payer_name': None, 'gateway_response': 'Approved / Successful', 'failed_stipends_deducted': 0.0}
+   Row 3: {'id': '13414ef6-e154-426d-a347-f8dde9c7521a', 'company_id': '11111111-1111-4111-8111-111111111111', 'delivery_agent_id': 'efcf71a2-486c-455d-bf38-66f088f443c6', 'reference_number': 'PSTK-RMT-PDA7000-420083', 'amount': 146500.0, 'gross_collections': 155000.0, 'commission_deducted': 3000.0, 'transport_allowance_deducted': 4500.0, 'pos_fee': 1000.0, 'payment_method': 'paystack', 'destination_bank_name': 'GTBank', 'destination_account_number': '0123456789', 'destination_account_name': 'NovaExpress Logistics Limited', 'status': 'verified', 'deposit_receipt_url': None, 'verified_by_user_id': None, 'verified_by_name': None, 'verified_at': '2026-09-08T10:23:53.093+00:00', 'notes': '[PAYSTACK] Ref: PSTK-RMT-PDA7000-420083 [Orders: TRK-2591, TRK-8712, TRK-7954] - Auto-verified instant remittance. [Discrepancy: ₦0 ] ', 'created_at': '2026-09-08T10:23:53.093+00:00', 'updated_at': '2026-09-08T09:23:53.541017+00:00', 'distribution_center_id': '00000000-0000-4000-8000-788825051520', 'is_partial': False, 'expected_amount': 146500.0, 'discrepancy_amount': 0.0, 'discrepancy_reason': None, 'paystack_channel': 'bank_transfer', 'paystack_bank': 'Titan Trust Bank / Paystack', 'paystack_auth_code': None, 'paystack_paid_at': None, 'payer_email': None, 'payer_name': None, 'gateway_response': 'Approved / Successful', 'failed_stipends_deducted': 0.0}
+   Row 4: {'id': 'eb47f4bd-97d0-48aa-85ce-e68e8408b43f', 'company_id': '11111111-1111-4111-8111-111111111111', 'delivery_agent_id': 'efcf71a2-486c-455d-bf38-66f088f443c6', 'reference_number': 'PSTK-RMT-PDA7000-539200', 'amount': 51600.0, 'gross_collections': 55000.0, 'commission_deducted': 1000.0, 'transport_allowance_deducted': 1500.0, 'pos_fee': 900.0, 'payment_method': 'paystack', 'destination_bank_name': 'GTBank', 'destination_account_number': '0123456789', 'destination_account_name': 'NovaExpress Logistics Limited', 'status': 'verified', 'deposit_receipt_url': None, 'verified_by_user_id': None, 'verified_by_name': None, 'verified_at': '2026-09-10T14:57:20.528+00:00', 'notes': '[PAYSTACK] Ref: PSTK-RMT-PDA7000-539200 [Orders: NOV-2026-7332] - Auto-verified instant remittance. [Discrepancy: ₦0 ] ', 'created_at': '2026-09-10T14:57:20.528+00:00', 'updated_at': '2026-09-10T13:57:20.54818+00:00', 'distribution_center_id': '00000000-0000-4000-8000-788825051520', 'is_partial': False, 'expected_amount': 51600.0, 'discrepancy_amount': 0.0, 'discrepancy_reason': None, 'paystack_channel': 'bank_transfer', 'paystack_bank': 'Titan Trust Bank / Paystack', 'paystack_auth_code': None, 'paystack_paid_at': None, 'payer_email': None, 'payer_name': None, 'gateway_response': 'Approved / Successful', 'failed_stipends_deducted': 0.0}
+   Row 5: {'id': '8d736ede-1aa6-4204-b681-d1119a437ffe', 'company_id': '11111111-1111-4111-8111-111111111111', 'delivery_agent_id': 'efcf71a2-486c-455d-bf38-66f088f443c6', 'reference_number': 'PSTK-RMT-PDA7000-658761', 'amount': 51600.0, 'gross_collections': 55000.0, 'commission_deducted': 1000.0, 'transport_allowance_deducted': 1500.0, 'pos_fee': 900.0, 'payment_method': 'paystack', 'destination_bank_name': 'GTBank', 'destination_account_number': '0123456789', 'destination_account_name': 'NovaExpress Logistics Limited', 'status': 'verified', 'deposit_receipt_url': None, 'verified_by_user_id': None, 'verified_by_name': None, 'verified_at': '2026-09-10T14:57:45.224+00:00', 'notes': '[PAYSTACK] Ref: PSTK-RMT-PDA7000-658761 [Orders: NOV-2026-7332] - Auto-verified instant remittance. [Discrepancy: ₦0 ] ', 'created_at': '2026-09-10T14:57:45.224+00:00', 'updated_at': '2026-09-10T13:57:44.957422+00:00', 'distribution_center_id': '00000000-0000-4000-8000-788825051520', 'is_partial': False, 'expected_amount': 51600.0, 'discrepancy_amount': 0.0, 'discrepancy_reason': None, 'paystack_channel': 'bank_transfer', 'paystack_bank': 'Titan Trust Bank / Paystack', 'paystack_auth_code': None, 'paystack_paid_at': None, 'payer_email': None, 'payer_name': None, 'gateway_response': 'Approved / Successful', 'failed_stipends_deducted': 0.0}
+
+[remittance_orders] Total Rows: 0
+
+[payout_requests] Total Rows: 0
+
+[payout_claims] Total Rows: 0
+
+[paystack_transactions] Total Rows: 6
+   Row 1: {'id': '5e28ff75-38df-48da-916a-a102fa7696bd', 'reference': 'PSTK-RMT-PDA7454-384865', 'virtual_account_id': None, 'order_id': None, 'remittance_id': '4d7c85d3-4040-4d26-aa34-20d6f7abfe83', 'delivery_agent_id': 'efcf71a2-486c-455d-bf38-66f088f443c6', 'distribution_center_id': None, 'amount': 49900.0, 'currency': 'NGN', 'transaction_type': 'remittance', 'channel': 'bank_transfer', 'payer_email': None, 'payer_name': 'Rider Cash Remittance', 'verification_status': 'verified', 'paystack_response': {}, 'created_at': '2026-09-08T06:13:13.649+00:00'}
+   Row 2: {'id': 'f0495b2f-a944-4952-86ca-c2c4813093d2', 'reference': 'PSTK-RMT-PDA7000-420083', 'virtual_account_id': None, 'order_id': None, 'remittance_id': '13414ef6-e154-426d-a347-f8dde9c7521a', 'delivery_agent_id': 'efcf71a2-486c-455d-bf38-66f088f443c6', 'distribution_center_id': None, 'amount': 146500.0, 'currency': 'NGN', 'transaction_type': 'remittance', 'channel': 'bank_transfer', 'payer_email': None, 'payer_name': 'Rider Cash Remittance', 'verification_status': 'verified', 'paystack_response': {}, 'created_at': '2026-09-08T10:24:03.492+00:00'}
+   Row 3: {'id': 'aa9303dc-8a3f-41d4-b08b-7d34d87aa308', 'reference': 'PSTK-RMT-PDA7000-539200', 'virtual_account_id': None, 'order_id': None, 'remittance_id': 'eb47f4bd-97d0-48aa-85ce-e68e8408b43f', 'delivery_agent_id': 'efcf71a2-486c-455d-bf38-66f088f443c6', 'distribution_center_id': None, 'amount': 51600.0, 'currency': 'NGN', 'transaction_type': 'remittance', 'channel': 'bank_transfer', 'payer_email': None, 'payer_name': 'Rider Cash Remittance', 'verification_status': 'verified', 'paystack_response': {}, 'created_at': '2026-09-10T14:57:22.676+00:00'}
+   Row 4: {'id': '3a7d2788-d970-4ad3-961d-8e8cc9e205be', 'reference': 'PSTK-RMT-PDA7000-525603', 'virtual_account_id': None, 'order_id': None, 'remittance_id': '05f38799-0d8b-45a8-a7ad-b560567dc653', 'delivery_agent_id': 'efcf71a2-486c-455d-bf38-66f088f443c6', 'distribution_center_id': None, 'amount': 51600.0, 'currency': 'NGN', 'transaction_type': 'remittance', 'channel': 'bank_transfer', 'payer_email': None, 'payer_name': 'Rider Cash Remittance', 'verification_status': 'verified', 'paystack_response': {}, 'created_at': '2026-09-10T14:57:31.168+00:00'}
+   Row 5: {'id': '83aa5508-9290-43df-9d55-5590407d3847', 'reference': 'PSTK-RMT-PDA7000-658761', 'virtual_account_id': None, 'order_id': None, 'remittance_id': '8d736ede-1aa6-4204-b681-d1119a437ffe', 'delivery_agent_id': 'efcf71a2-486c-455d-bf38-66f088f443c6', 'distribution_center_id': None, 'amount': 51600.0, 'currency': 'NGN', 'transaction_type': 'remittance', 'channel': 'bank_transfer', 'payer_email': None, 'payer_name': 'Rider Cash Remittance', 'verification_status': 'verified', 'paystack_response': {}, 'created_at': '2026-09-10T14:57:46.239+00:00'}
+
+[monnify_transactions] Total Rows: 0
+

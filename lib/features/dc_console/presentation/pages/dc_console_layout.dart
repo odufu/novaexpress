@@ -22,6 +22,7 @@ import 'dc_riders_page.dart';
 import 'dc_settings_page.dart';
 import 'dc_stock_page.dart';
 import 'dc_transactions_page.dart';
+import '../../../pipeline_chat/presentation/widgets/pipeline_chat_floating_action_button.dart';
 
 class DCConsoleLayout extends ConsumerStatefulWidget {
   const DCConsoleLayout({super.key});
@@ -75,6 +76,7 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
 
     return Scaffold(
       key: _scaffoldKey,
+      floatingActionButton: const PipelineChatFloatingActionButton(),
       backgroundColor: isDark ? const Color(0xFF0B1120) : const Color(0xFFF8FAFC),
       drawer: isDesktop ? null : Drawer(child: _buildSidebar(context, dcState, dcNotifier, isDark, user, isDrawer: true)),
       body: SafeArea(

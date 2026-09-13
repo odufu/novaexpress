@@ -4,6 +4,7 @@ import '../../../../core/constants/supabase_constants.dart';
 import '../../../auth/data/datasources/auth_remote_datasource.dart';
 import '../../../auth/data/models/user_model.dart';
 import '../../../client_portal/domain/entities/client_profile.dart';
+import '../../../client_portal/domain/entities/client_settlement.dart';
 import '../../domain/entities/dc_finance_settings.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
 import '../../domain/entities/dc_payout_claim.dart';
@@ -65,7 +66,29 @@ abstract class DCConsoleRemoteDataSource {
     String? bankName,
     String? bankAccountNumber,
     String? bankAccountName,
+    double? customDeliveryFee,
+    double? customPlatformFee,
+    double? customFailedAttemptFee,
     dynamic authDataSource,
+  });
+  Future<Map<String, dynamic>> approveCashRemittance({
+    required String remittanceId,
+    String? supervisorId,
+  });
+  Future<Map<String, dynamic>> generateDailyMerchantSettlement({
+    required String clientId,
+    required String dcId,
+    required DateTime periodStart,
+    required DateTime periodEnd,
+    Map<String, dynamic>? customDeductions,
+  });
+  Future<List<ClientSettlement>> fetchDcClientSettlements({
+    required String dcId,
+    String? clientId,
+  });
+  Future<Map<String, dynamic>> fetchMerchantAssetCustody({
+    required String clientId,
+    String? dcId,
   });
 }
 
@@ -587,8 +610,6 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
       'rider.emeka@novaexpress.com',
       'joel.odufu@novaexpress.ng',
       'dc.supervisor@novaexpress.ng',
-      'client.novacale@novaexpress.ng',
-      'closer.amaka@novacale.ng',
     };
     if (demoAccounts.contains(cleanEmail)) return true;
 
@@ -606,8 +627,8 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
 
       final existingClient = await adminDb
           .from('clients')
-          .select('id, contact_email, email')
-          .or('email.ilike.$cleanEmail,contact_email.ilike.$cleanEmail')
+          .select('id, email')
+          .ilike('email', cleanEmail)
           .maybeSingle();
       if (existingClient != null) return true;
 
@@ -636,6 +657,9 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
     String? bankName,
     String? bankAccountNumber,
     String? bankAccountName,
+    double? customDeliveryFee,
+    double? customPlatformFee,
+    double? customFailedAttemptFee,
     dynamic authDataSource,
   }) async {
     final cleanEmail = email.trim().toLowerCase();
@@ -682,12 +706,29 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
         throw Exception("A user with email '$cleanEmail' already exists. Please use a unique email address.");
       }
 
+      // Check duplicate phone in users table
+      final cleanPhone = phone.trim();
+      if (cleanPhone.isNotEmpty) {
+        try {
+          final existingPhoneUser = await adminDb
+              .from('users')
+              .select('id, email, phone_number')
+              .eq('phone_number', cleanPhone)
+              .maybeSingle();
+          if (existingPhoneUser != null) {
+            throw Exception("The phone number '$cleanPhone' is already registered to user (${existingPhoneUser['email'] ?? 'another account'}). Please use a distinct phone number for this client.");
+          }
+        } catch (phoneErr) {
+          if (phoneErr.toString().contains('already registered')) rethrow;
+        }
+      }
+
       // Check duplicate against clients table
       try {
         final existingClient = await adminDb
             .from('clients')
-            .select('id, contact_email, email')
-            .or('email.ilike.$cleanEmail,contact_email.ilike.$cleanEmail')
+            .select('id, email')
+            .ilike('email', cleanEmail)
             .maybeSingle();
         if (existingClient != null) {
           throw Exception("A client with email '$cleanEmail' already exists. Please use a unique email address.");
@@ -703,11 +744,8 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
         'name': cleanName,
         'code': effectiveCode,
         'contact_person': cleanPerson,
-        'contact_name': cleanPerson,
         'email': cleanEmail,
-        'contact_email': cleanEmail,
         'phone': cleanPhone,
-        'contact_phone': cleanPhone,
         'address': cleanAddress,
         'city': cleanCity,
         'state': cleanState,
@@ -716,6 +754,12 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
         'is_enterprise': isEnt,
         'is_active': true,
         'company_id': '11111111-1111-4111-8111-111111111111',
+        if (bankName != null && bankName.isNotEmpty) 'bank_name': bankName,
+        if (bankAccountNumber != null && bankAccountNumber.isNotEmpty) 'bank_account_number': bankAccountNumber,
+        if (bankAccountName != null && bankAccountName.isNotEmpty) 'bank_account_name': bankAccountName,
+        if (customDeliveryFee != null && customDeliveryFee > 0) 'custom_delivery_fee': customDeliveryFee,
+        if (customPlatformFee != null && customPlatformFee > 0) 'custom_platform_fee': customPlatformFee,
+        if (customFailedAttemptFee != null && customFailedAttemptFee > 0) 'custom_failed_attempt_fee': customFailedAttemptFee,
       };
 
       try {
@@ -752,6 +796,7 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
           bankName: bankName,
           bankAccountNumber: bankAccountNumber,
           bankAccountName: bankAccountName,
+          clientId: persistentClientId,
         );
       } else {
         final authDs = AuthRemoteDataSourceImpl(_getAdminClient());
@@ -770,6 +815,7 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
           bankName: bankName,
           bankAccountNumber: bankAccountNumber,
           bankAccountName: bankAccountName,
+          clientId: persistentClientId,
         );
       }
     } catch (authErr) {
@@ -816,6 +862,12 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
       isEnterprise: isEnt,
       totalClosersCount: 0,
       isActive: true,
+      bankName: bankName ?? '',
+      accountNumber: bankAccountNumber ?? '',
+      accountName: bankAccountName ?? cleanName,
+      customDeliveryFee: customDeliveryFee,
+      customPlatformFeeValue: customPlatformFee,
+      customFailedAttemptFee: customFailedAttemptFee,
       createdAt: DateTime.now(),
     );
   }
@@ -824,5 +876,103 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
     final now = DateTime.now().millisecondsSinceEpoch;
     final r = (now % 1000000000000).toString().padLeft(12, '0');
     return '00000000-0000-4000-8000-$r';
+  }
+
+  @override
+  Future<Map<String, dynamic>> approveCashRemittance({
+    required String remittanceId,
+    String? supervisorId,
+  }) async {
+    final adminDb = _getAdminClient();
+    try {
+      final response = await adminDb.rpc('fn_approve_cash_remittance', params: {
+        'p_remittance_id': remittanceId,
+        if (supervisorId != null) 'p_supervisor_id': supervisorId,
+      });
+
+      debugPrint('[DC_CONSOLE] ✅ Remittance $remittanceId verified and COD balance cleared.');
+      return Map<String, dynamic>.from(response as Map);
+    } catch (e) {
+      debugPrint('[DC_CONSOLE] ❌ approveCashRemittance error: $e');
+      rethrow;
+    } finally {
+      adminDb.dispose();
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> generateDailyMerchantSettlement({
+    required String clientId,
+    required String dcId,
+    required DateTime periodStart,
+    required DateTime periodEnd,
+    Map<String, dynamic>? customDeductions,
+  }) async {
+    final adminDb = _getAdminClient();
+    try {
+      final response = await adminDb.rpc('fn_generate_merchant_daily_settlement', params: {
+        'p_client_id': clientId,
+        'p_dc_id': dcId,
+        'p_period_start': periodStart.toIso8601String(),
+        'p_period_end': periodEnd.toIso8601String(),
+        if (customDeductions != null) 'p_custom_deductions': customDeductions,
+      });
+
+      debugPrint('[DC_CONSOLE] ✅ 10:00 PM Merchant settlement generated: ${response['settlement_number']}');
+      return Map<String, dynamic>.from(response as Map);
+    } catch (e) {
+      debugPrint('[DC_CONSOLE] ❌ generateDailyMerchantSettlement error: $e');
+      rethrow;
+    } finally {
+      adminDb.dispose();
+    }
+  }
+
+  @override
+  Future<List<ClientSettlement>> fetchDcClientSettlements({
+    required String dcId,
+    String? clientId,
+  }) async {
+    final adminDb = _getAdminClient();
+    try {
+      var query = adminDb.from('client_settlements').select('*');
+      if (clientId != null && clientId.isNotEmpty && clientId != 'all') {
+        query = query.eq('client_id', clientId);
+      } else {
+        query = query.eq('distribution_center_id', dcId);
+      }
+
+      final response = await query.order('settled_at', ascending: false);
+      return (response as List).map((json) => ClientSettlement.fromJson(json as Map<String, dynamic>)).toList();
+    } catch (e) {
+      debugPrint('[DC_CONSOLE] ❌ fetchDcClientSettlements error: $e');
+      return [];
+    } finally {
+      adminDb.dispose();
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> fetchMerchantAssetCustody({
+    required String clientId,
+    String? dcId,
+  }) async {
+    final adminDb = _getAdminClient();
+    try {
+      final response = await adminDb.rpc('fn_calculate_merchant_asset_custody', params: {
+        'p_client_id': clientId,
+        if (dcId != null) 'p_dc_id': dcId,
+      });
+
+      return Map<String, dynamic>.from(response as Map);
+    } catch (e) {
+      debugPrint('[DC_CONSOLE] ❌ fetchMerchantAssetCustody error: $e');
+      return {
+        'success': false,
+        'error': e.toString(),
+      };
+    } finally {
+      adminDb.dispose();
+    }
   }
 }

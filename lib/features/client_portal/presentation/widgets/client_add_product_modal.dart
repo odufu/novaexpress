@@ -30,6 +30,10 @@ class _ClientAddProductModalState extends ConsumerState<ClientAddProductModal> {
   final _nameCtrl = TextEditingController();
   final _skuCtrl = TextEditingController();
   final _priceCtrl = TextEditingController();
+  final _costPriceCtrl = TextEditingController();
+  final _barcodeCtrl = TextEditingController();
+  final _weightKgCtrl = TextEditingController(text: '0.5');
+  final _lowStockThresholdCtrl = TextEditingController(text: '10');
   final _descCtrl = TextEditingController();
   String _selectedCategory = 'Health & Wellness';
 
@@ -53,6 +57,10 @@ class _ClientAddProductModalState extends ConsumerState<ClientAddProductModal> {
     _nameCtrl.dispose();
     _skuCtrl.dispose();
     _priceCtrl.dispose();
+    _costPriceCtrl.dispose();
+    _barcodeCtrl.dispose();
+    _weightKgCtrl.dispose();
+    _lowStockThresholdCtrl.dispose();
     _descCtrl.dispose();
     super.dispose();
   }
@@ -104,11 +112,20 @@ class _ClientAddProductModalState extends ConsumerState<ClientAddProductModal> {
 
     try {
       final price = double.parse(_priceCtrl.text.trim().replaceAll(',', ''));
+      final costPrice = double.tryParse(_costPriceCtrl.text.trim().replaceAll(',', '')) ?? 0.0;
+      final barcode = _barcodeCtrl.text.trim().isNotEmpty ? _barcodeCtrl.text.trim() : null;
+      final weightKg = double.tryParse(_weightKgCtrl.text.trim()) ?? 0.5;
+      final lowStock = int.tryParse(_lowStockThresholdCtrl.text.trim()) ?? 10;
+
       final newProd = await ref.read(clientPortalProvider.notifier).createProduct(
         name: _nameCtrl.text.trim(),
         sku: _skuCtrl.text.trim().toUpperCase(),
         category: _selectedCategory,
         unitPrice: price,
+        costPrice: costPrice,
+        barcode: barcode,
+        weightKg: weightKg,
+        lowStockThreshold: lowStock,
         description: _descCtrl.text.trim().isNotEmpty ? _descCtrl.text.trim() : null,
         imageUrl: _selectedImageUrl,
         coveringStates: _selectedStates.toList(),
@@ -491,33 +508,174 @@ class _ClientAddProductModalState extends ConsumerState<ClientAddProductModal> {
                       ),
                       const SizedBox(height: 16),
 
-                      // Base Single Unit Price
-                      Text(
-                        'Base Single Unit Price (₦) *',
-                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF334155)),
+                      // Pricing & Cost of Goods Sold (COGS)
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Retail Selling Price (₦) *',
+                                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF334155)),
+                                ),
+                                const SizedBox(height: 6),
+                                TextFormField(
+                                  controller: _priceCtrl,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : Colors.black87),
+                                  decoration: InputDecoration(
+                                    hintText: 'e.g. 25000',
+                                    prefixText: '₦ ',
+                                    prefixStyle: GoogleFonts.inter(fontWeight: FontWeight.bold, color: isDark ? Colors.white70 : const Color(0xFF334155)),
+                                    hintStyle: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF94A3B8)),
+                                    filled: true,
+                                    fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))),
+                                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))),
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                  ),
+                                  validator: (v) {
+                                    if (v == null || v.trim().isEmpty) return 'Price is required';
+                                    final num = double.tryParse(v.trim().replaceAll(',', ''));
+                                    if (num == null || num <= 0) return 'Enter a valid price';
+                                    return null;
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      'Wholesale Unit Cost (COGS)',
+                                      style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF334155)),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Tooltip(
+                                      message: 'Wholesale or procurement cost per unit. Used to compute your true commercial gross profit.',
+                                      child: Icon(Icons.info_outline_rounded, size: 14, color: const Color(0xFF64748B)),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                TextFormField(
+                                  controller: _costPriceCtrl,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : Colors.black87),
+                                  decoration: InputDecoration(
+                                    hintText: 'e.g. 12000',
+                                    prefixText: '₦ ',
+                                    prefixStyle: GoogleFonts.inter(fontWeight: FontWeight.bold, color: isDark ? Colors.white70 : const Color(0xFF334155)),
+                                    hintStyle: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF94A3B8)),
+                                    filled: true,
+                                    fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))),
+                                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))),
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 6),
-                      TextFormField(
-                        controller: _priceCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : Colors.black87),
-                        decoration: InputDecoration(
-                          hintText: 'e.g. 25000',
-                          prefixText: '₦ ',
-                          prefixStyle: GoogleFonts.inter(fontWeight: FontWeight.bold, color: isDark ? Colors.white70 : const Color(0xFF334155)),
-                          hintStyle: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF94A3B8)),
-                          filled: true,
-                          fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))),
-                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        ),
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) return 'Price is required';
-                          final num = double.tryParse(v.trim().replaceAll(',', ''));
-                          if (num == null || num <= 0) return 'Enter a valid price';
-                          return null;
-                        },
+                      const SizedBox(height: 16),
+
+                      // Barcode, Weight & Low Stock Threshold
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Barcode / EAN (Optional)',
+                                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF334155)),
+                                ),
+                                const SizedBox(height: 6),
+                                TextFormField(
+                                  controller: _barcodeCtrl,
+                                  style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : Colors.black87),
+                                  decoration: InputDecoration(
+                                    hintText: 'e.g. 615123456789',
+                                    hintStyle: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF94A3B8)),
+                                    prefixIcon: const Icon(Icons.qr_code_scanner_rounded, size: 18, color: Color(0xFF64748B)),
+                                    filled: true,
+                                    fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))),
+                                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))),
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            flex: 2,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Weight (kg)',
+                                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF334155)),
+                                ),
+                                const SizedBox(height: 6),
+                                TextFormField(
+                                  controller: _weightKgCtrl,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : Colors.black87),
+                                  decoration: InputDecoration(
+                                    hintText: '0.5',
+                                    suffixText: 'kg',
+                                    filled: true,
+                                    fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))),
+                                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))),
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            flex: 2,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Low Stock Alert',
+                                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF334155)),
+                                ),
+                                const SizedBox(height: 6),
+                                TextFormField(
+                                  controller: _lowStockThresholdCtrl,
+                                  keyboardType: TextInputType.number,
+                                  style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : Colors.black87),
+                                  decoration: InputDecoration(
+                                    hintText: '10',
+                                    suffixText: 'units',
+                                    filled: true,
+                                    fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))),
+                                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))),
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 16),
 

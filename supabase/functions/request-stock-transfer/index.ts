@@ -42,16 +42,21 @@ serve(async (req: Request) => {
     const waybillNumber = `WB-PDA-${Date.now().toString().slice(-6)}`;
 
     // 1. Create stock transfer header
+    const insertPayload: Record<string, any> = {
+      waybill_number: waybillNumber,
+      transfer_number: waybillNumber,
+      company_id: payload.companyId || "11111111-1111-4111-8111-111111111111",
+      status: "pending",
+      notes: `Restock request from PDA. ${payload.notes || ""}`,
+      created_at: new Date().toISOString(),
+    };
+    if (payload.sourceWarehouseId) {
+      insertPayload.source_warehouse_id = payload.sourceWarehouseId;
+    }
+
     const { data: transfer, error: transferError } = await supabaseClient
       .from("stock_transfers")
-      .insert({
-        waybill_number: waybillNumber,
-        company_id: payload.companyId || "11111111-1111-4111-8111-111111111111",
-        source_warehouse_id: payload.sourceWarehouseId || "c1111111-1111-4111-8111-111111111111",
-        status: "pending",
-        notes: `Restock request from PDA. ${payload.notes || ""}`,
-        created_at: new Date().toISOString(),
-      })
+      .insert(insertPayload)
       .select()
       .single();
 
@@ -62,11 +67,11 @@ serve(async (req: Request) => {
       );
     }
 
-    // 2. Insert items
+    // 2. Insert items with authoritative schema columns: transfer_id, product_id, quantity_shipped, quantity_received
     const transferItems = payload.items.map((item) => ({
-      stock_transfer_id: transfer.id,
+      transfer_id: transfer.id,
       product_id: item.productId,
-      quantity_sent: item.quantityRequested,
+      quantity_shipped: item.quantityRequested,
       quantity_received: 0,
     }));
 

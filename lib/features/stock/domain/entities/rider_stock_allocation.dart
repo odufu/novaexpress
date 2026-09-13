@@ -23,7 +23,7 @@ class RiderStockAllocation {
     required this.productId,
     required this.productName,
     required this.sku,
-    this.clientName = 'Novacare Limited',
+    this.clientName = '',
     required this.allocatedUnits,
     this.deliveredUnits = 0,
     required this.inCustodyUnits,
@@ -32,6 +32,20 @@ class RiderStockAllocation {
     required this.allocatedAt,
     this.fulfillmentType = 'distributed_inventory',
   });
+
+  factory RiderStockAllocation.empty() => RiderStockAllocation(
+    id: '',
+    riderId: '',
+    riderName: '',
+    riderCode: '',
+    productId: '',
+    productName: '',
+    sku: '',
+    allocatedUnits: 0,
+    inCustodyUnits: 0,
+    unitPrice: 0.0,
+    allocatedAt: DateTime.now(),
+  );
 
   bool get isLowStock => inCustodyUnits <= 2;
 
@@ -80,7 +94,7 @@ class RiderStockAllocation {
       productId: json['product_id']?.toString() ?? json['productId'] ?? '',
       productName: json['product_name']?.toString() ?? json['productName'] ?? 'Product',
       sku: json['sku']?.toString() ?? 'SKU-001',
-      clientName: json['client_name']?.toString() ?? json['clientName'] ?? 'Novacare Limited',
+      clientName: json['client_name']?.toString() ?? json['clientName'] ?? '',
       allocatedUnits: (json['allocated_units'] as num?)?.toInt() ?? (json['allocatedUnits'] as num?)?.toInt() ?? 0,
       deliveredUnits: (json['delivered_units'] as num?)?.toInt() ?? (json['deliveredUnits'] as num?)?.toInt() ?? 0,
       inCustodyUnits: (json['in_custody_units'] as num?)?.toInt() ?? (json['inCustodyUnits'] as num?)?.toInt() ?? 0,

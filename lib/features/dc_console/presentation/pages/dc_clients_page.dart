@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../client_portal/domain/entities/client_profile.dart';
+import '../../../orders/domain/entities/order.dart';
+import '../../../orders/presentation/providers/orders_provider.dart';
 import '../providers/dc_console_provider.dart';
 import '../widgets/dc_onboard_client_modal.dart';
+import '../widgets/dc_client_asset_portfolio_modal.dart';
+import '../widgets/dc_daily_merchant_settlement_modal.dart';
 
 class DCClientsPage extends ConsumerWidget {
   const DCClientsPage({super.key});
@@ -11,6 +15,7 @@ class DCClientsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(dcConsoleProvider);
+    final ordersState = ref.watch(ordersProvider);
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
@@ -222,7 +227,7 @@ class DCClientsPage extends ConsumerWidget {
                       separatorBuilder: (_, __) => Divider(height: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)),
                       itemBuilder: (context, index) {
                         final client = state.filteredClients[index];
-                        return _buildClientRow(client, isDark);
+                        return _buildClientRow(context, client, isDark, ordersState.orders);
                       },
                     ),
                 ],
@@ -258,7 +263,7 @@ class DCClientsPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildClientRow(ClientProfile client, bool isDark) {
+  Widget _buildClientRow(BuildContext context, ClientProfile client, bool isDark, List<OrderEntity> allOrders) {
     final isEnterprise = client.isEnterprise;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
@@ -396,24 +401,73 @@ class DCClientsPage extends ConsumerWidget {
             ),
           ),
 
-          // Status Indicator
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFF10B981).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(width: 6, height: 6, decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle)),
-                const SizedBox(width: 6),
-                Text(
-                  'Active',
-                  style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF10B981)),
+          // Status Indicator & Action
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
                 ),
-              ],
-            ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(width: 6, height: 6, decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle)),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Active',
+                      style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF10B981)),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              OutlinedButton.icon(
+                onPressed: () => DCClientAssetPortfolioModal.show(context, client),
+                icon: const Icon(Icons.analytics_outlined, size: 14, color: Color(0xFF0D9488)),
+                label: Text(
+                  'View Assets',
+                  style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF0D9488)),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0xFF0D9488)),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton.icon(
+                onPressed: () {
+                  final eligible = allOrders.where((o) =>
+                    (o.merchantId == client.id || o.clientId == client.id) &&
+                    (o.paymentMethod.toLowerCase() == 'cash' ||
+                        o.paymentMethod.toLowerCase() == 'cod' ||
+                        o.paymentMethod.toLowerCase() == 'direct_transfer' ||
+                        o.paymentType == 'direct_transfer') &&
+                    o.status.toLowerCase() == 'delivered' &&
+                    o.financeSettlementStatus != 'settled'
+                  ).toList();
+                  DCDailyMerchantSettlementModal.show(
+                    context: context,
+                    client: client,
+                    eligibleOrders: eligible,
+                  );
+                },
+                icon: const Icon(Icons.payments_outlined, size: 14, color: Colors.white),
+                label: Text(
+                  '10 PM Settlement',
+                  style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0284C7),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  elevation: 0,
+                ),
+              ),
+            ],
           ),
         ],
       ),

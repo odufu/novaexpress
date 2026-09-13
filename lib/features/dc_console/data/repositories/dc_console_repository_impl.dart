@@ -1,5 +1,6 @@
 import '../../../../core/services/local_storage_service.dart';
 import '../../../client_portal/domain/entities/client_profile.dart';
+import '../../../client_portal/domain/entities/client_settlement.dart';
 import '../../domain/entities/dc_finance_settings.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
 import '../../domain/entities/dc_payout_claim.dart';
@@ -224,6 +225,9 @@ class DCConsoleRepositoryImpl implements DCConsoleRepository {
     String? bankName,
     String? bankAccountNumber,
     String? bankAccountName,
+    double? customDeliveryFee,
+    double? customPlatformFee,
+    double? customFailedAttemptFee,
     dynamic authDataSource,
   }) async {
     return await _remoteDataSource.createClient(
@@ -241,7 +245,60 @@ class DCConsoleRepositoryImpl implements DCConsoleRepository {
       bankName: bankName,
       bankAccountNumber: bankAccountNumber,
       bankAccountName: bankAccountName,
+      customDeliveryFee: customDeliveryFee,
+      customPlatformFee: customPlatformFee,
+      customFailedAttemptFee: customFailedAttemptFee,
       authDataSource: authDataSource,
+    );
+  }
+
+  @override
+  Future<Map<String, dynamic>> approveCashRemittance({
+    required String remittanceId,
+    String? supervisorId,
+  }) async {
+    return await _remoteDataSource.approveCashRemittance(
+      remittanceId: remittanceId,
+      supervisorId: supervisorId,
+    );
+  }
+
+  @override
+  Future<Map<String, dynamic>> generateDailyMerchantSettlement({
+    required String clientId,
+    required String dcId,
+    required DateTime periodStart,
+    required DateTime periodEnd,
+    Map<String, dynamic>? customDeductions,
+  }) async {
+    return await _remoteDataSource.generateDailyMerchantSettlement(
+      clientId: clientId,
+      dcId: dcId,
+      periodStart: periodStart,
+      periodEnd: periodEnd,
+      customDeductions: customDeductions,
+    );
+  }
+
+  @override
+  Future<List<ClientSettlement>> fetchDcClientSettlements({
+    required String dcId,
+    String? clientId,
+  }) async {
+    return await _remoteDataSource.fetchDcClientSettlements(
+      dcId: dcId,
+      clientId: clientId,
+    );
+  }
+
+  @override
+  Future<Map<String, dynamic>> fetchMerchantAssetCustody({
+    required String clientId,
+    String? dcId,
+  }) async {
+    return await _remoteDataSource.fetchMerchantAssetCustody(
+      clientId: clientId,
+      dcId: dcId,
     );
   }
 }

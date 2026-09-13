@@ -14,6 +14,7 @@ class ProductPackage {
   final int freeQuantity;
   final double packagePrice; // Total package selling price
   final String clientName;
+  final String? clientId;
   final String? description;
   final bool isCustom;
   final DateTime createdAt;
@@ -29,6 +30,7 @@ class ProductPackage {
     this.freeQuantity = 0,
     required this.packagePrice,
     required this.clientName,
+    this.clientId,
     this.description,
     this.isCustom = false,
     required this.createdAt,
@@ -67,6 +69,7 @@ class ProductPackage {
     int? freeQuantity,
     double? packagePrice,
     String? clientName,
+    String? clientId,
     String? description,
     bool? isCustom,
     DateTime? createdAt,
@@ -82,6 +85,7 @@ class ProductPackage {
       freeQuantity: freeQuantity ?? this.freeQuantity,
       packagePrice: packagePrice ?? this.packagePrice,
       clientName: clientName ?? this.clientName,
+      clientId: clientId ?? this.clientId,
       description: description ?? this.description,
       isCustom: isCustom ?? this.isCustom,
       createdAt: createdAt ?? this.createdAt,
@@ -100,6 +104,7 @@ class ProductPackage {
       'free_quantity': freeQuantity,
       'package_price': packagePrice,
       'client_name': clientName,
+      if (clientId != null) 'client_id': clientId,
       'description': description,
       'is_custom': isCustom,
       'created_at': createdAt.toIso8601String(),
@@ -121,12 +126,23 @@ class ProductPackage {
       paidQuantity: paidQty,
       freeQuantity: freeQty,
       packagePrice: (json['package_price'] as num?)?.toDouble() ?? 0.0,
-      clientName: json['client_name'] as String? ?? 'Novacare Limited',
+      clientName: json['client_name'] as String? ?? '',
+      clientId: json['client_id'] as String?,
       description: json['description'] as String?,
       isCustom: json['is_custom'] as bool? ?? false,
       createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'] as String) ?? DateTime.now() : DateTime.now(),
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ProductPackage &&
+          runtimeType == other.runtimeType &&
+          id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
 }
 
 /// Base Product Catalog Item
@@ -137,6 +153,10 @@ class CatalogProduct {
   final String clientName;
   final String? clientId;
   final double defaultUnitPrice;
+  final double costPrice;
+  final String? barcode;
+  final double weightKg;
+  final int lowStockThreshold;
   final String category;
   final String? description;
   final String? imageUrl;
@@ -151,6 +171,10 @@ class CatalogProduct {
     required this.clientName,
     this.clientId,
     required this.defaultUnitPrice,
+    this.costPrice = 0.0,
+    this.barcode,
+    this.weightKg = 0.5,
+    this.lowStockThreshold = 10,
     this.category = 'Health & Wellness',
     this.description,
     this.imageUrl,
@@ -166,6 +190,10 @@ class CatalogProduct {
     String? clientName,
     String? clientId,
     double? defaultUnitPrice,
+    double? costPrice,
+    String? barcode,
+    double? weightKg,
+    int? lowStockThreshold,
     String? category,
     String? description,
     String? imageUrl,
@@ -180,6 +208,10 @@ class CatalogProduct {
       clientName: clientName ?? this.clientName,
       clientId: clientId ?? this.clientId,
       defaultUnitPrice: defaultUnitPrice ?? this.defaultUnitPrice,
+      costPrice: costPrice ?? this.costPrice,
+      barcode: barcode ?? this.barcode,
+      weightKg: weightKg ?? this.weightKg,
+      lowStockThreshold: lowStockThreshold ?? this.lowStockThreshold,
       category: category ?? this.category,
       description: description ?? this.description,
       imageUrl: imageUrl ?? this.imageUrl,
@@ -197,6 +229,10 @@ class CatalogProduct {
       'client_name': clientName,
       if (clientId != null) 'client_id': clientId,
       'default_unit_price': defaultUnitPrice,
+      'cost_price': costPrice,
+      if (barcode != null) 'barcode': barcode,
+      'weight_kg': weightKg,
+      'low_stock_threshold': lowStockThreshold,
       'category': category,
       if (description != null) 'description': description,
       'image_url': imageUrl,
@@ -225,9 +261,13 @@ class CatalogProduct {
       id: json['id'] as String? ?? 'prod-${DateTime.now().millisecondsSinceEpoch}',
       name: json['name'] as String? ?? 'Product',
       sku: json['sku'] as String? ?? 'SKU-001',
-      clientName: json['client_name'] as String? ?? 'Novacare Limited',
+      clientName: json['client_name'] as String? ?? '',
       clientId: json['client_id'] as String?,
       defaultUnitPrice: (json['default_unit_price'] as num?)?.toDouble() ?? 0.0,
+      costPrice: (json['cost_price'] as num?)?.toDouble() ?? 0.0,
+      barcode: json['barcode'] as String?,
+      weightKg: (json['weight_kg'] as num?)?.toDouble() ?? 0.5,
+      lowStockThreshold: (json['low_stock_threshold'] as num?)?.toInt() ?? 10,
       category: json['category'] as String? ?? 'Health & Wellness',
       description: json['description'] as String?,
       imageUrl: json['image_url'] as String?,
@@ -239,4 +279,14 @@ class CatalogProduct {
           [],
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CatalogProduct &&
+          runtimeType == other.runtimeType &&
+          (id == other.id || (sku.isNotEmpty && sku.toUpperCase() == other.sku.toUpperCase()));
+
+  @override
+  int get hashCode => id.isNotEmpty ? id.hashCode : sku.toUpperCase().hashCode;
 }

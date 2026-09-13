@@ -12,6 +12,8 @@ class ProcessStockReturnUseCase {
     required String productId,
     required int quantity,
     required String reason,
+    String? destinationDcId,
+    String? condition,
     String? notes,
   }) {
     return repository.processStockReturn(
@@ -21,6 +23,8 @@ class ProcessStockReturnUseCase {
       productId: productId,
       quantity: quantity,
       reason: reason,
+      destinationDcId: destinationDcId,
+      condition: condition,
       notes: notes,
     );
   }

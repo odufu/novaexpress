@@ -15,6 +15,9 @@ import '../../domain/repositories/orders_repository.dart';
 import '../../../stock/presentation/providers/stock_provider.dart';
 import '../../../finance/presentation/providers/finance_provider.dart';
 import '../../../dc_console/presentation/providers/dc_console_provider.dart';
+import '../../../dc_console/domain/entities/distribution_center.dart';
+import '../../domain/services/order_routing_service.dart';
+import '../../../../core/services/audio_service.dart';
 
 final ordersRemoteDataSourceProvider = Provider<OrdersRemoteDataSource>((ref) {
   try {
@@ -96,9 +99,19 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
 
     if (_ref != null) {
       _ref.listen<AuthState>(authProvider, (previous, next) {
-        final nextAgentId = next.user?.deliveryAgentId ?? next.user?.id;
-        if (nextAgentId != null && nextAgentId.isNotEmpty) {
+        final user = next.user;
+        final role = user?.role.toLowerCase() ?? '';
+        final isRider = (role.contains('rider') || role.contains('agent') || role.contains('driver') || (user?.isPda ?? false));
+        final nextAgentId = user?.deliveryAgentId ?? user?.id;
+        if (isRider && nextAgentId != null && nextAgentId.isNotEmpty) {
           loadOrders(nextAgentId);
+        } else {
+          final userDcId = user?.distributionCenterId;
+          if (userDcId != null && userDcId.isNotEmpty) {
+            loadDcOrders(userDcId);
+          } else {
+            loadDcOrders();
+          }
         }
       });
     }
@@ -125,12 +138,86 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     return '';
   }
 
-  String _getScopeKey() {
+  String _getActiveDcId([String? overrideDcId]) {
+    if (overrideDcId != null && overrideDcId.isNotEmpty) {
+      return overrideDcId;
+    }
+    if (_ref != null) {
+      try {
+        final dcState = _ref.read(dcConsoleProvider);
+        if (dcState.activeHubId.isNotEmpty) {
+          return dcState.activeHubId;
+        }
+      } catch (_) {}
+      final user = _ref.read(authProvider).user;
+      if (user?.distributionCenterId != null && user!.distributionCenterId!.isNotEmpty) {
+        return user.distributionCenterId!;
+      }
+    }
+    return '22222222-2222-4222-8222-222222222222';
+  }
+
+  String _getScopeKey([String? explicitDcId]) {
     if (_isRiderUser()) {
       final agentId = _getActiveAgentId();
       return agentId.isNotEmpty ? 'rider_$agentId' : 'rider';
     }
-    return 'dc';
+    final dcId = _getActiveDcId(explicitDcId);
+    return 'dc_$dcId';
+  }
+
+  (DistributionCenter, List<DistributionCenter>) _resolveDcContext([String? targetDcId]) {
+    DistributionCenter? currentDc;
+    List<DistributionCenter> allDcs = [];
+
+    if (_ref != null) {
+      try {
+        final dcNotifier = _ref.read(dcConsoleProvider.notifier);
+        allDcs = dcNotifier.distributionCenters;
+      } catch (_) {
+        try {
+          final dcState = _ref.read(dcConsoleProvider);
+          allDcs = dcState.distributionCenters;
+        } catch (_) {}
+      }
+    }
+
+    if (allDcs.isEmpty) {
+      allDcs = defaultDistributionCenters;
+    }
+
+    final dcId = _getActiveDcId(targetDcId);
+    currentDc = allDcs.where((d) => d.id == dcId || d.code.toLowerCase() == dcId.toLowerCase()).firstOrNull;
+
+    if (currentDc == null) {
+      final isGrand = dcId == '22222222-2222-4222-8222-222222222222';
+      currentDc = DistributionCenter(
+        id: dcId,
+        name: isGrand ? 'Wuse Central Distribution Hub' : 'Distribution Center',
+        code: isGrand ? 'DC-WUSE-01' : 'DC-LOCAL',
+        state: isGrand ? 'Abuja (FCT)' : '',
+        city: isGrand ? 'Wuse 2' : '',
+        address: '',
+        isGrandDc: isGrand,
+        isHub: isGrand,
+      );
+    }
+
+    return (currentDc, allDcs);
+  }
+
+  List<OrderEntity> _filterOrdersForCurrentScope(List<OrderEntity> rawOrders, [String? targetDcId]) {
+    if (_isRiderUser()) {
+      return rawOrders;
+    }
+    final (currentDc, allDcs) = _resolveDcContext(targetDcId);
+    return rawOrders.where((order) {
+      return OrderRoutingService.doesOrderBelongToDc(
+        order: order,
+        currentDc: currentDc,
+        allDcs: allDcs,
+      );
+    }).toList();
   }
 
   List<OrderEntity> _sortOrdersByOperationalPriority(List<OrderEntity> rawOrders) {
@@ -196,6 +283,30 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
             callback: (payload) {
               debugPrint('[ORDERS_REALTIME] 🔔 Realtime event on orders table: ${payload.eventType}');
               final agentId = _getActiveAgentId();
+              final isRider = _isRiderUser();
+
+              if (payload.eventType == PostgresChangeEvent.insert) {
+                final newRecord = payload.newRecord;
+                if (isRider) {
+                  final assignedId = (newRecord['assigned_agent_id'] ?? newRecord['delivery_agent_id'])?.toString();
+                  if (agentId.isNotEmpty && assignedId == agentId) {
+                    AudioService().playIncomingOrder();
+                  }
+                } else {
+                  AudioService().playIncomingOrder();
+                }
+              } else if (payload.eventType == PostgresChangeEvent.update) {
+                final newRecord = payload.newRecord;
+                final oldRecord = payload.oldRecord;
+                if (isRider && agentId.isNotEmpty) {
+                  final wasAssigned = oldRecord['assigned_agent_id']?.toString() == agentId || oldRecord['delivery_agent_id']?.toString() == agentId;
+                  final isAssigned = newRecord['assigned_agent_id']?.toString() == agentId || newRecord['delivery_agent_id']?.toString() == agentId;
+                  if (!wasAssigned && isAssigned) {
+                    AudioService().playIncomingOrder();
+                  }
+                }
+              }
+
               if (agentId.isNotEmpty) {
                 _silentSyncOrders(agentId);
               } else {
@@ -215,8 +326,7 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     try {
       final isRider = _isRiderUser();
       final targetId = (agentId != null && agentId.isNotEmpty) ? agentId : _getActiveAgentId();
-      final user = _ref?.read(authProvider).user;
-      final dcId = user?.distributionCenterId ?? '22222222-2222-4222-8222-222222222222';
+      final dcId = _getActiveDcId();
 
       List<OrderEntity> fetchedList;
       if (isRider && targetId.isNotEmpty) {
@@ -225,9 +335,19 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
         fetchedList = await _repository.getDistributionCenterOrders(dcId);
       }
 
-      final freshList = _sortOrdersByOperationalPriority(fetchedList);
+      final filteredList = _filterOrdersForCurrentScope(fetchedList, dcId);
+      final freshList = _sortOrdersByOperationalPriority(filteredList);
 
       if (!mounted) return;
+
+      // If new orders arrived that were not in state.orders, alert with incoming order chime
+      if (state.orders.isNotEmpty && freshList.length > state.orders.length) {
+        final existingIds = state.orders.map((o) => o.id).toSet();
+        final hasNewOrders = freshList.any((o) => !existingIds.contains(o.id));
+        if (hasNewOrders) {
+          AudioService().playIncomingOrder();
+        }
+      }
 
       // Check if list or any order attribute changed
       bool hasChanges = freshList.length != state.orders.length;
@@ -255,9 +375,9 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
       }
 
       if (hasChanges && mounted) {
-        debugPrint('[ORDERS_PROVIDER] ⚡ Auto-synced ${freshList.length} orders in real time.');
+        debugPrint('[ORDERS_PROVIDER] ⚡ Auto-synced ${freshList.length} orders in real time for scope (${_getScopeKey(dcId)}).');
         state = state.copyWith(orders: freshList);
-        await _storageService.cacheOrders(freshList, _getScopeKey());
+        await _storageService.cacheOrders(freshList, _getScopeKey(dcId));
         if (_ref != null) {
           final activeTargetId = isRider ? targetId : dcId;
           _ref.read(financeProvider.notifier).loadRemittances(activeTargetId);
@@ -267,18 +387,14 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
   }
 
   Future<void> _initOrders([bool skipRemoteFetch = false]) async {
-    final cached = await _storageService.getCachedOrders(_getScopeKey());
+    final scopeKey = _getScopeKey();
+    final cached = await _storageService.getCachedOrders(scopeKey);
     if (!mounted) return;
     if (cached != null && cached.isNotEmpty) {
-      final merged = [...cached];
-      for (final o in state.orders) {
-        if (!merged.any((m) => m.id == o.id || m.orderNumber == o.orderNumber)) {
-          merged.add(o);
-        }
-      }
-      final sortedCached = _sortOrdersByOperationalPriority(merged);
+      final filteredCached = _filterOrdersForCurrentScope(cached);
+      final sortedCached = _sortOrdersByOperationalPriority(filteredCached);
       state = state.copyWith(orders: sortedCached);
-      debugPrint('[ORDERS_PROVIDER] ⚡ Hydrated ${sortedCached.length} orders from local cache for scope (${_getScopeKey()}).');
+      debugPrint('[ORDERS_PROVIDER] ⚡ Hydrated ${sortedCached.length} orders from local cache for scope ($scopeKey).');
     }
     if (skipRemoteFetch) return;
     final agentId = _getActiveAgentId();
@@ -303,27 +419,17 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
         final idToLoad = (agentId != null && agentId.isNotEmpty) ? agentId : _getActiveAgentId();
         final rawOrders = await _repository.getAssignedOrders(idToLoad);
         if (!mounted) return;
-        final merged = [...rawOrders];
-        for (final o in state.orders) {
-          if (!merged.any((m) => m.id == o.id || m.orderNumber == o.orderNumber)) {
-            merged.add(o);
-          }
-        }
-        final orderEntities = _sortOrdersByOperationalPriority(merged);
+        final orderEntities = _sortOrdersByOperationalPriority(rawOrders);
         state = state.copyWith(isLoading: false, orders: orderEntities);
         await _storageService.cacheOrders(orderEntities, _getScopeKey());
       } else {
-        final rawOrders = await _repository.getDistributionCenterOrders('22222222-2222-4222-8222-222222222222');
+        final dcId = _getActiveDcId();
+        final rawOrders = await _repository.getDistributionCenterOrders(dcId);
         if (!mounted) return;
-        final merged = [...rawOrders];
-        for (final o in state.orders) {
-          if (!merged.any((m) => m.id == o.id || m.orderNumber == o.orderNumber)) {
-            merged.add(o);
-          }
-        }
-        final orderEntities = _sortOrdersByOperationalPriority(merged);
+        final filtered = _filterOrdersForCurrentScope(rawOrders, dcId);
+        final orderEntities = _sortOrdersByOperationalPriority(filtered);
         state = state.copyWith(isLoading: false, orders: orderEntities);
-        await _storageService.cacheOrders(orderEntities, _getScopeKey());
+        await _storageService.cacheOrders(orderEntities, _getScopeKey(dcId));
       }
     } catch (e) {
       if (!mounted) return;
@@ -338,17 +444,25 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     if (!mounted) return;
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      final rawOrders = await _repository.getDistributionCenterOrders(dcId ?? '22222222-2222-4222-8222-222222222222');
-      if (!mounted) return;
-      final merged = [...rawOrders];
-      for (final o in state.orders) {
-        if (!merged.any((m) => m.id == o.id || m.orderNumber == o.orderNumber)) {
-          merged.add(o);
-        }
+      final targetDcId = _getActiveDcId(dcId);
+      final scopeKey = _getScopeKey(targetDcId);
+
+      // Hydrate from scoped cache first for snappy UI transition
+      final cached = await _storageService.getCachedOrders(scopeKey);
+      if (cached != null && cached.isNotEmpty && mounted) {
+        final filteredCached = _filterOrdersForCurrentScope(cached, targetDcId);
+        final sortedCached = _sortOrdersByOperationalPriority(filteredCached);
+        state = state.copyWith(orders: sortedCached);
       }
-      final orderEntities = _sortOrdersByOperationalPriority(merged);
+
+      final rawOrders = await _repository.getDistributionCenterOrders(targetDcId);
+      if (!mounted) return;
+
+      final filtered = _filterOrdersForCurrentScope(rawOrders, targetDcId);
+      final orderEntities = _sortOrdersByOperationalPriority(filtered);
+
       state = state.copyWith(isLoading: false, orders: orderEntities);
-      await _storageService.cacheOrders(orderEntities, 'dc');
+      await _storageService.cacheOrders(orderEntities, scopeKey);
     } catch (e) {
       if (!mounted) return;
       state = state.copyWith(isLoading: false, errorMessage: 'Failed to load DC orders: $e');
@@ -359,16 +473,32 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
       final created = await _repository.createOrder(orderData);
-      final rawUpdated = [
-        created,
-        ...state.orders.where((o) => o.id != created.id && o.orderNumber != created.orderNumber),
-      ];
-      final updatedOrders = _sortOrdersByOperationalPriority(rawUpdated);
+      final dcId = _getActiveDcId();
+      final (currentDc, allDcs) = _resolveDcContext(dcId);
+      final belongsToCurrentDc = _isRiderUser()
+          ? (created.deliveryAgentId == _getActiveAgentId() || created.deliveryAgentId == null || created.deliveryAgentId!.isEmpty)
+          : OrderRoutingService.doesOrderBelongToDc(
+              order: created,
+              currentDc: currentDc,
+              allDcs: allDcs,
+            );
+
+      List<OrderEntity> updatedOrders;
+      if (belongsToCurrentDc) {
+        final rawUpdated = [
+          created,
+          ...state.orders.where((o) => o.id != created.id && o.orderNumber != created.orderNumber),
+        ];
+        updatedOrders = _sortOrdersByOperationalPriority(rawUpdated);
+      } else {
+        updatedOrders = state.orders.where((o) => o.id != created.id && o.orderNumber != created.orderNumber).toList();
+      }
+
       state = state.copyWith(
         isLoading: false,
         orders: updatedOrders,
       );
-      await _storageService.cacheOrders(updatedOrders, _getScopeKey());
+      await _storageService.cacheOrders(updatedOrders, _getScopeKey(dcId));
       return true;
     } catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: 'Failed to create order: $e');
@@ -393,8 +523,18 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
       }
     }
 
+    final dcId = _getActiveDcId();
+    final (currentDc, allDcs) = _resolveDcContext(dcId);
+    final eligibleNewOrders = _isRiderUser()
+        ? newOrders.where((o) => o.deliveryAgentId == _getActiveAgentId()).toList()
+        : newOrders.where((o) => OrderRoutingService.doesOrderBelongToDc(
+            order: o,
+            currentDc: currentDc,
+            allDcs: allDcs,
+          )).toList();
+
     final rawUpdated = [
-      ...newOrders,
+      ...eligibleNewOrders,
       ...state.orders.where((o) => !newOrders.any((no) => no.id == o.id || no.orderNumber == o.orderNumber)),
     ];
     final updatedOrders = _sortOrdersByOperationalPriority(rawUpdated);
@@ -402,7 +542,7 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
       isLoading: false,
       orders: updatedOrders,
     );
-    await _storageService.cacheOrders(updatedOrders, _getScopeKey());
+    await _storageService.cacheOrders(updatedOrders, _getScopeKey(dcId));
 
     return {
       'success': successCount > 0,
@@ -508,6 +648,32 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
       await _storageService.cacheOrders(sortedList, _getScopeKey());
       return true;
     } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> unassignOrderFromRider(String orderId) async {
+    try {
+      await _repository.unassignOrderFromRider(orderId: orderId);
+
+      final updatedList = state.orders.map((o) {
+        if (o.id == orderId || o.orderNumber == orderId) {
+          return OrderModel.fromEntity(
+            o.copyWith(
+              clearAssignment: true,
+              status: 'pending_dispatch',
+            ),
+          );
+        }
+        return o;
+      }).toList();
+
+      final sortedList = _sortOrdersByOperationalPriority(updatedList);
+      state = state.copyWith(orders: sortedList);
+      await _storageService.cacheOrders(sortedList, _getScopeKey());
+      return true;
+    } catch (e) {
+      debugPrint('[ORDERS_NOTIFIER] Error unassigning order $orderId: $e');
       return false;
     }
   }

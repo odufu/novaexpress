@@ -41,17 +41,17 @@ class DCCreateOrderDraftState {
     this.selectedCity = 'Abuja Municipal (AMAC)',
     this.selectedLga = 'Abuja Municipal (AMAC)',
     this.selectedProductId,
-    this.selectedProductName = 'Grazer Tea',
+    this.selectedProductName = '',
     this.selectedPackage,
-    this.unitPrice = 22000.0,
+    this.unitPrice = 0.0,
     this.quantity = 1,
     this.upsellAmount = 0.0,
     this.paymentType = 'pay_on_delivery',
-    this.clientId = 'cli-novacale-001',
-    this.clientName = 'Dr. Chuka Okafor',
-    this.clientCompany = 'Novacale Limited',
-    this.clientPhone = '08034455667',
-    this.clientEmail = 'orders@novacale.com',
+    this.clientId = '',
+    this.clientName = '',
+    this.clientCompany = '',
+    this.clientPhone = '',
+    this.clientEmail = '',
     this.selectedRiderId,
     this.selectedRiderName,
     this.selectedRiderCode,
@@ -119,18 +119,14 @@ class DCCreateOrderDraftNotifier extends StateNotifier<DCCreateOrderDraftState> 
   void setLocation(String stateVal, String lgaVal) => state = state.copyWith(selectedState: stateVal, selectedLga: lgaVal, selectedCity: lgaVal);
   void setCity(String cityVal) => state = state.copyWith(selectedCity: cityVal, selectedLga: cityVal);
   void setLga(String lgaVal) => state = state.copyWith(selectedLga: lgaVal, selectedCity: lgaVal);
-  void setUnitPrice(double price) => state = state.copyWith(
-    unitPrice: price,
-    selectedPackage: state.selectedPackage != null
-        ? () => state.selectedPackage!.copyWith(packagePrice: price)
-        : null,
-  );
-  void setQuantity(int q) => state = state.copyWith(
-    quantity: q,
-    selectedPackage: state.selectedPackage != null
-        ? () => state.selectedPackage!.copyWith(quantity: q, paidQuantity: q)
-        : null,
-  );
+  void setUnitPrice(double price) {
+    if (state.selectedPackage != null) return;
+    state = state.copyWith(unitPrice: price);
+  }
+  void setQuantity(int q) {
+    if (state.selectedPackage != null) return;
+    state = state.copyWith(quantity: q);
+  }
   void setPaymentType(String type) => state = state.copyWith(paymentType: type);
   void setClientCompany(String company) => state = state.copyWith(clientCompany: company, clientName: company);
   void setAssignImmediately(bool val) => state = state.copyWith(assignImmediately: val);
@@ -184,8 +180,8 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
   final _landmarkController = TextEditingController();
   final _notesController = TextEditingController();
 
-  final _productNameController = TextEditingController(text: 'Grazer Tea');
-  final _priceController = TextEditingController(text: '22000');
+  final _productNameController = TextEditingController();
+  final _priceController = TextEditingController();
   final _quantityController = TextEditingController(text: '1');
 
   @override
@@ -203,6 +199,7 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
   }
 
   void _onPriceChanged() {
+    if (ref.read(dcCreateOrderDraftProvider).selectedPackage != null) return;
     final clean = _priceController.text.replaceAll(',', '').replaceAll('₦', '').trim();
     final parsed = double.tryParse(clean) ?? 0.0;
     final current = ref.read(dcCreateOrderDraftProvider).unitPrice;
@@ -212,6 +209,7 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
   }
 
   void _onQuantityChanged() {
+    if (ref.read(dcCreateOrderDraftProvider).selectedPackage != null) return;
     final clean = _quantityController.text.trim();
     final q = int.tryParse(clean) ?? 1;
     final current = ref.read(dcCreateOrderDraftProvider).quantity;
@@ -1033,7 +1031,7 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                                           icon: const Icon(Icons.remove_circle_outline, size: 20),
                                           padding: EdgeInsets.zero,
                                           constraints: const BoxConstraints(),
-                                          onPressed: draft.quantity > 1
+                                          onPressed: (draft.selectedPackage == null && draft.quantity > 1)
                                               ? () {
                                                   final next = draft.quantity - 1;
                                                   _quantityController.text = '$next';
@@ -1043,9 +1041,14 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                                         Expanded(
                                           child: TextField(
                                             controller: _quantityController,
+                                            readOnly: draft.selectedPackage != null,
                                             textAlign: TextAlign.center,
                                             keyboardType: TextInputType.number,
-                                            style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold),
+                                            style: GoogleFonts.inter(
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.bold,
+                                              color: draft.selectedPackage != null ? const Color(0xFF0D9488) : null,
+                                            ),
                                             decoration: const InputDecoration(
                                               border: InputBorder.none,
                                               isDense: true,
@@ -1057,10 +1060,12 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                                           icon: const Icon(Icons.add_circle_outline, size: 20),
                                           padding: EdgeInsets.zero,
                                           constraints: const BoxConstraints(),
-                                          onPressed: () {
-                                            final next = draft.quantity + 1;
-                                            _quantityController.text = '$next';
-                                          },
+                                          onPressed: draft.selectedPackage == null
+                                              ? () {
+                                                  final next = draft.quantity + 1;
+                                                  _quantityController.text = '$next';
+                                                }
+                                              : null,
                                         ),
                                       ],
                                     ),
@@ -1069,21 +1074,34 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                               ),
                             ),
                             const SizedBox(width: 10),
-                            // Editable Package Price (₦)
+                            // Package Price (₦) - Locked when package deal is chosen
                             Expanded(
                               flex: 6,
                               child: TextFormField(
                                 controller: _priceController,
+                                readOnly: draft.selectedPackage != null,
                                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold),
+                                style: GoogleFonts.inter(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: draft.selectedPackage != null ? const Color(0xFF0D9488) : null,
+                                ),
                                 decoration: _buildInputDecoration(
-                                  label: 'Package Price (₦) *',
+                                  label: draft.selectedPackage != null
+                                      ? 'Package Price (Locked) *'
+                                      : 'Package Price (₦) *',
                                   hint: 'e.g. 22000',
-                                  icon: Icons.payments_outlined,
+                                  icon: draft.selectedPackage != null
+                                      ? Icons.lock_rounded
+                                      : Icons.payments_outlined,
                                   isDark: isDark,
                                 ).copyWith(
                                   prefixText: '₦ ',
-                                  prefixStyle: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14, color: const Color(0xFF2563EB)),
+                                  prefixStyle: GoogleFonts.inter(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                    color: draft.selectedPackage != null ? const Color(0xFF0D9488) : const Color(0xFF2563EB),
+                                  ),
                                 ),
                                 validator: (v) {
                                   if (v == null || v.trim().isEmpty) return 'Price required';
@@ -1148,7 +1166,7 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                                           icon: const Icon(Icons.remove_circle_outline, size: 18),
                                           padding: EdgeInsets.zero,
                                           constraints: const BoxConstraints(),
-                                          onPressed: draft.quantity > 1
+                                          onPressed: (draft.selectedPackage == null && draft.quantity > 1)
                                               ? () {
                                                   final next = draft.quantity - 1;
                                                   _quantityController.text = '$next';
@@ -1158,9 +1176,14 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                                         Expanded(
                                           child: TextField(
                                             controller: _quantityController,
+                                            readOnly: draft.selectedPackage != null,
                                             textAlign: TextAlign.center,
                                             keyboardType: TextInputType.number,
-                                            style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold),
+                                            style: GoogleFonts.inter(
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.bold,
+                                              color: draft.selectedPackage != null ? const Color(0xFF0D9488) : null,
+                                            ),
                                             decoration: const InputDecoration(
                                               border: InputBorder.none,
                                               isDense: true,
@@ -1172,10 +1195,12 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                                           icon: const Icon(Icons.add_circle_outline, size: 18),
                                           padding: EdgeInsets.zero,
                                           constraints: const BoxConstraints(),
-                                          onPressed: () {
-                                            final next = draft.quantity + 1;
-                                            _quantityController.text = '$next';
-                                          },
+                                          onPressed: draft.selectedPackage == null
+                                              ? () {
+                                                  final next = draft.quantity + 1;
+                                                  _quantityController.text = '$next';
+                                                }
+                                              : null,
                                         ),
                                       ],
                                     ),
@@ -1184,21 +1209,34 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                               ),
                             ),
                             const SizedBox(width: 10),
-                            // Editable Package Price (₦)
+                            // Package Price (₦) - Locked when package deal chosen
                             Expanded(
                               flex: 4,
                               child: TextFormField(
                                 controller: _priceController,
+                                readOnly: draft.selectedPackage != null,
                                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold),
+                                style: GoogleFonts.inter(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: draft.selectedPackage != null ? const Color(0xFF0D9488) : null,
+                                ),
                                 decoration: _buildInputDecoration(
-                                  label: 'Package Price (₦) *',
+                                  label: draft.selectedPackage != null
+                                      ? 'Package Price (Locked) *'
+                                      : 'Package Price (₦) *',
                                   hint: 'e.g. 22000',
-                                  icon: Icons.payments_outlined,
+                                  icon: draft.selectedPackage != null
+                                      ? Icons.lock_rounded
+                                      : Icons.payments_outlined,
                                   isDark: isDark,
                                 ).copyWith(
                                   prefixText: '₦ ',
-                                  prefixStyle: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14, color: const Color(0xFF2563EB)),
+                                  prefixStyle: GoogleFonts.inter(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                    color: draft.selectedPackage != null ? const Color(0xFF0D9488) : const Color(0xFF2563EB),
+                                  ),
                                 ),
                                 validator: (v) {
                                   if (v == null || v.trim().isEmpty) return 'Price required';

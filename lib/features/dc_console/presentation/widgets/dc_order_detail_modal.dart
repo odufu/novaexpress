@@ -18,6 +18,8 @@ import '../../../stock/presentation/providers/stock_provider.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
 import '../providers/dc_console_provider.dart';
 import 'dc_assign_order_modal.dart';
+import '../../../orders/presentation/widgets/order_product_switch_modal.dart';
+import '../../../pipeline_chat/presentation/widgets/order_pipeline_chat_sheet.dart';
 
 class DCOrderDetailModal extends ConsumerStatefulWidget {
   final OrderEntity order;
@@ -256,6 +258,14 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
             ),
           ),
           const SizedBox(width: 6),
+          IconButton(
+            tooltip: 'Order Pipeline Chat & Incident Audit',
+            onPressed: () => OrderPipelineChatSheet.showForOrder(context, _currentOrder),
+            icon: const Icon(Icons.chat_bubble_outline_rounded, size: 20, color: Color(0xFF0D9488)),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+          ),
+          const SizedBox(width: 4),
           IconButton(
             onPressed: () => Navigator.of(context).pop(),
             icon: const Icon(Icons.close_rounded, size: 20),
@@ -629,13 +639,51 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
                 ),
               );
 
+              final actionWidgets = Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  pkgBadge,
+                  if (_currentOrder.status != 'delivered' && _currentOrder.status != 'cancelled')
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (ctx) => OrderProductSwitchModal(
+                            orderId: _currentOrder.id,
+                            orderNumber: _currentOrder.orderNumber,
+                            currentProductName: _currentOrder.productName,
+                            currentPackageName: _currentOrder.packageDealName,
+                            currentTotalAmount: _currentOrder.totalAmount,
+                            currentClientId: _currentOrder.clientId ?? '',
+                            currentClientName: _currentOrder.clientName,
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.swap_horizontal_circle_outlined, size: 14, color: Color(0xFF6366F1)),
+                      label: Text(
+                        'Change Product / Package',
+                        style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF6366F1)),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        side: const BorderSide(color: Color(0xFF6366F1)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                ],
+              );
+
               if (isNarrow) {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     titleCol,
                     const SizedBox(height: 6),
-                    pkgBadge,
+                    actionWidgets,
                   ],
                 );
               }
@@ -646,7 +694,7 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
                 children: [
                   Expanded(child: titleCol),
                   const SizedBox(width: 8),
-                  pkgBadge,
+                  actionWidgets,
                 ],
               );
             },

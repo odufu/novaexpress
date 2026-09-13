@@ -16,10 +16,12 @@ import '../widgets/return_stock_modal.dart';
 
 class StockDetailsGrazerPage extends ConsumerWidget {
   final String productName;
+  final StockItemEntity? stockItem;
 
   const StockDetailsGrazerPage({
     super.key,
-    this.productName = 'Respira Detox Tea',
+    this.productName = '',
+    this.stockItem,
   });
 
   @override
@@ -31,27 +33,34 @@ class StockDetailsGrazerPage extends ConsumerWidget {
     final ordersState = ref.watch(ordersProvider);
 
     // 1. Find matched stock item
-    StockItemEntity? matchedItem;
-    for (final item in stockState.stockItems) {
-      if (item.name.toLowerCase() == productName.toLowerCase() ||
-          item.sku.toLowerCase() == productName.toLowerCase()) {
-        matchedItem = item;
-        break;
+    StockItemEntity? matchedItem = stockItem;
+    if (matchedItem == null) {
+      for (final it in stockState.stockItems) {
+        if (productName.isNotEmpty &&
+            (it.name.toLowerCase() == productName.toLowerCase() ||
+                it.sku.toLowerCase() == productName.toLowerCase())) {
+          matchedItem = it;
+          break;
+        }
       }
     }
     final item = matchedItem ?? (stockState.stockItems.isNotEmpty ? stockState.stockItems.first : null);
 
-    final String displayName = item?.name ?? productName;
-    final String displaySku = item?.sku ?? 'RDT-001';
+    final String displayName = item?.name ?? (productName.isNotEmpty ? productName : 'Product Details');
+    final String displaySku = item?.sku ?? 'SKU-PENDING';
     final String displayDesc = (item != null && item.cleanDescription.isNotEmpty)
         ? item.cleanDescription
-        : 'Premium organic herbal blend formulated for detox, purification, and daily wellness. Store in cool, dry conditions.';
+        : (item?.description.isNotEmpty == true
+            ? item!.description
+            : 'Inventory stock item allocated for vehicle delivery operations.');
     final int assigned = item?.assignedCount ?? 0;
     final int delivered = item?.deliveredCount ?? 0;
     final int inVehicle = item?.availableCount ?? 0;
     final int returned = item?.returnedCount ?? 0;
-    final double unitPrice = item?.price ?? 22000.0;
-    final String ownerName = item?.ownerName ?? 'Novacare Limited';
+    final double unitPrice = item?.price ?? 0.0;
+    final String? barcode = item?.barcode;
+    final double? weightKg = item?.weightKg;
+    final String ownerName = item?.ownerName.isNotEmpty == true ? item!.ownerName : 'NovaExpress DC';
     final String? imageAsset = item?.imageAsset;
 
     // 2. Find commercial packages for this product
@@ -166,8 +175,10 @@ class StockDetailsGrazerPage extends ConsumerWidget {
                           ),
                         ),
                         const SizedBox(height: 6),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                        Wrap(
+                          alignment: WrapAlignment.center,
+                          spacing: 8,
+                          runSpacing: 6,
                           children: [
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -184,7 +195,6 @@ class StockDetailsGrazerPage extends ConsumerWidget {
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 8),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
@@ -200,6 +210,38 @@ class StockDetailsGrazerPage extends ConsumerWidget {
                                 ),
                               ),
                             ),
+                            if (barcode != null && barcode.isNotEmpty)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  'BAR: $barcode',
+                                  style: GoogleFonts.jetBrainsMono(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: const Color(0xFF8B5CF6),
+                                  ),
+                                ),
+                              ),
+                            if (weightKg != null && weightKg > 0)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF64748B).withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  '${weightKg}kg',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: const Color(0xFF64748B),
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
                         const SizedBox(height: 8),
