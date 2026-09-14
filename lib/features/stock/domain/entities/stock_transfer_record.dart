@@ -35,18 +35,20 @@ class StockTransferItemRecord {
 
   factory StockTransferItemRecord.fromJson(Map<String, dynamic> json) {
     // Product details may be nested if joined or flat
-    final productMap = json['product'] as Map<String, dynamic>?;
+    final productRaw = json['product'];
+    final productMap = productRaw is Map ? Map<String, dynamic>.from(productRaw) : null;
     final pName = productMap != null
         ? (productMap['name'] ?? '')
         : (json['product_name'] ?? json['name'] ?? '');
     final pSku = productMap != null
         ? (productMap['sku'] ?? '')
         : (json['sku'] ?? '');
+    final pId = (json['product_id'] ?? (productMap != null ? productMap['id'] : '') ?? '').toString();
 
     return StockTransferItemRecord(
       id: (json['id'] ?? '').toString(),
       transferId: (json['transfer_id'] ?? '').toString(),
-      productId: (json['product_id'] ?? '').toString(),
+      productId: pId,
       productName: pName.toString(),
       sku: pSku.toString(),
       quantity: (json['quantity_shipped'] ?? json['quantity'] as num?)?.toInt() ?? 0,
@@ -186,19 +188,21 @@ class StockTransferRecord {
     if (json['stock_transfer_items'] != null &&
         json['stock_transfer_items'] is List) {
       parsedItems = (json['stock_transfer_items'] as List)
+          .whereType<Map>()
           .map((item) => StockTransferItemRecord.fromJson(
-              item is Map<String, dynamic> ? item : <String, dynamic>{}))
+              Map<String, dynamic>.from(item)))
           .toList();
     } else if (json['items'] != null && json['items'] is List) {
       parsedItems = (json['items'] as List)
+          .whereType<Map>()
           .map((item) => StockTransferItemRecord.fromJson(
-              item is Map<String, dynamic> ? item : <String, dynamic>{}))
+              Map<String, dynamic>.from(item)))
           .toList();
     }
 
-    final sourceWh = json['source_warehouse'] as Map<String, dynamic>?;
-    final destWh = json['destination_warehouse'] as Map<String, dynamic>?;
-    final clientMap = json['client'] as Map<String, dynamic>?;
+    final sourceWh = json['source_warehouse'] is Map ? Map<String, dynamic>.from(json['source_warehouse'] as Map) : null;
+    final destWh = json['destination_warehouse'] is Map ? Map<String, dynamic>.from(json['destination_warehouse'] as Map) : null;
+    final clientMap = json['client'] is Map ? Map<String, dynamic>.from(json['client'] as Map) : null;
 
     DateTime parseDate(dynamic val, DateTime fallback) {
       if (val == null) return fallback;

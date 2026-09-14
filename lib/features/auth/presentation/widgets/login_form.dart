@@ -145,7 +145,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
         children: [
           // Quick Operations Selector Card
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
             decoration: BoxDecoration(
               color: const Color(0xFFF8FAFC),
               borderRadius: BorderRadius.circular(14),
@@ -155,33 +155,32 @@ class _LoginFormState extends ConsumerState<LoginForm> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.flash_on_rounded, size: 16, color: Color(0xFFEA580C)),
-                        const SizedBox(width: 5),
-                        Text(
-                          'QUICK OPERATIONS SELECTOR',
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.5,
-                            color: const Color(0xFF475569),
-                          ),
+                    const Icon(Icons.flash_on_rounded, size: 15, color: Color(0xFFEA580C)),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        'QUICK OPERATIONS SELECTOR',
+                        style: GoogleFonts.inter(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.4,
+                          color: const Color(0xFF475569),
                         ),
-                      ],
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
+                    const SizedBox(width: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                       decoration: BoxDecoration(
                         color: const Color(0xFFE2E8F0),
-                        borderRadius: BorderRadius.circular(6),
+                        borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        '1-Tap Autofill',
+                        '1-Tap Fill',
                         style: GoogleFonts.inter(
-                          fontSize: 9.5,
+                          fontSize: 9,
                           fontWeight: FontWeight.w600,
                           color: const Color(0xFF64748B),
                         ),
@@ -189,7 +188,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 Column(
                   children: _primaryAccounts.map((acc) {
                     final isSelected = _selectedDemoRole == acc.roleKey;
@@ -201,10 +200,16 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                             : Colors.white,
                         borderRadius: BorderRadius.circular(10),
                         child: InkWell(
-                          onTap: () => _quickFill(acc.roleKey, acc.email, acc.password),
+                          onTap: () {
+                            if (_selectedDemoRole == acc.roleKey) {
+                              _instantLogin(acc.roleKey, acc.email, acc.password);
+                            } else {
+                              _quickFill(acc.roleKey, acc.email, acc.password);
+                            }
+                          },
                           borderRadius: BorderRadius.circular(10),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
@@ -215,32 +220,34 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                             child: Row(
                               children: [
                                 Container(
-                                  padding: const EdgeInsets.all(7),
+                                  padding: const EdgeInsets.all(6),
                                   decoration: BoxDecoration(
                                     color: acc.themeColor.withValues(alpha: isSelected ? 0.18 : 0.1),
                                     shape: BoxShape.circle,
                                   ),
-                                  child: Icon(acc.icon, size: 16, color: acc.themeColor),
+                                  child: Icon(acc.icon, size: 15, color: acc.themeColor),
                                 ),
-                                const SizedBox(width: 10),
+                                const SizedBox(width: 8),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Row(
+                                      Wrap(
+                                        spacing: 5,
+                                        runSpacing: 2,
+                                        crossAxisAlignment: WrapCrossAlignment.center,
                                         children: [
                                           Text(
                                             acc.title,
                                             style: GoogleFonts.inter(
-                                              fontSize: 12.5,
+                                              fontSize: 12,
                                               fontWeight: isSelected ? FontWeight.w800 : FontWeight.w700,
                                               color: const Color(0xFF0F172A),
                                             ),
                                           ),
-                                          const SizedBox(width: 6),
                                           Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                                             decoration: BoxDecoration(
                                               color: acc.themeColor.withValues(alpha: 0.12),
                                               borderRadius: BorderRadius.circular(4),
@@ -248,7 +255,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                                             child: Text(
                                               acc.badge,
                                               style: GoogleFonts.inter(
-                                                fontSize: 9,
+                                                fontSize: 8.5,
                                                 fontWeight: FontWeight.bold,
                                                 color: acc.themeColor,
                                               ),
@@ -260,7 +267,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                                       Text(
                                         '${acc.personName} • ${acc.email}',
                                         style: GoogleFonts.inter(
-                                          fontSize: 10.5,
+                                          fontSize: 10,
                                           color: const Color(0xFF64748B),
                                         ),
                                         maxLines: 1,
@@ -269,44 +276,12 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                                     ],
                                   ),
                                 ),
-                                if (isSelected) ...[
-                                  ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: acc.themeColor,
-                                      foregroundColor: Colors.white,
-                                      elevation: 0,
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                      minimumSize: Size.zero,
-                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                    ),
-                                    onPressed: authState.isLoading
-                                        ? null
-                                        : () => _instantLogin(acc.roleKey, acc.email, acc.password),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          'Sign In',
-                                          style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        const Icon(Icons.bolt_rounded, size: 13),
-                                      ],
-                                    ),
-                                  ),
-                                ] else ...[
-                                  Text(
-                                    'Select',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: const Color(0xFF94A3B8),
-                                    ),
-                                  ),
-                                ],
+                                const SizedBox(width: 6),
+                                Icon(
+                                  isSelected ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                                  color: isSelected ? acc.themeColor : const Color(0xFFCBD5E1),
+                                  size: 18,
+                                ),
                               ],
                             ),
                           ),
@@ -315,17 +290,17 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                     );
                   }).toList(),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 // Alternate Demos
                 Wrap(
-                  spacing: 6,
+                  spacing: 5,
                   runSpacing: 4,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Text(
-                      'Alt Demos:',
+                      'Alt:',
                       style: GoogleFonts.inter(
-                        fontSize: 9.5,
+                        fontSize: 9,
                         fontWeight: FontWeight.w600,
                         color: const Color(0xFF94A3B8),
                       ),

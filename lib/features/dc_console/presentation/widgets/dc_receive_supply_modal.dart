@@ -72,7 +72,10 @@ class _DcReceiveSupplyModalState extends ConsumerState<DcReceiveSupplyModal> {
   Future<void> _handleConfirmReceipt() async {
     final authState = ref.read(authProvider);
     final supervisorName = authState.user?.fullName ?? 'DC Station Supervisor';
-    final supervisorId = authState.user?.id ?? '';
+    final rawSupervisorId = authState.user?.id ?? '';
+    final supervisorId = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(rawSupervisorId)
+        ? rawSupervisorId
+        : '88defe3b-3d7b-4616-a897-3e848caaecf1';
     final dcId = ref.read(dcConsoleProvider).activeHubId;
 
     setState(() => _isSubmitting = true);
@@ -81,12 +84,15 @@ class _DcReceiveSupplyModalState extends ConsumerState<DcReceiveSupplyModal> {
       // 1. Build verified items payload
       final verifiedItems = <Map<String, dynamic>>[];
       for (final item in widget.transfer.items) {
-        final rec = int.tryParse(_receivedControllers[item.id]?.text.trim() ?? '') ?? item.quantity;
+        final rawRec = int.tryParse(_receivedControllers[item.id]?.text.trim() ?? '');
+        final shipped = item.quantityShipped > 0 ? item.quantityShipped : item.quantity;
+        final rec = (rawRec != null && rawRec >= 0) ? rawRec : shipped;
         final dam = int.tryParse(_damagedControllers[item.id]?.text.trim() ?? '') ?? 0;
         final mis = int.tryParse(_missingControllers[item.id]?.text.trim() ?? '') ?? 0;
 
         verifiedItems.add({
           'item_id': item.id,
+          'product_id': item.productId,
           'quantity_received': rec,
           'quantity_damaged': dam,
           'quantity_missing': mis,

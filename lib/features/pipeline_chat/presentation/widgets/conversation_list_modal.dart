@@ -339,12 +339,14 @@ class _ConversationListModalState extends ConsumerState<ConversationListModal> {
         // Close modal sheet
         Navigator.of(context).pop();
 
-        // Open chat sheet for this order
+        // Open chat sheet for this order with callback returning to conversations list
         OrderPipelineChatSheet.show(
           context,
           orderId: conv.orderId,
           orderNumber: conv.orderNumber,
           customerName: conv.customerName,
+          showBackButton: true,
+          onBack: () => ConversationListModal.show(context),
         );
       },
       borderRadius: BorderRadius.circular(14),

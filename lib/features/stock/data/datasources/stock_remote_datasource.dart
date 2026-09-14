@@ -364,39 +364,48 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
           final tRes = await dbClient
               .from('stock_transfers')
               .select('id, destination_warehouse_id, receiver_id, status, stock_transfer_items(id, product_id, quantity_shipped, quantity_received)')
-              .or(trfFilter);
+              .or(trfFilter)
+              .not('status', 'in', '("cancelled","rejected")');
 
           for (final t in tRes as List) {
             final tMap = Map<String, dynamic>.from(t as Map);
+            final status = tMap['status']?.toString().toLowerCase() ?? '';
             final items = tMap['stock_transfer_items'] as List? ?? [];
             for (final it in items) {
               final itemMap = Map<String, dynamic>.from(it as Map);
               final pId = itemMap['product_id']?.toString() ?? '';
-              final qty = (itemMap['quantity_shipped'] as num?)?.toInt() ??
-                  (itemMap['quantity_received'] as num?)?.toInt() ??
-                  0;
+              final qty = status == 'completed'
+                  ? ((itemMap['quantity_received'] as num?)?.toInt() ??
+                      (itemMap['quantity_shipped'] as num?)?.toInt() ??
+                      0)
+                  : ((itemMap['quantity_shipped'] as num?)?.toInt() ?? 0);
               riderAllocatedUnits[pId] = (riderAllocatedUnits[pId] ?? 0) + qty;
             }
           }
         } else if (validDcId != null && validDcId.isNotEmpty) {
-          // DC Overview: Only count transfers for riders belonging to THIS DC
+          // DC Overview: Only count dc_to_rider transfers belonging to THIS DC
           try {
             final isUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(validDcId.trim());
             if (isUuid) {
               final tRes = await dbClient
                   .from('stock_transfers')
-                  .select('id, destination_warehouse_id, source_dc_id, status, stock_transfer_items(id, product_id, quantity_shipped, quantity_received)')
-                  .eq('source_dc_id', validDcId.trim());
+                  .select('id, destination_warehouse_id, source_dc_id, status, transfer_type, stock_transfer_items(id, product_id, quantity_shipped, quantity_received)')
+                  .eq('source_dc_id', validDcId.trim())
+                  .eq('transfer_type', 'dc_to_rider')
+                  .not('status', 'in', '("cancelled","rejected")');
 
               for (final t in tRes as List) {
                 final tMap = Map<String, dynamic>.from(t as Map);
+                final status = tMap['status']?.toString().toLowerCase() ?? '';
                 final items = tMap['stock_transfer_items'] as List? ?? [];
                 for (final it in items) {
                   final itemMap = Map<String, dynamic>.from(it as Map);
                   final pId = itemMap['product_id']?.toString() ?? '';
-                  final qty = (itemMap['quantity_shipped'] as num?)?.toInt() ??
-                      (itemMap['quantity_received'] as num?)?.toInt() ??
-                      0;
+                  final qty = status == 'completed'
+                      ? ((itemMap['quantity_received'] as num?)?.toInt() ??
+                          (itemMap['quantity_shipped'] as num?)?.toInt() ??
+                          0)
+                      : ((itemMap['quantity_shipped'] as num?)?.toInt() ?? 0);
                   riderAllocatedUnits[pId] = (riderAllocatedUnits[pId] ?? 0) + qty;
                 }
               }

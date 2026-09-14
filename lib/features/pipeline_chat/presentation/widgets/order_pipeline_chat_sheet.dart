@@ -9,6 +9,7 @@ import '../../../orders/domain/entities/order.dart';
 import '../../../orders/presentation/widgets/order_product_switch_modal.dart';
 import '../../../../core/widgets/user_avatar_widget.dart';
 import '../providers/pipeline_chat_provider.dart';
+import 'conversation_list_modal.dart';
 
 class OrderPipelineChatSheet extends ConsumerStatefulWidget {
   final String orderId;
@@ -16,6 +17,8 @@ class OrderPipelineChatSheet extends ConsumerStatefulWidget {
   final String customerName;
   final String? customerPhone;
   final String? initialMessage;
+  final bool showBackButton;
+  final VoidCallback? onBack;
 
   const OrderPipelineChatSheet({
     super.key,
@@ -24,12 +27,16 @@ class OrderPipelineChatSheet extends ConsumerStatefulWidget {
     required this.customerName,
     this.customerPhone,
     this.initialMessage,
+    this.showBackButton = true,
+    this.onBack,
   });
 
   static Future<void> showForOrder(
     BuildContext context,
     OrderEntity order, {
     String? initialMessage,
+    bool showBackButton = true,
+    VoidCallback? onBack,
   }) {
     return show(
       context,
@@ -38,6 +45,8 @@ class OrderPipelineChatSheet extends ConsumerStatefulWidget {
       customerName: order.customerName,
       customerPhone: order.customerPhone,
       initialMessage: initialMessage,
+      showBackButton: showBackButton,
+      onBack: onBack,
     );
   }
 
@@ -48,6 +57,8 @@ class OrderPipelineChatSheet extends ConsumerStatefulWidget {
     required String customerName,
     String? customerPhone,
     String? initialMessage,
+    bool showBackButton = true,
+    VoidCallback? onBack,
   }) {
     return showModalBottomSheet(
       context: context,
@@ -59,6 +70,8 @@ class OrderPipelineChatSheet extends ConsumerStatefulWidget {
         customerName: customerName,
         customerPhone: customerPhone,
         initialMessage: initialMessage,
+        showBackButton: showBackButton,
+        onBack: onBack,
       ),
     );
   }
@@ -184,6 +197,39 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
       child: Row(
         children: [
+          if (widget.showBackButton) ...[
+            Tooltip(
+              message: 'Back to Conversations',
+              child: InkWell(
+                onTap: () {
+                  Navigator.of(context).pop();
+                  if (widget.onBack != null) {
+                    widget.onBack!();
+                  } else {
+                    ConversationListModal.show(context);
+                  }
+                },
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF334155).withValues(alpha: 0.5) : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isDark ? const Color(0xFF475569) : const Color(0xFFE2E8F0),
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    size: 15,
+                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+          ],
+
           // Order / Customer Avatar
           UserAvatarWidget(
             fullName: widget.customerName,

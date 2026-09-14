@@ -8,7 +8,7 @@ class LoginPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final isCompact = screenWidth < 400;
+    final isCompact = screenWidth < 450;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7FAFC),
@@ -16,7 +16,7 @@ class LoginPage extends StatelessWidget {
         child: Center(
           child: SingleChildScrollView(
             padding: EdgeInsets.symmetric(
-              horizontal: isCompact ? 14 : 24,
+              horizontal: isCompact ? 12 : 24,
               vertical: isCompact ? 12 : 16,
             ),
             child: ConstrainedBox(
@@ -37,7 +37,10 @@ class LoginPage extends StatelessWidget {
                         ),
                       ],
                     ),
-                    padding: EdgeInsets.all(isCompact ? 16 : 24),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isCompact ? 14 : 24,
+                      vertical: isCompact ? 16 : 24,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
