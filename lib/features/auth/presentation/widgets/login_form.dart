@@ -15,11 +15,66 @@ class LoginForm extends ConsumerStatefulWidget {
   ConsumerState<LoginForm> createState() => _LoginFormState();
 }
 
+class _QuickAccount {
+  final String roleKey;
+  final String title;
+  final String personName;
+  final String badge;
+  final String email;
+  final String password;
+  final IconData icon;
+  final Color themeColor;
+
+  const _QuickAccount({
+    required this.roleKey,
+    required this.title,
+    required this.personName,
+    required this.badge,
+    required this.email,
+    required this.password,
+    required this.icon,
+    required this.themeColor,
+  });
+}
+
 class _LoginFormState extends ConsumerState<LoginForm> {
   final _formKey = GlobalKey<FormState>();
   final _agentIdController = TextEditingController(text: 'dc.supervisor@novaexpress.ng');
   final _passwordController = TextEditingController(text: 'Password123!');
   String? _selectedDemoRole = 'dc_manager';
+
+  static const List<_QuickAccount> _primaryAccounts = [
+    _QuickAccount(
+      roleKey: 'client',
+      title: 'Novacare Client',
+      personName: 'Dr. Chuka Okafor',
+      badge: 'Merchant Portal',
+      email: 'merchant@novacare.com',
+      password: 'Password123!',
+      icon: Icons.storefront_rounded,
+      themeColor: Color(0xFF0D9488),
+    ),
+    _QuickAccount(
+      roleKey: 'dc_manager',
+      title: 'DC Supervisor',
+      personName: 'Ahmed Bello',
+      badge: 'Wuse Central Hub',
+      email: 'dc.supervisor@novaexpress.ng',
+      password: 'Password123!',
+      icon: Icons.warehouse_rounded,
+      themeColor: Color(0xFF1E3A8A),
+    ),
+    _QuickAccount(
+      roleKey: 'rider',
+      title: 'Field Rider (PDA)',
+      personName: 'Emeka Rider',
+      badge: 'PDA-7000 (Abuja)',
+      email: 'rider.emeka@novaexpress.com',
+      password: 'Password123!',
+      icon: Icons.two_wheeler_rounded,
+      themeColor: Color(0xFFEA580C),
+    ),
+  ];
 
   @override
   void dispose() {
@@ -33,6 +88,13 @@ class _LoginFormState extends ConsumerState<LoginForm> {
       _selectedDemoRole = roleKey;
       _agentIdController.text = email;
       _passwordController.text = password;
+    });
+  }
+
+  void _instantLogin(String roleKey, String email, String password) {
+    _quickFill(roleKey, email, password);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _submit();
     });
   }
 
@@ -81,74 +143,204 @@ class _LoginFormState extends ConsumerState<LoginForm> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Quick Autofill Demo Credentials Bar
+          // Quick Operations Selector Card
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(12),
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(14),
               border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Wrap(
-                  alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 6,
-                  runSpacing: 2,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'QUICK TEST AUTOFILL',
-                      style: GoogleFonts.inter(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.6,
-                        color: const Color(0xFF64748B),
-                      ),
+                    Row(
+                      children: [
+                        const Icon(Icons.flash_on_rounded, size: 16, color: Color(0xFFEA580C)),
+                        const SizedBox(width: 5),
+                        Text(
+                          'QUICK OPERATIONS SELECTOR',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                            color: const Color(0xFF475569),
+                          ),
+                        ),
+                      ],
                     ),
-                    Text(
-                      'Role routes on login',
-                      style: GoogleFonts.inter(
-                        fontSize: 9.5,
-                        color: const Color(0xFF94A3B8),
-                        fontStyle: FontStyle.italic,
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE2E8F0),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '1-Tap Autofill',
+                        style: GoogleFonts.inter(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF64748B),
+                        ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
+                Column(
+                  children: _primaryAccounts.map((acc) {
+                    final isSelected = _selectedDemoRole == acc.roleKey;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Material(
+                        color: isSelected
+                            ? acc.themeColor.withValues(alpha: 0.08)
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        child: InkWell(
+                          onTap: () => _quickFill(acc.roleKey, acc.email, acc.password),
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: isSelected ? acc.themeColor : const Color(0xFFE2E8F0),
+                                width: isSelected ? 1.6 : 1,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(7),
+                                  decoration: BoxDecoration(
+                                    color: acc.themeColor.withValues(alpha: isSelected ? 0.18 : 0.1),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(acc.icon, size: 16, color: acc.themeColor),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Text(
+                                            acc.title,
+                                            style: GoogleFonts.inter(
+                                              fontSize: 12.5,
+                                              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w700,
+                                              color: const Color(0xFF0F172A),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                            decoration: BoxDecoration(
+                                              color: acc.themeColor.withValues(alpha: 0.12),
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              acc.badge,
+                                              style: GoogleFonts.inter(
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.bold,
+                                                color: acc.themeColor,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 1),
+                                      Text(
+                                        '${acc.personName} • ${acc.email}',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 10.5,
+                                          color: const Color(0xFF64748B),
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (isSelected) ...[
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: acc.themeColor,
+                                      foregroundColor: Colors.white,
+                                      elevation: 0,
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      minimumSize: Size.zero,
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                    ),
+                                    onPressed: authState.isLoading
+                                        ? null
+                                        : () => _instantLogin(acc.roleKey, acc.email, acc.password),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          'Sign In',
+                                          style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        const Icon(Icons.bolt_rounded, size: 13),
+                                      ],
+                                    ),
+                                  ),
+                                ] else ...[
+                                  Text(
+                                    'Select',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: const Color(0xFF94A3B8),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 4),
+                // Alternate Demos
                 Wrap(
                   spacing: 6,
-                  runSpacing: 6,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    _buildAutofillChip(
-                      label: 'DC Supervisor',
-                      roleKey: 'dc_manager',
-                      icon: Icons.admin_panel_settings_rounded,
-                      color: const Color(0xFF0B192C),
-                      onTap: () => _quickFill('dc_manager', 'dc.supervisor@novaexpress.ng', 'Password123!'),
+                    Text(
+                      'Alt Demos:',
+                      style: GoogleFonts.inter(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF94A3B8),
+                      ),
                     ),
-                    _buildAutofillChip(
-                      label: 'Field Rider (PDA)',
-                      roleKey: 'rider',
-                      icon: Icons.two_wheeler_rounded,
-                      color: AppColors.orange,
-                      onTap: () => _quickFill('rider', 'rider@novaexpress.ng', 'Password123!'),
-                    ),
-                    _buildAutofillChip(
-                      label: 'Merchant Admin',
-                      roleKey: 'client',
-                      icon: Icons.storefront_rounded,
+                    _buildMiniChip(
+                      label: 'client@novaexpress.ng',
+                      roleKey: 'client_alt',
                       color: const Color(0xFF0D9488),
                       onTap: () => _quickFill('client', 'client@novaexpress.ng', 'Password123!'),
                     ),
-                    _buildAutofillChip(
-                      label: 'Telesales Closer',
-                      roleKey: 'closer',
-                      icon: Icons.headset_mic_rounded,
-                      color: const Color(0xFF6366F1),
-                      onTap: () => _quickFill('closer', 'closer@novaexpress.ng', 'Password123!'),
+                    _buildMiniChip(
+                      label: 'emeka.rider@novaexpress.ng',
+                      roleKey: 'rider_alt',
+                      color: const Color(0xFFEA580C),
+                      onTap: () => _quickFill('rider', 'emeka.rider@novaexpress.ng', 'Password123!'),
                     ),
                   ],
                 ),
@@ -330,88 +522,88 @@ class _LoginFormState extends ConsumerState<LoginForm> {
           const SizedBox(height: 22),
 
           // Single Unified Sign In Button
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0F172A), // Deep professional navy
-                foregroundColor: Colors.white,
-                elevation: 2,
-                shadowColor: Colors.black.withValues(alpha: 0.2),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              onPressed: authState.isLoading ? null : _submit,
-              child: authState.isLoading
-                  ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                    )
-                  : FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'Sign In to Assigned Workspace',
-                            style: GoogleFonts.inter(
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.3,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          const Icon(Icons.arrow_forward_rounded, size: 18),
-                        ],
-                      ),
+          Builder(
+            builder: (context) {
+              final selectedAcc = _primaryAccounts.where((a) => a.roleKey == _selectedDemoRole).firstOrNull;
+              final btnColor = selectedAcc?.themeColor ?? const Color(0xFF0F172A);
+              final btnTitle = selectedAcc != null ? 'Sign In as ${selectedAcc.title}' : 'Sign In to Assigned Workspace';
+
+              return SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: btnColor,
+                    foregroundColor: Colors.white,
+                    elevation: 2,
+                    shadowColor: btnColor.withValues(alpha: 0.3),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
-            ),
+                  ),
+                  onPressed: authState.isLoading ? null : _submit,
+                  child: authState.isLoading
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        )
+                      : FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                btnTitle,
+                                style: GoogleFonts.inter(
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Icon(Icons.arrow_forward_rounded, size: 18),
+                            ],
+                          ),
+                        ),
+                ),
+              );
+            },
           ),
         ],
       ),
     );
   }
 
-  Widget _buildAutofillChip({
+  Widget _buildMiniChip({
     required String label,
     required String roleKey,
-    required IconData icon,
     required Color color,
     required VoidCallback onTap,
   }) {
     final isSelected = _selectedDemoRole == roleKey;
     return Material(
       color: isSelected ? color.withValues(alpha: 0.15) : Colors.white,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(6),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(6),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(6),
             border: Border.all(
               color: isSelected ? color : const Color(0xFFCBD5E1),
-              width: isSelected ? 1.5 : 1,
+              width: isSelected ? 1.2 : 1,
             ),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 13, color: isSelected ? color : const Color(0xFF64748B)),
-              const SizedBox(width: 5),
-              Text(
-                label,
-                style: GoogleFonts.inter(
-                  fontSize: 10.5,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                  color: isSelected ? color : const Color(0xFF334155),
-                ),
-              ),
-            ],
+          child: Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 9.5,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+              color: isSelected ? color : const Color(0xFF475569),
+            ),
           ),
         ),
       ),

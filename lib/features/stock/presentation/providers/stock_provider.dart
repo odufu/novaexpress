@@ -67,6 +67,9 @@ class StockState {
   List<StockTransferRecord> get pendingClientSupplies =>
       stockTransfers.where((t) => t.isClientSupply && t.isDispatched).toList();
 
+  List<StockTransferRecord> get pendingInterDcTransfers =>
+      stockTransfers.where((t) => t.isInterDc && t.isPendingDestinationAcceptance).toList();
+
   List<StockTransferRecord> get pendingRiderHandovers =>
       stockTransfers.where((t) => t.isDcToRider && t.isPendingRiderAcceptance).toList();
 
@@ -574,7 +577,8 @@ class StockNotifier extends StateNotifier<StockState> {
         coveringStates: coveringStates,
         dcStocks: dcStocks,
       );
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('[STOCK_PROVIDER] ⚠️ Remote repository.createProduct notice: $e\n$st');
       final newId = 'prod_${DateTime.now().millisecondsSinceEpoch}';
       newItem = StockItemEntity(
         id: newId,
@@ -775,6 +779,8 @@ class StockNotifier extends StateNotifier<StockState> {
     required String destinationDcId,
     required String destinationDcName,
     required int quantity,
+    String? senderId,
+    String? senderName,
     String? notes,
   }) async {
     if (quantity <= 0) {
@@ -819,8 +825,11 @@ class StockNotifier extends StateNotifier<StockState> {
         destinationDcId: destinationDcId,
         destinationDcName: destinationDcName,
         quantity: quantity,
+        senderId: senderId,
+        senderName: senderName,
         notes: notes,
       );
+      await fetchStockTransfers(dcId: sourceDcId);
     } catch (e) {
       debugPrint('[STOCK_PROVIDER] ℹ️ Remote transfer notice: $e');
     }
@@ -829,6 +838,8 @@ class StockNotifier extends StateNotifier<StockState> {
 
     return {
       'success': true,
+      'transfer_id': remoteRes['transfer_id'] ?? remoteRes['transferId'],
+      'transferId': remoteRes['transfer_id'] ?? remoteRes['transferId'],
       'waybillNumber': waybill,
       'remainingWarehouseStock': updatedTarget.availableCount,
       'transferredUnits': quantity,
@@ -1505,14 +1516,41 @@ class StockNotifier extends StateNotifier<StockState> {
     }
   }
 
-  /// Party A (Merchant/Client): Dispatches consignment to DC and signs on glass
+  /// Destination DC accepts and balances an inbound Inter-DC stock transfer
+  Future<Map<String, dynamic>> receiveInterDcTransfer({
+    required String transferId,
+    String? receiverId,
+    String? receiverName,
+    int? quantityReceived,
+    String? notes,
+    String? dcId,
+  }) async {
+    try {
+      final res = await repository.receiveInterDcTransfer(
+        transferId: transferId,
+        receiverId: receiverId,
+        receiverName: receiverName,
+        quantityReceived: quantityReceived,
+        notes: notes,
+      );
+      // Refresh inventory and transfers
+      await fetchStockItems(null, dcId);
+      await fetchStockTransfers(dcId: dcId);
+      return res;
+    } catch (e) {
+      debugPrint('[STOCK_PROVIDER] ⚠️ receiveInterDcTransfer error: $e');
+      rethrow;
+    }
+  }
+
+  /// Party A (Merchant/Client): Dispatches consignment request to DC (Two-Way Handshake)
   Future<Map<String, dynamic>> dispatchClientSupply({
     required String clientId,
     required String dcId,
     required List<Map<String, dynamic>> items,
     String? senderId,
     required String senderName,
-    required String senderSignatureUrl,
+    String senderSignatureUrl = '',
     String? notes,
   }) async {
     try {
@@ -1534,12 +1572,12 @@ class StockNotifier extends StateNotifier<StockState> {
     }
   }
 
-  /// Party B (DC Supervisor): Inspects physical items, records discrepancies, and signs receipt
+  /// Party B (DC Supervisor): Inspects physical items, verifies counts, and accepts inbound stock into DC
   Future<Map<String, dynamic>> receiveClientSupply({
     required String transferId,
     required String receiverId,
     required String receiverName,
-    required String receiverSignatureUrl,
+    String receiverSignatureUrl = '',
     required List<Map<String, dynamic>> verifiedItems,
     String? notes,
     String? dcId,
@@ -1554,7 +1592,7 @@ class StockNotifier extends StateNotifier<StockState> {
         notes: notes,
       );
       // Refresh inventory and transfers
-      await fetchStockItems();
+      await fetchStockItems(null, dcId);
       await fetchStockTransfers(dcId: dcId);
       return res;
     } catch (e) {
@@ -1563,14 +1601,14 @@ class StockNotifier extends StateNotifier<StockState> {
     }
   }
 
-  /// Party A (DC Supervisor): Issues stock to rider with supervisor signature (reserves shelf stock)
+  /// Party A (DC Supervisor): Issues stock to rider (reserves shelf stock)
   Future<Map<String, dynamic>> issueDcStockToRiderWithSignature({
     required String dcId,
     required String riderId,
     required List<Map<String, dynamic>> items,
     required String senderId,
     required String senderName,
-    required String senderSignatureUrl,
+    String senderSignatureUrl = '',
     String? notes,
   }) async {
     try {
@@ -1584,7 +1622,7 @@ class StockNotifier extends StateNotifier<StockState> {
         notes: notes,
       );
       // Refresh inventory and transfers
-      await fetchStockItems();
+      await fetchStockItems(null, dcId);
       await fetchStockTransfers(dcId: dcId);
       return res;
     } catch (e) {
@@ -1593,12 +1631,12 @@ class StockNotifier extends StateNotifier<StockState> {
     }
   }
 
-  /// Party B (Rider): Verifies physical items in hand and signs on glass to commit to vehicle custody
+  /// Party B (Rider): Verifies physical items in hand and accepts custody
   Future<Map<String, dynamic>> acceptRiderStockHandover({
     required String transferId,
     required String riderId,
     required String riderName,
-    required String riderSignatureUrl,
+    String riderSignatureUrl = '',
     List<Map<String, dynamic>>? verifiedItems,
     String? notes,
   }) async {

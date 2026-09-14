@@ -1369,18 +1369,21 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
                   child: const Icon(Icons.apartment_rounded, color: Color(0xFF2563EB), size: 20),
                 ),
                 const SizedBox(width: 10),
-                Text(
-                  isEditing ? 'Edit Distribution Center' : 'Register New Distribution Center',
-                  style: GoogleFonts.inter(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                Expanded(
+                  child: Text(
+                    isEditing ? 'Edit Distribution Center' : 'Register New Distribution Center',
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
             ),
-            content: SizedBox(
-              width: 580,
+            content: Container(
+              constraints: const BoxConstraints(maxWidth: 580),
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -1485,8 +1488,9 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
                       controller: addressCtrl,
                       maxLines: 2,
                       decoration: const InputDecoration(
-                        labelText: 'Full Physical Warehouse Address *',
-                        hintText: 'Plot number, street, industrial layout, nearest landmark',
+                        labelText: 'Full Physical Warehouse Address',
+                        hintText: 'Plot number, street, industrial layout, nearest landmark (defaults to City, State)',
+                        helperText: 'Optional: defaults to City, State if left blank',
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -1791,14 +1795,35 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
                   final name = nameCtrl.text.trim();
                   final code = codeCtrl.text.trim().toUpperCase();
                   final city = cityCtrl.text.trim();
-                  final address = addressCtrl.text.trim();
+                  final rawAddress = addressCtrl.text.trim();
+                  final address = rawAddress.isNotEmpty ? rawAddress : '$city, $selectedState State';
                   final supEmail = supervisorEmailCtrl.text.trim();
                   final supPass = supervisorPasswordCtrl.text.trim();
 
-                  if (name.isEmpty || code.isEmpty || city.isEmpty || address.isEmpty) {
+                  if (name.isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('⚠️ DC Name, Code, City, and Address are required fields.'),
+                        content: Text('⚠️ Distribution Center Name is required.'),
+                        backgroundColor: Color(0xFFEF4444),
+                      ),
+                    );
+                    return;
+                  }
+
+                  if (code.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('⚠️ Unique DC Code is required (e.g. DC-KD-001).'),
+                        backgroundColor: Color(0xFFEF4444),
+                      ),
+                    );
+                    return;
+                  }
+
+                  if (city.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('⚠️ Please select a City / LGA for this Distribution Center.'),
                         backgroundColor: Color(0xFFEF4444),
                       ),
                     );
@@ -1939,8 +1964,8 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
         backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-        content: SizedBox(
-          width: 480,
+        content: Container(
+          constraints: const BoxConstraints(maxWidth: 480),
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -2114,8 +2139,8 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
         backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-        content: SizedBox(
-          width: 440,
+        content: Container(
+          constraints: const BoxConstraints(maxWidth: 440),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -2252,8 +2277,8 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
                 ),
               ],
             ),
-            content: SizedBox(
-              width: 520,
+            content: Container(
+              constraints: const BoxConstraints(maxWidth: 520),
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,

@@ -1628,12 +1628,18 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
   // SUCCESS / CREDENTIALS SLIP CARD
   // ---------------------------------------------------------------------------
   Widget _buildCredentialsSuccessSlip(bool isDark, Map<String, dynamic> slip) {
+    final screenHeight = MediaQuery.of(context).size.height;
     return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       backgroundColor: isDark ? const Color(0xFF151D36) : Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       child: Container(
-        width: 600,
-        padding: const EdgeInsets.all(28),
+        constraints: BoxConstraints(
+          maxWidth: 600,
+          maxHeight: screenHeight * 0.92,
+        ),
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1654,20 +1660,20 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Rider Onboarded Successfully!', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold)),
-                        Text('Credentials & Agreement Slip issued for ${slip['name']}', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                        Text('Rider Onboarded Successfully!', style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.bold)),
+                        Text('Credentials issued for ${slip['name']}', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)), overflow: TextOverflow.ellipsis),
                       ],
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
               const Divider(height: 1),
               const SizedBox(height: 16),
 
               // Slip Container
               Container(
-                padding: const EdgeInsets.all(18),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: isDark ? const Color(0xFF0B1021) : const Color(0xFFF8FAFC),
                   borderRadius: BorderRadius.circular(16),
@@ -1690,40 +1696,45 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
 
               const SizedBox(height: 20),
 
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  SizedBox(
-                    width: 250,
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        final credText = 'NovaExpress Rider Credentials\nAgent Code: ${slip['driverCode']}\nName: ${slip['name']}\nEmail: ${slip['email']}\nTemporary Password: ${slip['password']}\nSecurity PIN: ${slip['pin']}\nHub: ${slip['hub']}';
-                        Clipboard.setData(ClipboardData(text: credText));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('📋 Credentials copied to clipboard!')),
-                        );
-                      },
-                      icon: const Icon(Icons.copy_rounded, size: 16),
-                      label: const Text('Copy Credentials'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
+              LayoutBuilder(
+                builder: (context, btnConstraints) {
+                  final isNarrow = btnConstraints.maxWidth < 450;
+                  return Wrap(
+                    spacing: 12,
+                    runSpacing: 10,
+                    children: [
+                      SizedBox(
+                        width: isNarrow ? double.infinity : (btnConstraints.maxWidth - 12) / 2,
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            final credText = 'NovaExpress Rider Credentials\nAgent Code: ${slip['driverCode']}\nName: ${slip['name']}\nEmail: ${slip['email']}\nTemporary Password: ${slip['password']}\nSecurity PIN: ${slip['pin']}\nHub: ${slip['hub']}';
+                            Clipboard.setData(ClipboardData(text: credText));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('📋 Credentials copied to clipboard!')),
+                            );
+                          },
+                          icon: const Icon(Icons.copy_rounded, size: 16),
+                          label: const Text('Copy Credentials'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 250,
-                    child: ElevatedButton.icon(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.check_rounded, size: 18, color: Colors.white),
-                      label: const Text('Save & Close', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF031632),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      SizedBox(
+                        width: isNarrow ? double.infinity : (btnConstraints.maxWidth - 12) / 2,
+                        child: ElevatedButton.icon(
+                          onPressed: () => Navigator.of(context).pop(),
+                          icon: const Icon(Icons.check_rounded, size: 18, color: Colors.white),
+                          label: const Text('Save & Close', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF031632),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                ],
+                    ],
+                  );
+                },
               ),
             ],
           ),

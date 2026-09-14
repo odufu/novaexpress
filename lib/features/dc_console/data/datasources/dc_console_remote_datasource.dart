@@ -94,12 +94,12 @@ abstract class DCConsoleRemoteDataSource {
 
 class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
   final SupabaseClient? _client;
+  SupabaseClient? _cachedAdminClient;
 
   DCConsoleRemoteDataSourceImpl([SupabaseClient? client]) : _client = client;
 
   SupabaseClient _getAdminClient() {
-    if (_client != null) return _client;
-    return SupabaseClient(
+    return _cachedAdminClient ??= SupabaseClient(
       SupabaseConstants.supabaseUrl,
       SupabaseConstants.supabaseServiceRoleKey,
       authOptions: const AuthClientOptions(autoRefreshToken: false),
@@ -164,13 +164,14 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
     final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
     String persistentId = newDcId;
 
+    final cleanAddress = address.trim();
+    final effectiveAddress = cleanAddress.isNotEmpty ? cleanAddress : '${city.trim()}, ${stateName.trim()} State';
     final effectiveZones = operatingZones.isNotEmpty ? operatingZones : [city.trim()];
     final effectiveManager = managerName?.trim().isNotEmpty == true ? managerName!.trim() : 'Station Supervisor';
     final effectivePhone = contactPhone?.trim().isNotEmpty == true ? contactPhone!.trim() : '+234 800 000 0000';
     final effectiveCapacity = storageCapacityUnits > 0 ? storageCapacityUnits : 25000;
 
     final adminDb = _getAdminClient();
-    try {
       // 1. Pre-flight check against users table for duplicate email
       final existingUser = await adminDb
           .from('users')
@@ -198,7 +199,7 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
         'code': cleanCode,
         'state': stateName.trim(),
         'city': city.trim(),
-        'address': address.trim(),
+        'address': effectiveAddress,
         'contact_phone': effectivePhone,
         'contact_email': supEmail,
         'manager_name': effectiveManager,
@@ -221,9 +222,6 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
       if (insertRes['id'] != null) {
         persistentId = insertRes['id'].toString();
       }
-    } finally {
-      adminDb.dispose();
-    }
 
     // 4. Provision Auth Account for DC Station Supervisor
     final nameParts = effectiveManager.split(' ');
@@ -291,7 +289,6 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
   @override
   Future<void> updateDistributionCenter(DistributionCenter dc) async {
     final adminDb = _getAdminClient();
-    try {
       final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
       final updatePayload = <String, dynamic>{
         'name': dc.name,
@@ -317,51 +314,35 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
       } else {
         await adminDb.from('distribution_centers').update(updatePayload).eq('code', dc.code);
       }
-    } finally {
-      adminDb.dispose();
-    }
   }
 
   @override
   Future<void> toggleDistributionCenterStatus(String dcId, bool isActive) async {
     final adminDb = _getAdminClient();
-    try {
       final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
       if (uuidRegex.hasMatch(dcId)) {
         await adminDb.from('distribution_centers').update({'is_active': isActive}).eq('id', dcId);
       }
-    } finally {
-      adminDb.dispose();
-    }
   }
 
   @override
   Future<void> updateOperatingZones(String dcId, List<String> zones) async {
     final adminDb = _getAdminClient();
-    try {
       final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
       if (uuidRegex.hasMatch(dcId)) {
         await adminDb.from('distribution_centers').update({'operating_zones': zones}).eq('id', dcId);
       }
-    } finally {
-      adminDb.dispose();
-    }
   }
 
   @override
   Future<void> deleteDistributionCenter(String dcId) async {
     final adminDb = _getAdminClient();
-    try {
       await adminDb.from('distribution_centers').delete().eq('id', dcId);
-    } finally {
-      adminDb.dispose();
-    }
   }
 
   @override
   Future<List<DCFleetDriver>> fetchDrivers() async {
     final client = _getAdminClient();
-    try {
       final response = await client
           .from('delivery_agents')
           .select('*, users(first_name, last_name, email, phone_number, avatar_url)')
@@ -376,17 +357,11 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
         }
       }
       return list;
-    } finally {
-      if (_client == null) {
-        client.dispose();
-      }
-    }
   }
 
   @override
   Future<void> updateDriverCompensationTerms(DCFleetDriver driver) async {
     final adminDb = _getAdminClient();
-    try {
       final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
       final extendedPayload = <String, dynamic>{
         'commission_rate': driver.commissionRate,
@@ -406,15 +381,11 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
       } else {
         await adminDb.from('delivery_agents').update(extendedPayload).eq('agent_code', driver.driverCode);
       }
-    } finally {
-      adminDb.dispose();
-    }
   }
 
   @override
   Future<DCFinanceSettings?> fetchFinanceSettings() async {
     final adminDb = _getAdminClient();
-    try {
       final response = await adminDb
           .from('dc_finance_settings')
           .select()
@@ -425,15 +396,11 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
         return DCFinanceSettings.fromJson(response);
       }
       return null;
-    } finally {
-      adminDb.dispose();
-    }
   }
 
   @override
   Future<void> updateFinanceSettings(DCFinanceSettings settings) async {
     final adminDb = _getAdminClient();
-    try {
       final payload = <String, dynamic>{
         'id': 'global_finance_config',
         'pos_charge_mode': settings.posChargeMode,
@@ -448,15 +415,11 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
         'updated_at': DateTime.now().toIso8601String(),
       };
       await adminDb.from('dc_finance_settings').upsert(payload);
-    } finally {
-      adminDb.dispose();
-    }
   }
 
   @override
   Future<List<DCPayoutClaim>> fetchPayoutClaims() async {
     final adminDb = _getAdminClient();
-    try {
       final response = await adminDb
           .from('payout_requests')
           .select('*, delivery_agents(agent_code, current_cod_balance, direct_transfer_balance, users(first_name, last_name, email, phone_number))')
@@ -469,9 +432,6 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
         } catch (_) {}
       }
       return list;
-    } finally {
-      adminDb.dispose();
-    }
   }
 
   @override
@@ -481,7 +441,6 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
     required String driverId,
   }) async {
     final adminDb = _getAdminClient();
-    try {
       await adminDb.from('payout_requests').update({
         'status': 'approved',
         'reviewed_at': DateTime.now().toIso8601String(),
@@ -494,9 +453,6 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
           'p_amount': amount,
         });
       } catch (_) {}
-    } finally {
-      adminDb.dispose();
-    }
   }
 
   @override
@@ -505,21 +461,16 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
     required String reason,
   }) async {
     final adminDb = _getAdminClient();
-    try {
       await adminDb.from('payout_requests').update({
         'status': 'rejected',
         'rejection_reason': reason,
         'reviewed_at': DateTime.now().toIso8601String(),
       }).eq('id', claimId);
-    } finally {
-      adminDb.dispose();
-    }
   }
 
   @override
   Future<List<DCTransactionRecord>> fetchDcTransactions() async {
     final adminDb = _getAdminClient();
-    try {
       final List<DCTransactionRecord> results = [];
 
       // 1. Paystack Transactions
@@ -566,15 +517,11 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
 
       results.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       return results;
-    } finally {
-      adminDb.dispose();
-    }
   }
 
   @override
   Future<List<ClientProfile>> fetchClients() async {
     final adminDb = _getAdminClient();
-    try {
       dynamic response;
       try {
         response = await adminDb
@@ -595,9 +542,6 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
         } catch (_) {}
       }
       return list;
-    } finally {
-      adminDb.dispose();
-    }
   }
 
   @override
@@ -636,8 +580,6 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
     } catch (e) {
       debugPrint('[DC_DATASOURCE] ℹ️ checkEmailExists notice: $e');
       return false;
-    } finally {
-      adminDb.dispose();
     }
   }
 
@@ -689,26 +631,24 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
 
     String persistentClientId = _generateUuid();
 
-    try {
-      // 2. Pre-flight check against users table & registered in-memory users for duplicate email
-      final registeredUser = AuthRemoteDataSourceImpl.getRegisteredUser(cleanEmail);
-      if (registeredUser != null) {
-        throw Exception("A user with email '$cleanEmail' already exists. Please use a unique email address.");
-      }
+    // 2. Pre-flight check against users table & registered in-memory users for duplicate email
+    final registeredUser = AuthRemoteDataSourceImpl.getRegisteredUser(cleanEmail);
+    if (registeredUser != null) {
+      throw Exception("A user with email '$cleanEmail' already exists. Please use a unique email address.");
+    }
 
-      final existingUser = await adminDb
-          .from('users')
-          .select('id, email')
-          .eq('email', cleanEmail)
-          .maybeSingle();
+    final existingUser = await adminDb
+        .from('users')
+        .select('id, email')
+        .eq('email', cleanEmail)
+        .maybeSingle();
 
-      if (existingUser != null) {
-        throw Exception("A user with email '$cleanEmail' already exists. Please use a unique email address.");
-      }
+    if (existingUser != null) {
+      throw Exception("A user with email '$cleanEmail' already exists. Please use a unique email address.");
+    }
 
-      // Check duplicate phone in users table
-      final cleanPhone = phone.trim();
-      if (cleanPhone.isNotEmpty) {
+    // Check duplicate phone in users table
+    if (cleanPhone.isNotEmpty) {
         try {
           final existingPhoneUser = await adminDb
               .from('users')
@@ -737,7 +677,7 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
         if (clientCheckErr.toString().contains('already exists')) rethrow;
       }
 
-      // 3. Insert record into clients table
+      // 3. Insert/Upsert record into clients table with authoritative column names
       final clientPayload = {
         'id': persistentClientId,
         'company_name': cleanName,
@@ -755,8 +695,8 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
         'is_active': true,
         'company_id': '11111111-1111-4111-8111-111111111111',
         if (bankName != null && bankName.isNotEmpty) 'bank_name': bankName,
-        if (bankAccountNumber != null && bankAccountNumber.isNotEmpty) 'bank_account_number': bankAccountNumber,
-        if (bankAccountName != null && bankAccountName.isNotEmpty) 'bank_account_name': bankAccountName,
+        if (bankAccountNumber != null && bankAccountNumber.isNotEmpty) 'account_number': bankAccountNumber,
+        if (bankAccountName != null && bankAccountName.isNotEmpty) 'account_name': bankAccountName,
         if (customDeliveryFee != null && customDeliveryFee > 0) 'custom_delivery_fee': customDeliveryFee,
         if (customPlatformFee != null && customPlatformFee > 0) 'custom_platform_fee': customPlatformFee,
         if (customFailedAttemptFee != null && customFailedAttemptFee > 0) 'custom_failed_attempt_fee': customFailedAttemptFee,
@@ -765,70 +705,50 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
       try {
         final insertRes = await adminDb
             .from('clients')
-            .insert(clientPayload)
+            .upsert(clientPayload)
             .select()
             .single();
         if (insertRes['id'] != null) {
           persistentClientId = insertRes['id'].toString();
         }
       } catch (dbErr) {
-        debugPrint('[DC_DATASOURCE] ℹ️ Clients table insert notice: $dbErr');
+        debugPrint('[DC_DATASOURCE] ⚠️ Clients table upsert notice: $dbErr');
+        if (dbErr.toString().contains('already exists')) rethrow;
       }
-    } finally {
-      adminDb.dispose();
-    }
 
-    // 4. Provision Authentication Account for the Client Admin
-    try {
-      if (authDataSource != null) {
-        await authDataSource.registerClientAccount(
-          email: cleanEmail,
-          password: effectivePassword,
-          companyName: cleanName,
-          contactPerson: cleanPerson,
-          phone: cleanPhone,
-          address: cleanAddress,
-          city: cleanCity,
-          stateName: cleanState,
-          tier: tier,
-          closerLimit: effectiveCloserLimit,
-          clientCode: effectiveCode,
-          bankName: bankName,
-          bankAccountNumber: bankAccountNumber,
-          bankAccountName: bankAccountName,
-          clientId: persistentClientId,
-        );
-      } else {
-        final authDs = AuthRemoteDataSourceImpl(_getAdminClient());
-        await authDs.registerClientAccount(
-          email: cleanEmail,
-          password: effectivePassword,
-          companyName: cleanName,
-          contactPerson: cleanPerson,
-          phone: cleanPhone,
-          address: cleanAddress,
-          city: cleanCity,
-          stateName: cleanState,
-          tier: tier,
-          closerLimit: effectiveCloserLimit,
-          clientCode: effectiveCode,
-          bankName: bankName,
-          bankAccountNumber: bankAccountNumber,
-          bankAccountName: bankAccountName,
-          clientId: persistentClientId,
-        );
-      }
-    } catch (authErr) {
-      if (authErr.toString().contains('already exists')) {
-        rethrow;
-      }
-      debugPrint('[DC_DATASOURCE] ℹ️ Auth provisioning notice ($authErr). Guaranteeing in-memory registration.');
+      // 4. Provision Authentication Account for the Client Admin
+      final effectiveAuthDs = (authDataSource is AuthRemoteDataSource)
+          ? authDataSource
+          : AuthRemoteDataSourceImpl(_getAdminClient());
+
+      await effectiveAuthDs.registerClientAccount(
+        email: cleanEmail,
+        password: effectivePassword,
+        companyName: cleanName,
+        contactPerson: cleanPerson,
+        phone: cleanPhone,
+        address: cleanAddress,
+        city: cleanCity,
+        stateName: cleanState,
+        tier: tier,
+        closerLimit: effectiveCloserLimit,
+        clientCode: effectiveCode,
+        bankName: bankName,
+        bankAccountNumber: bankAccountNumber,
+        bankAccountName: bankAccountName,
+        clientId: persistentClientId,
+        customDeliveryFee: customDeliveryFee,
+        customPlatformFee: customPlatformFee,
+        customFailedAttemptFee: customFailedAttemptFee,
+      );
+
+      // Also register in-memory for instant immediate capability in active session
       final nameParts = cleanPerson.split(' ');
       final fName = nameParts.isNotEmpty ? nameParts.first : cleanName;
       final lName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : 'Admin';
       AuthRemoteDataSourceImpl.registerUserInMemory(
         UserModel(
-          id: 'cli_${DateTime.now().millisecondsSinceEpoch}',
+          id: persistentClientId,
           email: cleanEmail,
           firstName: fName,
           lastName: lName,
@@ -845,7 +765,6 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
         ),
         effectivePassword,
       );
-    }
 
     return ClientProfile(
       id: persistentClientId,
@@ -895,8 +814,6 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
     } catch (e) {
       debugPrint('[DC_CONSOLE] ❌ approveCashRemittance error: $e');
       rethrow;
-    } finally {
-      adminDb.dispose();
     }
   }
 
@@ -923,8 +840,6 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
     } catch (e) {
       debugPrint('[DC_CONSOLE] ❌ generateDailyMerchantSettlement error: $e');
       rethrow;
-    } finally {
-      adminDb.dispose();
     }
   }
 
@@ -947,8 +862,6 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
     } catch (e) {
       debugPrint('[DC_CONSOLE] ❌ fetchDcClientSettlements error: $e');
       return [];
-    } finally {
-      adminDb.dispose();
     }
   }
 
@@ -971,8 +884,6 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
         'success': false,
         'error': e.toString(),
       };
-    } finally {
-      adminDb.dispose();
     }
   }
 }

@@ -213,8 +213,11 @@ class _DCAssignOrderModalState extends ConsumerState<DCAssignOrderModal> {
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       child: Container(
-        width: 720,
-        height: 680,
+        width: double.infinity,
+        constraints: BoxConstraints(
+          maxWidth: 720,
+          maxHeight: MediaQuery.of(context).size.height * 0.92,
+        ),
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF0F172A) : Colors.white,
           borderRadius: BorderRadius.circular(20),
@@ -314,47 +317,56 @@ class _DCAssignOrderModalState extends ConsumerState<DCAssignOrderModal> {
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.35)),
                 ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.radar_rounded, color: Color(0xFF059669), size: 22),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 4,
-                            crossAxisAlignment: WrapCrossAlignment.center,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final targetRider = nearestRider;
+                    if (targetRider == null) return const SizedBox.shrink();
+
+                    final isCompact = constraints.maxWidth < 520;
+                    final infoBlock = Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.radar_rounded, color: Color(0xFF059669), size: 22),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                '🎯 GIS Nearest Rider Match',
-                                style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF059669)),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 4,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  Text(
+                                    '🎯 GIS Nearest Rider Match',
+                                    style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF059669)),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF059669).withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      '${nearestDistanceKm ?? 0.8} km away',
+                                      style: GoogleFonts.jetBrainsMono(fontSize: 9.5, fontWeight: FontWeight.bold, color: const Color(0xFF059669)),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF059669).withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  '${nearestDistanceKm ?? 0.8} km away',
-                                  style: GoogleFonts.jetBrainsMono(fontSize: 9.5, fontWeight: FontWeight.bold, color: const Color(0xFF059669)),
-                                ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${targetRider.name} (${targetRider.driverCode}) is currently within proximity zone.',
+                                style: GoogleFonts.inter(fontSize: 11, color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155)),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${nearestRider.name} (${nearestRider.driverCode}) is currently within proximity zone.',
-                            style: GoogleFonts.inter(fontSize: 11, color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155)),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    ElevatedButton.icon(
-                      onPressed: () => _dispatchToRider(nearestRider!.id, nearestRider.name, nearestRider.driverCode),
+                        ),
+                      ],
+                    );
+
+                    final dispatchBtn = ElevatedButton.icon(
+                      onPressed: () => _dispatchToRider(targetRider.id, targetRider.name, targetRider.driverCode),
                       icon: const Icon(Icons.flash_on_rounded, size: 14, color: Colors.white),
                       label: const Text('Auto-Dispatch', style: TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.bold)),
                       style: ElevatedButton.styleFrom(
@@ -362,8 +374,27 @@ class _DCAssignOrderModalState extends ConsumerState<DCAssignOrderModal> {
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
-                    ),
-                  ],
+                    );
+
+                    if (isCompact) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          infoBlock,
+                          const SizedBox(height: 8),
+                          SizedBox(width: double.infinity, child: dispatchBtn),
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      children: [
+                        Expanded(child: infoBlock),
+                        const SizedBox(width: 10),
+                        dispatchBtn,
+                      ],
+                    );
+                  },
                 ),
               ),
 

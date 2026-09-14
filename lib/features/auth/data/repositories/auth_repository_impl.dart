@@ -106,6 +106,9 @@ class AuthRepositoryImpl implements AuthRepository {
     String? bankName,
     String? bankAccountNumber,
     String? bankAccountName,
+    double? customDeliveryFee,
+    double? customPlatformFee,
+    double? customFailedAttemptFee,
   }) async {
     return await remoteDataSource.registerClientAccount(
       email: email,
@@ -122,6 +125,9 @@ class AuthRepositoryImpl implements AuthRepository {
       bankName: bankName,
       bankAccountNumber: bankAccountNumber,
       bankAccountName: bankAccountName,
+      customDeliveryFee: customDeliveryFee,
+      customPlatformFee: customPlatformFee,
+      customFailedAttemptFee: customFailedAttemptFee,
     );
   }
 }

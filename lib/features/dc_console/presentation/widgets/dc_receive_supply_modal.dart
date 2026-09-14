@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../../core/widgets/signature_pad_modal.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../stock/domain/entities/stock_transfer_record.dart';
 import '../../../stock/presentation/providers/stock_provider.dart';
@@ -76,29 +75,10 @@ class _DcReceiveSupplyModalState extends ConsumerState<DcReceiveSupplyModal> {
     final supervisorId = authState.user?.id ?? '';
     final dcId = ref.read(dcConsoleProvider).activeHubId;
 
-    // 1. Mandatory Digital Signature on Glass
-    final sigResult = await SignaturePadModal.show(
-      context: context,
-      orderId: widget.transfer.transferNumber,
-      customerName: supervisorName,
-    );
-
-    if (sigResult == null || sigResult.signatureUrl.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            backgroundColor: Color(0xFFF59E0B),
-            content: Text('DC Supervisor signature on glass is required to accept inbound stock.'),
-          ),
-        );
-      }
-      return;
-    }
-
     setState(() => _isSubmitting = true);
 
     try {
-      // 2. Build verified items payload
+      // 1. Build verified items payload
       final verifiedItems = <Map<String, dynamic>>[];
       for (final item in widget.transfer.items) {
         final rec = int.tryParse(_receivedControllers[item.id]?.text.trim() ?? '') ?? item.quantity;
@@ -118,7 +98,7 @@ class _DcReceiveSupplyModalState extends ConsumerState<DcReceiveSupplyModal> {
             transferId: widget.transfer.id,
             receiverId: supervisorId,
             receiverName: supervisorName,
-            receiverSignatureUrl: sigResult.signatureUrl,
+            receiverSignatureUrl: '',
             verifiedItems: verifiedItems,
             notes: _notesCtrl.text.trim(),
             dcId: dcId,
@@ -174,12 +154,15 @@ class _DcReceiveSupplyModalState extends ConsumerState<DcReceiveSupplyModal> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
+    final screenHeight = MediaQuery.of(context).size.height;
     return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       backgroundColor: isDark ? const Color(0xFF1F2937) : Colors.white,
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 750, maxHeight: 750),
-        padding: const EdgeInsets.all(24),
+        constraints: BoxConstraints(maxWidth: 750, maxHeight: screenHeight * 0.92),
+        width: double.infinity,
+        padding: EdgeInsets.all(MediaQuery.of(context).size.width < 500 ? 16 : 24),
         child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -187,45 +170,45 @@ class _DcReceiveSupplyModalState extends ConsumerState<DcReceiveSupplyModal> {
             children: [
               // Header
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF10B981).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(
-                          Icons.fact_check_rounded,
-                          color: Color(0xFF10B981),
-                          size: 24,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Inspect & Receive Inbound Supply',
-                            style: GoogleFonts.inter(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: isDark ? Colors.white : const Color(0xFF111827),
-                            ),
-                          ),
-                          Text(
-                            'Waybill: ${widget.transfer.transferNumber} • Sender: ${widget.transfer.senderName ?? 'Merchant'}',
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.fact_check_rounded,
+                      color: Color(0xFF10B981),
+                      size: 24,
+                    ),
                   ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Inspect & Receive Inbound Supply',
+                          style: GoogleFonts.inter(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                            color: isDark ? Colors.white : const Color(0xFF111827),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          'Waybill: ${widget.transfer.transferNumber} • Sender: ${widget.transfer.senderName ?? 'Merchant'}',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   IconButton(
                     icon: const Icon(Icons.close_rounded),
                     onPressed: () => Navigator.of(context).pop(),
@@ -236,7 +219,7 @@ class _DcReceiveSupplyModalState extends ConsumerState<DcReceiveSupplyModal> {
               const Divider(),
               const SizedBox(height: 16),
 
-              // Merchant Signature Banner
+              // Merchant Consignment Info Banner
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -248,47 +231,30 @@ class _DcReceiveSupplyModalState extends ConsumerState<DcReceiveSupplyModal> {
                 ),
                 child: Row(
                   children: [
-                    if (widget.transfer.senderSignatureUrl != null &&
-                        widget.transfer.senderSignatureUrl!.isNotEmpty) ...[
-                      Container(
-                        width: 90,
-                        height: 50,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: const Color(0xFFCBD5E1)),
-                        ),
-                        child: Image.network(
-                          widget.transfer.senderSignatureUrl!,
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => const Center(
-                            child: Icon(Icons.verified_rounded, color: Color(0xFF10B981), size: 18),
-                          ),
-                        ),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      const SizedBox(width: 14),
-                    ],
+                      child: const Icon(Icons.outbox_rounded, color: Color(0xFF10B981), size: 20),
+                    ),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.verified_user_rounded, color: Color(0xFF10B981), size: 16),
-                              const SizedBox(width: 6),
-                              Text(
-                                'Authorized Merchant Waybill Proof',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: const Color(0xFF10B981),
-                                ),
-                              ),
-                            ],
+                          Text(
+                            'Incoming Merchant Consignment Manifest',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF10B981),
+                            ),
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'Dispatched by ${widget.transfer.senderName ?? 'Merchant'} on ${widget.transfer.dispatchedAt?.toLocal().toString().substring(0, 16) ?? 'Arrival'}. Verify physical pieces before countersigning.',
+                            'Dispatched by ${widget.transfer.senderName ?? 'Merchant'} on ${widget.transfer.dispatchedAt?.toLocal().toString().substring(0, 16) ?? 'Arrival'}. Verify physical count against manifest before accepting custody.',
                             style: GoogleFonts.inter(
                               fontSize: 11.5,
                               color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF64748B),
@@ -335,14 +301,18 @@ class _DcReceiveSupplyModalState extends ConsumerState<DcReceiveSupplyModal> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              item.productName.isNotEmpty ? item.productName : 'Product Item',
-                              style: GoogleFonts.inter(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w700,
-                                color: isDark ? Colors.white : const Color(0xFF111827),
+                            Expanded(
+                              child: Text(
+                                item.productName.isNotEmpty ? item.productName : 'Product Item',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: isDark ? Colors.white : const Color(0xFF111827),
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
+                            const SizedBox(width: 8),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
@@ -449,9 +419,9 @@ class _DcReceiveSupplyModalState extends ConsumerState<DcReceiveSupplyModal> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
                     onPressed: _isSubmitting ? null : _handleConfirmReceipt,
-                    icon: const Icon(Icons.draw_rounded, size: 18),
+                    icon: const Icon(Icons.check_circle_rounded, size: 18),
                     label: Text(
-                      _isSubmitting ? 'Signing & Verifying...' : 'Sign Receipt on Glass & Credit DC',
+                      _isSubmitting ? 'Verifying & Crediting DC...' : 'Verify & Accept Stock Receipt',
                       style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700),
                     ),
                   ),

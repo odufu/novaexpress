@@ -134,6 +134,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
     String? bankName,
     String? bankAccountNumber,
     String? bankAccountName,
+    double? customDeliveryFee,
+    double? customPlatformFee,
+    double? customFailedAttemptFee,
   }) async {
     if (authRepository != null) {
       return await authRepository!.registerClientAccount(
@@ -151,6 +154,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
         bankName: bankName,
         bankAccountNumber: bankAccountNumber,
         bankAccountName: bankAccountName,
+        customDeliveryFee: customDeliveryFee,
+        customPlatformFee: customPlatformFee,
+        customFailedAttemptFee: customFailedAttemptFee,
       );
     }
     final nameParts = contactPerson.trim().split(' ');

@@ -41,9 +41,10 @@ class _ClientConsignmentsModalState
     switch (status.toLowerCase()) {
       case 'completed':
         return const Color(0xFF10B981);
+      case 'pending_dc_acceptance':
       case 'dispatched':
       case 'in_transit':
-        return const Color(0xFF3B82F6);
+        return const Color(0xFFF59E0B);
       case 'discrepancy_reported':
         return const Color(0xFFF59E0B);
       case 'rejected':
@@ -56,10 +57,11 @@ class _ClientConsignmentsModalState
   String _getStatusLabel(String status) {
     switch (status.toLowerCase()) {
       case 'completed':
-        return 'Verified & Received';
+        return 'Received & Stock Balanced';
+      case 'pending_dc_acceptance':
       case 'dispatched':
       case 'in_transit':
-        return 'In Transit / Awaiting DC';
+        return 'Awaiting Receipt & Approval';
       case 'discrepancy_reported':
         return 'Discrepancy Reported';
       case 'rejected':
@@ -104,7 +106,7 @@ class _ClientConsignmentsModalState
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Waybill & Dual-Signature Handshake Proof',
+                            'Two-Way Consignment Verification & Custody Audit Trail',
                             style: GoogleFonts.inter(
                               fontSize: 12,
                               color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
@@ -219,9 +221,9 @@ class _ClientConsignmentsModalState
                 ),
                 const SizedBox(height: 20),
 
-                // Signatures Grid (Party A & Party B)
+                // Two-Way Custody Verification Handshake (Party A & Party B)
                 Text(
-                  'Two-Way Chain of Custody Proofs',
+                  'Two-Way Custody Verification Handshake',
                   style: GoogleFonts.inter(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -234,7 +236,7 @@ class _ClientConsignmentsModalState
                     final isNarrow = sigConstraints.maxWidth < 460;
 
                     final partyACard = Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
                         color: isDark ? const Color(0xFF111827) : const Color(0xFFF9FAFB),
                         borderRadius: BorderRadius.circular(10),
@@ -251,10 +253,10 @@ class _ClientConsignmentsModalState
                               const SizedBox(width: 6),
                               Expanded(
                                 child: Text(
-                                  'Party A: Merchant Dispatch',
+                                  'Giver: Merchant Dispatch',
                                   style: GoogleFonts.inter(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
                                     color: const Color(0xFF3B82F6),
                                   ),
                                   overflow: TextOverflow.ellipsis,
@@ -262,9 +264,9 @@ class _ClientConsignmentsModalState
                               ),
                             ],
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 8),
                           Text(
-                            transfer.senderName ?? 'Merchant Admin',
+                            transfer.senderName ?? 'Client Admin',
                             style: GoogleFonts.inter(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
@@ -273,54 +275,55 @@ class _ClientConsignmentsModalState
                           ),
                           Text(
                             transfer.dispatchedAt != null
-                                ? 'Signed: ${transfer.dispatchedAt!.toLocal().toString().substring(0, 16)}'
-                                : 'Signed on Glass',
+                                ? 'Dispatched: ${transfer.dispatchedAt!.toLocal().toString().substring(0, 16)}'
+                                : 'Consignment Logged',
                             style: GoogleFonts.inter(
-                              fontSize: 10,
+                              fontSize: 11,
                               color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
                             ),
                           ),
                           const SizedBox(height: 8),
-                          Container(
-                            height: 80,
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: const Color(0xFFD1D5DB)),
+                          Text(
+                            'Quantity Dispatched: ${transfer.totalQuantityRequested} units',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF3B82F6),
                             ),
-                            child: (transfer.senderSignatureUrl != null &&
-                                    transfer.senderSignatureUrl!.isNotEmpty)
-                                ? Image.network(
-                                    transfer.senderSignatureUrl!,
-                                    fit: BoxFit.contain,
-                                    errorBuilder: (_, __, ___) => const Center(
-                                      child: Text(
-                                        'Signature Captured ✓',
-                                        style: TextStyle(
-                                          color: Color(0xFF10B981),
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                  )
-                                : const Center(
-                                    child: Text(
-                                      'Authorized Digital Signature',
-                                      style: TextStyle(
-                                        color: Color(0xFF6B7280),
-                                        fontSize: 10,
-                                      ),
-                                    ),
+                          ),
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF3B82F6).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFF3B82F6).withValues(alpha: 0.3)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.check_circle_outline_rounded, size: 14, color: Color(0xFF3B82F6)),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Consignment Logged & Sent',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF3B82F6),
                                   ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
                     );
 
+                    final isReceived = transfer.isCompleted;
+                    final isDiscrepancy = transfer.isDiscrepancyReported;
+
                     final partyBCard = Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
                         color: isDark ? const Color(0xFF111827) : const Color(0xFFF9FAFB),
                         borderRadius: BorderRadius.circular(10),
@@ -334,31 +337,31 @@ class _ClientConsignmentsModalState
                           Row(
                             children: [
                               Icon(
-                                Icons.inventory_2_rounded,
+                                Icons.warehouse_rounded,
                                 size: 16,
-                                color: (transfer.isCompleted || transfer.isDiscrepancyReported)
+                                color: isReceived
                                     ? const Color(0xFF10B981)
-                                    : const Color(0xFFF59E0B),
+                                    : (isDiscrepancy ? const Color(0xFFEF4444) : const Color(0xFFF59E0B)),
                               ),
                               const SizedBox(width: 6),
                               Expanded(
                                 child: Text(
-                                  'Party B: DC Receipt',
+                                  'Receiver: DC Intake',
                                   style: GoogleFonts.inter(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: (transfer.isCompleted || transfer.isDiscrepancyReported)
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: isReceived
                                         ? const Color(0xFF10B981)
-                                        : const Color(0xFFF59E0B),
+                                        : (isDiscrepancy ? const Color(0xFFEF4444) : const Color(0xFFF59E0B)),
                                   ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 8),
                           Text(
-                            transfer.receiverName ?? 'Awaiting DC Intake',
+                            transfer.receiverName ?? (isReceived ? 'DC Supervisor' : 'Pending DC Intake'),
                             style: GoogleFonts.inter(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
@@ -368,49 +371,68 @@ class _ClientConsignmentsModalState
                           Text(
                             transfer.receivedAt != null
                                 ? 'Verified: ${transfer.receivedAt!.toLocal().toString().substring(0, 16)}'
-                                : 'Pending physical arrival',
+                                : 'Pending physical count',
                             style: GoogleFonts.inter(
-                              fontSize: 10,
+                              fontSize: 11,
                               color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
                             ),
                           ),
                           const SizedBox(height: 8),
-                          Container(
-                            height: 80,
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: const Color(0xFFD1D5DB)),
+                          Text(
+                            isReceived
+                                ? 'Quantity Accepted: ${transfer.totalQuantityReceived} units'
+                                : 'Expected Intake: ${transfer.totalQuantityRequested} units',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: isReceived
+                                  ? const Color(0xFF10B981)
+                                  : const Color(0xFFF59E0B),
                             ),
-                            child: (transfer.receiverSignatureUrl != null &&
-                                    transfer.receiverSignatureUrl!.isNotEmpty)
-                                ? Image.network(
-                                    transfer.receiverSignatureUrl!,
-                                    fit: BoxFit.contain,
-                                    errorBuilder: (_, __, ___) => const Center(
-                                      child: Text(
-                                        'Signature Verified ✓',
-                                        style: TextStyle(
-                                          color: Color(0xFF10B981),
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                  )
-                                : Center(
-                                    child: Text(
-                                      transfer.isDispatched
-                                          ? 'Pending DC Supervisor Countersignature'
-                                          : 'Not Countersigned',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
-                                        fontSize: 10,
-                                      ),
-                                    ),
+                          ),
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: (isReceived
+                                      ? const Color(0xFF10B981)
+                                      : (isDiscrepancy ? const Color(0xFFEF4444) : const Color(0xFFF59E0B)))
+                                  .withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: (isReceived
+                                        ? const Color(0xFF10B981)
+                                        : (isDiscrepancy ? const Color(0xFFEF4444) : const Color(0xFFF59E0B)))
+                                    .withValues(alpha: 0.3),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  isReceived
+                                      ? Icons.check_circle_rounded
+                                      : (isDiscrepancy ? Icons.warning_amber_rounded : Icons.hourglass_empty_rounded),
+                                  size: 14,
+                                  color: isReceived
+                                      ? const Color(0xFF10B981)
+                                      : (isDiscrepancy ? const Color(0xFFEF4444) : const Color(0xFFF59E0B)),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  isReceived
+                                      ? 'Received & Stock Balanced'
+                                      : (isDiscrepancy ? 'Discrepancy Logged' : 'Awaiting Receipt & Approval'),
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: isReceived
+                                        ? const Color(0xFF10B981)
+                                        : (isDiscrepancy ? const Color(0xFFEF4444) : const Color(0xFFF59E0B)),
                                   ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
@@ -548,7 +570,7 @@ class _ClientConsignmentsModalState
                               overflow: TextOverflow.ellipsis,
                             ),
                             Text(
-                              'Two-way signed chain of custody from Merchant to Distribution Centers',
+                              'Two-way verified custody handshake between Merchant and Distribution Center',
                               style: GoogleFonts.inter(
                                 fontSize: 11,
                                 color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
@@ -708,11 +730,11 @@ class _ClientConsignmentsModalState
 
                                   final actionBtn = OutlinedButton.icon(
                                     onPressed: () => _showTransferDetail(trf, isDark),
-                                    icon: const Icon(Icons.draw_rounded, size: 16),
-                                    label: const Text('View Signatures'),
+                                    icon: const Icon(Icons.verified_rounded, size: 16),
+                                    label: const Text('Verification Audit'),
                                     style: OutlinedButton.styleFrom(
-                                      foregroundColor: const Color(0xFF3B82F6),
-                                      side: const BorderSide(color: Color(0xFF3B82F6)),
+                                      foregroundColor: const Color(0xFF10B981),
+                                      side: const BorderSide(color: Color(0xFF10B981)),
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                     ),
                                   );

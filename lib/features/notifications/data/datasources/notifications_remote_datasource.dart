@@ -48,10 +48,28 @@ class NotificationsRemoteDataSourceImpl implements NotificationsRemoteDataSource
         }
       } catch (_) {}
 
+      String? resolvedDcId;
+      try {
+        final userCheck = await _activeClient
+            .from('users')
+            .select('distribution_center_id')
+            .eq('id', agentId)
+            .maybeSingle();
+        if (userCheck != null && userCheck['distribution_center_id'] != null) {
+          resolvedDcId = userCheck['distribution_center_id'].toString();
+        }
+      } catch (_) {}
+
+      final filter = StringBuffer(
+          'delivery_agent_id.eq.$resolvedAgentId,delivery_agent_id.eq.$agentId,user_id.eq.$agentId,client_id.eq.$agentId');
+      if (resolvedDcId != null && resolvedDcId.isNotEmpty) {
+        filter.write(',distribution_center_id.eq.$resolvedDcId');
+      }
+
       final response = await _activeClient
           .from('notifications')
           .select('*')
-          .or('delivery_agent_id.eq.$resolvedAgentId,delivery_agent_id.eq.$agentId,user_id.eq.$agentId,client_id.eq.$agentId')
+          .or(filter.toString())
           .order('created_at', ascending: false)
           .limit(40);
 

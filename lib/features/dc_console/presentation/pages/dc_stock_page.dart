@@ -10,12 +10,12 @@ import '../../../../core/widgets/product_image_widget.dart';
 import '../../../../core/widgets/user_avatar_widget.dart';
 import '../../../stock/domain/entities/stock_item.dart';
 import '../../../stock/domain/entities/rider_stock_allocation.dart';
+import '../../../stock/domain/entities/stock_transfer_record.dart';
 import '../../../stock/presentation/providers/stock_provider.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
 import '../providers/dc_console_provider.dart';
 import '../providers/product_catalog_provider.dart';
 import '../../../../core/services/signature_storage_service.dart';
-import '../../../../core/widgets/signature_pad_modal.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../client_portal/domain/entities/client_profile.dart';
 import '../widgets/dc_product_detail_modal.dart';
@@ -1024,11 +1024,13 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
             children: [
               const Icon(Icons.report_problem_rounded, color: Color(0xFFEF4444), size: 22),
               const SizedBox(width: 8),
-              Text('Report Damaged / Lost Units', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
+              Expanded(
+                child: Text('Report Damaged / Lost Units', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16), overflow: TextOverflow.ellipsis),
+              ),
             ],
           ),
-          content: SizedBox(
-            width: 450,
+          content: Container(
+            constraints: const BoxConstraints(maxWidth: 450),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1188,11 +1190,13 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
             children: [
               const Icon(Icons.add_box_rounded, color: Color(0xFF2563EB), size: 22),
               const SizedBox(width: 8),
-              Text('Register New Product', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 17)),
+              Expanded(
+                child: Text('Register New Product', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 17), overflow: TextOverflow.ellipsis),
+              ),
             ],
           ),
-          content: SizedBox(
-            width: 520,
+          content: Container(
+            constraints: const BoxConstraints(maxWidth: 520),
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -1623,8 +1627,8 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
         backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-        content: SizedBox(
-          width: 440,
+        content: Container(
+          constraints: const BoxConstraints(maxWidth: 440),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1768,8 +1772,8 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
         backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-        content: SizedBox(
-          width: 440,
+        content: Container(
+          constraints: const BoxConstraints(maxWidth: 440),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1922,11 +1926,13 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
             children: [
               const Icon(Icons.arrow_downward_rounded, color: Color(0xFF10B981), size: 22),
               const SizedBox(width: 8),
-              Text('Receive Incoming Stock', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 17)),
+              Expanded(
+                child: Text('Receive Incoming Stock', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 17), overflow: TextOverflow.ellipsis),
+              ),
             ],
           ),
-          content: SizedBox(
-            width: 480,
+          content: Container(
+            constraints: const BoxConstraints(maxWidth: 480),
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -2015,8 +2021,8 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                             ),
                           ],
                         ),
-                        content: SizedBox(
-                          width: 420,
+                        content: Container(
+                          constraints: const BoxConstraints(maxWidth: 420),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2188,11 +2194,13 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
             children: [
               const Icon(Icons.two_wheeler_rounded, color: Color(0xFF2563EB), size: 22),
               const SizedBox(width: 8),
-              Text('Assign Stock to Rider', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 17)),
+              Expanded(
+                child: Text('Assign Stock to Rider', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 17), overflow: TextOverflow.ellipsis),
+              ),
             ],
           ),
-          content: SizedBox(
-            width: 480,
+          content: Container(
+            constraints: const BoxConstraints(maxWidth: 480),
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -2331,8 +2339,8 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                             ),
                           ],
                         ),
-                        content: SizedBox(
-                          width: 420,
+                        content: Container(
+                          constraints: const BoxConstraints(maxWidth: 420),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2398,29 +2406,12 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                                         ref.read(dcConsoleProvider).selectedDcId ??
                                         ref.read(dcConsoleProvider).activeHubId;
 
-                                    // 1. Mandatory Digital Signature on Glass by DC Supervisor
-                                    final sigResult = await SignaturePadModal.show(
-                                      context: confirmCtx,
-                                      orderId: 'WB-RIDER-${DateTime.now().millisecondsSinceEpoch % 10000}',
-                                      customerName: supervisorName,
-                                    );
-
-                                    if (sigResult == null || sigResult.signatureUrl.isEmpty) {
-                                      messenger.showSnackBar(
-                                        const SnackBar(
-                                          content: Text('⚠️ DC Supervisor digital signature on glass is mandatory to issue stock.'),
-                                          backgroundColor: Color(0xFFF59E0B),
-                                        ),
-                                      );
-                                      return;
-                                    }
-
                                     if (!confirmCtx.mounted) return;
                                     setConfirmState(() => isSubmitting = true);
                                     final res = await showAppLoadingDialog(
                                       context: confirmCtx,
                                       message: 'Authorizing Stock Handover...',
-                                      subMessage: 'Signing & reserving $qty units for ${targetDriver.name}...',
+                                      subMessage: 'Reserving $qty units for ${targetDriver.name}...',
                                       isDark: isDark,
                                       task: () => ref.read(stockProvider.notifier).issueDcStockToRiderWithSignature(
                                             dcId: dcId,
@@ -2433,7 +2424,7 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                                             ],
                                             senderId: supervisorId,
                                             senderName: supervisorName,
-                                            senderSignatureUrl: sigResult.signatureUrl,
+                                            senderSignatureUrl: '',
                                             notes: 'DC Handover to ${targetDriver.name} (${targetDriver.driverCode})',
                                           ),
                                     );
@@ -2444,7 +2435,7 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                                       messenger.showSnackBar(
                                         SnackBar(
                                           content: Text(
-                                            '✅ Handover issued & digitally signed! $qty units reserved. Awaiting ${targetDriver.name} acceptance & signature on glass.',
+                                            '✅ Stock issued! $qty units reserved. Awaiting ${targetDriver.name} verification & custody acceptance on PDA.',
                                           ),
                                           backgroundColor: const Color(0xFF10B981),
                                           duration: const Duration(seconds: 4),
@@ -2462,9 +2453,9 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                                   },
                             icon: isSubmitting
                                 ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                : const Icon(Icons.draw_rounded, size: 16, color: Colors.white),
+                                : const Icon(Icons.send_rounded, size: 16, color: Colors.white),
                             label: Text(
-                              isSubmitting ? 'Signing & Dispatching...' : 'Sign on Glass & Issue to Rider',
+                              isSubmitting ? 'Issuing...' : 'Issue Stock to Rider',
                               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                             ),
                             style: ElevatedButton.styleFrom(
@@ -2547,8 +2538,8 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                 ),
               ],
             ),
-            content: SizedBox(
-              width: 500,
+            content: Container(
+              constraints: const BoxConstraints(maxWidth: 500),
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -2723,8 +2714,8 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                               ),
                             ],
                           ),
-                          content: SizedBox(
-                            width: 420,
+                          content: Container(
+                            constraints: const BoxConstraints(maxWidth: 420),
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -3224,7 +3215,7 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Section 1: Inbound Client Consignments Awaiting Inspection
+          // Section 1: Inbound Client Consignments Awaiting Verification
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -3237,14 +3228,14 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                         const Icon(Icons.mark_email_unread_rounded, color: Color(0xFFF59E0B), size: 22),
                         const SizedBox(width: 8),
                         Text(
-                          'Inbound Client Consignments Awaiting Inspection (${pendingConsignments.length})',
+                          'Inbound Client Consignments Awaiting Intake (${pendingConsignments.length})',
                           style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Dispatched by merchants with digital signature. Physical count and DC supervisor counter-signature required before stock is credited.',
+                      'Dispatched by merchants. Physical count verification and DC supervisor acceptance required before stock is balanced.',
                       style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
                     ),
                   ],
@@ -3280,7 +3271,7 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'All merchant supply consignments to this hub have been verified, signed, and credited.',
+                    'All merchant supply consignments to this hub have been verified, accepted, and credited.',
                     style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
                   ),
                 ],
@@ -3326,17 +3317,17 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                                    color: const Color(0xFFF59E0B).withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      const Icon(Icons.verified_user_rounded, size: 12, color: Color(0xFF10B981)),
+                                      const Icon(Icons.hourglass_top_rounded, size: 12, color: Color(0xFFF59E0B)),
                                       const SizedBox(width: 4),
                                       Text(
-                                        'Merchant Signed',
-                                        style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w700, color: const Color(0xFF10B981)),
+                                        'Awaiting DC Acceptance',
+                                        style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w700, color: const Color(0xFFF59E0B)),
                                       ),
                                     ],
                                   ),
@@ -3369,7 +3360,7 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                           );
                         },
                         icon: const Icon(Icons.fact_check_rounded, size: 16, color: Colors.white),
-                        label: const Text('Inspect & Sign Receipt', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        label: const Text('Verify & Accept Receipt', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF10B981),
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -3381,6 +3372,179 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                 );
               },
             ),
+          const SizedBox(height: 32),
+          const Divider(),
+          const SizedBox(height: 24),
+
+          // Section 2: Inbound Inter-DC Transfers Awaiting Receipt
+          Builder(
+            builder: (context) {
+              final pendingInterDc = stockState.pendingInterDcTransfers.where((t) {
+                if (activeHubId.isNotEmpty) {
+                  if (t.destinationDcId != null && t.destinationDcId!.isNotEmpty && t.destinationDcId != activeHubId) {
+                    return false;
+                  }
+                  if (t.destinationWarehouseId != null && t.destinationWarehouseId!.isNotEmpty && t.destinationWarehouseId != activeHubId) {
+                    return false;
+                  }
+                }
+                return true;
+              }).toList();
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.swap_horiz_rounded, color: Color(0xFF2563EB), size: 22),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Inbound Inter-DC Transfers Awaiting Receipt (${pendingInterDc.length})',
+                                  style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Transfers dispatched from other Distribution Centers. Confirm physical receipt to balance inventory.',
+                              style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () {
+                          ref.read(stockProvider.notifier).fetchStockTransfers(dcId: activeHubId);
+                        },
+                        icon: const Icon(Icons.refresh_rounded, size: 16),
+                        label: const Text('Refresh Transfers'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  if (pendingInterDc.isEmpty)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(Icons.check_circle_outline_rounded, size: 40, color: const Color(0xFF10B981).withValues(alpha: 0.6)),
+                          const SizedBox(height: 10),
+                          Text(
+                            'No Inbound Inter-DC Transfers Pending',
+                            style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'All transfers from other distribution centers have been verified and accepted.',
+                            style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: pendingInterDc.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      itemBuilder: (ctx, idx) {
+                        final trf = pendingInterDc[idx];
+                        return Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFF2563EB).withValues(alpha: 0.4)),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF2563EB).withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(Icons.swap_horiz_rounded, color: Color(0xFF2563EB), size: 24),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Text(
+                                          trf.transferNumber,
+                                          style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFF59E0B).withValues(alpha: 0.1),
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(Icons.hourglass_top_rounded, size: 12, color: Color(0xFFF59E0B)),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                'Awaiting Acceptance',
+                                                style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w700, color: const Color(0xFFF59E0B)),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'From: ${trf.sourceWarehouseName ?? trf.sourceWarehouseId ?? 'Origin DC'} • Dispatched: ${trf.dispatchedAt != null ? trf.dispatchedAt!.toLocal().toString().substring(0, 16) : ''}',
+                                      style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Items: ${trf.items.map((i) => '${i.quantity}x ${i.productName}').join(', ')} (Total: ${trf.totalQuantityRequested} units)',
+                                      style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF2563EB)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              ElevatedButton.icon(
+                                onPressed: () => _showAcceptInterDcTransferDialog(context, trf, activeHubId, isDark),
+                                icon: const Icon(Icons.verified_rounded, size: 16, color: Colors.white),
+                                label: const Text('Accept Transfer', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF10B981),
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                ],
+              );
+            },
+          ),
           const SizedBox(height: 32),
           const Divider(),
           const SizedBox(height: 24),
@@ -3403,6 +3567,128 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
         ],
       ),
     );
+  }
+
+  Future<void> _showAcceptInterDcTransferDialog(
+    BuildContext context,
+    StockTransferRecord trf,
+    String activeHubId,
+    bool isDark,
+  ) async {
+    final authState = ref.read(authProvider);
+    final supervisorName = authState.user?.fullName ?? 'DC Supervisor';
+    final supervisorId = authState.user?.id ?? '';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        title: Row(
+          children: [
+            const Icon(Icons.swap_horiz_rounded, color: Color(0xFF10B981)),
+            const SizedBox(width: 8),
+            Text(
+              'Accept Inter-DC Transfer',
+              style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Confirm receipt of transfer ${trf.transferNumber} from ${trf.sourceWarehouseName ?? trf.sourceWarehouseId ?? "Origin DC"} into this Hub.',
+              style: GoogleFonts.inter(fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: trf.items.map((it) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          it.productName.isNotEmpty ? it.productName : 'Product Item',
+                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      Text(
+                        '${it.quantity} units',
+                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF10B981)),
+                      ),
+                    ],
+                  ),
+                )).toList(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Total: ${trf.totalQuantityRequested} units will be balanced and credited to your warehouse bins.',
+              style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            icon: const Icon(Icons.check_circle_rounded, size: 16, color: Colors.white),
+            label: const Text('Verify & Accept Transfer', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    final res = await showAppLoadingDialog(
+      context: context,
+      message: 'Accepting Transfer...',
+      subMessage: 'Crediting ${trf.totalQuantityRequested} units to Hub inventory...',
+      isDark: isDark,
+      task: () => ref.read(stockProvider.notifier).receiveInterDcTransfer(
+            transferId: trf.id,
+            receiverId: supervisorId,
+            receiverName: supervisorName,
+            quantityReceived: trf.totalQuantityRequested,
+            notes: 'Received and verified at Hub',
+            dcId: activeHubId,
+          ),
+    );
+
+    if (res?['success'] == true) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('✅ Inter-DC transfer accepted! ${trf.totalQuantityRequested} units credited to this Hub.'),
+          backgroundColor: const Color(0xFF10B981),
+        ),
+      );
+      if (mounted) {
+        ref.read(stockProvider.notifier).fetchStockTransfers(dcId: activeHubId);
+        ref.read(stockProvider.notifier).fetchStockItems(null, activeHubId);
+      }
+    } else {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(res?['message']?.toString() ?? '❌ Failed to accept Inter-DC transfer.'),
+          backgroundColor: const Color(0xFFEF4444),
+        ),
+      );
+    }
   }
 
   // ==========================================
@@ -3492,7 +3778,9 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
-                            trf.status.toUpperCase(),
+                            trf.status == 'pending_rider_acceptance'
+                                ? 'AWAITING RIDER ACCEPTANCE'
+                                : trf.status.toUpperCase(),
                             style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: trf.status == 'completed' ? const Color(0xFF059669) : const Color(0xFFD97706)),
                           ),
                         ),

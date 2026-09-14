@@ -1742,13 +1742,16 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Proof of Delivery (POD) Photo / Waybill', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
-                        Text('Order #${_currentOrder.orderNumber} • ${_currentOrder.customerName}', style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B))),
-                      ],
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Proof of Delivery (POD) Photo / Waybill', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16), overflow: TextOverflow.ellipsis),
+                          Text('Order #${_currentOrder.orderNumber} • ${_currentOrder.customerName}', style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)), overflow: TextOverflow.ellipsis),
+                        ],
+                      ),
                     ),
+                    const SizedBox(width: 8),
                     IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close_rounded)),
                   ],
                 ),
@@ -1804,13 +1807,16 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Proof of Delivery (POD) Signature', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
-                        Text('Order #${_currentOrder.orderNumber} • ${_currentOrder.customerName}', style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B))),
-                      ],
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Proof of Delivery (POD) Signature', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16), overflow: TextOverflow.ellipsis),
+                          Text('Order #${_currentOrder.orderNumber} • ${_currentOrder.customerName}', style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)), overflow: TextOverflow.ellipsis),
+                        ],
+                      ),
                     ),
+                    const SizedBox(width: 8),
                     IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close_rounded)),
                   ],
                 ),

@@ -1696,7 +1696,130 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
   ) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final crossAxisCount = constraints.maxWidth < 650 ? 1 : (constraints.maxWidth < 1100 ? 2 : 3);
+        final isMobile = constraints.maxWidth < 650;
+        final crossAxisCount = constraints.maxWidth < 1100 ? 2 : 3;
+
+        Widget buildOrderCard(OrderEntity order) {
+          final isUnassigned = order.deliveryAgentId == null || order.deliveryAgentId!.isEmpty;
+          final isDelivered = order.status == 'delivered';
+          final isFailed = order.status == 'cancelled' || order.status == 'failed' || order.status == 'call_back';
+
+          return InkWell(
+            onTap: () {
+              showDialog(
+                context: context,
+                builder: (ctx) => DCOrderDetailModal(order: order),
+              );
+            },
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: isMobile ? MainAxisAlignment.start : MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('#${order.orderNumber}', style: GoogleFonts.jetBrainsMono(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB))),
+                      _buildOrderStatusBadge(order),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(order.customerName, style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${order.customerPhone} • ${order.deliveryAddress}, ${order.deliveryCity}',
+                        style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
+                        maxLines: isMobile ? 2 : 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '${order.quantity}x ${order.productName} • ${CurrencyFormatter.formatNaira(order.totalAmount)}',
+                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF16A34A)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  if (isMobile)
+                    Divider(height: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)),
+                  if (isMobile)
+                    const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          isUnassigned ? '⚠️ Unassigned' : '🚴 ${order.deliveryAgentName ?? "Rider"}',
+                          style: GoogleFonts.inter(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.bold,
+                            color: isUnassigned ? const Color(0xFFF37021) : const Color(0xFF2563EB),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: [
+                          if (isUnassigned && !isDelivered && !isFailed)
+                            ElevatedButton(
+                              onPressed: () => _showAssignRiderModal(context, isDark, order, dcState, ordersState),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFF37021),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                              ),
+                              child: const Text('Assign', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                            ),
+                          OutlinedButton.icon(
+                            onPressed: () => OrderPipelineChatSheet.showForOrder(context, order),
+                            icon: const Icon(Icons.chat_bubble_outline_rounded, size: 13, color: Color(0xFF0D9488)),
+                            label: const Text('Chat', style: TextStyle(fontSize: 11, color: Color(0xFF0D9488))),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                              side: const BorderSide(color: Color(0xFF0D9488)),
+                            ),
+                          ),
+                          OutlinedButton(
+                            onPressed: () => showDialog(context: context, builder: (ctx) => DCOrderDetailModal(order: order)),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                            ),
+                            child: const Text('Details', style: TextStyle(fontSize: 11)),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        if (isMobile) {
+          return ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: orders.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (ctx, idx) => buildOrderCard(orders[idx]),
+          );
+        }
+
         return GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -1707,95 +1830,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
             mainAxisSpacing: 14,
           ),
           itemCount: orders.length,
-          itemBuilder: (ctx, idx) {
-            final order = orders[idx];
-            final isUnassigned = order.deliveryAgentId == null || order.deliveryAgentId!.isEmpty;
-            final isDelivered = order.status == 'delivered';
-            final isFailed = order.status == 'cancelled' || order.status == 'failed' || order.status == 'call_back';
-
-            return InkWell(
-              onTap: () {
-                showDialog(
-                  context: context,
-                  builder: (ctx) => DCOrderDetailModal(order: order),
-                );
-              },
-              borderRadius: BorderRadius.circular(14),
-              child: Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('#${order.orderNumber}', style: GoogleFonts.jetBrainsMono(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB))),
-                        _buildOrderStatusBadge(order),
-                      ],
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(order.customerName, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold)),
-                        Text('${order.customerPhone} • ${order.deliveryAddress}, ${order.deliveryCity}', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)), maxLines: 1, overflow: TextOverflow.ellipsis),
-                        const SizedBox(height: 4),
-                        Text('${order.quantity}x ${order.productName} • ${CurrencyFormatter.formatNaira(order.totalAmount)}', style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w600, color: const Color(0xFF16A34A))),
-                      ],
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          isUnassigned ? 'Unassigned' : '🚴 ${order.deliveryAgentName ?? "Rider"}',
-                          style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: isUnassigned ? const Color(0xFFF37021) : const Color(0xFF2563EB)),
-                        ),
-                        Row(
-                          children: [
-                            if (isUnassigned && !isDelivered && !isFailed)
-                              ElevatedButton(
-                                onPressed: () => _showAssignRiderModal(context, isDark, order, dcState, ordersState),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFFF37021),
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                                ),
-                                child: const Text('Assign', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                              ),
-                            const SizedBox(width: 6),
-                            OutlinedButton.icon(
-                              onPressed: () => OrderPipelineChatSheet.showForOrder(context, order),
-                              icon: const Icon(Icons.chat_bubble_outline_rounded, size: 13, color: Color(0xFF0D9488)),
-                              label: const Text('Chat', style: TextStyle(fontSize: 11, color: Color(0xFF0D9488))),
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                                side: const BorderSide(color: Color(0xFF0D9488)),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            OutlinedButton(
-                              onPressed: () => showDialog(context: context, builder: (ctx) => DCOrderDetailModal(order: order)),
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                              ),
-                              child: const Text('Details', style: TextStyle(fontSize: 11)),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
+          itemBuilder: (ctx, idx) => buildOrderCard(orders[idx]),
         );
       },
     );

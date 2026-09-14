@@ -18,22 +18,30 @@ import '../widgets/dc_contact_rider_modal.dart';
 import '../widgets/dc_remittance_detail_modal.dart';
 import '../widgets/dc_rider_detail_modal.dart';
 
-final dcOrderMatchingSearchProvider = StateProvider.autoDispose<String>((ref) => '');
-final dcOrderMatchingFilterProvider = StateProvider.autoDispose<String>((ref) => 'all');
-final dcOrderMatchingRiderFilterProvider = StateProvider.autoDispose<String?>((ref) => null);
-final dcOrderMatchingTableViewProvider = StateProvider.autoDispose<bool>((ref) => true);
-final dcOrderMatchingDateFilterProvider = StateProvider.autoDispose<String>((ref) => 'all_time');
+final dcOrderMatchingSearchProvider =
+    StateProvider.autoDispose<String>((ref) => '');
+final dcOrderMatchingFilterProvider =
+    StateProvider.autoDispose<String>((ref) => 'all');
+final dcOrderMatchingRiderFilterProvider =
+    StateProvider.autoDispose<String?>((ref) => null);
+final dcOrderMatchingTableViewProvider =
+    StateProvider.autoDispose<bool>((ref) => true);
+final dcOrderMatchingDateFilterProvider =
+    StateProvider.autoDispose<String>((ref) => 'all_time');
 final dcOrderMatchingPageProvider = StateProvider.autoDispose<int>((ref) => 1);
-final dcOrderMatchingRowsPerPageProvider = StateProvider.autoDispose<int>((ref) => 15);
+final dcOrderMatchingRowsPerPageProvider =
+    StateProvider.autoDispose<int>((ref) => 15);
 
 class DCOrderPaymentMatchingPage extends ConsumerStatefulWidget {
   const DCOrderPaymentMatchingPage({super.key});
 
   @override
-  DCOrderPaymentMatchingPageState createState() => DCOrderPaymentMatchingPageState();
+  DCOrderPaymentMatchingPageState createState() =>
+      DCOrderPaymentMatchingPageState();
 }
 
-class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchingPage> {
+class DCOrderPaymentMatchingPageState
+    extends ConsumerState<DCOrderPaymentMatchingPage> {
   final TextEditingController _searchController = TextEditingController();
   Timer? _searchDebounceTimer;
 
@@ -45,7 +53,8 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
       final dcState = ref.read(dcConsoleProvider);
       final activeDcId = dcState.activeHubId.isNotEmpty
           ? dcState.activeHubId
-          : (user?.distributionCenterId ?? '22222222-2222-4222-8222-222222222222');
+          : (user?.distributionCenterId ??
+              '22222222-2222-4222-8222-222222222222');
       ref.read(ordersProvider.notifier).loadDcOrders(activeDcId);
       ref.read(financeProvider.notifier).loadRemittances(activeDcId);
       ref.read(dcConsoleProvider.notifier).loadDriversFromDatabase();
@@ -82,7 +91,9 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
     if (allDrivers.isEmpty) return null;
 
     // 1. Exact ID
-    if (agentId != null && agentId.isNotEmpty && driverById.containsKey(agentId)) {
+    if (agentId != null &&
+        agentId.isNotEmpty &&
+        driverById.containsKey(agentId)) {
       return driverById[agentId];
     }
 
@@ -93,7 +104,9 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
     }
 
     // 3. Exact Name (case-insensitive)
-    if (agentName != null && agentName.isNotEmpty && agentName != 'Fleet Rider') {
+    if (agentName != null &&
+        agentName.isNotEmpty &&
+        agentName != 'Fleet Rider') {
       final match = driverByName[agentName.toLowerCase()];
       if (match != null) return match;
     }
@@ -148,7 +161,8 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
       if (rem.isVerified) {
         for (final ao in rem.associatedOrders) {
           if (ao.orderId.isNotEmpty) verifiedOrderNumbers.add(ao.orderId);
-          if (ao.orderNumber.isNotEmpty) verifiedOrderNumbers.add(ao.orderNumber);
+          if (ao.orderNumber.isNotEmpty)
+            verifiedOrderNumbers.add(ao.orderNumber);
         }
       }
     }
@@ -167,13 +181,15 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
             order.remittanceStatus.toLowerCase() == 'remitted' ||
             order.remittanceStatus.toLowerCase() == 'cleared' ||
             order.paymentStatus.toLowerCase() == 'remitted' ||
-            order.financialSettlementStatus.toLowerCase() == 'cash_remitted_verified' ||
+            order.financialSettlementStatus.toLowerCase() ==
+                'cash_remitted_verified' ||
             (order.deliveryNotes?.contains('[REMITTED') == true) ||
             verifiedOrderNumbers.contains(order.id) ||
             verifiedOrderNumbers.contains(order.orderNumber);
 
         if (!isRemitted) {
-          final riderKey = order.deliveryAgentId ?? order.deliveryAgentCode ?? 'unassigned';
+          final riderKey =
+              order.deliveryAgentId ?? order.deliveryAgentCode ?? 'unassigned';
           unremittedCashByRider.putIfAbsent(riderKey, () => []).add(order);
         }
       }
@@ -184,10 +200,14 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
       riderOrders.sort((a, b) => a.createdAt.compareTo(b.createdAt));
       final firstOrder = riderOrders.first;
       final totalGross = riderOrders.fold(0.0, (sum, o) => sum + o.totalAmount);
-      final riderCommission = riderOrders.length * dcState.financeSettings.defaultCommissionRate;
-      final transportAllowance = dcState.financeSettings.defaultTransportAllowance;
+      final riderCommission =
+          riderOrders.length * dcState.financeSettings.defaultCommissionRate;
+      final transportAllowance =
+          dcState.financeSettings.defaultTransportAllowance;
       final posFee = dcState.financeSettings.computePosFee(totalGross);
-      final netDue = (totalGross - riderCommission - transportAllowance - posFee).clamp(0.0, totalGross);
+      final netDue =
+          (totalGross - riderCommission - transportAllowance - posFee)
+              .clamp(0.0, totalGross);
 
       final resolvedDriver = _resolveDriverFast(
         firstOrder.deliveryAgentId ?? riderKey,
@@ -199,18 +219,31 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
         dcState.drivers,
       );
 
-      final riderName = (resolvedDriver?.name.isNotEmpty == true && resolvedDriver!.name != 'Fleet Rider')
+      final riderName = (resolvedDriver?.name.isNotEmpty == true &&
+              resolvedDriver!.name != 'Fleet Rider')
           ? resolvedDriver.name
-          : (firstOrder.deliveryAgentName != null && firstOrder.deliveryAgentName!.isNotEmpty && firstOrder.deliveryAgentName != 'Fleet Rider'
+          : (firstOrder.deliveryAgentName != null &&
+                  firstOrder.deliveryAgentName!.isNotEmpty &&
+                  firstOrder.deliveryAgentName != 'Fleet Rider'
               ? firstOrder.deliveryAgentName!
-              : (resolvedDriver?.name ?? (dcState.drivers.isNotEmpty ? dcState.drivers.first.name : 'Unassigned Rider')));
+              : (resolvedDriver?.name ??
+                  (dcState.drivers.isNotEmpty
+                      ? dcState.drivers.first.name
+                      : 'Unassigned Rider')));
 
-      final riderCode = (resolvedDriver?.driverCode.isNotEmpty == true && resolvedDriver!.driverCode != 'PDA-7000')
+      final riderCode = (resolvedDriver?.driverCode.isNotEmpty == true &&
+              resolvedDriver!.driverCode != 'PDA-7000')
           ? resolvedDriver.driverCode
-          : (firstOrder.deliveryAgentCode ?? (resolvedDriver?.driverCode ?? (dcState.drivers.isNotEmpty ? dcState.drivers.first.driverCode : 'UNASSIGNED')));
+          : (firstOrder.deliveryAgentCode ??
+              (resolvedDriver?.driverCode ??
+                  (dcState.drivers.isNotEmpty
+                      ? dcState.drivers.first.driverCode
+                      : 'UNASSIGNED')));
 
       final riderAvatarUrl = resolvedDriver?.avatarUrl ?? '';
-      final riderPhone = resolvedDriver?.phone ?? firstOrder.deliveryAgentPhone ?? firstOrder.customerPhone;
+      final riderPhone = resolvedDriver?.phone ??
+          firstOrder.deliveryAgentPhone ??
+          firstOrder.customerPhone;
 
       items.add(
         DCRemittanceLifecycleItem(
@@ -238,7 +271,10 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
 
     // 2. Add Direct Transfer (Paystack / Monnify) Instant Settled Remittances
     for (final order in allOrders) {
-      if (order.isDirectTransfer || (order.status == 'delivered' && (order.paymentType == 'direct_transfer' || order.paymentType == 'prepaid'))) {
+      if (order.isDirectTransfer ||
+          (order.status == 'delivered' &&
+              (order.paymentType == 'direct_transfer' ||
+                  order.paymentType == 'prepaid'))) {
         final resolvedDriver = _resolveDriverFast(
           order.deliveryAgentId,
           order.deliveryAgentCode,
@@ -249,24 +285,37 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
           dcState.drivers,
         );
 
-        final riderName = (resolvedDriver?.name.isNotEmpty == true && resolvedDriver!.name != 'Fleet Rider')
+        final riderName = (resolvedDriver?.name.isNotEmpty == true &&
+                resolvedDriver!.name != 'Fleet Rider')
             ? resolvedDriver.name
-            : (order.deliveryAgentName != null && order.deliveryAgentName!.isNotEmpty && order.deliveryAgentName != 'Fleet Rider'
+            : (order.deliveryAgentName != null &&
+                    order.deliveryAgentName!.isNotEmpty &&
+                    order.deliveryAgentName != 'Fleet Rider'
                 ? order.deliveryAgentName!
-                : (resolvedDriver?.name ?? (dcState.drivers.isNotEmpty ? dcState.drivers.first.name : 'Unassigned Rider')));
+                : (resolvedDriver?.name ??
+                    (dcState.drivers.isNotEmpty
+                        ? dcState.drivers.first.name
+                        : 'Unassigned Rider')));
 
-        final riderCode = (resolvedDriver?.driverCode.isNotEmpty == true && resolvedDriver!.driverCode != 'PDA-7000')
+        final riderCode = (resolvedDriver?.driverCode.isNotEmpty == true &&
+                resolvedDriver!.driverCode != 'PDA-7000')
             ? resolvedDriver.driverCode
-            : (order.deliveryAgentCode ?? (resolvedDriver?.driverCode ?? (dcState.drivers.isNotEmpty ? dcState.drivers.first.driverCode : 'UNASSIGNED')));
+            : (order.deliveryAgentCode ??
+                (resolvedDriver?.driverCode ??
+                    (dcState.drivers.isNotEmpty
+                        ? dcState.drivers.first.driverCode
+                        : 'UNASSIGNED')));
 
         final riderAvatarUrl = resolvedDriver?.avatarUrl ?? '';
-        final riderPhone = resolvedDriver?.phone ?? order.deliveryAgentPhone ?? '08031234567';
+        final riderPhone =
+            resolvedDriver?.phone ?? order.deliveryAgentPhone ?? '08031234567';
 
         items.add(
           DCRemittanceLifecycleItem(
             id: 'dt-${order.id}',
             referenceNumber: 'DT-${order.orderNumber}',
-            riderId: resolvedDriver?.id ?? order.deliveryAgentId ?? 'rider-unknown',
+            riderId:
+                resolvedDriver?.id ?? order.deliveryAgentId ?? 'rider-unknown',
             riderName: riderName,
             riderCode: riderCode,
             riderAvatarUrl: riderAvatarUrl,
@@ -296,7 +345,8 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
         for (final ao in rem.associatedOrders) {
           if (ao.orderId.isNotEmpty && ordersById.containsKey(ao.orderId)) {
             matchingOrders.add(ordersById[ao.orderId]!);
-          } else if (ao.orderNumber.isNotEmpty && ordersByNumber.containsKey(ao.orderNumber)) {
+          } else if (ao.orderNumber.isNotEmpty &&
+              ordersByNumber.containsKey(ao.orderNumber)) {
             matchingOrders.add(ordersByNumber[ao.orderNumber]!);
           }
         }
@@ -316,7 +366,8 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
           processedOrderIds.add(mo.id);
         }
 
-        final firstMatch = matchingOrders.isNotEmpty ? matchingOrders.first : null;
+        final firstMatch =
+            matchingOrders.isNotEmpty ? matchingOrders.first : null;
         final resolvedDriver = _resolveDriverFast(
           rem.deliveryAgentId,
           firstMatch?.deliveryAgentCode,
@@ -327,20 +378,34 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
           dcState.drivers,
         );
 
-        final riderName = (resolvedDriver?.name.isNotEmpty == true && resolvedDriver!.name != 'Fleet Rider')
+        final riderName = (resolvedDriver?.name.isNotEmpty == true &&
+                resolvedDriver!.name != 'Fleet Rider')
             ? resolvedDriver.name
-            : (firstMatch?.deliveryAgentName != null && firstMatch!.deliveryAgentName!.isNotEmpty && firstMatch.deliveryAgentName != 'Fleet Rider'
+            : (firstMatch?.deliveryAgentName != null &&
+                    firstMatch!.deliveryAgentName!.isNotEmpty &&
+                    firstMatch.deliveryAgentName != 'Fleet Rider'
                 ? firstMatch.deliveryAgentName!
-                : (resolvedDriver?.name ?? (dcState.drivers.isNotEmpty ? dcState.drivers.first.name : 'Unassigned Rider')));
+                : (resolvedDriver?.name ??
+                    (dcState.drivers.isNotEmpty
+                        ? dcState.drivers.first.name
+                        : 'Unassigned Rider')));
 
-        final riderCode = (resolvedDriver?.driverCode.isNotEmpty == true && resolvedDriver!.driverCode != 'PDA-7000')
+        final riderCode = (resolvedDriver?.driverCode.isNotEmpty == true &&
+                resolvedDriver!.driverCode != 'PDA-7000')
             ? resolvedDriver.driverCode
-            : (firstMatch?.deliveryAgentCode ?? (resolvedDriver?.driverCode ?? (dcState.drivers.isNotEmpty ? dcState.drivers.first.driverCode : 'UNASSIGNED')));
+            : (firstMatch?.deliveryAgentCode ??
+                (resolvedDriver?.driverCode ??
+                    (dcState.drivers.isNotEmpty
+                        ? dcState.drivers.first.driverCode
+                        : 'UNASSIGNED')));
 
         final riderAvatarUrl = resolvedDriver?.avatarUrl ?? '';
-        final riderPhone = resolvedDriver?.phone ?? firstMatch?.deliveryAgentPhone ?? '08031234567';
+        final riderPhone = resolvedDriver?.phone ??
+            firstMatch?.deliveryAgentPhone ??
+            '08031234567';
 
-        final gross = rem.grossCollections > 0 ? rem.grossCollections : rem.amount;
+        final gross =
+            rem.grossCollections > 0 ? rem.grossCollections : rem.amount;
         final commission = rem.commissionDeducted;
         final transport = rem.transportAllowanceDeducted;
         final pos = rem.posFee;
@@ -356,7 +421,9 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
             riderAvatarUrl: riderAvatarUrl,
             riderPhone: riderPhone,
             type: 'cash_pod',
-            status: rem.isVerified ? 'verified' : (rem.isPending ? 'pending_audit' : rem.status),
+            status: rem.isVerified
+                ? 'verified'
+                : (rem.isPending ? 'pending_audit' : rem.status),
             openingDate: rem.createdAt,
             closingDate: rem.verifiedAt ?? rem.createdAt,
             grossAmount: gross,
@@ -366,7 +433,8 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
             posFee: pos,
             netAmount: net,
             orders: matchingOrders,
-            paymentMethod: rem.paymentMethod.isNotEmpty ? rem.paymentMethod : 'paystack',
+            paymentMethod:
+                rem.paymentMethod.isNotEmpty ? rem.paymentMethod : 'paystack',
             depositReceiptUrl: rem.depositReceiptUrl,
             verifiedByName: rem.verifiedByName,
             verifiedAt: rem.verifiedAt,
@@ -380,7 +448,8 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
     for (final order in allOrders) {
       if (!order.isDirectTransfer &&
           order.status == 'delivered' &&
-          (order.remittanceStatus.toLowerCase() == 'remitted' || order.remittanceStatus.toLowerCase() == 'cleared') &&
+          (order.remittanceStatus.toLowerCase() == 'remitted' ||
+              order.remittanceStatus.toLowerCase() == 'cleared') &&
           !processedOrderIds.contains(order.id)) {
         final resolvedDriver = _resolveDriverFast(
           order.deliveryAgentId,
@@ -392,24 +461,37 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
           dcState.drivers,
         );
 
-        final riderName = (resolvedDriver?.name.isNotEmpty == true && resolvedDriver!.name != 'Fleet Rider')
+        final riderName = (resolvedDriver?.name.isNotEmpty == true &&
+                resolvedDriver!.name != 'Fleet Rider')
             ? resolvedDriver.name
-            : (order.deliveryAgentName != null && order.deliveryAgentName!.isNotEmpty && order.deliveryAgentName != 'Fleet Rider'
+            : (order.deliveryAgentName != null &&
+                    order.deliveryAgentName!.isNotEmpty &&
+                    order.deliveryAgentName != 'Fleet Rider'
                 ? order.deliveryAgentName!
-                : (resolvedDriver?.name ?? (dcState.drivers.isNotEmpty ? dcState.drivers.first.name : 'Unassigned Rider')));
+                : (resolvedDriver?.name ??
+                    (dcState.drivers.isNotEmpty
+                        ? dcState.drivers.first.name
+                        : 'Unassigned Rider')));
 
-        final riderCode = (resolvedDriver?.driverCode.isNotEmpty == true && resolvedDriver!.driverCode != 'PDA-7000')
+        final riderCode = (resolvedDriver?.driverCode.isNotEmpty == true &&
+                resolvedDriver!.driverCode != 'PDA-7000')
             ? resolvedDriver.driverCode
-            : (order.deliveryAgentCode ?? (resolvedDriver?.driverCode ?? (dcState.drivers.isNotEmpty ? dcState.drivers.first.driverCode : 'UNASSIGNED')));
+            : (order.deliveryAgentCode ??
+                (resolvedDriver?.driverCode ??
+                    (dcState.drivers.isNotEmpty
+                        ? dcState.drivers.first.driverCode
+                        : 'UNASSIGNED')));
 
         final riderAvatarUrl = resolvedDriver?.avatarUrl ?? '';
-        final riderPhone = resolvedDriver?.phone ?? order.deliveryAgentPhone ?? '08031234567';
+        final riderPhone =
+            resolvedDriver?.phone ?? order.deliveryAgentPhone ?? '08031234567';
 
         items.add(
           DCRemittanceLifecycleItem(
             id: 'rem-${order.id}',
             referenceNumber: 'REM-${order.orderNumber}',
-            riderId: resolvedDriver?.id ?? order.deliveryAgentId ?? 'rider-unknown',
+            riderId:
+                resolvedDriver?.id ?? order.deliveryAgentId ?? 'rider-unknown',
             riderName: riderName,
             riderCode: riderCode,
             riderAvatarUrl: riderAvatarUrl,
@@ -417,12 +499,18 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
             type: 'cash_pod',
             status: 'verified',
             openingDate: order.createdAt,
-            closingDate: order.remittedAt ?? order.createdAt.add(const Duration(hours: 3)),
+            closingDate: order.remittedAt ??
+                order.createdAt.add(const Duration(hours: 3)),
             grossAmount: order.totalAmount,
             commissionAmount: dcState.financeSettings.defaultCommissionRate,
-            transportAllowance: dcState.financeSettings.defaultTransportAllowance,
+            transportAllowance:
+                dcState.financeSettings.defaultTransportAllowance,
             posFee: dcState.financeSettings.computePosFee(order.totalAmount),
-            netAmount: (order.totalAmount - dcState.financeSettings.defaultCommissionRate - dcState.financeSettings.defaultTransportAllowance - dcState.financeSettings.computePosFee(order.totalAmount)).clamp(0.0, order.totalAmount),
+            netAmount: (order.totalAmount -
+                    dcState.financeSettings.defaultCommissionRate -
+                    dcState.financeSettings.defaultTransportAllowance -
+                    dcState.financeSettings.computePosFee(order.totalAmount))
+                .clamp(0.0, order.totalAmount),
             orders: [order],
             paymentMethod: 'cash_to_dc',
           ),
@@ -437,7 +525,8 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
       if (!a.isVerified && !b.isVerified) {
         return a.openingDate.compareTo(b.openingDate);
       }
-      return (b.closingDate ?? b.openingDate).compareTo(a.closingDate ?? a.openingDate);
+      return (b.closingDate ?? b.openingDate)
+          .compareTo(a.closingDate ?? a.openingDate);
     });
 
     return items;
@@ -457,13 +546,17 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
 
     return items.where((item) {
       // 1. Status Filter (Remitted vs Not Remitted)
-      if (selectedFilter == 'not_remitted' && (item.isVerified || item.isDirectTransfer)) return false;
-      if (selectedFilter == 'remitted' && (!item.isVerified || item.isDirectTransfer)) return false;
-      if (selectedFilter == 'direct_paystack' && !item.isDirectTransfer) return false;
+      if (selectedFilter == 'not_remitted' &&
+          (item.isVerified || item.isDirectTransfer)) return false;
+      if (selectedFilter == 'remitted' &&
+          (!item.isVerified || item.isDirectTransfer)) return false;
+      if (selectedFilter == 'direct_paystack' && !item.isDirectTransfer)
+        return false;
 
       // 2. Rider Filter
       if (selectedRiderFilter != null && selectedRiderFilter.isNotEmpty) {
-        if (item.riderCode != selectedRiderFilter && item.riderId != selectedRiderFilter) return false;
+        if (item.riderCode != selectedRiderFilter &&
+            item.riderId != selectedRiderFilter) return false;
       }
 
       // 3. Opening Date Filter
@@ -473,7 +566,8 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
       } else if (dateFilter == 'yesterday') {
         final yesterdayStart = todayStart.subtract(const Duration(days: 1));
         final yesterdayEnd = todayStart.subtract(const Duration(seconds: 1));
-        if (date.isBefore(yesterdayStart) || date.isAfter(yesterdayEnd)) return false;
+        if (date.isBefore(yesterdayStart) || date.isAfter(yesterdayEnd))
+          return false;
       } else if (dateFilter == 'this_week') {
         final weekStart = todayStart.subtract(Duration(days: now.weekday - 1));
         if (date.isBefore(weekStart)) return false;
@@ -511,30 +605,34 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
 
   void _openRiderProfile(DCRemittanceLifecycleItem item) {
     final dcState = ref.read(dcConsoleProvider);
-    final matchedDriver = dcState.drivers.where((d) =>
-        (item.riderId.isNotEmpty && d.id == item.riderId) ||
-        (item.riderCode.isNotEmpty && d.driverCode.toLowerCase() == item.riderCode.toLowerCase()) ||
-        (item.riderName.isNotEmpty && d.name.toLowerCase() == item.riderName.toLowerCase())
-    ).firstOrNull;
+    final matchedDriver = dcState.drivers
+        .where((d) =>
+            (item.riderId.isNotEmpty && d.id == item.riderId) ||
+            (item.riderCode.isNotEmpty &&
+                d.driverCode.toLowerCase() == item.riderCode.toLowerCase()) ||
+            (item.riderName.isNotEmpty &&
+                d.name.toLowerCase() == item.riderName.toLowerCase()))
+        .firstOrNull;
 
-    final driver = matchedDriver ?? DCFleetDriver(
-      id: item.riderId,
-      driverCode: item.riderCode,
-      name: item.riderName,
-      phone: item.riderPhone ?? '08031234567',
-      avatarUrl: item.riderAvatarUrl ?? '',
-      vehicleModel: 'Bajaj Boxer 150',
-      vehiclePlate: 'ABJ-894-XA',
-      vehicleType: 'Motorcycle',
-      status: 'active',
-      assignedZone: 'Abuja Municipal',
-      totalAssignedOrders: item.orderCount,
-      completedOrders: item.orderCount,
-      routeProgressPercent: 100.0,
-      efficiencyRating: 98.5,
-      cashInCustody: item.grossAmount,
-      itemsInCustody: item.orderCount,
-    );
+    final driver = matchedDriver ??
+        DCFleetDriver(
+          id: item.riderId,
+          driverCode: item.riderCode,
+          name: item.riderName,
+          phone: item.riderPhone ?? '08031234567',
+          avatarUrl: item.riderAvatarUrl ?? '',
+          vehicleModel: 'Bajaj Boxer 150',
+          vehiclePlate: 'ABJ-894-XA',
+          vehicleType: 'Motorcycle',
+          status: 'active',
+          assignedZone: 'Abuja Municipal',
+          totalAssignedOrders: item.orderCount,
+          completedOrders: item.orderCount,
+          routeProgressPercent: 100.0,
+          efficiencyRating: 98.5,
+          cashInCustody: item.grossAmount,
+          itemsInCustody: item.orderCount,
+        );
 
     DCRiderDetailModal.show(context, driver);
   }
@@ -557,21 +655,27 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
     final isMobile = screenWidth < 768;
 
     final allDcs = dcState.distributionCenters;
-    final activeDc = allDcs.where(
-      (d) => d.id == dcState.activeHubId || d.code == dcState.activeHubCode,
-    ).firstOrNull ?? DistributionCenter(
-      id: dcState.activeHubId,
-      name: dcState.activeHubName,
-      code: dcState.activeHubCode,
-      state: dcState.isCurrentHubGrandDc ? 'Abuja (FCT)' : '',
-      city: '',
-      address: '',
-      isGrandDc: dcState.isCurrentHubGrandDc,
-      isHub: dcState.isCurrentHubGrandDc,
-    );
+    final activeDc = allDcs
+            .where(
+              (d) =>
+                  d.id == dcState.activeHubId ||
+                  d.code == dcState.activeHubCode,
+            )
+            .firstOrNull ??
+        DistributionCenter(
+          id: dcState.activeHubId,
+          name: dcState.activeHubName,
+          code: dcState.activeHubCode,
+          state: dcState.isCurrentHubGrandDc ? 'Abuja (FCT)' : '',
+          city: '',
+          address: '',
+          isGrandDc: dcState.isCurrentHubGrandDc,
+          isHub: dcState.isCurrentHubGrandDc,
+        );
 
     ref.listen<DCConsoleState>(dcConsoleProvider, (previous, next) {
-      if (previous?.activeHubId != next.activeHubId && next.activeHubId.isNotEmpty) {
+      if (previous?.activeHubId != next.activeHubId &&
+          next.activeHubId.isNotEmpty) {
         ref.read(ordersProvider.notifier).loadDcOrders(next.activeHubId);
         ref.read(financeProvider.notifier).loadRemittances(next.activeHubId);
       }
@@ -586,30 +690,44 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
     }).toList();
     final dcRiderIds = dcState.drivers.map((d) => d.id).toSet();
     final allRemittances = financeState.remittances.where((r) {
-      if (r.distributionCenterId != null && r.distributionCenterId!.isNotEmpty) {
+      if (r.distributionCenterId != null &&
+          r.distributionCenterId!.isNotEmpty) {
         return r.distributionCenterId == activeDc.id;
       }
       return dcRiderIds.contains(r.deliveryAgentId);
     }).toList();
 
     // Fast Single-Pass Processing
-    final allLifecycleItems = _buildRemittanceLifecycleItems(allOrders, allRemittances, dcState);
-    final filteredItems = _filterRemittances(allLifecycleItems, selectedFilter, selectedRiderFilter, searchQuery, dateFilter);
+    final allLifecycleItems =
+        _buildRemittanceLifecycleItems(allOrders, allRemittances, dcState);
+    final filteredItems = _filterRemittances(allLifecycleItems, selectedFilter,
+        selectedRiderFilter, searchQuery, dateFilter);
 
     // Compute Key Metrics
-    final totalMonitoredValue = allOrders.fold(0.0, (sum, o) => sum + o.totalAmount);
-    final directPaystackItems = allLifecycleItems.where((i) => i.isDirectTransfer).toList();
-    final directPaystackSum = directPaystackItems.fold(0.0, (sum, i) => sum + i.grossAmount);
+    final totalMonitoredValue =
+        allOrders.fold(0.0, (sum, o) => sum + o.totalAmount);
+    final directPaystackItems =
+        allLifecycleItems.where((i) => i.isDirectTransfer).toList();
+    final directPaystackSum =
+        directPaystackItems.fold(0.0, (sum, i) => sum + i.grossAmount);
 
-    final notRemittedItems = allLifecycleItems.where((i) => !i.isVerified && !i.isDirectTransfer).toList();
-    final notRemittedGross = notRemittedItems.fold(0.0, (sum, i) => sum + i.grossAmount);
-    final notRemittedNet = notRemittedItems.fold(0.0, (sum, i) => sum + i.netAmount);
+    final notRemittedItems = allLifecycleItems
+        .where((i) => !i.isVerified && !i.isDirectTransfer)
+        .toList();
+    final notRemittedGross =
+        notRemittedItems.fold(0.0, (sum, i) => sum + i.grossAmount);
+    final notRemittedNet =
+        notRemittedItems.fold(0.0, (sum, i) => sum + i.netAmount);
 
-    final remittedItems = allLifecycleItems.where((i) => i.isVerified && !i.isDirectTransfer).toList();
-    final remittedSum = remittedItems.fold(0.0, (sum, i) => sum + i.grossAmount);
+    final remittedItems = allLifecycleItems
+        .where((i) => i.isVerified && !i.isDirectTransfer)
+        .toList();
+    final remittedSum =
+        remittedItems.fold(0.0, (sum, i) => sum + i.grossAmount);
 
     // Compute Pagination Slice
-    final totalPages = (filteredItems.length / rowsPerPage).ceil().clamp(1, 9999);
+    final totalPages =
+        (filteredItems.length / rowsPerPage).ceil().clamp(1, 9999);
     final safePage = currentPage.clamp(1, totalPages);
     final startIndex = (safePage - 1) * rowsPerPage;
     final endIndex = (startIndex + rowsPerPage).clamp(0, filteredItems.length);
@@ -624,7 +742,8 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
     }
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0B1120) : const Color(0xFFF8FAFC),
+      backgroundColor:
+          isDark ? const Color(0xFF0B1120) : const Color(0xFFF8FAFC),
       body: SingleChildScrollView(
         padding: EdgeInsets.all(isMobile ? 14 : 22),
         child: Column(
@@ -644,10 +763,12 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
                             Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFF37021).withValues(alpha: 0.15),
+                                color: const Color(0xFFF37021)
+                                    .withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: const Icon(Icons.payments_rounded, color: Color(0xFFF37021), size: 22),
+                              child: const Icon(Icons.payments_rounded,
+                                  color: Color(0xFFF37021), size: 22),
                             ),
                             const SizedBox(width: 10),
                             Flexible(
@@ -656,7 +777,9 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
                                 style: GoogleFonts.inter(
                                   fontSize: isMobile ? 17 : 21,
                                   fontWeight: FontWeight.w900,
-                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                  color: isDark
+                                      ? Colors.white
+                                      : const Color(0xFF0F172A),
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -675,14 +798,22 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.refresh_rounded, color: Color(0xFF64748B)),
+                    icon: const Icon(Icons.refresh_rounded,
+                        color: Color(0xFF64748B)),
                     tooltip: 'Refresh Remittances',
                     onPressed: () {
                       final user = ref.read(authProvider).user;
-                      final activeDcId = user?.distributionCenterId ?? '22222222-2222-4222-8222-222222222222';
-                      ref.read(ordersProvider.notifier).loadDcOrders(activeDcId);
-                      ref.read(financeProvider.notifier).loadRemittances(activeDcId);
-                      ref.read(dcConsoleProvider.notifier).loadDriversFromDatabase();
+                      final activeDcId = user?.distributionCenterId ??
+                          '22222222-2222-4222-8222-222222222222';
+                      ref
+                          .read(ordersProvider.notifier)
+                          .loadDcOrders(activeDcId);
+                      ref
+                          .read(financeProvider.notifier)
+                          .loadRemittances(activeDcId);
+                      ref
+                          .read(dcConsoleProvider.notifier)
+                          .loadDriversFromDatabase();
                     },
                   ),
                 ],
@@ -709,45 +840,64 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
                     children: [
                       _buildSummaryCard(
                         title: 'TOTAL MONITORED VALUE',
-                        value: CurrencyFormatter.formatNaira(totalMonitoredValue),
+                        value:
+                            CurrencyFormatter.formatNaira(totalMonitoredValue),
                         subtext: '${allOrders.length} Shipments Audited',
                         icon: Icons.receipt_long_rounded,
                         iconColor: const Color(0xFF3B82F6),
-                        bgColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-                        borderColor: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                        bgColor:
+                            isDark ? const Color(0xFF1E293B) : Colors.white,
+                        borderColor: isDark
+                            ? const Color(0xFF334155)
+                            : const Color(0xFFE2E8F0),
                         width: cardWidth,
                         isDark: isDark,
                       ),
                       _buildSummaryCard(
                         title: 'DIRECT PAYSTACK PAID',
                         value: CurrencyFormatter.formatNaira(directPaystackSum),
-                        subtext: '${directPaystackItems.length} Direct Settlements • ₦0 Held',
+                        subtext:
+                            '${directPaystackItems.length} Direct Settlements • ₦0 Held',
                         icon: Icons.bolt_rounded,
                         iconColor: const Color(0xFF00A2D3),
-                        bgColor: isDark ? const Color(0xFF0C243B) : const Color(0xFFF0F9FF),
-                        borderColor: isDark ? const Color(0xFF0369A1) : const Color(0xFFBAE6FD),
+                        bgColor: isDark
+                            ? const Color(0xFF0C243B)
+                            : const Color(0xFFF0F9FF),
+                        borderColor: isDark
+                            ? const Color(0xFF0369A1)
+                            : const Color(0xFFBAE6FD),
                         width: cardWidth,
                         isDark: isDark,
                       ),
                       _buildSummaryCard(
                         title: 'NOT REMITTED (HELD BY RIDERS)',
                         value: CurrencyFormatter.formatNaira(notRemittedNet),
-                        subtext: '${notRemittedItems.length} Open Batches (${CurrencyFormatter.formatNaira(notRemittedGross)} Gross)',
+                        subtext:
+                            '${notRemittedItems.length} Open Batches (${CurrencyFormatter.formatNaira(notRemittedGross)} Gross)',
                         icon: Icons.warning_amber_rounded,
                         iconColor: const Color(0xFFF59E0B),
-                        bgColor: isDark ? const Color(0xFF2D2305) : const Color(0xFFFFFBEB),
-                        borderColor: isDark ? const Color(0xFFB45309) : const Color(0xFFFDE68A),
+                        bgColor: isDark
+                            ? const Color(0xFF2D2305)
+                            : const Color(0xFFFFFBEB),
+                        borderColor: isDark
+                            ? const Color(0xFFB45309)
+                            : const Color(0xFFFDE68A),
                         width: cardWidth,
                         isDark: isDark,
                       ),
                       _buildSummaryCard(
                         title: 'REMITTED & RECONCILED',
                         value: CurrencyFormatter.formatNaira(remittedSum),
-                        subtext: '${remittedItems.length} Batches Cleared into Treasury',
+                        subtext:
+                            '${remittedItems.length} Batches Cleared into Treasury',
                         icon: Icons.check_circle_rounded,
                         iconColor: const Color(0xFF10B981),
-                        bgColor: isDark ? const Color(0xFF062D1F) : const Color(0xFFECFDF5),
-                        borderColor: isDark ? const Color(0xFF047857) : const Color(0xFFA7F3D0),
+                        bgColor: isDark
+                            ? const Color(0xFF062D1F)
+                            : const Color(0xFFECFDF5),
+                        borderColor: isDark
+                            ? const Color(0xFF047857)
+                            : const Color(0xFFA7F3D0),
                         width: cardWidth,
                         isDark: isDark,
                       ),
@@ -765,10 +915,14 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
                 decoration: BoxDecoration(
                   color: isDark ? const Color(0xFF1E293B) : Colors.white,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                  border: Border.all(
+                      color: isDark
+                          ? const Color(0xFF334155)
+                          : const Color(0xFFE2E8F0)),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+                      color:
+                          Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
                       blurRadius: 10,
                       offset: const Offset(0, 2),
                     ),
@@ -781,30 +935,50 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
                     final searchBox = Container(
                       height: 42,
                       decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                        color: isDark
+                            ? const Color(0xFF0F172A)
+                            : const Color(0xFFF8FAFC),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                        border: Border.all(
+                            color: isDark
+                                ? const Color(0xFF334155)
+                                : const Color(0xFFE2E8F0)),
                       ),
                       child: TextField(
                         controller: _searchController,
                         onChanged: _onSearchChanged,
-                        style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                        style: GoogleFonts.inter(
+                            fontSize: 13,
+                            color: isDark
+                                ? Colors.white
+                                : const Color(0xFF0F172A)),
                         decoration: InputDecoration(
-                          hintText: 'Search by Rider Name, Code, Ref #, or Order...',
-                          hintStyle: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)),
-                          prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Color(0xFF64748B)),
+                          hintText:
+                              'Search by Rider Name, Code, Ref #, or Order...',
+                          hintStyle: GoogleFonts.inter(
+                              fontSize: 12, color: const Color(0xFF94A3B8)),
+                          prefixIcon: const Icon(Icons.search_rounded,
+                              size: 18, color: Color(0xFF64748B)),
                           suffixIcon: searchQuery.isNotEmpty
                               ? IconButton(
-                                  icon: const Icon(Icons.clear_rounded, size: 16),
+                                  icon:
+                                      const Icon(Icons.clear_rounded, size: 16),
                                   onPressed: () {
                                     _searchController.clear();
-                                    ref.read(dcOrderMatchingPageProvider.notifier).state = 1;
-                                    ref.read(dcOrderMatchingSearchProvider.notifier).state = '';
+                                    ref
+                                        .read(dcOrderMatchingPageProvider
+                                            .notifier)
+                                        .state = 1;
+                                    ref
+                                        .read(dcOrderMatchingSearchProvider
+                                            .notifier)
+                                        .state = '';
                                   },
                                 )
                               : null,
                           border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 11),
+                          contentPadding:
+                              const EdgeInsets.symmetric(vertical: 11),
                         ),
                       ),
                     );
@@ -813,28 +987,87 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
                       height: 42,
                       padding: const EdgeInsets.symmetric(horizontal: 10),
                       decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                        color: isDark
+                            ? const Color(0xFF0F172A)
+                            : const Color(0xFFF8FAFC),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                        border: Border.all(
+                            color: isDark
+                                ? const Color(0xFF334155)
+                                : const Color(0xFFE2E8F0)),
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
                           isExpanded: true,
                           value: dateFilter,
-                          icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Color(0xFF64748B)),
-                          dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                          icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                              size: 18, color: Color(0xFF64748B)),
+                          dropdownColor:
+                              isDark ? const Color(0xFF1E293B) : Colors.white,
                           items: [
-                            DropdownMenuItem(value: 'all_time', child: Text('📅 All Time', style: GoogleFonts.inter(fontSize: 12, color: isDark ? Colors.white : const Color(0xFF0F172A)), overflow: TextOverflow.ellipsis)),
-                            DropdownMenuItem(value: 'today', child: Text('📅 Today', style: GoogleFonts.inter(fontSize: 12, color: isDark ? Colors.white : const Color(0xFF0F172A)), overflow: TextOverflow.ellipsis)),
-                            DropdownMenuItem(value: 'yesterday', child: Text('📅 Yesterday', style: GoogleFonts.inter(fontSize: 12, color: isDark ? Colors.white : const Color(0xFF0F172A)), overflow: TextOverflow.ellipsis)),
-                            DropdownMenuItem(value: 'this_week', child: Text('📅 This Week', style: GoogleFonts.inter(fontSize: 12, color: isDark ? Colors.white : const Color(0xFF0F172A)), overflow: TextOverflow.ellipsis)),
-                            DropdownMenuItem(value: 'this_month', child: Text('📅 This Month', style: GoogleFonts.inter(fontSize: 12, color: isDark ? Colors.white : const Color(0xFF0F172A)), overflow: TextOverflow.ellipsis)),
-                            DropdownMenuItem(value: 'older', child: Text('⚠️ Long-Term (> 2 Days)', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFFF59E0B)), overflow: TextOverflow.ellipsis)),
+                            DropdownMenuItem(
+                                value: 'all_time',
+                                child: Text('📅 All Time',
+                                    style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        color: isDark
+                                            ? Colors.white
+                                            : const Color(0xFF0F172A)),
+                                    overflow: TextOverflow.ellipsis)),
+                            DropdownMenuItem(
+                                value: 'today',
+                                child: Text('📅 Today',
+                                    style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        color: isDark
+                                            ? Colors.white
+                                            : const Color(0xFF0F172A)),
+                                    overflow: TextOverflow.ellipsis)),
+                            DropdownMenuItem(
+                                value: 'yesterday',
+                                child: Text('📅 Yesterday',
+                                    style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        color: isDark
+                                            ? Colors.white
+                                            : const Color(0xFF0F172A)),
+                                    overflow: TextOverflow.ellipsis)),
+                            DropdownMenuItem(
+                                value: 'this_week',
+                                child: Text('📅 This Week',
+                                    style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        color: isDark
+                                            ? Colors.white
+                                            : const Color(0xFF0F172A)),
+                                    overflow: TextOverflow.ellipsis)),
+                            DropdownMenuItem(
+                                value: 'this_month',
+                                child: Text('📅 This Month',
+                                    style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        color: isDark
+                                            ? Colors.white
+                                            : const Color(0xFF0F172A)),
+                                    overflow: TextOverflow.ellipsis)),
+                            DropdownMenuItem(
+                                value: 'older',
+                                child: Text('⚠️ Long-Term (> 2 Days)',
+                                    style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: const Color(0xFFF59E0B)),
+                                    overflow: TextOverflow.ellipsis)),
                           ],
                           onChanged: (val) {
                             if (val != null) {
-                              ref.read(dcOrderMatchingPageProvider.notifier).state = 1;
-                              ref.read(dcOrderMatchingDateFilterProvider.notifier).state = val;
+                              ref
+                                  .read(dcOrderMatchingPageProvider.notifier)
+                                  .state = 1;
+                              ref
+                                  .read(dcOrderMatchingDateFilterProvider
+                                      .notifier)
+                                  .state = val;
                             }
                           },
                         ),
@@ -845,32 +1078,59 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
                       height: 42,
                       padding: const EdgeInsets.symmetric(horizontal: 10),
                       decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                        color: isDark
+                            ? const Color(0xFF0F172A)
+                            : const Color(0xFFF8FAFC),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                        border: Border.all(
+                            color: isDark
+                                ? const Color(0xFF334155)
+                                : const Color(0xFFE2E8F0)),
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String?>(
                           isExpanded: true,
                           value: selectedRiderFilter,
-                          hint: Text('All Fleet Riders', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)), overflow: TextOverflow.ellipsis),
-                          icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Color(0xFF64748B)),
-                          dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                          hint: Text('All Fleet Riders',
+                              style: GoogleFonts.inter(
+                                  fontSize: 12, color: const Color(0xFF64748B)),
+                              overflow: TextOverflow.ellipsis),
+                          icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                              size: 18, color: Color(0xFF64748B)),
+                          dropdownColor:
+                              isDark ? const Color(0xFF1E293B) : Colors.white,
                           items: [
                             DropdownMenuItem<String?>(
                               value: null,
-                              child: Text('All Fleet Riders', style: GoogleFonts.inter(fontSize: 12, color: isDark ? Colors.white : const Color(0xFF0F172A)), overflow: TextOverflow.ellipsis),
+                              child: Text('All Fleet Riders',
+                                  style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      color: isDark
+                                          ? Colors.white
+                                          : const Color(0xFF0F172A)),
+                                  overflow: TextOverflow.ellipsis),
                             ),
                             ...uniqueRiders.entries.map((e) {
                               return DropdownMenuItem<String?>(
                                 value: e.key,
-                                child: Text('🚴 ${e.value} (${e.key})', style: GoogleFonts.inter(fontSize: 12, color: isDark ? Colors.white : const Color(0xFF0F172A)), overflow: TextOverflow.ellipsis),
+                                child: Text('🚴 ${e.value} (${e.key})',
+                                    style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        color: isDark
+                                            ? Colors.white
+                                            : const Color(0xFF0F172A)),
+                                    overflow: TextOverflow.ellipsis),
                               );
                             }),
                           ],
                           onChanged: (val) {
-                            ref.read(dcOrderMatchingPageProvider.notifier).state = 1;
-                            ref.read(dcOrderMatchingRiderFilterProvider.notifier).state = val;
+                            ref
+                                .read(dcOrderMatchingPageProvider.notifier)
+                                .state = 1;
+                            ref
+                                .read(
+                                    dcOrderMatchingRiderFilterProvider.notifier)
+                                .state = val;
                           },
                         ),
                       ),
@@ -881,13 +1141,28 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
                       physics: const BouncingScrollPhysics(),
                       child: Row(
                         children: [
-                          _buildFilterChip('all', 'All Remittances (${allLifecycleItems.length})', Icons.dashboard_rounded),
+                          _buildFilterChip(
+                              'all',
+                              'All Remittances (${allLifecycleItems.length})',
+                              Icons.dashboard_rounded),
                           const SizedBox(width: 8),
-                          _buildFilterChip('not_remitted', '⚠️ Not Remitted (${notRemittedItems.length})', Icons.warning_amber_rounded, color: const Color(0xFFF59E0B)),
+                          _buildFilterChip(
+                              'not_remitted',
+                              '⚠️ Not Remitted (${notRemittedItems.length})',
+                              Icons.warning_amber_rounded,
+                              color: const Color(0xFFF59E0B)),
                           const SizedBox(width: 8),
-                          _buildFilterChip('remitted', '✅ Remitted & Cleared (${remittedItems.length})', Icons.check_circle_rounded, color: const Color(0xFF10B981)),
+                          _buildFilterChip(
+                              'remitted',
+                              '✅ Remitted & Cleared (${remittedItems.length})',
+                              Icons.check_circle_rounded,
+                              color: const Color(0xFF10B981)),
                           const SizedBox(width: 8),
-                          _buildFilterChip('direct_paystack', '⚡ Direct Paystack (${directPaystackItems.length})', Icons.bolt_rounded, color: const Color(0xFF00A2D3)),
+                          _buildFilterChip(
+                              'direct_paystack',
+                              '⚡ Direct Paystack (${directPaystackItems.length})',
+                              Icons.bolt_rounded,
+                              color: const Color(0xFF00A2D3)),
                         ],
                       ),
                     );
@@ -895,9 +1170,14 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
                     final viewSwitcher = Container(
                       padding: const EdgeInsets.all(3),
                       decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                        color: isDark
+                            ? const Color(0xFF0F172A)
+                            : const Color(0xFFF1F5F9),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                        border: Border.all(
+                            color: isDark
+                                ? const Color(0xFF334155)
+                                : const Color(0xFFE2E8F0)),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -907,14 +1187,18 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
                             label: 'Table',
                             isSelected: isTableView,
                             isDark: isDark,
-                            onTap: () => ref.read(dcOrderMatchingTableViewProvider.notifier).state = true,
+                            onTap: () => ref
+                                .read(dcOrderMatchingTableViewProvider.notifier)
+                                .state = true,
                           ),
                           _buildViewToggleBtn(
                             icon: Icons.grid_view_rounded,
                             label: 'Cards',
                             isSelected: !isTableView,
                             isDark: isDark,
-                            onTap: () => ref.read(dcOrderMatchingTableViewProvider.notifier).state = false,
+                            onTap: () => ref
+                                .read(dcOrderMatchingTableViewProvider.notifier)
+                                .state = false,
                           ),
                         ],
                       ),
@@ -934,10 +1218,19 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
                             ],
                           ),
                           const SizedBox(height: 12),
+                          filterChips,
+                          const SizedBox(height: 10),
                           Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Expanded(child: filterChips),
-                              const SizedBox(width: 8),
+                              Text(
+                                '${filteredItems.length} Remittance Records',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFF64748B),
+                                ),
+                              ),
                               viewSwitcher,
                             ],
                           ),
@@ -983,21 +1276,33 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
                       decoration: BoxDecoration(
                         color: isDark ? const Color(0xFF1E293B) : Colors.white,
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                        border: Border.all(
+                            color: isDark
+                                ? const Color(0xFF334155)
+                                : const Color(0xFFE2E8F0)),
                       ),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.rule_folder_outlined, size: 48, color: const Color(0xFF64748B).withValues(alpha: 0.5)),
+                          Icon(Icons.rule_folder_outlined,
+                              size: 48,
+                              color: const Color(0xFF64748B)
+                                  .withValues(alpha: 0.5)),
                           const SizedBox(height: 12),
                           Text(
                             'No remittances matching the selected filter criteria',
-                            style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold, color: isDark ? Colors.white70 : const Color(0xFF334155)),
+                            style: GoogleFonts.inter(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: isDark
+                                    ? Colors.white70
+                                    : const Color(0xFF334155)),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             'Try selecting "All Remittances" or changing the date opening filter.',
-                            style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)),
+                            style: GoogleFonts.inter(
+                                fontSize: 12, color: const Color(0xFF94A3B8)),
                           ),
                         ],
                       ),
@@ -1006,16 +1311,19 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         if (isTableView)
-                          _buildRemittancesTableView(pagedItems, isDark, isMobile)
+                          _buildRemittancesTableView(
+                              pagedItems, isDark, isMobile)
                         else
                           ListView.separated(
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
                             itemCount: pagedItems.length,
-                            separatorBuilder: (_, __) => const SizedBox(height: 12),
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 12),
                             itemBuilder: (ctx, index) {
                               final item = pagedItems[index];
-                              return _buildRemittanceLifecycleCard(item, isDark, isMobile);
+                              return _buildRemittanceLifecycleCard(
+                                  item, isDark, isMobile);
                             },
                           ),
                         const SizedBox(height: 12),
@@ -1076,7 +1384,11 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
               Expanded(
                 child: Text(
                   title,
-                  style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w700, color: const Color(0xFF64748B), letterSpacing: 0.5),
+                  style: GoogleFonts.inter(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF64748B),
+                      letterSpacing: 0.5),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -1093,13 +1405,17 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
           const SizedBox(height: 8),
           Text(
             value,
-            style: GoogleFonts.jetBrainsMono(fontSize: 18, fontWeight: FontWeight.w900, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+            style: GoogleFonts.jetBrainsMono(
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                color: isDark ? Colors.white : const Color(0xFF0F172A)),
             overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 4),
           Text(
             subtext,
-            style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
+            style:
+                GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
             overflow: TextOverflow.ellipsis,
           ),
         ],
@@ -1107,7 +1423,8 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
     );
   }
 
-  Widget _buildFilterChip(String key, String label, IconData icon, {Color? color}) {
+  Widget _buildFilterChip(String key, String label, IconData icon,
+      {Color? color}) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final selectedFilter = ref.watch(dcOrderMatchingFilterProvider);
     final isSelected = selectedFilter == key;
@@ -1128,21 +1445,29 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
               : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isSelected ? chipColor : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+            color: isSelected
+                ? chipColor
+                : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
             width: isSelected ? 1.5 : 1.0,
           ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 14, color: isSelected ? chipColor : const Color(0xFF64748B)),
+            Icon(icon,
+                size: 14,
+                color: isSelected ? chipColor : const Color(0xFF64748B)),
             const SizedBox(width: 6),
             Text(
               label,
               style: GoogleFonts.inter(
                 fontSize: 12,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                color: isSelected ? chipColor : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                color: isSelected
+                    ? chipColor
+                    : (isDark
+                        ? const Color(0xFF94A3B8)
+                        : const Color(0xFF64748B)),
               ),
             ),
           ],
@@ -1173,7 +1498,11 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
             Icon(
               icon,
               size: 14,
-              color: isSelected ? Colors.white : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+              color: isSelected
+                  ? Colors.white
+                  : (isDark
+                      ? const Color(0xFF94A3B8)
+                      : const Color(0xFF64748B)),
             ),
             const SizedBox(width: 4),
             Text(
@@ -1181,7 +1510,11 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
               style: GoogleFonts.inter(
                 fontSize: 11.5,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                color: isSelected ? Colors.white : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                color: isSelected
+                    ? Colors.white
+                    : (isDark
+                        ? const Color(0xFF94A3B8)
+                        : const Color(0xFF64748B)),
               ),
             ),
           ],
@@ -1203,7 +1536,8 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+        border: Border.all(
+            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
@@ -1220,20 +1554,29 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
           child: ConstrainedBox(
             constraints: const BoxConstraints(minWidth: 1050),
             child: DataTable(
-              headingRowColor: WidgetStateProperty.all(isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
+              headingRowColor: WidgetStateProperty.all(
+                  isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
               dataRowMinHeight: 56,
               dataRowMaxHeight: 68,
               horizontalMargin: 16,
               columnSpacing: 22,
               columns: [
-                _buildTableColumnHeader('RIDER / AGENT', Icons.badge_outlined, isDark),
-                _buildTableColumnHeader('ORDERS', Icons.inventory_2_outlined, isDark),
-                _buildTableColumnHeader('AMOUNT TO REMIT', Icons.payments_outlined, isDark),
-                _buildTableColumnHeader('NET REMITTANCE', Icons.account_balance_wallet_outlined, isDark),
-                _buildTableColumnHeader('PAYMENT METHOD', Icons.credit_card_outlined, isDark),
-                _buildTableColumnHeader('OPENING DATE', Icons.schedule_rounded, isDark),
-                _buildTableColumnHeader('CLOSING DATE', Icons.event_available_rounded, isDark),
-                _buildTableColumnHeader('REMITTANCE STATUS', Icons.rule_rounded, isDark),
+                _buildTableColumnHeader(
+                    'RIDER / AGENT', Icons.badge_outlined, isDark),
+                _buildTableColumnHeader(
+                    'ORDERS', Icons.inventory_2_outlined, isDark),
+                _buildTableColumnHeader(
+                    'AMOUNT TO REMIT', Icons.payments_outlined, isDark),
+                _buildTableColumnHeader('NET REMITTANCE',
+                    Icons.account_balance_wallet_outlined, isDark),
+                _buildTableColumnHeader(
+                    'PAYMENT METHOD', Icons.credit_card_outlined, isDark),
+                _buildTableColumnHeader(
+                    'OPENING DATE', Icons.schedule_rounded, isDark),
+                _buildTableColumnHeader(
+                    'CLOSING DATE', Icons.event_available_rounded, isDark),
+                _buildTableColumnHeader(
+                    'REMITTANCE STATUS', Icons.rule_rounded, isDark),
                 _buildTableColumnHeader('ACTION', Icons.tune_rounded, isDark),
               ],
               rows: items.map((item) {
@@ -1293,7 +1636,9 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
                     fullName: item.riderName,
                     radius: 16,
                     showBorder: true,
-                    borderColor: item.isVerified ? const Color(0xFF10B981) : const Color(0xFFF37021),
+                    borderColor: item.isVerified
+                        ? const Color(0xFF10B981)
+                        : const Color(0xFFF37021),
                   ),
                   const SizedBox(width: 10),
                   Column(
@@ -1305,15 +1650,24 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
                         children: [
                           Text(
                             item.riderName,
-                            style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                            style: GoogleFonts.inter(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.bold,
+                                color: isDark
+                                    ? Colors.white
+                                    : const Color(0xFF0F172A)),
                           ),
                           const SizedBox(width: 4),
-                          const Icon(Icons.open_in_new_rounded, size: 11, color: Color(0xFF94A3B8)),
+                          const Icon(Icons.open_in_new_rounded,
+                              size: 11, color: Color(0xFF94A3B8)),
                         ],
                       ),
                       Text(
                         item.riderCode,
-                        style: GoogleFonts.jetBrainsMono(fontSize: 11, fontWeight: FontWeight.w500, color: const Color(0xFF64748B)),
+                        style: GoogleFonts.jetBrainsMono(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: const Color(0xFF64748B)),
                       ),
                     ],
                   ),
@@ -1338,12 +1692,14 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
               decoration: BoxDecoration(
                 color: const Color(0xFF2563EB).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFF2563EB).withValues(alpha: 0.25)),
+                border: Border.all(
+                    color: const Color(0xFF2563EB).withValues(alpha: 0.25)),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.inventory_2_rounded, size: 13, color: Color(0xFF2563EB)),
+                  const Icon(Icons.inventory_2_rounded,
+                      size: 13, color: Color(0xFF2563EB)),
                   const SizedBox(width: 5),
                   Text(
                     '${item.orderCount} ${item.orderCount == 1 ? 'Order' : 'Orders'}',
@@ -1363,7 +1719,10 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
         DataCell(
           Text(
             CurrencyFormatter.formatNaira(item.grossAmount),
-            style: GoogleFonts.jetBrainsMono(fontSize: 13, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+            style: GoogleFonts.jetBrainsMono(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : const Color(0xFF0F172A)),
           ),
         ),
 
@@ -1374,7 +1733,11 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
             style: GoogleFonts.jetBrainsMono(
               fontSize: 13,
               fontWeight: FontWeight.w900,
-              color: item.isVerified ? const Color(0xFF10B981) : (isDirect ? const Color(0xFF00A2D3) : const Color(0xFFF59E0B)),
+              color: item.isVerified
+                  ? const Color(0xFF10B981)
+                  : (isDirect
+                      ? const Color(0xFF00A2D3)
+                      : const Color(0xFFF59E0B)),
             ),
           ),
         ),
@@ -1387,12 +1750,17 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
               Icon(
                 isDirect ? Icons.bolt_rounded : Icons.payments_rounded,
                 size: 14,
-                color: isDirect ? const Color(0xFF00A2D3) : const Color(0xFFF59E0B),
+                color: isDirect
+                    ? const Color(0xFF00A2D3)
+                    : const Color(0xFFF59E0B),
               ),
               const SizedBox(width: 6),
               Text(
                 isDirect ? 'Direct Transfer' : 'Cash POD',
-                style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w500, color: isDark ? Colors.white70 : const Color(0xFF334155)),
+                style: GoogleFonts.inter(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w500,
+                    color: isDark ? Colors.white70 : const Color(0xFF334155)),
               ),
             ],
           ),
@@ -1402,18 +1770,24 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
         DataCell(
           Text(
             _formatDateShort(item.openingDate),
-            style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+            style:
+                GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
           ),
         ),
 
         // 7. Closing Date
         DataCell(
           Text(
-            item.closingDate != null ? _formatDateShort(item.closingDate!) : 'Active (Open)',
+            item.closingDate != null
+                ? _formatDateShort(item.closingDate!)
+                : 'Active (Open)',
             style: GoogleFonts.inter(
               fontSize: 11,
-              fontWeight: item.closingDate != null ? FontWeight.w500 : FontWeight.bold,
-              color: item.closingDate != null ? const Color(0xFF64748B) : const Color(0xFFF59E0B),
+              fontWeight:
+                  item.closingDate != null ? FontWeight.w500 : FontWeight.bold,
+              color: item.closingDate != null
+                  ? const Color(0xFF64748B)
+                  : const Color(0xFFF59E0B),
             ),
           ),
         ),
@@ -1437,9 +1811,11 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
               foregroundColor: const Color(0xFFF37021),
               elevation: 0,
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
             ),
-            child: const Text('View', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+            child: const Text('View',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
           ),
         ),
       ],
@@ -1502,7 +1878,9 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
                         fullName: item.riderName,
                         radius: 20,
                         showBorder: true,
-                        borderColor: item.isVerified ? const Color(0xFF10B981) : const Color(0xFFF37021),
+                        borderColor: item.isVerified
+                            ? const Color(0xFF10B981)
+                            : const Color(0xFFF37021),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -1521,28 +1899,37 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
                                     style: GoogleFonts.inter(
                                       fontSize: 14,
                                       fontWeight: FontWeight.bold,
-                                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                      color: isDark
+                                          ? Colors.white
+                                          : const Color(0xFF0F172A),
                                     ),
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                                 const SizedBox(width: 8),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 7, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF2563EB).withValues(alpha: 0.1),
+                                    color: const Color(0xFF2563EB)
+                                        .withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Text(
                                     '${item.orderCount} ${item.orderCount == 1 ? 'Order' : 'Orders'}',
-                                    style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
+                                    style: GoogleFonts.inter(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: const Color(0xFF2563EB)),
                                   ),
                                 ),
                               ],
                             ),
                             Text(
                               'Driver Code: ${item.riderCode} • Ref: ${item.referenceNumber}',
-                              style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
+                              style: GoogleFonts.inter(
+                                  fontSize: 11.5,
+                                  color: const Color(0xFF64748B)),
                             ),
                           ],
                         ),
@@ -1560,25 +1947,42 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('AMOUNT TO REMIT', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF64748B))),
+                        Text('AMOUNT TO REMIT',
+                            style: GoogleFonts.inter(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFF64748B))),
                         const SizedBox(height: 2),
                         Text(
                           CurrencyFormatter.formatNaira(item.grossAmount),
-                          style: GoogleFonts.jetBrainsMono(fontSize: 15, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                          style: GoogleFonts.jetBrainsMono(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: isDark
+                                  ? Colors.white
+                                  : const Color(0xFF0F172A)),
                         ),
                       ],
                     ),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Text('NET REMITTANCE', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF64748B))),
+                        Text('NET REMITTANCE',
+                            style: GoogleFonts.inter(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFF64748B))),
                         const SizedBox(height: 2),
                         Text(
                           CurrencyFormatter.formatNaira(item.netAmount),
                           style: GoogleFonts.jetBrainsMono(
                             fontSize: 16,
                             fontWeight: FontWeight.w900,
-                            color: item.isVerified ? const Color(0xFF10B981) : (isDirect ? const Color(0xFF00A2D3) : const Color(0xFFF59E0B)),
+                            color: item.isVerified
+                                ? const Color(0xFF10B981)
+                                : (isDirect
+                                    ? const Color(0xFF00A2D3)
+                                    : const Color(0xFFF59E0B)),
                           ),
                         ),
                       ],
@@ -1593,19 +1997,24 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.schedule_rounded, size: 13, color: Color(0xFF94A3B8)),
+                        const Icon(Icons.schedule_rounded,
+                            size: 13, color: Color(0xFF94A3B8)),
                         const SizedBox(width: 4),
                         Text(
                           'Opened: ${_formatDateShort(item.openingDate)}',
-                          style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                          style: GoogleFonts.inter(
+                              fontSize: 11, color: const Color(0xFF64748B)),
                         ),
                       ],
                     ),
                     Row(
                       children: [
-                        if (!item.isVerified && !isDirect && item.orders.isNotEmpty)
+                        if (!item.isVerified &&
+                            !isDirect &&
+                            item.orders.isNotEmpty)
                           IconButton(
-                            icon: const Icon(Icons.phone_in_talk_rounded, size: 16, color: Color(0xFFF37021)),
+                            icon: const Icon(Icons.phone_in_talk_rounded,
+                                size: 16, color: Color(0xFFF37021)),
                             tooltip: 'Contact Rider to Remit',
                             onPressed: () {
                               DCContactRiderModal.show(
@@ -1623,14 +2032,17 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
                           onPressed: () {
                             showDialog(
                               context: context,
-                              builder: (ctx) => DCRemittanceDetailModal(remittance: item),
+                              builder: (ctx) =>
+                                  DCRemittanceDetailModal(remittance: item),
                             );
                           },
-                          icon: const Icon(Icons.arrow_forward_rounded, size: 14),
+                          icon:
+                              const Icon(Icons.arrow_forward_rounded, size: 14),
                           label: const Text('View Breakdown'),
                           style: TextButton.styleFrom(
                             foregroundColor: const Color(0xFFF37021),
-                            textStyle: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+                            textStyle: const TextStyle(
+                                fontSize: 11.5, fontWeight: FontWeight.bold),
                           ),
                         ),
                       ],
@@ -1664,7 +2076,8 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+        border: Border.all(
+            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1675,17 +2088,23 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
             children: [
               Text(
                 'Showing ${totalItems == 0 ? 0 : startIndex + 1}–$endIndex of $totalItems',
-                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF64748B)),
+                style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF64748B)),
               ),
               if (!isMobile) ...[
                 const SizedBox(width: 14),
-                Text('Rows per page:', style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF94A3B8))),
+                Text('Rows per page:',
+                    style: GoogleFonts.inter(
+                        fontSize: 11.5, color: const Color(0xFF94A3B8))),
                 const SizedBox(width: 6),
                 DropdownButtonHideUnderline(
                   child: DropdownButton<int>(
                     value: rowsPerPage,
                     isDense: true,
-                    dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                    dropdownColor:
+                        isDark ? const Color(0xFF1E293B) : Colors.white,
                     items: const [
                       DropdownMenuItem(value: 10, child: Text('10')),
                       DropdownMenuItem(value: 15, child: Text('15')),
@@ -1695,8 +2114,11 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
                     ],
                     onChanged: (val) {
                       if (val != null) {
-                        ref.read(dcOrderMatchingPageProvider.notifier).state = 1;
-                        ref.read(dcOrderMatchingRowsPerPageProvider.notifier).state = val;
+                        ref.read(dcOrderMatchingPageProvider.notifier).state =
+                            1;
+                        ref
+                            .read(dcOrderMatchingRowsPerPageProvider.notifier)
+                            .state = val;
                       }
                     },
                   ),
@@ -1713,27 +2135,37 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
                 icon: const Icon(Icons.chevron_left_rounded, size: 20),
                 tooltip: 'Previous Page',
                 onPressed: currentPage > 1
-                    ? () => ref.read(dcOrderMatchingPageProvider.notifier).state = currentPage - 1
+                    ? () => ref
+                        .read(dcOrderMatchingPageProvider.notifier)
+                        .state = currentPage - 1
                     : null,
                 color: const Color(0xFFF37021),
                 disabledColor: const Color(0xFF94A3B8).withValues(alpha: 0.3),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                  color: isDark
+                      ? const Color(0xFF0F172A)
+                      : const Color(0xFFF1F5F9),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
                   'Page $currentPage of $totalPages',
-                  style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                  style: GoogleFonts.inter(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A)),
                 ),
               ),
               IconButton(
                 icon: const Icon(Icons.chevron_right_rounded, size: 20),
                 tooltip: 'Next Page',
                 onPressed: currentPage < totalPages
-                    ? () => ref.read(dcOrderMatchingPageProvider.notifier).state = currentPage + 1
+                    ? () => ref
+                        .read(dcOrderMatchingPageProvider.notifier)
+                        .state = currentPage + 1
                     : null,
                 color: const Color(0xFFF37021),
                 disabledColor: const Color(0xFF94A3B8).withValues(alpha: 0.3),
@@ -1746,7 +2178,8 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
   }
 
   Widget _buildStatusBadge(String status) {
-    final bool isNotRemitted = status == 'awaiting_remittance' || status == 'not_remitted';
+    final bool isNotRemitted =
+        status == 'awaiting_remittance' || status == 'not_remitted';
     final bool isDirect = status == 'direct_settled';
 
     final Color badgeColor = isNotRemitted
@@ -1773,7 +2206,8 @@ class DCOrderPaymentMatchingPageState extends ConsumerState<DCOrderPaymentMatchi
           const SizedBox(width: 5),
           Text(
             label,
-            style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.bold, color: badgeColor),
+            style: GoogleFonts.inter(
+                fontSize: 10.5, fontWeight: FontWeight.bold, color: badgeColor),
           ),
         ],
       ),

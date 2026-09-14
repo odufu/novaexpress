@@ -117,9 +117,12 @@ class _DCRemittanceDetailModalState extends ConsumerState<DCRemittanceDetailModa
                 child: const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 22),
               ),
               const SizedBox(width: 10),
-              Text(
-                'Verify & Clear Remittance',
-                style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold),
+              Expanded(
+                child: Text(
+                  'Verify & Clear Remittance',
+                  style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),

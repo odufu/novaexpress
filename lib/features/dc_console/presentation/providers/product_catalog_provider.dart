@@ -65,6 +65,14 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
     _initCatalog();
   }
 
+  SupabaseClient _getAuthDbClient() {
+    return SupabaseClient(
+      SupabaseConstants.supabaseUrl,
+      SupabaseConstants.supabaseServiceRoleKey,
+      authOptions: const AuthClientOptions(autoRefreshToken: false),
+    );
+  }
+
   /// Builds the baseline single-unit commercial package for a product.
   /// NOTE: Strict pricing governance forbids synthetic multi-pack discount calculations.
   /// All multi-pack bundles must be pre-created by merchants or operators in public.product_packages.
@@ -315,11 +323,7 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
 
     SupabaseClient? dbClient;
     try {
-      dbClient = SupabaseClient(
-        SupabaseConstants.supabaseUrl,
-        SupabaseConstants.supabaseServiceRoleKey,
-        authOptions: const AuthClientOptions(autoRefreshToken: false),
-      );
+      dbClient = _getAuthDbClient();
 
       final updatedProducts = <CatalogProduct>[];
 
@@ -343,21 +347,50 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
 
         try {
           final bool isValidUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(p.id);
+          final cleanCId = (p.clientId != null &&
+                  RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(p.clientId!))
+              ? p.clientId
+              : null;
+
           dynamic res;
           if (isValidUuid) {
             res = await dbClient.from('products').update({
               'description': combinedDesc,
+              if (p.clientName.isNotEmpty) 'client_name': p.clientName,
+              if (cleanCId != null) 'client_id': cleanCId,
+              if (p.imageUrl != null && p.imageUrl!.isNotEmpty) 'image_url': p.imageUrl,
+              if (p.coveringStates.isNotEmpty) 'covering_states': p.coveringStates,
+              'cost_price': p.costPrice,
+              if (p.barcode != null && p.barcode!.isNotEmpty) 'barcode': p.barcode,
+              'weight_kg': p.weightKg,
+              'low_stock_threshold': p.lowStockThreshold,
             }).eq('id', p.id).select();
           }
 
           if (res == null || (res as List).isEmpty) {
             final resBySku = await dbClient.from('products').update({
               'description': combinedDesc,
+              if (p.clientName.isNotEmpty) 'client_name': p.clientName,
+              if (cleanCId != null) 'client_id': cleanCId,
+              if (p.imageUrl != null && p.imageUrl!.isNotEmpty) 'image_url': p.imageUrl,
+              if (p.coveringStates.isNotEmpty) 'covering_states': p.coveringStates,
+              'cost_price': p.costPrice,
+              if (p.barcode != null && p.barcode!.isNotEmpty) 'barcode': p.barcode,
+              'weight_kg': p.weightKg,
+              'low_stock_threshold': p.lowStockThreshold,
             }).eq('sku', p.sku).select();
 
             if ((resBySku as List).isEmpty) {
               final resByName = await dbClient.from('products').update({
                 'description': combinedDesc,
+                if (p.clientName.isNotEmpty) 'client_name': p.clientName,
+                if (cleanCId != null) 'client_id': cleanCId,
+                if (p.imageUrl != null && p.imageUrl!.isNotEmpty) 'image_url': p.imageUrl,
+                if (p.coveringStates.isNotEmpty) 'covering_states': p.coveringStates,
+                'cost_price': p.costPrice,
+                if (p.barcode != null && p.barcode!.isNotEmpty) 'barcode': p.barcode,
+                'weight_kg': p.weightKg,
+                'low_stock_threshold': p.lowStockThreshold,
               }).eq('name', p.name).select();
 
               if ((resByName as List).isEmpty) {
@@ -369,15 +402,48 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
                   'sku': p.sku,
                   'category': p.category,
                   'base_price': p.defaultUnitPrice,
+                  'cost_price': p.costPrice,
+                  if (p.barcode != null && p.barcode!.isNotEmpty) 'barcode': p.barcode,
+                  'weight_kg': p.weightKg,
+                  'low_stock_threshold': p.lowStockThreshold,
+                  if (p.clientName.isNotEmpty) 'client_name': p.clientName,
+                  if (cleanCId != null) 'client_id': cleanCId,
+                  if (p.imageUrl != null && p.imageUrl!.isNotEmpty) 'image_url': p.imageUrl,
+                  if (p.coveringStates.isNotEmpty) 'covering_states': p.coveringStates,
                   'description': combinedDesc,
                   'is_active': true,
                 };
                 if (isValidUuid) {
                   insertPayload['id'] = p.id;
                 }
-                await dbClient.from('products').upsert(insertPayload, onConflict: 'sku');
+                final insRes = await dbClient.from('products').upsert(insertPayload, onConflict: 'sku').select('id').maybeSingle();
+                if (insRes != null && insRes['id'] != null && !isValidUuid) {
+                  final effectiveId = insRes['id'].toString();
+                  for (final pkg in p.packages) {
+                    try {
+                      final pkgPayload = pkg.copyWith(
+                        productId: effectiveId,
+                        clientName: p.clientName,
+                        clientId: cleanCId,
+                      ).toJson();
+                      await dbClient.from('product_packages').upsert(pkgPayload);
+                    } catch (_) {}
+                  }
+                }
               }
             }
+          }
+
+          // Authoritatively persist packages into product_packages table
+          for (final pkg in p.packages) {
+            try {
+              final pkgPayload = pkg.copyWith(
+                productId: isValidUuid ? p.id : pkg.productId,
+                clientName: p.clientName,
+                clientId: cleanCId,
+              ).toJson();
+              await dbClient.from('product_packages').upsert(pkgPayload);
+            } catch (_) {}
           }
         } catch (_) {
           try {
@@ -534,11 +600,18 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
 
     // Persist to Supabase product_packages table asynchronously
     try {
-      final client = Supabase.instance.client;
-      client.from('product_packages').upsert(newPackage.toJson()).then((_) {
+      final db = _getAuthDbClient();
+      final cleanCId = (effectiveClientId != null &&
+              RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(effectiveClientId))
+          ? effectiveClientId
+          : null;
+      final payload = newPackage.copyWith(clientId: cleanCId).toJson();
+      db.from('product_packages').upsert(payload).then((_) {
         debugPrint('[CATALOG_PROVIDER] ✅ Persisted package ${newPackage.packageName} to Supabase product_packages.');
+        db.dispose();
       }).catchError((err) {
         debugPrint('[CATALOG_PROVIDER] ℹ️ Error saving to product_packages table: $err');
+        db.dispose();
       });
     } catch (_) {}
 
@@ -562,11 +635,13 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
 
     // Delete from Supabase product_packages table asynchronously
     try {
-      final client = Supabase.instance.client;
-      client.from('product_packages').delete().eq('id', packageId).then((_) {
+      final db = _getAuthDbClient();
+      db.from('product_packages').delete().eq('id', packageId).then((_) {
         debugPrint('[CATALOG_PROVIDER] ✅ Deleted package $packageId from Supabase product_packages.');
+        db.dispose();
       }).catchError((err) {
         debugPrint('[CATALOG_PROVIDER] ℹ️ Error deleting from product_packages: $err');
+        db.dispose();
       });
     } catch (_) {}
 
@@ -621,11 +696,13 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
 
     // Update in Supabase product_packages table asynchronously
     try {
-      final client = Supabase.instance.client;
-      client.from('product_packages').update(updatedPkg!.toJson()).eq('id', packageId).then((_) {
+      final db = _getAuthDbClient();
+      db.from('product_packages').update(updatedPkg!.toJson()).eq('id', packageId).then((_) {
         debugPrint('[CATALOG_PROVIDER] ✅ Updated package $packageId in Supabase product_packages.');
+        db.dispose();
       }).catchError((err) {
         debugPrint('[CATALOG_PROVIDER] ℹ️ Error updating product_packages: $err');
+        db.dispose();
       });
     } catch (_) {}
 
@@ -663,12 +740,18 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
           clientName: clientName,
         );
 
+    final cleanClientId = (clientId != null &&
+            clientId.trim().isNotEmpty &&
+            RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(clientId.trim()))
+        ? clientId.trim()
+        : null;
+
     final newProduct = CatalogProduct(
       id: newId,
       name: cleanName,
       sku: cleanSku,
       clientName: clientName,
-      clientId: clientId,
+      clientId: cleanClientId,
       defaultUnitPrice: baseUnitPrice,
       costPrice: costPrice ?? 0.0,
       barcode: barcode,
@@ -682,23 +765,24 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
       packages: initialPackages,
     );
 
-    final updated = [
-      ...state.products.where((p) => p.sku.toUpperCase() != cleanSku && p.name.toLowerCase() != cleanName.toLowerCase()),
-      newProduct
-    ];
-    state = state.copyWith(products: updated);
-
-    // Persist new product and packages directly to Supabase
+    // Persist new product and packages directly to Supabase using authenticated client
+    SupabaseClient? dbClient;
+    String effectiveProdId = newId;
     try {
-      final client = Supabase.instance.client;
+      dbClient = _getAuthDbClient();
       final bool isValidUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(newId);
+
       final Map<String, dynamic> productPayload = {
         'name': cleanName,
         'sku': cleanSku,
         'base_price': baseUnitPrice,
+        'cost_price': costPrice ?? 0.0,
+        if (barcode != null && barcode.trim().isNotEmpty) 'barcode': barcode.trim(),
+        'weight_kg': weightKg ?? 0.5,
+        'low_stock_threshold': lowStockThreshold ?? 10,
         'category': category,
-        'client_name': clientName,
-        'client_id': clientId,
+        'client_name': clientName.isNotEmpty ? clientName : 'NovaExpress Merchant',
+        if (cleanClientId != null) 'client_id': cleanClientId,
         'description': description,
         'image_url': imageUrl,
         'stock_quantity': 0,
@@ -707,22 +791,49 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
         'delivered_count': 0,
         'is_active': true,
         'company_id': '11111111-1111-4111-8111-111111111111',
+        if (coveringStates.isNotEmpty) 'covering_states': coveringStates,
       };
       if (isValidUuid) {
         productPayload['id'] = newId;
       }
-      await client.from('products').upsert(productPayload, onConflict: 'sku');
+      final upsertRes = await dbClient
+          .from('products')
+          .upsert(productPayload, onConflict: 'sku')
+          .select('id')
+          .maybeSingle();
+
+      if (upsertRes != null && upsertRes['id'] != null) {
+        effectiveProdId = upsertRes['id'].toString();
+      }
 
       for (final pkg in initialPackages) {
-        final pkgPayload = pkg.copyWith(productId: newId, clientName: clientName, clientId: clientId).toJson();
-        await client.from('product_packages').upsert(pkgPayload);
+        final pkgPayload = pkg.copyWith(
+          productId: effectiveProdId,
+          clientName: clientName,
+          clientId: cleanClientId,
+        ).toJson();
+        await dbClient.from('product_packages').upsert(pkgPayload);
       }
-    } catch (e) {
-      debugPrint('[CATALOG_PROVIDER] ℹ️ Register product to Supabase notice: $e');
+      debugPrint('[CATALOG_PROVIDER] ✅ Authoritatively saved new product $cleanSku ($effectiveProdId) and ${initialPackages.length} package(s) to Supabase.');
+    } catch (e, st) {
+      debugPrint('[CATALOG_PROVIDER] ❌ Register product to Supabase error: $e\n$st');
+    } finally {
+      dbClient?.dispose();
     }
 
+    final finalProduct = newProduct.copyWith(
+      id: effectiveProdId,
+      packages: initialPackages.map((p) => p.copyWith(productId: effectiveProdId)).toList(),
+    );
+
+    final updated = [
+      ...state.products.where((p) => p.sku.toUpperCase() != cleanSku && p.name.toLowerCase() != cleanName.toLowerCase()),
+      finalProduct
+    ];
+    state = state.copyWith(products: updated);
+
     await _persistCatalog();
-    return newProduct;
+    return finalProduct;
   }
 }
 

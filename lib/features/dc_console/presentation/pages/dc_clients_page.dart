@@ -28,28 +28,30 @@ class DCClientsPage extends ConsumerWidget {
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0B1120) : const Color(0xFFF8FAFC),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Top Section: Header & Action
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isCompact = constraints.maxWidth < 650;
+                final titleBlock = Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 10,
+                      runSpacing: 6,
                       children: [
                         Text(
                           'Clients & Enterprise Merchants',
                           style: GoogleFonts.inter(
-                            fontSize: 22,
+                            fontSize: isCompact ? 18 : 22,
                             fontWeight: FontWeight.w800,
                             color: isDark ? Colors.white : const Color(0xFF0F172A),
                           ),
                         ),
-                        const SizedBox(width: 10),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
@@ -71,13 +73,14 @@ class DCClientsPage extends ConsumerWidget {
                     Text(
                       'Manage enterprise accounts and merchant partners shared across all regional distribution centers',
                       style: GoogleFonts.inter(
-                        fontSize: 13,
+                        fontSize: isCompact ? 12 : 13,
                         color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                       ),
                     ),
                   ],
-                ),
-                ElevatedButton.icon(
+                );
+
+                final registerButton = ElevatedButton.icon(
                   onPressed: () {
                     showDialog(
                       context: context,
@@ -95,22 +98,43 @@ class DCClientsPage extends ConsumerWidget {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     elevation: 0,
                   ),
-                ),
-              ],
+                );
+
+                if (isCompact) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      titleBlock,
+                      const SizedBox(height: 12),
+                      SizedBox(width: double.infinity, child: registerButton),
+                    ],
+                  );
+                }
+
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(child: titleBlock),
+                    const SizedBox(width: 16),
+                    registerButton,
+                  ],
+                );
+              },
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
 
             // Summary KPI Cards
             LayoutBuilder(
               builder: (context, constraints) {
                 final isWide = constraints.maxWidth >= 900;
+                final isMobile = constraints.maxWidth < 550;
                 return GridView.count(
-                  crossAxisCount: isWide ? 4 : 2,
+                  crossAxisCount: isWide ? 4 : (isMobile ? 1 : 2),
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                  childAspectRatio: isWide ? 2.1 : 1.8,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: isWide ? 2.1 : (isMobile ? 2.8 : 1.8),
                   children: [
                     _buildKpiCard(
                       title: 'Total Registered Clients',
@@ -148,7 +172,7 @@ class DCClientsPage extends ConsumerWidget {
                 );
               },
             ),
-            const SizedBox(height: 28),
+            const SizedBox(height: 24),
 
             // Directory Table Container
             Container(
@@ -169,21 +193,26 @@ class DCClientsPage extends ConsumerWidget {
                 children: [
                   // Filter Toolbar
                   Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            _buildFilterTab(ref, 'all', 'All Clients ($totalClients)', state.clientFilter, isDark),
-                            const SizedBox(width: 8),
-                            _buildFilterTab(ref, 'enterprise', 'Enterprise Tier ($enterpriseClients)', state.clientFilter, isDark),
-                            const SizedBox(width: 8),
-                            _buildFilterTab(ref, 'standard', 'Standard ($standardClients)', state.clientFilter, isDark),
-                          ],
-                        ),
-                        SizedBox(
-                          width: 260,
+                    padding: const EdgeInsets.all(16),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isMobileFilter = constraints.maxWidth < 750;
+
+                        final filterTabs = SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              _buildFilterTab(ref, 'all', 'All Clients ($totalClients)', state.clientFilter, isDark),
+                              const SizedBox(width: 8),
+                              _buildFilterTab(ref, 'enterprise', 'Enterprise Tier ($enterpriseClients)', state.clientFilter, isDark),
+                              const SizedBox(width: 8),
+                              _buildFilterTab(ref, 'standard', 'Standard ($standardClients)', state.clientFilter, isDark),
+                            ],
+                          ),
+                        );
+
+                        final searchField = SizedBox(
+                          width: isMobileFilter ? double.infinity : 260,
                           height: 38,
                           child: TextField(
                             onChanged: (v) => ref.read(dcConsoleProvider.notifier).setSearchQuery(v),
@@ -199,8 +228,27 @@ class DCClientsPage extends ConsumerWidget {
                               enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
                             ),
                           ),
-                        ),
-                      ],
+                        );
+
+                        if (isMobileFilter) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              filterTabs,
+                              const SizedBox(height: 12),
+                              searchField,
+                            ],
+                          );
+                        }
+
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            filterTabs,
+                            searchField,
+                          ],
+                        );
+                      },
                     ),
                   ),
                   Divider(height: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
@@ -220,14 +268,22 @@ class DCClientsPage extends ConsumerWidget {
                       ),
                     )
                   else
-                    ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: state.filteredClients.length,
-                      separatorBuilder: (_, __) => Divider(height: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)),
-                      itemBuilder: (context, index) {
-                        final client = state.filteredClients[index];
-                        return _buildClientRow(context, client, isDark, ordersState.orders);
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isMobileCard = constraints.maxWidth < 750;
+                        return ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: state.filteredClients.length,
+                          separatorBuilder: (_, __) => Divider(height: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)),
+                          itemBuilder: (context, index) {
+                            final client = state.filteredClients[index];
+                            if (isMobileCard) {
+                              return _buildMobileClientCard(context, client, isDark, ordersState.orders);
+                            }
+                            return _buildClientRow(context, client, isDark, ordersState.orders);
+                          },
+                        );
                       },
                     ),
                 ],
@@ -259,6 +315,210 @@ class DCClientsPage extends ConsumerWidget {
             color: isSelected ? Colors.white : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildMobileClientCard(BuildContext context, ClientProfile client, bool isDark, List<OrderEntity> allOrders) {
+    final isEnterprise = client.isEnterprise;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: isEnterprise
+                      ? const Color(0xFF6366F1).withValues(alpha: 0.12)
+                      : const Color(0xFF0D9488).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  isEnterprise ? Icons.corporate_fare_rounded : Icons.storefront_rounded,
+                  color: isEnterprise ? const Color(0xFF6366F1) : const Color(0xFF0D9488),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            client.companyName,
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF64748B).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            client.code,
+                            style: GoogleFonts.inter(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w700,
+                              color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${client.contactPerson} • ${client.email}',
+                      style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF94A3B8)),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(width: 6, height: 6, decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle)),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Active',
+                      style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w700, color: const Color(0xFF10B981)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: isEnterprise
+                      ? const Color(0xFF6366F1).withValues(alpha: 0.12)
+                      : const Color(0xFF0D9488).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  isEnterprise ? 'ENTERPRISE TIER' : 'STANDARD TIER',
+                  style: GoogleFonts.inter(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: isEnterprise ? const Color(0xFF6366F1) : const Color(0xFF0D9488),
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  isEnterprise
+                      ? '${client.totalClosersCount} Closers (${client.closerLimit} Max)'
+                      : 'Direct Merchant',
+                  style: GoogleFonts.inter(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF475569),
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '${client.city}, ${client.state.split(" ").first}',
+                  style: GoogleFonts.inter(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF475569),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => DCClientAssetPortfolioModal.show(context, client),
+                  icon: const Icon(Icons.analytics_outlined, size: 14, color: Color(0xFF0D9488)),
+                  label: Text(
+                    'View Assets',
+                    style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF0D9488)),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFF0D9488)),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    final eligible = allOrders.where((o) =>
+                      (o.merchantId == client.id || o.clientId == client.id) &&
+                      (o.paymentMethod.toLowerCase() == 'cash' ||
+                          o.paymentMethod.toLowerCase() == 'cod' ||
+                          o.paymentMethod.toLowerCase() == 'direct_transfer' ||
+                          o.paymentType == 'direct_transfer') &&
+                      o.status.toLowerCase() == 'delivered' &&
+                      o.financeSettlementStatus != 'settled'
+                    ).toList();
+                    DCDailyMerchantSettlementModal.show(
+                      context: context,
+                      client: client,
+                      eligibleOrders: eligible,
+                    );
+                  },
+                  icon: const Icon(Icons.payments_outlined, size: 14, color: Colors.white),
+                  label: Text(
+                    '10 PM Settlement',
+                    style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0284C7),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    elevation: 0,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

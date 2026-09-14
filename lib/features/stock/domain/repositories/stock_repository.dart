@@ -58,6 +58,15 @@ abstract class StockRepository {
     required String destinationDcId,
     required String destinationDcName,
     required int quantity,
+    String? senderId,
+    String? senderName,
+    String? notes,
+  });
+  Future<Map<String, dynamic>> receiveInterDcTransfer({
+    required String transferId,
+    String? receiverId,
+    String? receiverName,
+    int? quantityReceived,
     String? notes,
   });
   Future<Map<String, dynamic>> processStockReturn({
@@ -93,14 +102,14 @@ abstract class StockRepository {
     required List<Map<String, dynamic>> items,
     String? senderId,
     required String senderName,
-    required String senderSignatureUrl,
+    String senderSignatureUrl = '',
     String? notes,
   });
   Future<Map<String, dynamic>> receiveClientSupply({
     required String transferId,
     required String receiverId,
     required String receiverName,
-    required String receiverSignatureUrl,
+    String receiverSignatureUrl = '',
     required List<Map<String, dynamic>> verifiedItems,
     String? notes,
   });
@@ -110,14 +119,14 @@ abstract class StockRepository {
     required List<Map<String, dynamic>> items,
     required String senderId,
     required String senderName,
-    required String senderSignatureUrl,
+    String senderSignatureUrl = '',
     String? notes,
   });
   Future<Map<String, dynamic>> acceptRiderStockHandover({
     required String transferId,
     required String riderId,
     required String riderName,
-    required String riderSignatureUrl,
+    String riderSignatureUrl = '',
     List<Map<String, dynamic>>? verifiedItems,
     String? notes,
   });

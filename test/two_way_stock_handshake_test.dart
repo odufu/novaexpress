@@ -46,7 +46,7 @@ class MockTwoWayStockRepository implements StockRepository {
     required List<Map<String, dynamic>> items,
     String? senderId,
     required String senderName,
-    required String senderSignatureUrl,
+    String senderSignatureUrl = '',
     String? notes,
   }) async {
     final transferId = 'transfer_cs_${transfers.length + 1}';
@@ -99,7 +99,7 @@ class MockTwoWayStockRepository implements StockRepository {
     required String transferId,
     required String receiverId,
     required String receiverName,
-    required String receiverSignatureUrl,
+    String receiverSignatureUrl = '',
     required List<Map<String, dynamic>> verifiedItems,
     String? notes,
   }) async {
@@ -147,13 +147,88 @@ class MockTwoWayStockRepository implements StockRepository {
   }
 
   @override
+  Future<Map<String, dynamic>> transferStockBetweenDCs({
+    required String productIdOrSku,
+    required String sourceDcId,
+    required String sourceDcName,
+    required String destinationDcId,
+    required String destinationDcName,
+    required int quantity,
+    String? senderId,
+    String? senderName,
+    String? notes,
+  }) async {
+    final transferId = 'transfer_dc_${transfers.length + 1}';
+    final now = DateTime.now();
+    final newRecord = StockTransferRecord(
+      id: transferId,
+      transferNumber: 'WB-INTERDC-${transfers.length + 1}',
+      sourceDcId: sourceDcId,
+      destinationDcId: destinationDcId,
+      transferType: 'inter_dc',
+      status: 'pending_destination_acceptance',
+      senderId: senderId ?? 'supervisor_origin',
+      senderName: senderName ?? sourceDcName,
+      senderRole: 'dc_supervisor',
+      dispatchedAt: now,
+      createdAt: now,
+      notes: notes,
+      items: [
+        StockTransferItemRecord(
+          id: 'item_interdc_1',
+          transferId: transferId,
+          productId: productIdOrSku,
+          productName: 'Inter-DC Product',
+          sku: 'SKU-INTERDC',
+          quantity: quantity,
+          quantityReceived: 0,
+        ),
+      ],
+    );
+    transfers.add(newRecord);
+    return {
+      'success': true,
+      'transfer_id': transferId,
+      'waybillNumber': newRecord.transferNumber,
+    };
+  }
+
+  @override
+  Future<Map<String, dynamic>> receiveInterDcTransfer({
+    required String transferId,
+    String? receiverId,
+    String? receiverName,
+    int? quantityReceived,
+    String? notes,
+  }) async {
+    final index = transfers.indexWhere((t) => t.id == transferId);
+    if (index == -1) throw Exception('Transfer not found');
+    final existing = transfers[index];
+
+    final updated = existing.copyWith(
+      status: 'completed',
+      receiverId: receiverId ?? 'supervisor_dest',
+      receiverName: receiverName ?? 'Destination Supervisor',
+      receivedAt: DateTime.now(),
+      notes: notes,
+      items: existing.items.map((it) => it.copyWith(quantityReceived: quantityReceived ?? it.quantity)).toList(),
+    );
+    transfers[index] = updated;
+    return {
+      'success': true,
+      'transfer_id': transferId,
+      'status': 'completed',
+    };
+  }
+
+  @override
   Future<Map<String, dynamic>> issueDcStockToRiderWithSignature({
     required String dcId,
     required String riderId,
     required List<Map<String, dynamic>> items,
     required String senderId,
     required String senderName,
-    required String senderSignatureUrl,
+    String senderSignatureUrl = '',
     String? notes,
   }) async {
     final transferId = 'transfer_rh_${transfers.length + 1}';
@@ -198,7 +273,7 @@ class MockTwoWayStockRepository implements StockRepository {
     required String transferId,
     required String riderId,
     required String riderName,
-    required String riderSignatureUrl,
+    String riderSignatureUrl = '',
     List<Map<String, dynamic>>? verifiedItems,
     String? notes,
   }) async {
@@ -245,8 +320,28 @@ class MockTwoWayStockRepository implements StockRepository {
     };
   }
 
+  Future<List<StockItemEntity>> fetchStockItems([String? filter, String? dcId]) async {
+    return [
+      StockItemEntity.empty.copyWith(
+        id: 'prod_tea_1',
+        name: 'Respira Detox Tea',
+        sku: 'SKU-RESP-01',
+        availableCount: 100,
+        totalInCustody: 100,
+      ),
+    ];
+  }
+
   @override
-  Future<List<StockItemEntity>> getVehicleStockItems([String? agentId, String? dcId]) async => [];
+  Future<List<StockItemEntity>> getVehicleStockItems([String? agentId, String? dcId]) async => [
+    StockItemEntity.empty.copyWith(
+      id: 'prod_tea_1',
+      name: 'Respira Detox Tea',
+      sku: 'SKU-RESP-01',
+      availableCount: 100,
+      totalInCustody: 100,
+    ),
+  ];
 
   @override
   Future<List<RiderStockAllocation>> getRiderStockAllocations([String? riderId, String? dcId]) async => [];
@@ -322,7 +417,7 @@ void main() {
     });
 
     test('Discrepancy calculations correctly compute missing and damaged balances', () {
-      final itemClean = const StockTransferItemRecord(
+      const itemClean = StockTransferItemRecord(
         id: 'i1',
         transferId: 't1',
         productId: 'p1',
@@ -334,7 +429,7 @@ void main() {
         quantityMissing: 0,
       );
 
-      final itemDamaged = const StockTransferItemRecord(
+      const itemDamaged = StockTransferItemRecord(
         id: 'i2',
         transferId: 't1',
         productId: 'p2',
@@ -346,7 +441,7 @@ void main() {
         quantityMissing: 0,
       );
 
-      final itemMissing = const StockTransferItemRecord(
+      const itemMissing = StockTransferItemRecord(
         id: 'i3',
         transferId: 't1',
         productId: 'p3',
@@ -545,6 +640,102 @@ void main() {
       final rejected = stateAfterReject.stockTransfers.firstWhere((t) => t.id == transferId);
       expect(rejected.isRejected, isTrue);
       expect(rejected.discrepancyNotes, contains('Carton was soaked'));
+    });
+
+    test('Full Inter-DC Two-Way Transfer & Acceptance Handshake', () async {
+      final notifier = container.read(stockProvider.notifier);
+
+      // Pre-load stock items so origin DC has stock to transfer
+      await notifier.fetchStockItems(null, 'dc_lagos_central');
+
+      // Step 1: Origin DC dispatches Inter-DC stock transfer
+      final dispatchResult = await notifier.transferStockBetweenDCs(
+        productIdOrSku: 'prod_tea_1',
+        sourceDcId: 'dc_lagos_central',
+        sourceDcName: 'Lagos Central Hub',
+        destinationDcId: 'dc_abuja_hub',
+        destinationDcName: 'Abuja Hub',
+        quantity: 25,
+        senderId: 'sup_lagos',
+        senderName: 'Supervisor Lagos',
+        notes: 'Replenishment for Abuja Hub',
+      );
+
+      expect(dispatchResult['success'], isTrue);
+      final transferId = dispatchResult['transfer_id'] as String;
+
+      // Verify that destination DC sees pending inbound transfer
+      await notifier.fetchStockTransfers(dcId: 'dc_abuja_hub');
+      final stateAfterDispatch = container.read(stockProvider);
+      final pendingTransfer = stateAfterDispatch.stockTransfers.firstWhere((t) => t.id == transferId);
+      expect(pendingTransfer.isPendingDestinationAcceptance, isTrue);
+      expect(pendingTransfer.destinationDcId, 'dc_abuja_hub');
+      expect(pendingTransfer.sourceDcId, 'dc_lagos_central');
+
+      // Step 2: Destination DC receives and accepts the incoming transfer
+      final receiveResult = await notifier.receiveInterDcTransfer(
+        transferId: transferId,
+        receiverId: 'sup_abuja',
+        receiverName: 'Supervisor Abuja',
+        quantityReceived: 25,
+        notes: 'Physical count verified 25 units',
+        dcId: 'dc_abuja_hub',
+      );
+
+      expect(receiveResult['success'], isTrue);
+      expect(receiveResult['status'], 'completed');
+
+      // Verify that the transfer is marked completed and stock balanced
+      await notifier.fetchStockTransfers(dcId: 'dc_abuja_hub');
+      final stateAfterReceive = container.read(stockProvider);
+      final completedTransfer = stateAfterReceive.stockTransfers.firstWhere((t) => t.id == transferId);
+      expect(completedTransfer.isCompleted, isTrue);
+      expect(completedTransfer.receiverName, 'Supervisor Abuja');
+      expect(completedTransfer.items.first.quantityReceived, 25);
+    });
+
+    test('Signature-Free Verification Handshake succeeds across all transfers', () async {
+      final notifier = container.read(stockProvider.notifier);
+
+      // Client Supply without signatures
+      final clientSupplyRes = await notifier.dispatchClientSupply(
+        clientId: 'client_beta',
+        dcId: 'dc_ibadan',
+        items: [{'product_id': 'prod_cream_1', 'quantity': 50}],
+        senderName: 'Beta Cosmetics',
+        senderSignatureUrl: '', // Explicit empty signature
+      );
+      expect(clientSupplyRes['success'], isTrue);
+      final csId = clientSupplyRes['transfer_id'] as String;
+
+      final receiveCsRes = await notifier.receiveClientSupply(
+        transferId: csId,
+        receiverId: 'sup_ibadan',
+        receiverName: 'DC Supervisor Ibadan',
+        receiverSignatureUrl: '', // Explicit empty signature
+        verifiedItems: [{'product_id': 'prod_cream_1', 'quantity_received': 50}],
+      );
+      expect(receiveCsRes['success'], isTrue);
+
+      // DC to Rider Handover without signatures
+      final issueRes = await notifier.issueDcStockToRiderWithSignature(
+        dcId: 'dc_ibadan',
+        riderId: 'rider_ibadan_1',
+        senderId: 'sup_ibadan',
+        senderName: 'DC Supervisor Ibadan',
+        senderSignatureUrl: '', // Explicit empty signature
+        items: [{'product_id': 'prod_cream_1', 'quantity': 10}],
+      );
+      expect(issueRes['success'], isTrue);
+      final rhId = issueRes['transfer_id'] as String;
+
+      final acceptRes = await notifier.acceptRiderStockHandover(
+        transferId: rhId,
+        riderId: 'rider_ibadan_1',
+        riderName: 'Rider Ibadan',
+        riderSignatureUrl: '', // Explicit empty signature
+      );
+      expect(acceptRes['success'], isTrue);
     });
   });
 }

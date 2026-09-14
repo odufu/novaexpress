@@ -71,6 +71,15 @@ abstract class StockRemoteDataSource {
     required String destinationDcId,
     required String destinationDcName,
     required int quantity,
+    String? senderId,
+    String? senderName,
+    String? notes,
+  });
+  Future<Map<String, dynamic>> receiveInterDcTransfer({
+    required String transferId,
+    String? receiverId,
+    String? receiverName,
+    int? quantityReceived,
     String? notes,
   });
   Future<Map<String, dynamic>> processStockReturn({
@@ -98,14 +107,14 @@ abstract class StockRemoteDataSource {
     required List<Map<String, dynamic>> items,
     String? senderId,
     required String senderName,
-    required String senderSignatureUrl,
+    String senderSignatureUrl = '',
     String? notes,
   });
   Future<Map<String, dynamic>> receiveClientSupply({
     required String transferId,
     required String receiverId,
     required String receiverName,
-    required String receiverSignatureUrl,
+    String receiverSignatureUrl = '',
     required List<Map<String, dynamic>> verifiedItems,
     String? notes,
   });
@@ -115,14 +124,14 @@ abstract class StockRemoteDataSource {
     required List<Map<String, dynamic>> items,
     required String senderId,
     required String senderName,
-    required String senderSignatureUrl,
+    String senderSignatureUrl = '',
     String? notes,
   });
   Future<Map<String, dynamic>> acceptRiderStockHandover({
     required String transferId,
     required String riderId,
     required String riderName,
-    required String riderSignatureUrl,
+    String riderSignatureUrl = '',
     List<Map<String, dynamic>>? verifiedItems,
     String? notes,
   });
@@ -291,8 +300,9 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
         debugPrint('[STOCK_DATASOURCE] ⚠️ orders query error: $e');
       }
 
-      // 3. Fetch transfer allocations for riders from warehouses + stock_transfers + stock_transfer_items
+      // 3. Fetch transfer allocations and vehicle custody for riders
       final Map<String, int> riderAllocatedUnits = {};
+      final Map<String, Map<String, dynamic>> agentInventoryMap = {};
       try {
         if (validAgentId != null && validAgentId.isNotEmpty) {
           // Resolve both agent id and user id for resilient lookup
@@ -310,6 +320,25 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
             }
           } catch (_) {}
 
+          // Authoritative vehicle custody from agent_inventory
+          try {
+            final aiRes = await dbClient
+                .from('agent_inventory')
+                .select('product_id, total_in_custody, available_count, delivered_count_today, returned_count')
+                .or(linkedUserId != null && linkedUserId != agentId
+                    ? 'delivery_agent_id.eq.$agentId,delivery_agent_id.eq.$linkedUserId'
+                    : 'delivery_agent_id.eq.$agentId');
+            for (final row in aiRes as List) {
+              final rMap = Map<String, dynamic>.from(row as Map);
+              final pId = rMap['product_id']?.toString() ?? '';
+              if (pId.isNotEmpty) {
+                agentInventoryMap[pId] = rMap;
+              }
+            }
+          } catch (aiErr) {
+            debugPrint('[STOCK_DATASOURCE] ℹ️ agent_inventory query note: $aiErr');
+          }
+
           final riderFilter = (linkedUserId != null && linkedUserId != agentId)
               ? 'rider_id.eq.$agentId,rider_id.eq.$linkedUserId'
               : 'rider_id.eq.$agentId';
@@ -321,23 +350,32 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
               .or(riderFilter);
           final wIds = (wRes as List).map((w) => w['id'].toString()).toList();
 
+          final String trfFilter;
           if (wIds.isNotEmpty) {
-            final tRes = await dbClient
-                .from('stock_transfers')
-                .select('id, destination_warehouse_id, status, stock_transfer_items(id, product_id, quantity_shipped, quantity_received)')
-                .filter('destination_warehouse_id', 'in', wIds);
+            trfFilter = (linkedUserId != null && linkedUserId != agentId)
+                ? 'receiver_id.eq.$agentId,receiver_id.eq.$linkedUserId,destination_warehouse_id.in.(${wIds.join(",")})'
+                : 'receiver_id.eq.$agentId,destination_warehouse_id.in.(${wIds.join(",")})';
+          } else {
+            trfFilter = (linkedUserId != null && linkedUserId != agentId)
+                ? 'receiver_id.eq.$agentId,receiver_id.eq.$linkedUserId'
+                : 'receiver_id.eq.$agentId';
+          }
 
-            for (final t in tRes as List) {
-              final tMap = Map<String, dynamic>.from(t as Map);
-              final items = tMap['stock_transfer_items'] as List? ?? [];
-              for (final it in items) {
-                final itemMap = Map<String, dynamic>.from(it as Map);
-                final pId = itemMap['product_id']?.toString() ?? '';
-                final qty = (itemMap['quantity_shipped'] as num?)?.toInt() ??
-                    (itemMap['quantity_received'] as num?)?.toInt() ??
-                    0;
-                riderAllocatedUnits[pId] = (riderAllocatedUnits[pId] ?? 0) + qty;
-              }
+          final tRes = await dbClient
+              .from('stock_transfers')
+              .select('id, destination_warehouse_id, receiver_id, status, stock_transfer_items(id, product_id, quantity_shipped, quantity_received)')
+              .or(trfFilter);
+
+          for (final t in tRes as List) {
+            final tMap = Map<String, dynamic>.from(t as Map);
+            final items = tMap['stock_transfer_items'] as List? ?? [];
+            for (final it in items) {
+              final itemMap = Map<String, dynamic>.from(it as Map);
+              final pId = itemMap['product_id']?.toString() ?? '';
+              final qty = (itemMap['quantity_shipped'] as num?)?.toInt() ??
+                  (itemMap['quantity_received'] as num?)?.toInt() ??
+                  0;
+              riderAllocatedUnits[pId] = (riderAllocatedUnits[pId] ?? 0) + qty;
             }
           }
         } else if (validDcId != null && validDcId.isNotEmpty) {
@@ -421,11 +459,22 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
         bool isCoveredByThisDc = true;
 
         if (validAgentId != null) {
-          // Rider View: Available is physical transfers minus delivered orders
-          final netInVehicle = (totalAllocatedToRider - deliveredQty - returnedQty).clamp(0, 999999);
-          availableCount = netInVehicle > 0 ? netInVehicle : (totalAllocatedToRider > 0 ? totalAllocatedToRider : inTransitQty);
-          assignedCount = totalAllocatedToRider > 0 ? totalAllocatedToRider : (availableCount + deliveredQty + returnedQty);
-          totalInCustody = availableCount;
+          if (agentInventoryMap.containsKey(pId)) {
+            final inv = agentInventoryMap[pId]!;
+            final invAvail = (inv['available_count'] as num?)?.toInt() ?? 0;
+            final invTotal = (inv['total_in_custody'] as num?)?.toInt() ?? invAvail;
+            final invDelivered = (inv['delivered_count_today'] as num?)?.toInt() ?? deliveredQty;
+            final invReturned = (inv['returned_count'] as num?)?.toInt() ?? returnedQty;
+            availableCount = invAvail;
+            totalInCustody = invTotal;
+            assignedCount = invTotal + invDelivered + invReturned;
+          } else {
+            // Rider View: Available is physical transfers minus delivered orders
+            final netInVehicle = (totalAllocatedToRider - deliveredQty - returnedQty).clamp(0, 999999);
+            availableCount = netInVehicle > 0 ? netInVehicle : (totalAllocatedToRider > 0 ? totalAllocatedToRider : inTransitQty);
+            assignedCount = totalAllocatedToRider > 0 ? totalAllocatedToRider : (availableCount + deliveredQty + returnedQty);
+            totalInCustody = availableCount;
+          }
         } else {
           // DC Supervisor View: Warehouse shelf stock strictly scoped to this DC
           final dbQty = (json['stock_quantity'] as num?)?.toInt() ?? 0;
@@ -622,7 +671,12 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
         'dc_stocks': dcStocks,
     };
     if (clientId != null && clientId.trim().isNotEmpty) {
-      cleanPayload['client_id'] = clientId.trim();
+      final cleanCId = clientId.trim();
+      if (RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(cleanCId)) {
+        cleanPayload['client_id'] = cleanCId;
+      } else {
+        debugPrint('[STOCK_DATASOURCE] ℹ️ Ignoring non-UUID clientId "$cleanCId" for products table');
+      }
     }
 
     Map<String, dynamic>? res;
@@ -970,7 +1024,76 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
         linkedUserId = a['user_id']?.toString() ?? a['id']?.toString();
       }
 
-      // 3. Fetch warehouses for riders
+      // 3a. Read live vehicle custody from authoritative agent_inventory table
+      final Map<String, RiderStockAllocation> allocationsMap = {};
+      try {
+        var aiQuery = dbClient.from('agent_inventory').select();
+        if (validRiderId != null) {
+          final filter = linkedUserId != null && linkedUserId != validRiderId
+              ? 'delivery_agent_id.eq.$validRiderId,delivery_agent_id.eq.$linkedUserId'
+              : 'delivery_agent_id.eq.$validRiderId';
+          aiQuery = aiQuery.or(filter);
+        }
+        final aiRes = await aiQuery;
+        for (final item in aiRes as List) {
+          final aiMap = Map<String, dynamic>.from(item as Map);
+          final rId = aiMap['delivery_agent_id']?.toString() ?? '';
+          final pId = aiMap['product_id']?.toString() ?? '';
+          final totalCustody = (aiMap['total_in_custody'] as num?)?.toInt() ?? 0;
+          final deliveredToday = (aiMap['delivered_count_today'] as num?)?.toInt() ?? 0;
+          final returnedCount = (aiMap['returned_count'] as num?)?.toInt() ?? 0;
+
+          final agentInfo = agentsMap[rId] ?? {};
+          final agentDc = agentInfo['distribution_center_id']?.toString();
+          if (validDcId != null && agentDc != null && agentDc.isNotEmpty && agentDc != validDcId) {
+            continue;
+          }
+
+          final rUser = agentInfo['users'] is Map<String, dynamic>
+              ? agentInfo['users'] as Map<String, dynamic>
+              : (agentInfo['users'] is List && (agentInfo['users'] as List).isNotEmpty
+                  ? (agentInfo['users'] as List).first as Map<String, dynamic>
+                  : null);
+          final uFirst = rUser?['first_name']?.toString() ?? '';
+          final uLast = rUser?['last_name']?.toString() ?? '';
+          final uFull = '$uFirst $uLast'.trim();
+          final rName = (uFull.isNotEmpty && uFull.toLowerCase() != 'delivery agent')
+              ? uFull
+              : (agentInfo['bank_account_name']?.toString() ??
+                  agentInfo['name']?.toString() ??
+                  agentInfo['full_name']?.toString() ??
+                  'Rider');
+          final rCode = agentInfo['agent_code']?.toString() ?? 'PDA-RIDER';
+
+          final pInfo = productMap[pId] ?? {};
+          final pName = pInfo['name']?.toString() ?? 'Product';
+          final sku = pInfo['sku']?.toString() ?? 'SKU-001';
+          final price = (pInfo['base_price'] as num?)?.toDouble() ?? 0.0;
+          final client = pInfo['owner_name']?.toString() ?? pInfo['client_name']?.toString() ?? '';
+
+          final key = '${rId}_$pId';
+          allocationsMap[key] = RiderStockAllocation(
+            id: 'alloc_${key.hashCode.abs()}',
+            riderId: rId,
+            riderName: rName,
+            riderCode: rCode,
+            productId: pId,
+            productName: pName,
+            sku: sku,
+            clientName: client,
+            allocatedUnits: totalCustody + deliveredToday + returnedCount,
+            deliveredUnits: deliveredToday,
+            inCustodyUnits: totalCustody,
+            returnedUnits: returnedCount,
+            unitPrice: price,
+            allocatedAt: DateTime.tryParse(aiMap['updated_at']?.toString() ?? '') ?? DateTime.now(),
+          );
+        }
+      } catch (e) {
+        debugPrint('[STOCK_DATASOURCE] ℹ️ agent_inventory allocation query notice: $e');
+      }
+
+      // 3b. Augment with stock_transfers (warehouses or direct receiver_id)
       final Map<String, Map<String, dynamic>> warehouseToRider = {};
       try {
         final wRes = await dbClient
@@ -994,65 +1117,71 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
         }
       } catch (_) {}
 
-      final Map<String, RiderStockAllocation> allocationsMap = {};
+      try {
+        var tQuery = dbClient
+            .from('stock_transfers')
+            .select('id, destination_warehouse_id, receiver_id, source_dc_id, status, created_at, stock_transfer_items(id, product_id, quantity_shipped, quantity_received)');
 
-      if (warehouseToRider.isNotEmpty) {
-        try {
-          final tRes = await dbClient
-              .from('stock_transfers')
-              .select('id, destination_warehouse_id, source_dc_id, status, created_at, stock_transfer_items(id, product_id, quantity_shipped, quantity_received)')
-              .filter('destination_warehouse_id', 'in', warehouseToRider.keys.toList());
+        if (warehouseToRider.isNotEmpty) {
+          tQuery = tQuery.filter('destination_warehouse_id', 'in', warehouseToRider.keys.toList());
+        } else if (validRiderId != null) {
+          final filter = linkedUserId != null && linkedUserId != validRiderId
+              ? 'receiver_id.eq.$validRiderId,receiver_id.eq.$linkedUserId'
+              : 'receiver_id.eq.$validRiderId';
+          tQuery = tQuery.or(filter);
+        } else {
+          tQuery = tQuery.eq('transfer_type', 'dc_to_rider');
+        }
 
-          for (final t in tRes as List) {
-            final tMap = Map<String, dynamic>.from(t as Map);
-            final destWarehouseId = tMap['destination_warehouse_id']?.toString() ?? '';
-            final wInfo = warehouseToRider[destWarehouseId];
-            if (wInfo == null) continue;
+        final tRes = await tQuery;
+        for (final t in tRes as List) {
+          final tMap = Map<String, dynamic>.from(t as Map);
+          final destWarehouseId = tMap['destination_warehouse_id']?.toString() ?? '';
+          final wInfo = warehouseToRider[destWarehouseId];
+          final rId = wInfo?['rider_id']?.toString() ?? tMap['receiver_id']?.toString() ?? '';
+          if (rId.isEmpty) continue;
 
-            final rId = wInfo['rider_id']?.toString() ?? '';
-            final agentInfo = agentsMap[rId] ?? {};
-            final agentDc = agentInfo['distribution_center_id']?.toString();
-            final sourceDc = tMap['source_dc_id']?.toString();
+          final agentInfo = agentsMap[rId] ?? {};
+          final agentDc = agentInfo['distribution_center_id']?.toString();
+          final sourceDc = tMap['source_dc_id']?.toString();
 
-            if (validDcId != null && agentDc != validDcId && sourceDc != validDcId) {
-              continue;
-            }
-            
-            final rUser = agentInfo['users'] is Map<String, dynamic>
-                ? agentInfo['users'] as Map<String, dynamic>
-                : (agentInfo['users'] is List && (agentInfo['users'] as List).isNotEmpty
-                    ? (agentInfo['users'] as List).first as Map<String, dynamic>
-                    : null);
-            final uFirst = rUser?['first_name']?.toString() ?? '';
-            final uLast = rUser?['last_name']?.toString() ?? '';
-            final uFull = '$uFirst $uLast'.trim();
-            final rName = (uFull.isNotEmpty && uFull.toLowerCase() != 'delivery agent')
-                ? uFull
-                : (agentInfo['bank_account_name']?.toString() ??
-                    agentInfo['name']?.toString() ??
-                    wInfo['name']?.toString() ??
-                    'Rider');
-            final rCode = agentInfo['agent_code']?.toString() ?? 'PDA-RIDER';
+          if (validDcId != null && agentDc != validDcId && sourceDc != validDcId) {
+            continue;
+          }
 
-            final items = tMap['stock_transfer_items'] as List? ?? [];
-            for (final it in items) {
-              final itemMap = Map<String, dynamic>.from(it as Map);
-              final pId = itemMap['product_id']?.toString() ?? '';
-              final qty = (itemMap['quantity_shipped'] as num?)?.toInt() ??
-                  (itemMap['quantity_received'] as num?)?.toInt() ??
-                  0;
+          final rUser = agentInfo['users'] is Map<String, dynamic>
+              ? agentInfo['users'] as Map<String, dynamic>
+              : (agentInfo['users'] is List && (agentInfo['users'] as List).isNotEmpty
+                  ? (agentInfo['users'] as List).first as Map<String, dynamic>
+                  : null);
+          final uFirst = rUser?['first_name']?.toString() ?? '';
+          final uLast = rUser?['last_name']?.toString() ?? '';
+          final uFull = '$uFirst $uLast'.trim();
+          final rName = (uFull.isNotEmpty && uFull.toLowerCase() != 'delivery agent')
+              ? uFull
+              : (agentInfo['bank_account_name']?.toString() ??
+                  agentInfo['name']?.toString() ??
+                  wInfo?['name']?.toString() ??
+                  'Rider');
+          final rCode = agentInfo['agent_code']?.toString() ?? 'PDA-RIDER';
 
-              final pInfo = productMap[pId] ?? {};
-              final pName = pInfo['name']?.toString() ?? 'Product';
-              final sku = pInfo['sku']?.toString() ?? 'SKU-001';
-              final price = (pInfo['base_price'] as num?)?.toDouble() ?? 0.0;
-              final client = pInfo['owner_name']?.toString() ?? pInfo['client_name']?.toString() ?? '';
+          final items = tMap['stock_transfer_items'] as List? ?? [];
+          for (final it in items) {
+            final itemMap = Map<String, dynamic>.from(it as Map);
+            final pId = itemMap['product_id']?.toString() ?? '';
+            final qty = (itemMap['quantity_shipped'] as num?)?.toInt() ??
+                (itemMap['quantity_received'] as num?)?.toInt() ??
+                0;
 
-              final key = '${rId}_$pId';
-              final existing = allocationsMap[key];
-              final newAlloc = (existing?.allocatedUnits ?? 0) + qty;
-              final newCustody = (existing?.inCustodyUnits ?? 0) + qty;
+            final pInfo = productMap[pId] ?? {};
+            final pName = pInfo['name']?.toString() ?? 'Product';
+            final sku = pInfo['sku']?.toString() ?? 'SKU-001';
+            final price = (pInfo['base_price'] as num?)?.toDouble() ?? 0.0;
+            final client = pInfo['owner_name']?.toString() ?? pInfo['client_name']?.toString() ?? '';
 
+            final key = '${rId}_$pId';
+            final existing = allocationsMap[key];
+            if (existing == null) {
               allocationsMap[key] = RiderStockAllocation(
                 id: 'alloc_${key.hashCode.abs()}',
                 riderId: rId,
@@ -1062,17 +1191,21 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
                 productName: pName,
                 sku: sku,
                 clientName: client,
-                allocatedUnits: newAlloc,
-                deliveredUnits: existing?.deliveredUnits ?? 0,
-                inCustodyUnits: newCustody,
+                allocatedUnits: qty,
+                deliveredUnits: 0,
+                inCustodyUnits: qty,
                 unitPrice: price,
                 allocatedAt: DateTime.tryParse(tMap['created_at']?.toString() ?? '') ?? DateTime.now(),
               );
+            } else if (existing.allocatedUnits < qty) {
+              allocationsMap[key] = existing.copyWith(
+                allocatedUnits: existing.allocatedUnits + qty,
+              );
             }
           }
-        } catch (e) {
-          debugPrint('[STOCK_DATASOURCE] ℹ️ stock_transfers allocation query notice: $e');
         }
+      } catch (e) {
+        debugPrint('[STOCK_DATASOURCE] ℹ️ stock_transfers allocation query notice: $e');
       }
 
       // Reconcile delivered and returned counts from orders
@@ -1420,93 +1553,118 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
     required String destinationDcId,
     required String destinationDcName,
     required int quantity,
+    String? senderId,
+    String? senderName,
     String? notes,
   }) async {
     final dbClient = _getAuthDbClient();
-    final transferNumber = 'TRF-DC-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
-    final waybillNumber = 'WB-DC-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
-
     try {
-      // 1. Resolve product
-      String resolvedProdId = productIdOrSku;
-      final isProdUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(productIdOrSku.trim());
-      try {
-        final query = dbClient.from('products').select('id, stock_quantity');
-        final pRes = isProdUuid
-            ? await query.eq('id', productIdOrSku.trim()).limit(1)
-            : await query.or('sku.eq.${productIdOrSku.trim()},name.eq.${productIdOrSku.trim()}').limit(1);
-        if ((pRes as List).isNotEmpty) {
-          resolvedProdId = pRes.first['id'].toString();
-        }
-      } catch (_) {}
+      // 1. Resolve product UUID
+      String resolvedProdId = productIdOrSku.trim();
+      final isProdUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(resolvedProdId);
+      if (!isProdUuid) {
+        try {
+          final pRes = await dbClient.from('products').select('id').or('sku.eq.$resolvedProdId,name.eq.$resolvedProdId').limit(1);
+          if ((pRes as List).isNotEmpty) {
+            resolvedProdId = pRes.first['id'].toString();
+          }
+        } catch (_) {}
+      }
 
-      // 2. Insert into stock_transfers
-      final transferRes = await dbClient.from('stock_transfers').insert({
-        'transfer_number': transferNumber,
-        'waybill_number': waybillNumber,
-        'transfer_type': 'inter_dc',
-        'source_dc_id': sourceDcId.isNotEmpty ? sourceDcId : null,
-        'destination_dc_id': destinationDcId.isNotEmpty ? destinationDcId : null,
-        'status': 'in_transit',
-        'notes': notes ?? 'Inter-DC stock rebalance from $sourceDcName to $destinationDcName',
-        'created_at': DateTime.now().toIso8601String(),
-        'updated_at': DateTime.now().toIso8601String(),
-      }).select().single();
-
-      final transferId = transferRes['id']?.toString() ?? 'trf_${DateTime.now().millisecondsSinceEpoch}';
-
-      // 3. Insert into stock_transfer_items
-      await dbClient.from('stock_transfer_items').insert({
-        'transfer_id': transferId,
-        'product_id': resolvedProdId,
-        'quantity_shipped': quantity,
-        'quantity_received': 0,
-        'created_at': DateTime.now().toIso8601String(),
+      // 2. Call atomic stored procedure fn_dispatch_inter_dc_transfer
+      final res = await dbClient.rpc('fn_dispatch_inter_dc_transfer', params: {
+        'p_source_dc_id': sourceDcId,
+        'p_destination_dc_id': destinationDcId,
+        'p_product_id': resolvedProdId,
+        'p_quantity': quantity,
+        'p_sender_id': senderId,
+        'p_sender_name': senderName ?? 'DC Station Supervisor',
+        'p_notes': notes ?? 'Inter-DC stock transfer from $sourceDcName to $destinationDcName',
       });
 
-      // 4. Update DC stock breakdown in product description
+      final map = Map<String, dynamic>.from(res as Map);
+      final waybill = map['waybill_number']?.toString() ?? 'WB-INTERDC';
+
+      // 3. Keep product description tags in sync
       try {
-        final pFullRes = await dbClient.from('products').select('id, description, stock_quantity').eq('id', resolvedProdId).limit(1);
+        final pFullRes = await dbClient.from('products').select('id, description, dc_stocks').eq('id', resolvedProdId).limit(1);
         if ((pFullRes as List).isNotEmpty) {
           final pRow = pFullRes.first;
           var desc = pRow['description']?.toString() ?? '';
-          final totalStock = (pRow['stock_quantity'] as num?)?.toInt() ?? 0;
-          final dcStocks = _parseDcStocks(desc);
-          final originDc = _parseOriginDc(desc);
-
-          final currentSrc = dcStocks[sourceDcId] ?? (originDc == sourceDcId ? totalStock : 0);
-          dcStocks[sourceDcId] = (currentSrc - quantity).clamp(0, 999999);
-          dcStocks[destinationDcId] = (dcStocks[destinationDcId] ?? 0) + quantity;
-
-          final jsonTag = jsonEncode(dcStocks);
-          if (desc.contains('[DC_STOCKS:')) {
-            desc = desc.replaceAll(RegExp(r'\[DC_STOCKS:\s*\{.*?\}\]'), '[DC_STOCKS: $jsonTag]');
-          } else {
-            desc = '$desc [DC_STOCKS: $jsonTag]'.trim();
+          if (pRow['dc_stocks'] is Map) {
+            final jsonTag = jsonEncode(pRow['dc_stocks']);
+            if (desc.contains('[DC_STOCKS:')) {
+              desc = desc.replaceAll(RegExp(r'\[DC_STOCKS:\s*\{.*?\}\]'), '[DC_STOCKS: $jsonTag]');
+            } else {
+              desc = '$desc [DC_STOCKS: $jsonTag]'.trim();
+            }
+            await dbClient.from('products').update({'description': desc}).eq('id', resolvedProdId);
           }
-
-          await dbClient.from('products').update({
-            'description': desc,
-            'dc_stocks': dcStocks,
-            'updated_at': DateTime.now().toIso8601String(),
-          }).eq('id', resolvedProdId);
         }
       } catch (_) {}
 
       return {
-        'success': true,
-        'transferNumber': transferNumber,
-        'waybillNumber': waybillNumber,
-        'message': 'Successfully created Inter-DC transfer ($waybillNumber) to $destinationDcName',
+        'success': map['success'] == true,
+        'transfer_id': map['transfer_id'],
+        'transferId': map['transfer_id'],
+        'transferNumber': waybill,
+        'waybillNumber': waybill,
+        'message': map['message'] ?? 'Successfully dispatched Inter-DC transfer ($waybill) to $destinationDcName',
       };
     } catch (e) {
-      debugPrint('[STOCK_DATASOURCE] ℹ️ transferStockBetweenDCs notice: $e');
-      return {
-        'success': true,
-        'transferNumber': transferNumber,
-        'waybillNumber': waybillNumber,
-        'message': 'Inter-DC transfer ($waybillNumber) logged locally for $destinationDcName',
-      };
+      debugPrint('[STOCK_DATASOURCE] ⚠️ transferStockBetweenDCs error: $e');
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> receiveInterDcTransfer({
+    required String transferId,
+    String? receiverId,
+    String? receiverName,
+    int? quantityReceived,
+    String? notes,
+  }) async {
+    final dbClient = _getAuthDbClient();
+    try {
+      final res = await dbClient.rpc('fn_receive_inter_dc_transfer', params: {
+        'p_transfer_id': transferId,
+        'p_receiver_id': receiverId,
+        'p_receiver_name': receiverName ?? 'DC Station Supervisor',
+        'p_quantity_received': quantityReceived,
+        'p_notes': notes ?? '',
+      });
+
+      final map = Map<String, dynamic>.from(res as Map);
+
+      // Keep product description tags in sync
+      try {
+        final itemRes = await dbClient.from('stock_transfer_items').select('product_id').eq('transfer_id', transferId).limit(1);
+        if ((itemRes as List).isNotEmpty) {
+          final pId = itemRes.first['product_id']?.toString();
+          if (pId != null) {
+            final pFullRes = await dbClient.from('products').select('id, description, dc_stocks').eq('id', pId).limit(1);
+            if ((pFullRes as List).isNotEmpty) {
+              final pRow = pFullRes.first;
+              var desc = pRow['description']?.toString() ?? '';
+              if (pRow['dc_stocks'] is Map) {
+                final jsonTag = jsonEncode(pRow['dc_stocks']);
+                if (desc.contains('[DC_STOCKS:')) {
+                  desc = desc.replaceAll(RegExp(r'\[DC_STOCKS:\s*\{.*?\}\]'), '[DC_STOCKS: $jsonTag]');
+                } else {
+                  desc = '$desc [DC_STOCKS: $jsonTag]'.trim();
+                }
+                await dbClient.from('products').update({'description': desc}).eq('id', pId);
+              }
+            }
+          }
+        }
+      } catch (_) {}
+
+      return map;
+    } catch (e) {
+      debugPrint('[STOCK_DATASOURCE] ⚠️ receiveInterDcTransfer error: $e');
+      rethrow;
     }
   }
 
@@ -1567,7 +1725,7 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
     required List<Map<String, dynamic>> items,
     String? senderId,
     required String senderName,
-    required String senderSignatureUrl,
+    String senderSignatureUrl = '',
     String? notes,
   }) async {
     final dbClient = _getAuthDbClient();
@@ -1593,7 +1751,7 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
     required String transferId,
     required String receiverId,
     required String receiverName,
-    required String receiverSignatureUrl,
+    String receiverSignatureUrl = '',
     required List<Map<String, dynamic>> verifiedItems,
     String? notes,
   }) async {
@@ -1621,7 +1779,7 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
     required List<Map<String, dynamic>> items,
     required String senderId,
     required String senderName,
-    required String senderSignatureUrl,
+    String senderSignatureUrl = '',
     String? notes,
   }) async {
     final dbClient = _getAuthDbClient();
@@ -1647,7 +1805,7 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
     required String transferId,
     required String riderId,
     required String riderName,
-    required String riderSignatureUrl,
+    String riderSignatureUrl = '',
     List<Map<String, dynamic>>? verifiedItems,
     String? notes,
   }) async {
@@ -1733,10 +1891,26 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
       }).toList();
 
       if (riderId != null && riderId.isNotEmpty) {
+        String effectiveAgentId = riderId;
+        String? linkedUserId;
+        try {
+          final daRes = await dbClient
+              .from('delivery_agents')
+              .select('id, user_id')
+              .or('id.eq.$riderId,user_id.eq.$riderId')
+              .limit(1);
+          if ((daRes as List).isNotEmpty) {
+            effectiveAgentId = daRes.first['id']?.toString() ?? riderId;
+            linkedUserId = daRes.first['user_id']?.toString();
+          }
+        } catch (_) {}
+
         return list.where((trf) =>
-            trf.receiverId == riderId ||
-            trf.senderId == riderId ||
-            (trf.notes != null && trf.notes!.contains(riderId))).toList();
+            trf.receiverId == effectiveAgentId ||
+            (linkedUserId != null && trf.receiverId == linkedUserId) ||
+            trf.senderId == effectiveAgentId ||
+            (linkedUserId != null && trf.senderId == linkedUserId) ||
+            (trf.notes != null && (trf.notes!.contains(effectiveAgentId) || (linkedUserId != null && trf.notes!.contains(linkedUserId))))).toList();
       }
 
       return list;
@@ -1803,15 +1977,20 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
   Future<List<Map<String, dynamic>>> fetchPendingDcReturns(String dcId) async {
     final dbClient = _getAuthDbClient();
     try {
-      final res = await dbClient
+      var query = dbClient
           .from('stock_returns')
           .select('''
             *,
-            delivery_agents(id, full_name, agent_code, phone),
+            delivery_agents(id, full_name, agent_code),
             products(id, name, sku, base_price)
           ''')
-          .eq('status', 'submitted')
-          .order('created_at', ascending: false);
+          .eq('status', 'submitted');
+
+      if (dcId.isNotEmpty) {
+        query = query.or('distribution_center_id.eq.$dcId,destination_dc_id.eq.$dcId');
+      }
+
+      final res = await query.order('created_at', ascending: false);
       return (res as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
     } catch (e) {
       debugPrint('[STOCK_DATASOURCE] ⚠️ fetchPendingDcReturns error: $e');

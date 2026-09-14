@@ -447,15 +447,20 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
             children: [
               const Icon(Icons.nightlight_round, color: Color(0xFF0284C7), size: 22),
               const SizedBox(width: 8),
-              Text(
-                '10:00 PM Daily Merchant Settlement',
-                style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800),
+              Expanded(
+                child: Text(
+                  'Daily Merchant Settlement',
+                  style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),
-          content: SizedBox(
-            width: 480,
-            child: Column(
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: SizedBox(
+              width: double.maxFinite,
+              child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -513,7 +518,8 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
               ],
             ),
           ),
-          actions: [
+        ),
+        actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
               child: const Text('Cancel'),
@@ -882,34 +888,38 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
 
     showDialog(
       context: context,
-      builder: (ctx) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-        child: Container(
-          width: 580,
-          constraints: const BoxConstraints(maxHeight: 780),
-          padding: const EdgeInsets.all(22),
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // 1. Top Header & Reference
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF00A2D3).withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(Icons.bolt_rounded, color: Color(0xFF00A2D3), size: 22),
+      builder: (ctx) {
+        final screenHeight = MediaQuery.of(ctx).size.height;
+        return Dialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+          child: Container(
+            constraints: BoxConstraints(
+              maxWidth: 580,
+              maxHeight: screenHeight * 0.92,
+            ),
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 1. Top Header & Reference
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF00A2D3).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                        const SizedBox(width: 10),
-                        Column(
+                        child: const Icon(Icons.bolt_rounded, color: Color(0xFF00A2D3), size: 22),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
@@ -919,21 +929,23 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
                                 fontWeight: FontWeight.bold,
                                 color: isDark ? Colors.white : const Color(0xFF0F172A),
                               ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                             Text(
                               'NovaExpress Distribution Center Financial Pool',
                               style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),
-                      ],
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close_rounded, size: 20),
-                      onPressed: () => Navigator.pop(ctx),
-                    ),
-                  ],
-                ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, size: 20),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
 
                 const SizedBox(height: 16),
 
@@ -1292,9 +1304,10 @@ NovaExpress Distribution Center Audit
             ),
           ),
         ),
-      ),
-    );
-  }
+      );
+    },
+  );
+}
 
   Widget _buildModalRow(String label, String value, {bool isBold = false, Color? valueColor}) {
     return Padding(

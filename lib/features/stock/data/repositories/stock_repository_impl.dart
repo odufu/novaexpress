@@ -131,6 +131,8 @@ class StockRepositoryImpl implements StockRepository {
     required String destinationDcId,
     required String destinationDcName,
     required int quantity,
+    String? senderId,
+    String? senderName,
     String? notes,
   }) async {
     return await remoteDataSource.transferStockBetweenDCs(
@@ -140,6 +142,25 @@ class StockRepositoryImpl implements StockRepository {
       destinationDcId: destinationDcId,
       destinationDcName: destinationDcName,
       quantity: quantity,
+      senderId: senderId,
+      senderName: senderName,
+      notes: notes,
+    );
+  }
+
+  @override
+  Future<Map<String, dynamic>> receiveInterDcTransfer({
+    required String transferId,
+    String? receiverId,
+    String? receiverName,
+    int? quantityReceived,
+    String? notes,
+  }) async {
+    return await remoteDataSource.receiveInterDcTransfer(
+      transferId: transferId,
+      receiverId: receiverId,
+      receiverName: receiverName,
+      quantityReceived: quantityReceived,
       notes: notes,
     );
   }
@@ -217,7 +238,7 @@ class StockRepositoryImpl implements StockRepository {
     required List<Map<String, dynamic>> items,
     String? senderId,
     required String senderName,
-    required String senderSignatureUrl,
+    String senderSignatureUrl = '',
     String? notes,
   }) async {
     return await remoteDataSource.dispatchClientSupply(
@@ -236,7 +257,7 @@ class StockRepositoryImpl implements StockRepository {
     required String transferId,
     required String receiverId,
     required String receiverName,
-    required String receiverSignatureUrl,
+    String receiverSignatureUrl = '',
     required List<Map<String, dynamic>> verifiedItems,
     String? notes,
   }) async {
@@ -257,7 +278,7 @@ class StockRepositoryImpl implements StockRepository {
     required List<Map<String, dynamic>> items,
     required String senderId,
     required String senderName,
-    required String senderSignatureUrl,
+    String senderSignatureUrl = '',
     String? notes,
   }) async {
     return await remoteDataSource.issueDcStockToRiderWithSignature(
@@ -276,7 +297,7 @@ class StockRepositoryImpl implements StockRepository {
     required String transferId,
     required String riderId,
     required String riderName,
-    required String riderSignatureUrl,
+    String riderSignatureUrl = '',
     List<Map<String, dynamic>>? verifiedItems,
     String? notes,
   }) async {

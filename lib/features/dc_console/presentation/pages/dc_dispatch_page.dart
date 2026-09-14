@@ -200,35 +200,57 @@ class DCDispatchPage extends ConsumerWidget {
           const SizedBox(height: 20),
 
           // Quick Metric Counters
-          Row(
-            children: [
-              _buildMetricPill(
-                label: 'Unassigned Pool',
-                count: unassignedOrders.length,
-                color: const Color(0xFFF59E0B),
-                isDark: isDark,
-              ),
-              const SizedBox(width: 12),
-              _buildMetricPill(
-                label: 'In-Transit Deliveries',
-                count: inTransitOrders.length,
-                color: const Color(0xFF2563EB),
-                isDark: isDark,
-              ),
-              const SizedBox(width: 12),
-              _buildMetricPill(
-                label: 'Active Hub Drivers',
-                count: dcState.drivers.length,
-                color: const Color(0xFF10B981),
-                isDark: isDark,
-              ),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompact = constraints.maxWidth < 650;
+              final pills = [
+                _buildMetricPill(
+                  label: 'Unassigned Pool',
+                  count: unassignedOrders.length,
+                  color: const Color(0xFFF59E0B),
+                  isDark: isDark,
+                ),
+                _buildMetricPill(
+                  label: 'In-Transit Deliveries',
+                  count: inTransitOrders.length,
+                  color: const Color(0xFF2563EB),
+                  isDark: isDark,
+                ),
+                _buildMetricPill(
+                  label: 'Active Hub Drivers',
+                  count: dcState.drivers.length,
+                  color: const Color(0xFF10B981),
+                  isDark: isDark,
+                ),
+              ];
+
+              if (isCompact) {
+                return Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: pills.map((p) => SizedBox(
+                    width: constraints.maxWidth < 450 ? double.infinity : (constraints.maxWidth - 10) / 2,
+                    child: p,
+                  )).toList(),
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(child: pills[0]),
+                  const SizedBox(width: 12),
+                  Expanded(child: pills[1]),
+                  const SizedBox(width: 12),
+                  Expanded(child: pills[2]),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 24),
 
           // SECTION 1: Unassigned Orders Awaiting Rider Dispatch
           Container(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF1E293B) : Colors.white,
               borderRadius: BorderRadius.circular(16),
@@ -240,23 +262,29 @@ class DCDispatchPage extends ConsumerWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(8),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.pending_actions_rounded, color: Color(0xFFD97706), size: 18),
                           ),
-                          child: const Icon(Icons.pending_actions_rounded, color: Color(0xFFD97706), size: 18),
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          'Unassigned Orders Awaiting Rider',
-                          style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold),
-                        ),
-                      ],
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Unassigned Orders Awaiting Rider',
+                              style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
+                    const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
@@ -309,99 +337,143 @@ class DCDispatchPage extends ConsumerWidget {
                     ),
                     itemBuilder: (ctx, i) {
                       final order = unassignedOrders[i];
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        child: Row(
-                          children: [
-                            Expanded(
+                      return LayoutBuilder(
+                        builder: (context, constraints) {
+                          final isMobileOrder = constraints.maxWidth < 600;
+                          final infoColumn = Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Wrap(
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                spacing: 8,
+                                runSpacing: 4,
+                                children: [
+                                  Text(
+                                    '#${order.orderNumber}',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: const Color(0xFF2563EB),
+                                    ),
+                                  ),
+                                  Text(
+                                    order.customerName,
+                                    style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold),
+                                  ),
+                                  if (order.customerPhone.isNotEmpty)
+                                    Text(
+                                      '(${order.customerPhone})',
+                                      style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  const Icon(Icons.location_on_outlined, size: 14, color: Color(0xFF64748B)),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      '${order.deliveryAddress}, ${order.deliveryCity}',
+                                      style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              if (order.clientName.isNotEmpty || order.packageDealName != null) ...[
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.inventory_2_outlined, size: 13, color: Color(0xFF8B5CF6)),
+                                    const SizedBox(width: 4),
+                                    Expanded(
+                                      child: Text(
+                                        'Client: ${order.clientName.isNotEmpty ? order.clientName : "Merchant"} ${order.packageDealName != null ? "• Package: ${order.packageDealName}" : ""}',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.w600,
+                                          color: const Color(0xFF8B5CF6),
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ],
+                          );
+
+                          if (isMobileOrder) {
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
+                                  infoColumn,
+                                  const SizedBox(height: 10),
                                   Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
                                       Text(
-                                        '#${order.orderNumber}',
-                                        style: GoogleFonts.inter(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                          color: const Color(0xFF2563EB),
-                                        ),
+                                        CurrencyFormatter.formatNaira(order.totalAmount),
+                                        style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold),
                                       ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        order.customerName,
-                                        style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold),
-                                      ),
-                                      if (order.customerPhone.isNotEmpty) ...[
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          '(${order.customerPhone})',
-                                          style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                                      ElevatedButton.icon(
+                                        onPressed: () => _showAssignModal(context, order),
+                                        icon: const Icon(Icons.person_add_alt_1_rounded, size: 14, color: Colors.white),
+                                        label: const Text(
+                                          'Assign Rider',
+                                          style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                                         ),
-                                      ],
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.location_on_outlined, size: 14, color: Color(0xFF64748B)),
-                                      const SizedBox(width: 4),
-                                      Expanded(
-                                        child: Text(
-                                          '${order.deliveryAddress}, ${order.deliveryCity}',
-                                          style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
-                                          overflow: TextOverflow.ellipsis,
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(0xFF2563EB),
+                                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                          elevation: 0,
                                         ),
                                       ),
                                     ],
                                   ),
-                                  if (order.clientName.isNotEmpty || order.packageDealName != null) ...[
-                                    const SizedBox(height: 4),
-                                    Row(
-                                      children: [
-                                        const Icon(Icons.inventory_2_outlined, size: 13, color: Color(0xFF8B5CF6)),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          'Client: ${order.clientName.isNotEmpty ? order.clientName : "Merchant"} ${order.packageDealName != null ? "• Package: ${order.packageDealName}" : ""}',
-                                          style: GoogleFonts.inter(
-                                            fontSize: 11.5,
-                                            fontWeight: FontWeight.w600,
-                                            color: const Color(0xFF8B5CF6),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
                                 ],
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
+                            );
+                          }
+
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: Row(
                               children: [
-                                Text(
-                                  CurrencyFormatter.formatNaira(order.totalAmount),
-                                  style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold),
-                                ),
-                                const SizedBox(height: 6),
-                                ElevatedButton.icon(
-                                  onPressed: () => _showAssignModal(context, order),
-                                  icon: const Icon(Icons.person_add_alt_1_rounded, size: 14, color: Colors.white),
-                                  label: const Text(
-                                    'Assign Rider',
-                                    style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF2563EB),
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                    elevation: 0,
-                                  ),
+                                Expanded(child: infoColumn),
+                                const SizedBox(width: 12),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      CurrencyFormatter.formatNaira(order.totalAmount),
+                                      style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    ElevatedButton.icon(
+                                      onPressed: () => _showAssignModal(context, order),
+                                      icon: const Icon(Icons.person_add_alt_1_rounded, size: 14, color: Colors.white),
+                                      label: const Text(
+                                        'Assign Rider',
+                                        style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                      ),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF2563EB),
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                        elevation: 0,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
-                          ],
-                        ),
+                          );
+                        },
                       );
                     },
                   ),
@@ -412,7 +484,7 @@ class DCDispatchPage extends ConsumerWidget {
 
           // SECTION 2: In-Transit Deliveries Monitor
           Container(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF1E293B) : Colors.white,
               borderRadius: BorderRadius.circular(16),
@@ -424,23 +496,29 @@ class DCDispatchPage extends ConsumerWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF2563EB).withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(8),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF2563EB).withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.local_shipping_outlined, color: Color(0xFF2563EB), size: 18),
                           ),
-                          child: const Icon(Icons.local_shipping_outlined, color: Color(0xFF2563EB), size: 18),
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          'Active In-Transit Hub Deliveries',
-                          style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold),
-                        ),
-                      ],
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Active In-Transit Hub Deliveries',
+                              style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
+                    const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
@@ -495,77 +573,108 @@ class DCDispatchPage extends ConsumerWidget {
                           ? '${order.deliveryAgentName} (${order.deliveryAgentCode ?? 'PDA'})'
                           : 'Assigned Rider';
 
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Row(
+                      return LayoutBuilder(
+                        builder: (context, constraints) {
+                          final isMobileTransit = constraints.maxWidth < 600;
+
+                          final transitInfo = Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF2563EB).withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(Icons.local_shipping_outlined, color: Color(0xFF2563EB), size: 18),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '$orderNum • $custName',
+                                      style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    Text(
+                                      'Zone: $city • Delivery Agent: $agentDisplay',
+                                      style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    if (order.clientName.isNotEmpty) ...[
+                                      Text(
+                                        'Client: ${order.clientName} ${order.packageDealName != null ? "(${order.packageDealName})" : ""}',
+                                        style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF8B5CF6)),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ],
+                          );
+
+                          final statusBadge = Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEDE9FE),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              'IN-TRANSIT',
+                              style: GoogleFonts.inter(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFF7C3AED),
+                              ),
+                            ),
+                          );
+
+                          if (isMobileTransit) {
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF2563EB).withValues(alpha: 0.15),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: const Icon(Icons.local_shipping_outlined, color: Color(0xFF2563EB), size: 18),
-                                  ),
-                                  const SizedBox(width: 14),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          '$orderNum • $custName',
-                                          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        Text(
-                                          'Zone: $city • Delivery Agent: $agentDisplay',
-                                          style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        if (order.clientName.isNotEmpty) ...[
-                                          Text(
-                                            'Client: ${order.clientName} ${order.packageDealName != null ? "(${order.packageDealName})" : ""}',
-                                            style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF8B5CF6)),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ],
-                                      ],
-                                    ),
+                                  transitInfo,
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        CurrencyFormatter.formatNaira(amount),
+                                        style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold),
+                                      ),
+                                      statusBadge,
+                                    ],
                                   ),
                                 ],
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            Row(
+                            );
+                          }
+
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text(
-                                  CurrencyFormatter.formatNaira(amount),
-                                  style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold),
-                                ),
+                                Expanded(child: transitInfo),
                                 const SizedBox(width: 12),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFEDE9FE),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    'IN-TRANSIT',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                      color: const Color(0xFF7C3AED),
+                                Row(
+                                  children: [
+                                    Text(
+                                      CurrencyFormatter.formatNaira(amount),
+                                      style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold),
                                     ),
-                                  ),
+                                    const SizedBox(width: 12),
+                                    statusBadge,
+                                  ],
                                 ),
                               ],
                             ),
-                          ],
-                        ),
+                          );
+                        },
                       );
                     },
                   ),
@@ -583,43 +692,41 @@ class DCDispatchPage extends ConsumerWidget {
     required Color color,
     required bool isDark,
   }) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E293B) : Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
-                color: color,
-                shape: BoxShape.circle,
-              ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    count.toString(),
-                    style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    label,
-                    style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  count.toString(),
+                  style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  label,
+                  style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

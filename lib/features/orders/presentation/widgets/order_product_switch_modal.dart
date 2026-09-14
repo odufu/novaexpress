@@ -150,8 +150,8 @@ class _OrderProductSwitchModalState extends ConsumerState<OrderProductSwitchModa
       backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Container(
-        width: 520,
-        padding: const EdgeInsets.all(24),
+        constraints: const BoxConstraints(maxWidth: 520),
+        padding: const EdgeInsets.all(20),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -161,42 +161,48 @@ class _OrderProductSwitchModalState extends ConsumerState<OrderProductSwitchModa
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF6366F1).withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(
-                          Icons.swap_horizontal_circle_rounded,
-                          color: Color(0xFF6366F1),
-                          size: 24,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Modify Product & Packages',
-                            style: GoogleFonts.inter(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              color: isDark ? Colors.white : const Color(0xFF0F172A),
-                            ),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF6366F1).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          Text(
-                            'Order ${widget.orderNumber} • Handling DC Operations Override',
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                            ),
+                          child: const Icon(
+                            Icons.swap_horizontal_circle_rounded,
+                            color: Color(0xFF6366F1),
+                            size: 24,
                           ),
-                        ],
-                      ),
-                    ],
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Modify Product & Packages',
+                                style: GoogleFonts.inter(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w800,
+                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Text(
+                                'Order ${widget.orderNumber} • Handling DC Operations Override',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
@@ -564,44 +570,48 @@ class _OrderProductSwitchModalState extends ConsumerState<OrderProductSwitchModa
               const SizedBox(height: 22),
 
               // Actions
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  OutlinedButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Wrap(
+                  alignment: WrapAlignment.end,
+                  spacing: 12,
+                  runSpacing: 10,
+                  children: [
+                    OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      child: Text('Cancel', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
                     ),
-                    child: Text('Cancel', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-                  ),
-                  const SizedBox(width: 12),
-                  ElevatedButton(
-                    onPressed: (_isSubmitting || _selectedProduct == null || _selectedPackage == null)
-                        ? null
-                        : _submitTransfer,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: isCrossClient ? const Color(0xFFD97706) : const Color(0xFF6366F1),
-                      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      elevation: 0,
-                    ),
-                    child: _isSubmitting
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                          )
-                        : Text(
-                            isCrossClient ? 'Confirm & Transfer Ownership' : 'Confirm Switch',
-                            style: GoogleFonts.inter(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
+                    ElevatedButton(
+                      onPressed: (_isSubmitting || _selectedProduct == null || _selectedPackage == null)
+                          ? null
+                          : _submitTransfer,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isCrossClient ? const Color(0xFFD97706) : const Color(0xFF6366F1),
+                        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        elevation: 0,
+                      ),
+                      child: _isSubmitting
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : Text(
+                              isCrossClient ? 'Confirm & Transfer Ownership' : 'Confirm Switch',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
                             ),
-                          ),
-                  ),
-                ],
+                    ),
+                  ],
+                ),
               ),
             ],
           ),

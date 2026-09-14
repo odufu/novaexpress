@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/helpers/formatters.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/widgets/product_image_widget.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../dc_console/domain/entities/product_package.dart';
 import '../../../dc_console/presentation/providers/product_catalog_provider.dart';
 import '../providers/client_portal_provider.dart';
@@ -62,12 +63,37 @@ class _ClientProductsPageState extends ConsumerState<ClientProductsPage> {
   Widget build(BuildContext context) {
     final catalogState = ref.watch(productCatalogProvider);
     final state = ref.watch(clientPortalProvider);
+    final authState = ref.watch(authProvider);
     final themeMode = ref.watch(themeProvider);
     final isDark = themeMode == ThemeMode.dark ||
         (themeMode == ThemeMode.system &&
             MediaQuery.of(context).platformBrightness == Brightness.dark);
 
-    final rawProducts = state.products;
+    final effectiveClientId = state.clientProfile.id.isNotEmpty
+        ? state.clientProfile.id
+        : (authState.user?.clientId ?? '');
+    final effectiveCompanyName = state.clientProfile.companyName.isNotEmpty
+        ? state.clientProfile.companyName
+        : (authState.user?.clientCompanyName ?? '');
+
+    // Scoped products from master catalog for this merchant
+    final catalogMerchantProducts = catalogState.products.where((p) {
+      if (effectiveClientId.isNotEmpty && p.clientId != null && p.clientId == effectiveClientId) return true;
+      if (effectiveCompanyName.isNotEmpty && p.clientName.trim().isNotEmpty && p.clientName.trim().toLowerCase() == effectiveCompanyName.trim().toLowerCase()) return true;
+      return false;
+    }).toList();
+
+    // Deduplicate merged products by SKU & ID
+    final Set<String> seenSkus = {};
+    final List<CatalogProduct> rawProducts = [];
+    for (final p in [...state.products, ...catalogMerchantProducts]) {
+      final skuKey = p.sku.trim().toUpperCase();
+      final idKey = p.id.trim();
+      final dedupKey = skuKey.isNotEmpty ? skuKey : idKey;
+      if (dedupKey.isNotEmpty && seenSkus.add(dedupKey)) {
+        rawProducts.add(p);
+      }
+    }
 
     // Precompute product sales & metrics map for fast access and sorting
     final Map<String, _ProductMetrics> metricsMap = {};

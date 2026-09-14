@@ -283,7 +283,7 @@ Initial Password: ${_createdPassword ?? 'ClientPass2026!'}
         child: _createdClient != null
             ? _buildSuccessView(isDark)
             : SingleChildScrollView(
-                padding: const EdgeInsets.all(28),
+                padding: EdgeInsets.all(MediaQuery.of(context).size.width < 600 ? 16 : 28),
                 child: Form(
                   key: _formKey,
                   child: Column(
@@ -324,57 +324,60 @@ Initial Password: ${_createdPassword ?? 'ClientPass2026!'}
   // ===========================================================================
   Widget _buildHeader(bool isDark) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0D9488).withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.domain_add_rounded, color: Color(0xFF0D9488), size: 24),
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0D9488).withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Icon(Icons.domain_add_rounded, color: Color(0xFF0D9488), size: 24),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Flexible(
+                    child: Text(
                       'Onboard Client Account',
                       style: GoogleFonts.inter(
-                        fontSize: 18,
+                        fontSize: 17,
                         fontWeight: FontWeight.w800,
                         color: isDark ? Colors.white : const Color(0xFF0F172A),
                       ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0D9488).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        'Unique Auth',
-                        style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: const Color(0xFF0D9488)),
-                      ),
-                    ),
-                  ],
-                ),
-                Text(
-                  'Provision authenticatable merchant credentials & multi-closer permissions',
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                   ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0D9488).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'Unique Auth',
+                      style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: const Color(0xFF0D9488)),
+                    ),
+                  ),
+                ],
+              ),
+              Text(
+                'Provision authenticatable merchant credentials & multi-closer permissions',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                 ),
-              ],
-            ),
-          ],
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
         ),
+        const SizedBox(width: 8),
         IconButton(
           icon: Icon(Icons.close_rounded, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
           onPressed: () => Navigator.of(context).pop(),
@@ -1379,13 +1382,17 @@ Initial Password: ${_createdPassword ?? 'ClientPass2026!'}
           label,
           style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF64748B)),
         ),
-        const Spacer(),
-        Text(
-          value,
-          style: GoogleFonts.inter(
-            fontSize: 12.5,
-            fontWeight: FontWeight.w700,
-            color: isDark ? Colors.white : const Color(0xFF0F172A),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: GoogleFonts.inter(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              color: isDark ? Colors.white : const Color(0xFF0F172A),
+            ),
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],

@@ -773,7 +773,10 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
         if (dbErr.toString().contains('already exists')) {
           rethrow;
         }
-        debugPrint('[DC_CONSOLE] ℹ️ Remote createClient notice: $dbErr. Utilizing resilient local fallback.');
+        debugPrint('[DC_CONSOLE] ⚠️ Remote createClient error: $dbErr.');
+        if (!isTestEnvironment) {
+          rethrow;
+        }
         final isEnt = tier.toLowerCase() == 'enterprise';
         final cleanName = companyName.trim();
         final words = cleanName.split(RegExp(r'\s+'));

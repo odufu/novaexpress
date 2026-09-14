@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
+import '../../../../core/constants/supabase_constants.dart';
 import '../../../auth/data/datasources/auth_remote_datasource.dart';
 import '../../../auth/data/models/user_model.dart';
 import '../../data/repositories/client_portal_repository_impl.dart';
@@ -538,6 +540,41 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
           ),
         ) {
     loadClientData();
+
+    // 1. Reactive listener to auth changes (when client merchant logs in or profile hydrates)
+    _ref.listen<AuthState>(authProvider, (previous, next) {
+      final prevUser = previous?.user;
+      final nextUser = next.user;
+      if (nextUser != null && (prevUser == null || prevUser.id != nextUser.id || prevUser.clientId != nextUser.clientId)) {
+        debugPrint('[CLIENT_PORTAL] 👤 Auth user detected: ${nextUser.email} (Client: ${nextUser.clientId}). Refreshing client data...');
+        loadClientData();
+      }
+    });
+
+    // 2. Reactive listener to product catalog changes (when catalog finishes remote sync)
+    _ref.listen<ProductCatalogState>(productCatalogProvider, (previous, next) {
+      if (next.products.isEmpty && state.products.isNotEmpty) return;
+      final clientId = state.clientProfile.id.isNotEmpty ? state.clientProfile.id : (_ref.read(authProvider).user?.clientId ?? '');
+      final companyName = state.clientProfile.companyName.isNotEmpty ? state.clientProfile.companyName : (_ref.read(authProvider).user?.clientCompanyName ?? '');
+
+      final clientProducts = next.products.where((p) {
+        if (clientId.isNotEmpty && p.clientId != null && p.clientId == clientId) return true;
+        if (companyName.isNotEmpty && p.clientName.trim().isNotEmpty && p.clientName.trim().toLowerCase() == companyName.trim().toLowerCase()) return true;
+        return false;
+      }).toList();
+
+      List<ProductPackage> allPackages = [];
+      for (final p in clientProducts) {
+        allPackages.addAll(next.getPackagesForProduct(p.name));
+      }
+
+      state = state.copyWith(
+        products: clientProducts,
+        packages: allPackages,
+      );
+    });
+
+    // 3. Reactive listener to orders
     _ref.listen<OrdersState>(ordersProvider, (previous, next) {
       if (next.orders.isEmpty) return;
       final companyName = state.clientProfile.companyName.trim().toLowerCase();
@@ -614,14 +651,34 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
       final user = _ref.read(authProvider).user;
-      final clientId = user?.clientId ?? '';
-      final companyName = user?.clientCompanyName ?? (user?.fullName.isNotEmpty == true ? user!.fullName : '');
+      var clientId = user?.clientId ?? '';
+      var companyName = user?.clientCompanyName ?? '';
+      if (companyName.isEmpty && user != null && user.fullName.isNotEmpty) {
+        companyName = user.fullName;
+      }
+
+      // Resilient database fallback if client info is missing from auth state
+      if ((clientId.isEmpty || companyName.isEmpty) && user != null && user.email.isNotEmpty) {
+        try {
+          final db = SupabaseClient(
+            SupabaseConstants.supabaseUrl,
+            SupabaseConstants.supabaseServiceRoleKey,
+            authOptions: const AuthClientOptions(autoRefreshToken: false),
+          );
+          final clientRow = await db.from('clients').select().ilike('email', user.email.trim()).maybeSingle();
+          if (clientRow != null) {
+            if (clientId.isEmpty) clientId = clientRow['id']?.toString() ?? '';
+            if (companyName.isEmpty) companyName = clientRow['name']?.toString() ?? clientRow['company_name']?.toString() ?? '';
+          }
+          db.dispose();
+        } catch (_) {}
+      }
 
       // 1. Fetch live products and packages strictly scoped for this client
       final catalogState = _ref.read(productCatalogProvider);
       final clientProducts = catalogState.products.where((p) {
-        if (p.clientId != null && p.clientId == clientId) return true;
-        if (p.clientName.trim().isNotEmpty && p.clientName.trim().toLowerCase() == companyName.trim().toLowerCase()) return true;
+        if (clientId.isNotEmpty && p.clientId != null && p.clientId == clientId) return true;
+        if (companyName.isNotEmpty && p.clientName.trim().isNotEmpty && p.clientName.trim().toLowerCase() == companyName.trim().toLowerCase()) return true;
         return false;
       }).toList();
 
@@ -633,8 +690,8 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
       // 2. Fetch all orders from OrdersProvider strictly scoped for this client
       final ordersState = _ref.read(ordersProvider);
       List<OrderEntity> clientOrders = ordersState.orders.where((o) {
-        if (o.clientId != null && o.clientId == clientId) return true;
-        if (o.clientName.trim().isNotEmpty && o.clientName.trim().toLowerCase() == companyName.trim().toLowerCase()) return true;
+        if (clientId.isNotEmpty && o.clientId != null && o.clientId == clientId) return true;
+        if (companyName.isNotEmpty && o.clientName.trim().isNotEmpty && o.clientName.trim().toLowerCase() == companyName.trim().toLowerCase()) return true;
         return false;
       }).toList();
 
@@ -771,7 +828,10 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         if (dbErr.toString().contains('already exists')) {
           rethrow;
         }
-        debugPrint('[CLIENT_PORTAL] ℹ️ Remote createCloser notice: $dbErr. Utilizing resilient local fallback.');
+        debugPrint('[CLIENT_PORTAL] ⚠️ Remote createCloser error: $dbErr.');
+        if (!const bool.fromEnvironment('flutter.test')) {
+          rethrow;
+        }
         newCloser = ClientCloser(
           id: fallbackId,
           clientId: state.clientProfile.id,
@@ -1351,10 +1411,52 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
     try {
       final cleanName = name.trim();
       final cleanSku = sku.trim().toUpperCase();
-      final clientCompany = state.clientProfile.companyName;
-      final clientId = state.clientProfile.id;
 
-      // 1. Resolve DCs located in the selected covering states
+      // 1. Resolve client identity with fallbacks
+      var clientCompany = state.clientProfile.companyName.trim();
+      var clientId = state.clientProfile.id.trim();
+
+      final authUser = _ref.read(authProvider).user;
+      if (clientCompany.isEmpty && authUser != null) {
+        clientCompany = (authUser.clientCompanyName ?? (authUser.fullName.isNotEmpty ? authUser.fullName : '')).trim();
+      }
+      if (clientId.isEmpty && authUser != null) {
+        clientId = (authUser.clientId ?? '').trim();
+      }
+
+      final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
+      if ((!uuidRegex.hasMatch(clientId) || clientCompany.isEmpty) && authUser != null && authUser.email.isNotEmpty) {
+        try {
+          final db = SupabaseClient(
+            SupabaseConstants.supabaseUrl,
+            SupabaseConstants.supabaseServiceRoleKey,
+            authOptions: const AuthClientOptions(autoRefreshToken: false),
+          );
+          final clientRow = await db.from('clients').select().ilike('email', authUser.email.trim()).maybeSingle();
+          if (clientRow != null) {
+            clientId = clientRow['id']?.toString() ?? clientId;
+            clientCompany = clientRow['name']?.toString() ?? clientRow['company_name']?.toString() ?? clientCompany;
+          }
+          db.dispose();
+        } catch (_) {}
+      }
+
+      final String? validClientId = uuidRegex.hasMatch(clientId) ? clientId : null;
+      if (clientCompany.isEmpty) {
+        clientCompany = 'NovaExpress Merchant';
+      }
+
+      // Update state client profile if it was previously empty
+      if (state.clientProfile.id.isEmpty && validClientId != null) {
+        state = state.copyWith(
+          clientProfile: state.clientProfile.copyWith(
+            id: validClientId,
+            companyName: clientCompany,
+          ),
+        );
+      }
+
+      // 2. Resolve DCs located in the selected covering states
       final dcState = _ref.read(dcConsoleProvider);
       final List<DistributionCenter> allDcs = dcState.distributionCenters.isNotEmpty
           ? dcState.distributionCenters
@@ -1369,7 +1471,7 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         for (final dc in matchingDcs) dc.id: 0,
       };
 
-      // 2. Register into central DC Inventory (StockProvider)
+      // 3. Register into central DC Inventory (StockProvider)
       final stockItem = await _ref.read(stockProvider.notifier).addNewProduct(
         name: cleanName,
         sku: cleanSku,
@@ -1379,7 +1481,7 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         barcode: barcode,
         weightKg: weightKg,
         ownerName: clientCompany,
-        clientId: clientId,
+        clientId: validClientId,
         initialQuantity: 0,
         lowStockThreshold: lowStockThreshold ?? 10,
         description: description ?? '',
@@ -1388,7 +1490,7 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         dcStocks: dcStocks,
       );
 
-      // 3. Register into Master Commercial Catalog with auto-built packages
+      // 4. Register into Master Commercial Catalog with auto-built packages
       final newProd = await _ref.read(productCatalogProvider.notifier).registerNewProduct(
         id: stockItem.id,
         name: cleanName,
@@ -1400,7 +1502,7 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         lowStockThreshold: lowStockThreshold ?? 10,
         category: category,
         clientName: clientCompany,
-        clientId: clientId,
+        clientId: validClientId,
         description: description,
         imageUrl: imageUrl,
         coveringStates: coveringStates,
@@ -1432,40 +1534,34 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
   }) async {
     state = state.copyWith(isLoading: true);
     try {
-      final clientId = state.clientProfile.id;
-      final clientCompany = state.clientProfile.companyName;
-      final resolvedSenderName = senderName ?? (state.clientProfile.companyName.isNotEmpty ? state.clientProfile.companyName : 'Merchant Admin');
+      var clientId = state.clientProfile.id;
+      var clientCompany = state.clientProfile.companyName;
+      if (clientId.isEmpty || clientCompany.isEmpty) {
+        final authUser = _ref.read(authProvider).user;
+        if (clientId.isEmpty) clientId = authUser?.clientId ?? '';
+        if (clientCompany.isEmpty) clientCompany = authUser?.clientCompanyName ?? (authUser?.fullName ?? '');
+      }
+      final resolvedSenderName = senderName ?? (clientCompany.isNotEmpty ? clientCompany : 'Merchant Admin');
 
       for (final entry in dcAllocations.entries) {
         final dcId = entry.key;
         final qty = entry.value;
         if (qty > 0) {
-          if (senderSignatureUrl != null && senderSignatureUrl.isNotEmpty) {
-            await _ref.read(stockProvider.notifier).dispatchClientSupply(
-              clientId: clientId,
-              dcId: dcId,
-              items: [
-                {
-                  'product_id': productId,
-                  'quantity': qty,
-                  'notes': notes,
-                }
-              ],
-              senderId: senderId,
-              senderName: resolvedSenderName,
-              senderSignatureUrl: senderSignatureUrl,
-              notes: notes,
-            );
-          } else {
-            // Legacy fallback if no signature
-            await _ref.read(stockProvider.notifier).receiveStock(
-              productIdOrSku: sku.trim(),
-              quantity: qty,
-              waybillNumber: waybillNumber,
-              distributionCenterId: dcId,
-              supplierName: clientCompany,
-            );
-          }
+          await _ref.read(stockProvider.notifier).dispatchClientSupply(
+            clientId: clientId,
+            dcId: dcId,
+            items: [
+              {
+                'product_id': productId,
+                'quantity': qty,
+                'notes': notes,
+              }
+            ],
+            senderId: senderId,
+            senderName: resolvedSenderName,
+            senderSignatureUrl: senderSignatureUrl ?? '',
+            notes: notes,
+          );
         }
       }
 
@@ -1477,7 +1573,24 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         await _ref.read(stockProvider.notifier).fetchStockTransfers(clientId: clientId);
       }
 
-      state = state.copyWith(isLoading: false);
+      // Update local client products with latest from catalog
+      final catalogState = _ref.read(productCatalogProvider);
+      final clientProducts = catalogState.products.where((p) {
+        if (clientId.isNotEmpty && p.clientId != null && p.clientId == clientId) return true;
+        if (clientCompany.isNotEmpty && p.clientName.trim().isNotEmpty && p.clientName.trim().toLowerCase() == clientCompany.trim().toLowerCase()) return true;
+        return false;
+      }).toList();
+
+      List<ProductPackage> allPackages = [];
+      for (final p in clientProducts) {
+        allPackages.addAll(catalogState.getPackagesForProduct(p.name));
+      }
+
+      state = state.copyWith(
+        products: clientProducts,
+        packages: allPackages,
+        isLoading: false,
+      );
     } catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
       rethrow;

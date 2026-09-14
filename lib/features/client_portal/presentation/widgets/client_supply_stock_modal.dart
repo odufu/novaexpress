@@ -2,7 +2,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../../core/widgets/signature_pad_modal.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../dc_console/domain/entities/distribution_center.dart';
 import '../../../dc_console/domain/entities/product_package.dart';
@@ -137,25 +136,6 @@ class _ClientSupplyStockModalState extends ConsumerState<ClientSupplyStockModal>
     final clientState = ref.read(clientPortalProvider);
     final senderName = authState.user?.fullName ?? (clientState.clientProfile.companyName.isNotEmpty ? clientState.clientProfile.companyName : 'Merchant Admin');
 
-    // Prompt for Merchant Digital Dispatch Signature
-    final sigResult = await SignaturePadModal.show(
-      context: context,
-      orderId: _waybillCtrl.text.trim(),
-      customerName: senderName,
-    );
-
-    if (sigResult == null || sigResult.signatureUrl.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            backgroundColor: Color(0xFFF59E0B),
-            content: Text('Digital signature on glass is mandatory to authorize consignment dispatch.'),
-          ),
-        );
-      }
-      return;
-    }
-
     setState(() => _isSubmitting = true);
 
     try {
@@ -168,7 +148,7 @@ class _ClientSupplyStockModalState extends ConsumerState<ClientSupplyStockModal>
         notes: _notesCtrl.text.trim().isNotEmpty ? _notesCtrl.text.trim() : null,
         senderId: authState.user?.id,
         senderName: senderName,
-        senderSignatureUrl: sigResult.signatureUrl,
+        senderSignatureUrl: '',
       );
 
       if (!mounted) return;
@@ -186,7 +166,7 @@ class _ClientSupplyStockModalState extends ConsumerState<ClientSupplyStockModal>
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Consignment of $totalAllocated units authorized & signed! Awaiting DC physical count and supervisor countersignature.',
+                  'Consignment of $totalAllocated units dispatched! Awaiting DC physical count and intake approval.',
                   style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600),
                 ),
               ),

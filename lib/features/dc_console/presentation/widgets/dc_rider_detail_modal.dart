@@ -1722,13 +1722,21 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
               children: [
                 const Icon(Icons.inventory_2_rounded, color: Color(0xFF2563EB), size: 22),
                 const SizedBox(width: 8),
-                Text('Assign Product to ${driver.name}', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
+                Expanded(
+                  child: Text(
+                    'Assign Product to ${driver.name}',
+                    style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ),
-            content: SizedBox(
-              width: 480,
-              child: SingleChildScrollView(
-                child: Column(
+            content: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: SizedBox(
+                width: double.maxFinite,
+                child: SingleChildScrollView(
+                  child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1801,7 +1809,8 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
                 ),
               ),
             ),
-            actions: [
+          ),
+          actions: [
               TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
               ElevatedButton(
                 onPressed: () async {
@@ -1849,9 +1858,11 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
                               ),
                             ],
                           ),
-                          content: SizedBox(
-                            width: 420,
-                            child: Column(
+                          content: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 420),
+                            child: SizedBox(
+                              width: double.maxFinite,
+                              child: Column(
                               mainAxisSize: MainAxisSize.min,
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -1900,7 +1911,8 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
                               ],
                             ),
                           ),
-                          actions: [
+                        ),
+                        actions: [
                             TextButton(
                               onPressed: isSubmitting ? null : () => Navigator.of(confirmCtx).pop(),
                               child: const Text('Go Back / Edit'),
@@ -1998,12 +2010,20 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
           children: [
             const Icon(Icons.add_circle_outline_rounded, color: Color(0xFF10B981), size: 22),
             const SizedBox(width: 8),
-            Text('Top Up: ${item.productName}', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
+            Expanded(
+              child: Text(
+                'Top Up: ${item.productName}',
+                style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
-        content: SizedBox(
-          width: 450,
-          child: Column(
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 450),
+          child: SizedBox(
+            width: double.maxFinite,
+            child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -2058,7 +2078,8 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
             ],
           ),
         ),
-        actions: [
+      ),
+      actions: [
           TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () async {
@@ -2106,9 +2127,11 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
                           ),
                         ],
                       ),
-                      content: SizedBox(
-                        width: 420,
-                        child: Column(
+                      content: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 420),
+                        child: SizedBox(
+                          width: double.maxFinite,
+                          child: Column(
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -2155,7 +2178,8 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
                           ],
                         ),
                       ),
-                      actions: [
+                    ),
+                    actions: [
                         TextButton(
                           onPressed: isSubmitting ? null : () => Navigator.of(confirmCtx).pop(),
                           child: const Text('Go Back / Edit'),
@@ -3497,7 +3521,12 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
               color: nextStatus ? const Color(0xFF10B981) : const Color(0xFFEF4444),
             ),
             const SizedBox(width: 10),
-            Text(nextStatus ? 'Activate Rider?' : 'Deactivate Rider?'),
+            Expanded(
+              child: Text(
+                nextStatus ? 'Activate Rider?' : 'Deactivate Rider?',
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
         content: Text(

@@ -472,12 +472,17 @@ ORD-003,Engr. Tunde Bakare,08099887766,8 Adetokunbo Ademola,Wuse 2,FCT - Abuja,L
     final invalidCount = _parsedRows.where((r) => !r.isValid).length;
     final double totalValuation = _parsedRows.where((r) => r.isValid).fold(0.0, (acc, r) => acc + r.totalAmount);
 
+    final screenHeight = MediaQuery.of(context).size.height;
+
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       child: Container(
-        width: 900,
-        height: 720,
+        constraints: BoxConstraints(
+          maxWidth: 900,
+          maxHeight: screenHeight * 0.92,
+        ),
+        width: double.infinity,
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF0F172A) : Colors.white,
           borderRadius: BorderRadius.circular(20),
@@ -497,7 +502,7 @@ ORD-003,Engr. Tunde Bakare,08099887766,8 Adetokunbo Ademola,Wuse 2,FCT - Abuja,L
           children: [
             // Modal Header
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
@@ -506,14 +511,14 @@ ORD-003,Engr. Tunde Bakare,08099887766,8 Adetokunbo Ademola,Wuse 2,FCT - Abuja,L
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: const Color(0xFF2563EB).withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.file_upload_rounded, color: Color(0xFF2563EB), size: 22),
+                    child: const Icon(Icons.file_upload_rounded, color: Color(0xFF2563EB), size: 20),
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -526,13 +531,13 @@ ORD-003,Engr. Tunde Bakare,08099887766,8 Adetokunbo Ademola,Wuse 2,FCT - Abuja,L
                             Text(
                               'Import Orders via CSV',
                               style: GoogleFonts.inter(
-                                fontSize: 18,
+                                fontSize: 16,
                                 fontWeight: FontWeight.bold,
                                 color: isDark ? Colors.white : const Color(0xFF0F172A),
                               ),
                             ),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFF37021).withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(6),
@@ -540,7 +545,7 @@ ORD-003,Engr. Tunde Bakare,08099887766,8 Adetokunbo Ademola,Wuse 2,FCT - Abuja,L
                               child: Text(
                                 'BATCH CREATION',
                                 style: GoogleFonts.jetBrainsMono(
-                                  fontSize: 10,
+                                  fontSize: 9,
                                   fontWeight: FontWeight.bold,
                                   color: const Color(0xFFF37021),
                                 ),
@@ -550,23 +555,24 @@ ORD-003,Engr. Tunde Bakare,08099887766,8 Adetokunbo Ademola,Wuse 2,FCT - Abuja,L
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          'Upload spreadsheet data to instantly create multiple delivery manifests',
-                          style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                          'Upload spreadsheet data to create delivery manifests',
+                          style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
                   ),
-                  OutlinedButton.icon(
+                  const SizedBox(width: 8),
+                  IconButton(
                     onPressed: _copyTemplateToClipboard,
-                    icon: const Icon(Icons.copy_rounded, size: 14, color: Color(0xFF2563EB)),
-                    label: const Text('Sample Template', style: TextStyle(fontSize: 12, color: Color(0xFF2563EB), fontWeight: FontWeight.w600)),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      side: const BorderSide(color: Color(0xFF93C5FD)),
+                    icon: const Icon(Icons.copy_rounded, size: 18, color: Color(0xFF2563EB)),
+                    tooltip: 'Sample Template',
+                    style: IconButton.styleFrom(
+                      backgroundColor: const Color(0xFF2563EB).withValues(alpha: 0.1),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 8),
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
                     icon: const Icon(Icons.close_rounded, size: 20),
@@ -778,16 +784,42 @@ ORD-003,Engr. Tunde Bakare,08099887766,8 Adetokunbo Ademola,Wuse 2,FCT - Abuja,L
 
                     // Metrics & Statistics Toolbar
                     if (_parsedRows.isNotEmpty) ...[
-                      Row(
-                        children: [
-                          _buildStatCard('Total Rows', '${_parsedRows.length}', Icons.format_list_numbered_rounded, const Color(0xFF64748B), isDark),
-                          const SizedBox(width: 8),
-                          _buildStatCard('Valid Orders', '$validCount', Icons.check_circle_rounded, const Color(0xFF16A34A), isDark),
-                          const SizedBox(width: 8),
-                          _buildStatCard('Errors / Invalid', '$invalidCount', Icons.warning_amber_rounded, const Color(0xFFDC2626), isDark),
-                          const SizedBox(width: 8),
-                          _buildStatCard('Total Valuation', CurrencyFormatter.formatNaira(totalValuation), Icons.payments_rounded, const Color(0xFF2563EB), isDark),
-                        ],
+                      LayoutBuilder(
+                        builder: (context, metricConstraints) {
+                          final isNarrow = metricConstraints.maxWidth < 620;
+                          if (isNarrow) {
+                            return Column(
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(child: _buildStatCard('Total Rows', '${_parsedRows.length}', Icons.format_list_numbered_rounded, const Color(0xFF64748B), isDark)),
+                                    const SizedBox(width: 8),
+                                    Expanded(child: _buildStatCard('Valid Orders', '$validCount', Icons.check_circle_rounded, const Color(0xFF16A34A), isDark)),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Expanded(child: _buildStatCard('Errors / Invalid', '$invalidCount', Icons.warning_amber_rounded, const Color(0xFFDC2626), isDark)),
+                                    const SizedBox(width: 8),
+                                    Expanded(child: _buildStatCard('Total Valuation', CurrencyFormatter.formatNaira(totalValuation), Icons.payments_rounded, const Color(0xFF2563EB), isDark)),
+                                  ],
+                                ),
+                              ],
+                            );
+                          }
+                          return Row(
+                            children: [
+                              Expanded(child: _buildStatCard('Total Rows', '${_parsedRows.length}', Icons.format_list_numbered_rounded, const Color(0xFF64748B), isDark)),
+                              const SizedBox(width: 8),
+                              Expanded(child: _buildStatCard('Valid Orders', '$validCount', Icons.check_circle_rounded, const Color(0xFF16A34A), isDark)),
+                              const SizedBox(width: 8),
+                              Expanded(child: _buildStatCard('Errors / Invalid', '$invalidCount', Icons.warning_amber_rounded, const Color(0xFFDC2626), isDark)),
+                              const SizedBox(width: 8),
+                              Expanded(child: _buildStatCard('Total Valuation', CurrencyFormatter.formatNaira(totalValuation), Icons.payments_rounded, const Color(0xFF2563EB), isDark)),
+                            ],
+                          );
+                        },
                       ),
                       const SizedBox(height: 12),
 
@@ -947,14 +979,17 @@ ORD-003,Engr. Tunde Bakare,08099887766,8 Adetokunbo Ademola,Wuse 2,FCT - Abuja,L
 
             // Modal Footer Actions
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
                 borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
                 border: Border(top: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                runSpacing: 8,
                 children: [
                   TextButton.icon(
                     onPressed: () {
@@ -969,28 +1004,29 @@ ORD-003,Engr. Tunde Bakare,08099887766,8 Adetokunbo Ademola,Wuse 2,FCT - Abuja,L
                     label: const Text('Clear / Reset', style: TextStyle(color: Color(0xFF64748B))),
                   ),
                   Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       OutlinedButton(
                         onPressed: () => Navigator.of(context).pop(),
                         style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
                         child: const Text('Cancel'),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                       ElevatedButton.icon(
                         onPressed: (_parsedRows.isEmpty || validCount == 0 || _isImporting) ? null : _executeImport,
                         icon: _isImporting
                             ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                             : const Icon(Icons.file_download_done_rounded, size: 18, color: Colors.white),
                         label: Text(
-                          _isImporting ? 'Importing Orders...' : 'Confirm & Import $validCount Orders',
+                          _isImporting ? 'Importing...' : 'Import $validCount Orders',
                           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                         ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF16A34A),
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
                       ),
@@ -1040,46 +1076,45 @@ ORD-003,Engr. Tunde Bakare,08099887766,8 Adetokunbo Ademola,Wuse 2,FCT - Abuja,L
   }
 
   Widget _buildStatCard(String label, String value, IconData icon, Color color, bool isDark) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withValues(alpha: 0.2)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.15),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: color, size: 16),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B), fontWeight: FontWeight.w500),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    value,
-                    style: GoogleFonts.jetBrainsMono(fontSize: 13, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
+            child: Icon(icon, color: color, size: 16),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B), fontWeight: FontWeight.w500),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  value,
+                  style: GoogleFonts.jetBrainsMono(fontSize: 12, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

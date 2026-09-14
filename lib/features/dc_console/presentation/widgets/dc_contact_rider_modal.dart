@@ -189,41 +189,41 @@ ${customNote.isNotEmpty ? "Note: $customNote\n" : ""}Kindly remit the cash custo
             children: [
               // Header with Title and Close Button
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF37021).withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(Icons.support_agent_rounded, color: Color(0xFFF37021), size: 24),
-                      ),
-                      const SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Contact Delivery Agent',
-                            style: GoogleFonts.inter(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: isDark ? Colors.white : const Color(0xFF0F172A),
-                            ),
-                          ),
-                          Text(
-                            'Remittance & Route Communication',
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              color: const Color(0xFF64748B),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF37021).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.support_agent_rounded, color: Color(0xFFF37021), size: 24),
                   ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Contact Delivery Agent',
+                          style: GoogleFonts.inter(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          'Remittance & Route Communication',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: const Color(0xFF64748B),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   IconButton(
                     icon: Icon(Icons.close_rounded, color: isDark ? Colors.white70 : const Color(0xFF64748B)),
                     onPressed: () => Navigator.pop(context),
@@ -318,7 +318,15 @@ ${customNote.isNotEmpty ? "Note: $customNote\n" : ""}Kindly remit the cash custo
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text('Customer & Location', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF78350F))),
-                        Text('${widget.order.customerName} (${widget.order.deliveryCity})', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF78350F))),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            '${widget.order.customerName} (${widget.order.deliveryCity})',
+                            textAlign: TextAlign.end,
+                            style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF78350F)),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                       ],
                     ),
                     const Divider(height: 14),
@@ -359,36 +367,76 @@ ${customNote.isNotEmpty ? "Note: $customNote\n" : ""}Kindly remit the cash custo
               const SizedBox(height: 18),
 
               // Primary Contact Actions
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _callRider,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2563EB),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              LayoutBuilder(
+                builder: (context, btnConstraints) {
+                  final isNarrow = btnConstraints.maxWidth < 420;
+                  if (isNarrow) {
+                    return Column(
+                      children: [
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: _callRider,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF2563EB),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            icon: const Icon(Icons.phone_rounded, size: 18),
+                            label: Text('Direct Call', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: _sendWhatsAppReminder,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF16A34A),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
+                            label: Text('WhatsApp Reminder', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: _callRider,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2563EB),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          icon: const Icon(Icons.phone_rounded, size: 18),
+                          label: Text('Direct Call', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold)),
+                        ),
                       ),
-                      icon: const Icon(Icons.phone_rounded, size: 18),
-                      label: Text('Direct Call', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _sendWhatsAppReminder,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF16A34A),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: _sendWhatsAppReminder,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF16A34A),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
+                          label: Text('WhatsApp Reminder', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold)),
+                        ),
                       ),
-                      icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
-                      label: Text('WhatsApp Reminder', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                ],
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 10),
 

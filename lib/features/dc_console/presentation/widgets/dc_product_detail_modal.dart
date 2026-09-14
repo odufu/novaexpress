@@ -1142,10 +1142,12 @@ class _DCProductDetailModalState extends ConsumerState<DCProductDetailModal> {
                 ),
               ],
             ),
-            content: SizedBox(
-              width: 480,
-              child: SingleChildScrollView(
-                child: Column(
+            content: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: SizedBox(
+                width: double.maxFinite,
+                child: SingleChildScrollView(
+                  child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1278,7 +1280,8 @@ class _DCProductDetailModalState extends ConsumerState<DCProductDetailModal> {
                 ),
               ),
             ),
-            actions: [
+          ),
+          actions: [
               TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
               ElevatedButton(
                 onPressed: () {

@@ -50,5 +50,8 @@ abstract class AuthRepository {
     String? bankName,
     String? bankAccountNumber,
     String? bankAccountName,
+    double? customDeliveryFee,
+    double? customPlatformFee,
+    double? customFailedAttemptFee,
   });
 }

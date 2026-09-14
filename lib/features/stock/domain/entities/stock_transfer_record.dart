@@ -159,13 +159,15 @@ class StockTransferRecord {
 
   String get waybillNumber => transferNumber;
 
-  bool get isClientSupply => transferType == 'client_supply';
+  bool get isClientSupply => transferType == 'client_supply' || transferType == 'client_to_dc';
   bool get isDcToRider => transferType == 'dc_to_rider';
   bool get isRiderReturn => transferType == 'rider_return';
   bool get isInterDc => transferType == 'inter_dc';
 
-  bool get isDispatched => status == 'dispatched';
+  bool get isDispatched => status == 'dispatched' || status == 'pending_dc_acceptance';
   bool get isPendingRiderAcceptance => status == 'pending_rider_acceptance';
+  bool get isPendingDestinationAcceptance => status == 'pending_destination_acceptance' || status == 'in_transit';
+  bool get isInTransit => status == 'in_transit';
   bool get isCompleted => status == 'completed';
   bool get isRejected => status == 'rejected';
   bool get isDiscrepancyReported => status == 'discrepancy_reported';

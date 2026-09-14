@@ -13,13 +13,14 @@ import 'package:novexps/features/auth/presentation/providers/auth_provider.dart'
 
 import 'package:novexps/features/orders/data/datasources/orders_remote_datasource.dart';
 import 'package:novexps/features/orders/data/models/order_model.dart';
-import 'package:novexps/features/orders/data/repositories/orders_repository_impl.dart';
+import 'package:novexps/features/orders/domain/entities/order.dart';
 import 'package:novexps/features/orders/presentation/providers/orders_provider.dart';
 
 import 'package:novexps/features/stock/data/datasources/stock_remote_datasource.dart';
 import 'package:novexps/features/stock/data/models/stock_item_model.dart';
 import 'package:novexps/features/stock/data/repositories/stock_repository_impl.dart';
 import 'package:novexps/features/stock/domain/entities/rider_stock_allocation.dart';
+import 'package:novexps/features/stock/domain/entities/stock_transfer_record.dart';
 import 'package:novexps/features/stock/presentation/providers/stock_provider.dart';
 
 import 'package:novexps/features/finance/data/datasources/finance_remote_datasource.dart';
@@ -64,6 +65,7 @@ class _MockAuthRemoteDS implements AuthRemoteDataSource {
     lastName: 'Supervisor',
     phone: '08099887766',
     role: 'dc_manager',
+    distributionCenterId: '22222222-2222-4222-8222-222222222222',
     distributionCenterName: 'Wuse Distribution Center',
   );
 
@@ -115,6 +117,9 @@ class _MockAuthRemoteDS implements AuthRemoteDataSource {
 
   @override
   Future<bool> checkPhoneExists(String phone) async => false;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class _MockOrdersRemoteDS implements OrdersRemoteDataSource {
@@ -156,6 +161,20 @@ class _MockOrdersRemoteDS implements OrdersRemoteDataSource {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
+class _MockOrdersNotifier extends StateNotifier<OrdersState> implements OrdersNotifier {
+  _MockOrdersNotifier(List<OrderEntity> initialOrders)
+      : super(OrdersState(orders: initialOrders, isLoading: false));
+
+  @override
+  Future<void> loadDcOrders([String? dcId]) async {}
+
+  @override
+  Future<void> loadOrders([String? agentId]) async {}
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 class _MockFinanceRemoteDS implements FinanceRemoteDataSource {
   @override
   Future<List<RemittanceModel>> getAgentRemittances([String? agentId]) async => [];
@@ -169,7 +188,11 @@ class _MockStockRemoteDS implements StockRemoteDataSource {
   @override
   Future<List<RiderStockAllocation>> getRiderStockAllocations([String? riderId, String? dcId]) async => [];
   @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+  Future<List<Map<String, dynamic>>> fetchPendingDcReturns([String? dcId]) async => [];
+  @override
+  Future<List<StockTransferRecord>> fetchStockTransfers({String? dcId, String? clientId, String? riderId, String? status, String? transferType}) async => [];
+  @override
+  dynamic noSuchMethod(Invocation invocation) => null;
 }
 
 void main() {
@@ -184,6 +207,7 @@ void main() {
       firstName: 'Adekunle',
       lastName: 'Supervisor',
       role: 'dc_manager',
+      distributionCenterId: '22222222-2222-4222-8222-222222222222',
       phone: '08099887766',
     );
 
@@ -200,11 +224,27 @@ void main() {
           return notifier;
         }),
         ordersRemoteDataSourceProvider.overrideWithValue(_MockOrdersRemoteDS()),
-        ordersProvider.overrideWith((ref) {
-          final notifier = OrdersNotifier(OrdersRepositoryImpl(_MockOrdersRemoteDS()));
-          notifier.state = OrdersState(orders: const [], isLoading: false);
-          return notifier;
-        }),
+        ordersProvider.overrideWith((ref) => _MockOrdersNotifier([
+          OrderModel(
+            id: 'ord-8930',
+            orderNumber: 'TRK-8930',
+            customerName: 'Senator Kashim Shettima',
+            customerPhone: '08091112233',
+            deliveryState: 'Abuja (FCT)',
+            deliveryCity: 'Abuja',
+            deliveryAddress: 'Plot 104 Shehu Shagari Way, Maitama, Abuja',
+            productName: '2x Respira Detox Tea',
+            status: 'pending',
+            quantity: 2,
+            basePrice: 25000.0,
+            upsellAmount: 0.0,
+            totalAmount: 50000.0,
+            paymentType: 'pay_on_delivery',
+            paymentStatus: 'pending',
+            distributionCenterId: '22222222-2222-4222-8222-222222222222',
+            createdAt: DateTime.now(),
+          ),
+        ])),
         financeRemoteDataSourceProvider.overrideWithValue(_MockFinanceRemoteDS()),
         financeProvider.overrideWith((ref) {
           final notifier = FinanceNotifier(FinanceRepositoryImpl(_MockFinanceRemoteDS()));

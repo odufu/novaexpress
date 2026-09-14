@@ -11,26 +11,37 @@ class DCAnalyticsPage extends ConsumerWidget {
     final isDark = theme.brightness == Brightness.dark;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Analytics & Hub SLA Reports', style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 4),
-                    Text('Historical delivery throughput, SLA performance curves and official reconciliation audits', style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B))),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              Wrap(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompact = constraints.maxWidth < 650;
+              final titleWidget = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Analytics & Hub SLA Reports',
+                    style: GoogleFonts.inter(
+                      fontSize: isCompact ? 18 : 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Historical delivery throughput, SLA performance curves and official reconciliation audits',
+                    style: GoogleFonts.inter(
+                      fontSize: isCompact ? 12 : 13,
+                      color: const Color(0xFF64748B),
+                    ),
+                  ),
+                ],
+              );
+
+              final actionsWidget = Wrap(
                 spacing: 10,
+                runSpacing: 8,
                 children: [
                   ElevatedButton.icon(
                     onPressed: () {
@@ -52,32 +63,60 @@ class DCAnalyticsPage extends ConsumerWidget {
                     label: const Text('Export CSV'),
                   ),
                 ],
-              ),
-            ],
+              );
+
+              if (isCompact) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    titleWidget,
+                    const SizedBox(height: 12),
+                    actionsWidget,
+                  ],
+                );
+              }
+
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(child: titleWidget),
+                  const SizedBox(width: 16),
+                  actionsWidget,
+                ],
+              );
+            },
           ),
 
           const SizedBox(height: 20),
 
           // SLA Metrics Grid
-          GridView.count(
-            crossAxisCount: 3,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
-            childAspectRatio: 2.2,
-            children: [
-              _buildMetricCard('First-Attempt Success Rate', '94.2%', '+2.1% vs Target', const Color(0xFF10B981), isDark),
-              _buildMetricCard('Average Hub Fulfillment SLA', '24.5 min', 'Target: 25.0 min', const Color(0xFF2563EB), isDark),
-              _buildMetricCard('Damaged / QC Write-Off Rate', '0.4%', '-0.1% vs Benchmark', const Color(0xFF8B5CF6), isDark),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isMobile = constraints.maxWidth < 600;
+              final isTablet = constraints.maxWidth < 900;
+              final crossAxisCount = isMobile ? 1 : (isTablet ? 2 : 3);
+              final childAspectRatio = isMobile ? 2.8 : 2.2;
+              return GridView.count(
+                crossAxisCount: crossAxisCount,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisSpacing: 14,
+                mainAxisSpacing: 14,
+                childAspectRatio: childAspectRatio,
+                children: [
+                  _buildMetricCard('First-Attempt Success Rate', '94.2%', '+2.1% vs Target', const Color(0xFF10B981), isDark),
+                  _buildMetricCard('Average Hub Fulfillment SLA', '24.5 min', 'Target: 25.0 min', const Color(0xFF2563EB), isDark),
+                  _buildMetricCard('Damaged / QC Write-Off Rate', '0.4%', '-0.1% vs Benchmark', const Color(0xFF8B5CF6), isDark),
+                ],
+              );
+            },
           ),
 
           const SizedBox(height: 20),
 
           // Zone Turnaround Time Analysis Table
           Container(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF1E293B) : Colors.white,
               borderRadius: BorderRadius.circular(20),
@@ -88,13 +127,13 @@ class DCAnalyticsPage extends ConsumerWidget {
               children: [
                 Text('Zone Performance & Turnaround Velocity', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 14),
-                _buildZoneRow('Wuse Zone II & IV', '21.2 min', '98.5% Success', '4 Active Units'),
+                _buildZoneRow(context, 'Wuse Zone II & IV', '21.2 min', '98.5% Success', '4 Active Units'),
                 const Divider(height: 1, color: Color(0xFF334155)),
-                _buildZoneRow('Maitama & Ministers Hill', '24.0 min', '94.0% Success', '3 Active Units'),
+                _buildZoneRow(context, 'Maitama & Ministers Hill', '24.0 min', '94.0% Success', '3 Active Units'),
                 const Divider(height: 1, color: Color(0xFF334155)),
-                _buildZoneRow('Garki I & II', '28.1 min', '91.8% Success', '3 Active Units'),
+                _buildZoneRow(context, 'Garki I & II', '28.1 min', '91.8% Success', '3 Active Units'),
                 const Divider(height: 1, color: Color(0xFF334155)),
-                _buildZoneRow('Asokoro & Guzape', '26.4 min', '96.2% Success', '2 Active Units'),
+                _buildZoneRow(context, 'Asokoro & Guzape', '26.4 min', '96.2% Success', '2 Active Units'),
               ],
             ),
           ),
@@ -105,7 +144,7 @@ class DCAnalyticsPage extends ConsumerWidget {
 
   Widget _buildMetricCard(String title, String val, String sub, Color color, bool isDark) {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -123,15 +162,59 @@ class DCAnalyticsPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildZoneRow(String zone, String avgTime, String success, String fleet) {
+  Widget _buildZoneRow(BuildContext context, String zone, String avgTime, String success, String fleet) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+
+    if (isMobile) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    zone,
+                    style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Text(
+                  avgTime,
+                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  success,
+                  style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF10B981), fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  fleet,
+                  style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(zone, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600)),
-          Text(avgTime, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB))),
-          Text(success, style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF10B981), fontWeight: FontWeight.bold)),
+          Expanded(flex: 2, child: Text(zone, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600))),
+          Expanded(child: Text(avgTime, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)))),
+          Expanded(child: Text(success, style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF10B981), fontWeight: FontWeight.bold))),
           Text(fleet, style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
         ],
       ),

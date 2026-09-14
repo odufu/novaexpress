@@ -79,6 +79,7 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
       floatingActionButton: const PipelineChatFloatingActionButton(),
       backgroundColor: isDark ? const Color(0xFF0B1120) : const Color(0xFFF8FAFC),
       drawer: isDesktop ? null : Drawer(child: _buildSidebar(context, dcState, dcNotifier, isDark, user, isDrawer: true)),
+      bottomNavigationBar: isDesktop ? null : _buildMobileBottomNav(context, dcState, dcNotifier, isDark),
       body: SafeArea(
         child: Row(
           children: [
@@ -435,11 +436,12 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
   ) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isCompact = screenWidth < 800;
+    final isVeryCompact = screenWidth < 500;
     final activeTitle = _getActiveTabTitle(dcState.activeTabIndex);
 
     return Container(
       height: 64,
-      padding: EdgeInsets.symmetric(horizontal: isCompact ? 10 : 20),
+      padding: EdgeInsets.symmetric(horizontal: isVeryCompact ? 6 : (isCompact ? 10 : 20)),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
         border: Border(
@@ -452,13 +454,18 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
         children: [
           if (!isDesktop)
             IconButton(
+              padding: EdgeInsets.all(isVeryCompact ? 4 : 8),
+              constraints: isVeryCompact ? const BoxConstraints(minWidth: 32, minHeight: 32) : null,
               icon: const Icon(Icons.menu_rounded),
               onPressed: () => _scaffoldKey.currentState?.openDrawer(),
             ),
 
           // Active DC Hub Indicator Badge (Locked to logged-in supervisor account's DC)
           Container(
-            padding: EdgeInsets.symmetric(horizontal: isCompact ? 7 : 10, vertical: isCompact ? 4 : 6),
+            padding: EdgeInsets.symmetric(
+              horizontal: isVeryCompact ? 5 : (isCompact ? 7 : 10),
+              vertical: isCompact ? 4 : 6,
+            ),
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
               borderRadius: BorderRadius.circular(8),
@@ -477,13 +484,13 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
                     shape: BoxShape.circle,
                   ),
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 4),
                 ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: isCompact ? 80 : 160),
+                  constraints: BoxConstraints(maxWidth: isVeryCompact ? 55 : (isCompact ? 80 : 160)),
                   child: Text(
                     isCompact ? dcState.activeHubCode : dcState.activeHubName,
                     style: GoogleFonts.inter(
-                      fontSize: isCompact ? 11 : 12,
+                      fontSize: isVeryCompact ? 10.5 : (isCompact ? 11 : 12),
                       fontWeight: FontWeight.bold,
                       color: isDark ? Colors.white : const Color(0xFF0F172A),
                     ),
@@ -504,14 +511,14 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
             ),
           ),
 
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
 
           // Screen Title Centered on AppBar
           Expanded(
             child: Text(
               activeTitle,
               style: GoogleFonts.inter(
-                fontSize: isCompact ? 13.5 : 17,
+                fontSize: isVeryCompact ? 13 : (isCompact ? 13.5 : 17),
                 fontWeight: FontWeight.w700,
                 color: isDark ? Colors.white : const Color(0xFF0F172A),
                 letterSpacing: -0.2,
@@ -521,25 +528,26 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
             ),
           ),
 
-          const SizedBox(width: 4),
+          const SizedBox(width: 2),
 
-          // Interactive System Presentation Button
-          IconButton(
-            padding: EdgeInsets.all(isCompact ? 4 : 8),
-            constraints: isCompact ? const BoxConstraints(minWidth: 32, minHeight: 32) : null,
-            icon: const Icon(
-              Icons.slideshow_rounded,
-              size: 20,
-              color: Color(0xFF10B981),
+          // Interactive System Presentation Button (Hidden on very compact screens to avoid crowding)
+          if (!isVeryCompact)
+            IconButton(
+              padding: EdgeInsets.all(isCompact ? 4 : 8),
+              constraints: isCompact ? const BoxConstraints(minWidth: 32, minHeight: 32) : null,
+              icon: const Icon(
+                Icons.slideshow_rounded,
+                size: 20,
+                color: Color(0xFF10B981),
+              ),
+              onPressed: () async {
+                final uri = Uri.parse('presentation/index.html');
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri);
+                }
+              },
+              tooltip: 'Interactive System Presentation',
             ),
-            onPressed: () async {
-              final uri = Uri.parse('presentation/index.html');
-              if (await canLaunchUrl(uri)) {
-                await launchUrl(uri);
-              }
-            },
-            tooltip: 'Interactive System Presentation',
-          ),
 
           // Theme Switcher Toggle
           IconButton(
@@ -734,6 +742,88 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
     );
   }
 
+  Widget _buildMobileBottomNav(
+    BuildContext context,
+    DCConsoleState state,
+    DCConsoleNotifier notifier,
+    bool isDark,
+  ) {
+    final navItems = [
+      (index: 0, label: 'Dashboard', icon: Icons.dashboard_rounded),
+      (index: 1, label: 'Deliveries', icon: Icons.local_shipping_rounded),
+      (index: 2, label: 'Matching', icon: Icons.price_check_rounded),
+      (index: 3, label: 'Stock', icon: Icons.inventory_2_rounded),
+      (index: 8, label: 'Fleet', icon: Icons.two_wheeler_rounded),
+      (index: -1, label: 'More', icon: Icons.menu_open_rounded),
+    ];
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : Colors.white,
+        border: Border(
+          top: BorderSide(
+            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+          ),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 56,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: navItems.map((item) {
+              final isSelected = item.index >= 0 && state.activeTabIndex == item.index;
+              return Expanded(
+                child: InkWell(
+                  onTap: () {
+                    if (item.index == -1) {
+                      _scaffoldKey.currentState?.openDrawer();
+                    } else {
+                      notifier.setActiveTab(item.index);
+                    }
+                  },
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        item.icon,
+                        size: 20,
+                        color: isSelected
+                            ? const Color(0xFFF37021)
+                            : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        item.label,
+                        style: GoogleFonts.inter(
+                          fontSize: 10,
+                          fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                          color: isSelected
+                              ? const Color(0xFFF37021)
+                              : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ),
+    );
+  }
+
   void _confirmDcLogout(BuildContext context, WidgetRef ref) {
     showDialog(
       context: context,
@@ -743,9 +833,12 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
           children: [
             const Icon(Icons.logout_rounded, color: Color(0xFFEF4444)),
             const SizedBox(width: 10),
-            Text(
-              'Confirm DC Logout',
-              style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 18),
+            Expanded(
+              child: Text(
+                'Confirm DC Logout',
+                style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 18),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ],
         ),

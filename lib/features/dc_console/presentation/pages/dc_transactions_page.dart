@@ -778,38 +778,42 @@ class _DCTransactionsPageState extends ConsumerState<DCTransactionsPage> {
 
     showDialog(
       context: context,
-      builder: (ctx) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-        child: Container(
-          width: 580,
-          constraints: const BoxConstraints(maxHeight: 780),
-          padding: const EdgeInsets.all(22),
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // 1. Top Header & Reference
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF00A2D3).withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(
-                            isPstk ? Icons.bolt_rounded : Icons.receipt_long_rounded,
-                            color: const Color(0xFF00A2D3),
-                            size: 22,
-                          ),
+      builder: (ctx) {
+        final screenHeight = MediaQuery.of(ctx).size.height;
+        return Dialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+          child: Container(
+            constraints: BoxConstraints(
+              maxWidth: 580,
+              maxHeight: screenHeight * 0.92,
+            ),
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 1. Top Header & Reference
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF00A2D3).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                        const SizedBox(width: 10),
-                        Column(
+                        child: Icon(
+                          isPstk ? Icons.bolt_rounded : Icons.receipt_long_rounded,
+                          color: const Color(0xFF00A2D3),
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
@@ -819,21 +823,23 @@ class _DCTransactionsPageState extends ConsumerState<DCTransactionsPage> {
                                 fontWeight: FontWeight.bold,
                                 color: isDark ? Colors.white : const Color(0xFF0F172A),
                               ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                             Text(
                               'NovaExpress Distribution Center Financial Ledger',
                               style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),
-                      ],
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close_rounded, size: 20),
-                      onPressed: () => Navigator.pop(ctx),
-                    ),
-                  ],
-                ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, size: 20),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
 
                 const SizedBox(height: 16),
 
@@ -1154,9 +1160,10 @@ NovaExpress Distribution Center Audit
             ),
           ),
         ),
-      ),
-    );
-  }
+      );
+    },
+  );
+}
 
   Widget _buildReceiptRow(String label, String value, {bool isBold = false, Color? color}) {
     return Padding(

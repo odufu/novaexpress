@@ -79,82 +79,87 @@ class _DCClientAssetPortfolioModalState
 
     return Dialog(
       backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Container(
-        width: 960,
-        height: 720,
-        padding: const EdgeInsets.all(24),
+        width: double.infinity,
+        constraints: BoxConstraints(
+          maxWidth: 960,
+          maxHeight: MediaQuery.of(context).size.height * 0.92,
+        ),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header: Client Info & Dismiss
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 52,
-                      height: 52,
-                      decoration: BoxDecoration(
-                        color: widget.client.isEnterprise
-                            ? const Color(0xFF6366F1).withValues(alpha: 0.15)
-                            : const Color(0xFF0D9488).withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Icon(
-                        widget.client.isEnterprise
-                            ? Icons.corporate_fare_rounded
-                            : Icons.storefront_rounded,
-                        color: widget.client.isEnterprise
-                            ? const Color(0xFF6366F1)
-                            : const Color(0xFF0D9488),
-                        size: 28,
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Text(
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: widget.client.isEnterprise
+                        ? const Color(0xFF6366F1).withValues(alpha: 0.15)
+                        : const Color(0xFF0D9488).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    widget.client.isEnterprise
+                        ? Icons.corporate_fare_rounded
+                        : Icons.storefront_rounded,
+                    color: widget.client.isEnterprise
+                        ? const Color(0xFF6366F1)
+                        : const Color(0xFF0D9488),
+                    size: 26,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
                               widget.client.companyName,
                               style: GoogleFonts.inter(
-                                fontSize: 18,
+                                fontSize: 17,
                                 fontWeight: FontWeight.w800,
                                 color: isDark ? Colors.white : const Color(0xFF0F172A),
                               ),
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF0D9488).withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                widget.client.code,
-                                style: GoogleFonts.inter(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: const Color(0xFF0D9488),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          '${widget.client.contactPerson} • ${widget.client.phone} • ${widget.client.city}, ${widget.client.state}',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                           ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0D9488).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              widget.client.code,
+                              style: GoogleFonts.inter(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF0D9488),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${widget.client.contactPerson} • ${widget.client.phone} • ${widget.client.city}, ${widget.client.state}',
+                        style: GoogleFonts.inter(
+                          fontSize: 11.5,
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                         ),
-                      ],
-                    ),
-                  ],
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
                 ),
                 IconButton(
                   onPressed: () => Navigator.of(context).pop(),
@@ -162,47 +167,70 @@ class _DCClientAssetPortfolioModalState
                 ),
               ],
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 16),
 
             // Top Summary Cards
-            Row(
-              children: [
-                _buildKpiChip(
-                  title: 'Catalog Products',
-                  value: '${clientProducts.length}',
-                  subtitle: '${clientProducts.fold(0, (s, p) => s + p.packages.length)} Packages',
-                  icon: Icons.inventory_2_outlined,
-                  color: const Color(0xFF0D9488),
-                  isDark: isDark,
-                ),
-                const SizedBox(width: 12),
-                _buildKpiChip(
-                  title: 'Total Stock in Network',
-                  value: '${clientStockItems.fold(0, (s, i) => s + i.totalStock)}',
-                  subtitle: 'Units Across Hubs',
-                  icon: Icons.warehouse_rounded,
-                  color: const Color(0xFF6366F1),
-                  isDark: isDark,
-                ),
-                const SizedBox(width: 12),
-                _buildKpiChip(
-                  title: 'Total Orders',
-                  value: '${clientOrders.length}',
-                  subtitle: '${deliveredOrders.length} Delivered',
-                  icon: Icons.local_shipping_outlined,
-                  color: const Color(0xFF0EA5E9),
-                  isDark: isDark,
-                ),
-                const SizedBox(width: 12),
-                _buildKpiChip(
-                  title: 'COD Collected',
-                  value: currency.format(codCollected),
-                  subtitle: 'Total Delivered Value',
-                  icon: Icons.payments_outlined,
-                  color: const Color(0xFF10B981),
-                  isDark: isDark,
-                ),
-              ],
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isCompact = constraints.maxWidth < 650;
+                final chips = [
+                  _buildKpiChip(
+                    title: 'Catalog Products',
+                    value: '${clientProducts.length}',
+                    subtitle: '${clientProducts.fold(0, (s, p) => s + p.packages.length)} Packages',
+                    icon: Icons.inventory_2_outlined,
+                    color: const Color(0xFF0D9488),
+                    isDark: isDark,
+                  ),
+                  _buildKpiChip(
+                    title: 'Total Stock in Network',
+                    value: '${clientStockItems.fold(0, (s, i) => s + i.totalStock)}',
+                    subtitle: 'Units Across Hubs',
+                    icon: Icons.warehouse_rounded,
+                    color: const Color(0xFF6366F1),
+                    isDark: isDark,
+                  ),
+                  _buildKpiChip(
+                    title: 'Total Orders',
+                    value: '${clientOrders.length}',
+                    subtitle: '${deliveredOrders.length} Delivered',
+                    icon: Icons.local_shipping_outlined,
+                    color: const Color(0xFF0EA5E9),
+                    isDark: isDark,
+                  ),
+                  _buildKpiChip(
+                    title: 'COD Collected',
+                    value: currency.format(codCollected),
+                    subtitle: 'Total Delivered Value',
+                    icon: Icons.payments_outlined,
+                    color: const Color(0xFF10B981),
+                    isDark: isDark,
+                  ),
+                ];
+
+                if (isCompact) {
+                  return Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: chips.map((c) => SizedBox(
+                      width: constraints.maxWidth < 450 ? double.infinity : (constraints.maxWidth - 8) / 2,
+                      child: c,
+                    )).toList(),
+                  );
+                }
+
+                return Row(
+                  children: [
+                    Expanded(child: chips[0]),
+                    const SizedBox(width: 12),
+                    Expanded(child: chips[1]),
+                    const SizedBox(width: 12),
+                    Expanded(child: chips[2]),
+                    const SizedBox(width: 12),
+                    Expanded(child: chips[3]),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 16),
 
@@ -249,61 +277,59 @@ class _DCClientAssetPortfolioModalState
     required Color color,
     required bool isDark,
   }) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: color, size: 18),
           ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(icon, color: color, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.inter(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF94A3B8),
+                  ),
+                ),
+                Text(
+                  value,
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  subtitle,
+                  style: GoogleFonts.inter(
+                    fontSize: 10,
+                    color: const Color(0xFF64748B),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: GoogleFonts.inter(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF94A3B8),
-                    ),
-                  ),
-                  Text(
-                    value,
-                    style: GoogleFonts.inter(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      color: isDark ? Colors.white : const Color(0xFF0F172A),
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    subtitle,
-                    style: GoogleFonts.inter(
-                      fontSize: 10,
-                      color: const Color(0xFF64748B),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

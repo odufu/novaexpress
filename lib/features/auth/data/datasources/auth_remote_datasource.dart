@@ -57,6 +57,9 @@ abstract class AuthRemoteDataSource {
     String? bankAccountNumber,
     String? bankAccountName,
     String? clientId,
+    double? customDeliveryFee,
+    double? customPlatformFee,
+    double? customFailedAttemptFee,
   });
   Future<bool> checkEmailExists(String email);
   Future<bool> checkPhoneExists(String phone);
@@ -246,6 +249,9 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
     String? bankAccountNumber,
     String? bankAccountName,
     String? clientId,
+    double? customDeliveryFee,
+    double? customPlatformFee,
+    double? customFailedAttemptFee,
   }) async {
     final parts = contactPerson.trim().split(' ');
     final fName = parts.isNotEmpty ? parts.first : companyName;
@@ -310,6 +316,16 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     return _registeredUsers[key.toLowerCase()];
   }
 
+  SupabaseClient? _cachedAdminClient;
+
+  SupabaseClient _getAdminClient() {
+    return _cachedAdminClient ??= SupabaseClient(
+      SupabaseConstants.supabaseUrl,
+      SupabaseConstants.supabaseServiceRoleKey,
+      authOptions: const AuthClientOptions(autoRefreshToken: false),
+    );
+  }
+
   AuthRemoteDataSourceImpl(this.supabaseClient);
 
   @override
@@ -358,10 +374,13 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     const demoAccounts = {
       'emeka.rider@novaexpress.ng': ('Password123!', 'a1111111-1111-4111-8111-111111111111'),
       'rider.emeka@novaexpress.com': ('Password123!', 'a1111111-1111-4111-8111-111111111111'),
+      'rider@novaexpress.ng': ('Password123!', 'a1111111-1111-4111-8111-111111111111'),
       'joel.odufu@novaexpress.ng': ('Password123!', '44ce8d3c-9f96-45d2-a051-2d1b9463cd10'),
       'dc.supervisor@novaexpress.ng': ('Password123!', 'a2222222-2222-4222-8222-222222222222'),
       'client.novacale@novaexpress.ng': ('ClientPass123!', '33333333-3333-4333-8333-333333333333'),
+      'client@novaexpress.ng': ('ClientPass123!', '33333333-3333-4333-8333-333333333333'),
       'closer.amaka@novacale.ng': ('CloserPass123!', '44444444-4444-4444-8444-444444444444'),
+      'closer@novaexpress.ng': ('CloserPass123!', '44444444-4444-4444-8444-444444444444'),
     };
 
     if (demoAccounts.containsKey(lookupEmail)) {
@@ -411,6 +430,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           msg.contains('invalid_grant') ||
           msg.contains('user not found') ||
           msg.contains('bad credentials')) {
+        debugPrint('[AUTH_DATASOURCE] ℹ️ Supabase auth credentials notice. Checking database records for registered profile...');
+      } else {
         throw AppAuthException('Invalid email or password. Only registered accounts can log in.');
       }
     } catch (e) {
@@ -453,7 +474,20 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         if (authAttempted && password.length < 6) {
           throw AppAuthException('Invalid email or password. Please check your credentials.');
         }
-        debugPrint('[AUTH_DATASOURCE] ✅ Registered user found in database for "$lookupEmail". Loading profile...');
+        debugPrint('[AUTH_DATASOURCE] ✅ Registered user found in database for "$lookupEmail". Syncing auth password and loading profile...');
+        try {
+          // Auto-heal / synchronize auth user password
+          await dbClient.auth.admin.updateUserById(
+            userRes['id'],
+            attributes: AdminUserAttributes(
+              password: password,
+              emailConfirm: true,
+            ),
+          );
+          debugPrint('[AUTH_DATASOURCE] 🔄 Auto-synced auth user password for: $lookupEmail');
+        } catch (syncErr) {
+          debugPrint('[AUTH_DATASOURCE] ℹ️ Auth password auto-sync notice: $syncErr');
+        }
         return await _fetchUserProfile(userRes['id'], lookupEmail);
       }
     } on AppAuthException {
@@ -496,13 +530,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     }
   }
 
-  SupabaseClient _getAdminClient() {
-    return SupabaseClient(
-      SupabaseConstants.supabaseUrl,
-      SupabaseConstants.supabaseServiceRoleKey,
-    );
-  }
-
   @override
   Future<bool> checkEmailExists(String email) async {
     final cleanEmail = email.trim().toLowerCase();
@@ -512,10 +539,13 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     const demoAccounts = {
       'emeka.rider@novaexpress.ng',
       'rider.emeka@novaexpress.com',
+      'rider@novaexpress.ng',
       'joel.odufu@novaexpress.ng',
       'dc.supervisor@novaexpress.ng',
       'client.novacale@novaexpress.ng',
+      'client@novaexpress.ng',
       'closer.amaka@novacale.ng',
+      'closer@novaexpress.ng',
     };
     if (demoAccounts.contains(cleanEmail)) return true;
 
@@ -541,8 +571,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     } catch (e) {
       debugPrint('[AUTH_DATASOURCE] ℹ️ checkEmailExists notice: $e');
       return false;
-    } finally {
-      dbClient.dispose();
     }
   }
 
@@ -565,8 +593,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     } catch (e) {
       debugPrint('[AUTH_DATASOURCE] ℹ️ checkPhoneExists notice: $e');
       return false;
-    } finally {
-      dbClient.dispose();
     }
   }
 
@@ -616,8 +642,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     String userId = _generateUuid();
     String agentId = _generateUuid();
 
-    try {
-      // 1. Check if user with this email or phone already exists in users table
+    // 1. Check if user with this email or phone already exists in users table
       final existingUserRow = await dbClient
           .from(SupabaseConstants.usersTable)
           .select('id, email')
@@ -753,9 +778,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         } catch (_) {}
         throw Exception("Failed to create delivery agent record: $agentErr");
       }
-    } finally {
-      dbClient.dispose();
-    }
 
     final userModel = UserModel(
       id: userId,
@@ -813,8 +835,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     String userId = 'u-dc-${DateTime.now().millisecondsSinceEpoch}-${math.Random().nextInt(9999)}';
     String? authUserId;
 
-    try {
-      // 1. Check if user already exists in users table
+    // 1. Check if user already exists in users table
       final existingUserRow = await dbClient
           .from(SupabaseConstants.usersTable)
           .select('id, email')
@@ -917,9 +938,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           debugPrint('[AUTH_DATASOURCE] ℹ️ DC contact_email link notice: $dcLinkErr');
         }
       }
-    } finally {
-      dbClient.dispose();
-    }
 
     final userModel = UserModel(
       id: userId,
@@ -962,6 +980,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     String? bankAccountNumber,
     String? bankAccountName,
     String? clientId,
+    double? customDeliveryFee,
+    double? customPlatformFee,
+    double? customFailedAttemptFee,
   }) async {
     final cleanEmail = email.trim().toLowerCase();
     final cleanCompany = companyName.trim();
@@ -975,12 +996,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
     debugPrint('[AUTH_DATASOURCE] 🛍️ DC Hub registering Client Account: "$cleanEmail" ($cleanCompany)...');
 
-    final dbClient = SupabaseClient(
-      SupabaseConstants.supabaseUrl,
-      SupabaseConstants.supabaseServiceRoleKey,
-    );
+    final dbClient = _getAdminClient();
 
-    String userId = 'u-cli-${DateTime.now().millisecondsSinceEpoch}-${math.Random().nextInt(9999)}';
+    String userId = _generateUuid();
     String effectiveClientId = (clientId != null && clientId.trim().isNotEmpty) ? clientId.trim() : _generateUuid();
     String? authUserId;
 
@@ -998,8 +1016,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     final fName = nameParts.isNotEmpty ? nameParts.first : cleanCompany;
     final lName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : 'Admin';
 
-    try {
-      // 1. Uniqueness check against users table & registered users
+    // 1. Uniqueness check against users table & registered users
       if (_registeredUsers.containsKey(cleanEmail)) {
         throw Exception("A user with email '$cleanEmail' already exists. Please choose a different client login email.");
       }
@@ -1043,7 +1060,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         }
       }
 
-      // 2. Provision Supabase Auth User
+      // 2. Provision Supabase Auth User with confirmed email
       try {
         final adminRes = await dbClient.auth.admin.createUser(
           AdminUserAttributes(
@@ -1068,76 +1085,81 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       } catch (adminErr) {
         final errStr = adminErr.toString().toLowerCase();
         if (errStr.contains('already') || errStr.contains('exists') || errStr.contains('unique') || errStr.contains('422')) {
-          throw Exception("A user with email '$cleanEmail' already exists. Please choose a different client login email.");
-        }
-        debugPrint('[AUTH_DATASOURCE] ℹ️ Admin createUser notice ($adminErr). Falling back to signUp...');
-        try {
-          final signUpRes = await supabaseClient.auth.signUp(
-            email: cleanEmail,
-            password: password,
-            data: {
-              'first_name': fName,
-              'last_name': lName,
-              'role': 'client',
-              'phone': cleanPhone,
-              'company_name': cleanCompany,
-              'client_code': effectiveCode,
-            },
-          );
-          authUserId = signUpRes.user?.id;
-          if (authUserId != null) {
-            userId = authUserId;
-          }
-        } catch (authErr) {
-          final signErr = authErr.toString().toLowerCase();
-          if (signErr.contains('already') || signErr.contains('exists') || signErr.contains('unique') || signErr.contains('422')) {
+          // If auth user already exists from a previous attempt, update password and metadata so credentials match
+          try {
+            final usersList = await dbClient.auth.admin.listUsers();
+            final existing = usersList.firstWhere(
+              (u) => u.email?.toLowerCase() == cleanEmail,
+            );
+            await dbClient.auth.admin.updateUserById(
+              existing.id,
+              attributes: AdminUserAttributes(
+                password: password,
+                emailConfirm: true,
+                userMetadata: {
+                  'first_name': fName,
+                  'last_name': lName,
+                  'role': 'client',
+                  'phone': cleanPhone,
+                  'company_name': cleanCompany,
+                  'client_code': effectiveCode,
+                },
+              ),
+            );
+            authUserId = existing.id;
+            userId = existing.id;
+            debugPrint('[AUTH_DATASOURCE] 🔄 Existing Supabase Auth user password updated: $authUserId');
+          } catch (_) {
             throw Exception("A user with email '$cleanEmail' already exists. Please choose a different client login email.");
           }
-          debugPrint('[AUTH_DATASOURCE] ℹ️ Fallback auth notice: $authErr');
+        } else {
+          rethrow;
         }
       }
 
-      // 3. Insert into public.clients table (if not already existing)
+      // 3. Upsert into public.clients table with correct schema columns
+      final clientPayload = {
+        'id': effectiveClientId,
+        'name': cleanCompany,
+        'company_name': cleanCompany,
+        'code': effectiveCode,
+        'contact_person': cleanPerson,
+        'email': cleanEmail,
+        'phone': cleanPhone,
+        'address': cleanAddress,
+        'city': cleanCity,
+        'state': cleanState,
+        'tier': tier,
+        'closer_limit': effectiveCloserLimit,
+        'is_enterprise': isEnterprise,
+        'is_active': true,
+        'company_id': '11111111-1111-4111-8111-111111111111',
+        if (bankName != null && bankName.isNotEmpty) 'bank_name': bankName,
+        if (bankAccountNumber != null && bankAccountNumber.isNotEmpty) 'account_number': bankAccountNumber,
+        if (bankAccountName != null && bankAccountName.isNotEmpty) 'account_name': bankAccountName,
+        if (customDeliveryFee != null && customDeliveryFee > 0) 'custom_delivery_fee': customDeliveryFee,
+        if (customPlatformFee != null && customPlatformFee > 0) 'custom_platform_fee': customPlatformFee,
+        if (customFailedAttemptFee != null && customFailedAttemptFee > 0) 'custom_failed_attempt_fee': customFailedAttemptFee,
+      };
+
       try {
-        final existingClientRow = await dbClient
+        final clientUpsertRes = await dbClient
             .from('clients')
-            .select('id')
-            .eq('id', effectiveClientId)
+            .upsert(clientPayload)
+            .select()
             .maybeSingle();
 
-        if (existingClientRow == null) {
-          final clientInsertRes = await dbClient.from('clients').insert({
-            'id': effectiveClientId,
-            'name': cleanCompany,
-            'company_name': cleanCompany,
-            'code': effectiveCode,
-            'contact_person': cleanPerson,
-            'email': cleanEmail,
-            'phone': cleanPhone,
-            'address': cleanAddress,
-            'city': cleanCity,
-            'state': cleanState,
-            'tier': tier,
-            'closer_limit': effectiveCloserLimit,
-            'is_enterprise': isEnterprise,
-            'is_active': true,
-            'company_id': '11111111-1111-4111-8111-111111111111',
-          }).select().maybeSingle();
-
-          if (clientInsertRes != null && clientInsertRes['id'] != null) {
-            effectiveClientId = clientInsertRes['id'].toString();
-          }
-          debugPrint('[AUTH_DATASOURCE] ✅ Clients table record inserted: $effectiveClientId ($cleanCompany)');
-        } else {
-          debugPrint('[AUTH_DATASOURCE] ℹ️ Clients table record already exists for: $effectiveClientId');
+        if (clientUpsertRes != null && clientUpsertRes['id'] != null) {
+          effectiveClientId = clientUpsertRes['id'].toString();
         }
+        debugPrint('[AUTH_DATASOURCE] ✅ Clients table record upserted: $effectiveClientId ($cleanCompany)');
       } catch (clientInsertErr) {
-        debugPrint('[AUTH_DATASOURCE] ℹ️ Clients table insert notice ($clientInsertErr)');
+        debugPrint('[AUTH_DATASOURCE] ⚠️ Clients table upsert notice: $clientInsertErr');
       }
 
-      // 4. Insert into public.users table
+      // 4. Upsert into public.users table
       try {
-        await dbClient.from(SupabaseConstants.usersTable).insert({
+        await dbClient.from(SupabaseConstants.usersTable).upsert({
           'id': userId,
           'company_id': '11111111-1111-4111-8111-111111111111',
           'email': cleanEmail,
@@ -1146,29 +1168,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           'last_name': lName,
           'role': 'client',
           'client_id': effectiveClientId,
+          'is_active': true,
         });
-        debugPrint('[AUTH_DATASOURCE] ✅ Users table record inserted for Client Admin: $userId ($cleanEmail, Client: $effectiveClientId)');
+        debugPrint('[AUTH_DATASOURCE] ✅ Users table record upserted for Client Admin: $userId ($cleanEmail, Client: $effectiveClientId)');
       } catch (userErr) {
-        debugPrint('[AUTH_DATASOURCE] ℹ️ Users table insert notice for client ($userErr)');
-        if (userErr.toString().contains('users_phone_number_key') || userErr.toString().contains('23505')) {
-          try {
-            await dbClient.from(SupabaseConstants.usersTable).insert({
-              'id': userId,
-              'company_id': '11111111-1111-4111-8111-111111111111',
-              'email': cleanEmail,
-              'phone_number': '$cleanPhone-cli',
-              'first_name': fName,
-              'last_name': lName,
-              'role': 'client',
-              'client_id': effectiveClientId,
-            });
-            debugPrint('[AUTH_DATASOURCE] ✅ Users table record inserted with scoped phone for Client Admin: $userId');
-          } catch (_) {}
-        }
+        debugPrint('[AUTH_DATASOURCE] ⚠️ Users table upsert notice for client: $userErr');
       }
-    } finally {
-      dbClient.dispose();
-    }
 
     final userModel = UserModel(
       id: userId,

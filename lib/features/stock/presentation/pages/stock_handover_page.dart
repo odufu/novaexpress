@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../../core/widgets/signature_pad_modal.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/entities/stock_transfer_record.dart';
 import '../providers/stock_provider.dart';
@@ -98,26 +97,6 @@ class _StockHandoverPageState extends ConsumerState<StockHandoverPage> {
         ? '${user.firstName} ${user.lastName}'.trim()
         : 'Rider Agent';
     final riderId = user?.deliveryAgentId ?? user?.id ?? '';
-
-    // 1. Mandatory Digital Signature on Glass by Rider
-    final sigResult = await SignaturePadModal.show(
-      context: context,
-      orderId: _transfer!.transferNumber,
-      customerName: riderName,
-    );
-
-    if (sigResult == null || sigResult.signatureUrl.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            backgroundColor: Color(0xFFF59E0B),
-            content: Text('Rider digital signature on glass is mandatory to accept vehicle custody.'),
-          ),
-        );
-      }
-      return;
-    }
-
     setState(() => _isSubmitting = true);
 
     try {
@@ -132,7 +111,7 @@ class _StockHandoverPageState extends ConsumerState<StockHandoverPage> {
             transferId: _transfer!.id,
             riderId: riderId,
             riderName: riderName,
-            riderSignatureUrl: sigResult.signatureUrl,
+            riderSignatureUrl: '',
             verifiedItems: verifiedPayload,
             notes: _notesCtrl.text.trim(),
           );
@@ -410,7 +389,7 @@ class _StockHandoverPageState extends ConsumerState<StockHandoverPage> {
           ),
           const SizedBox(height: 16),
 
-          // 2. Supervisor Digital Signature Proof (Party A)
+          // 2. Supervisor Dispatch Allocation Card
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
@@ -426,7 +405,7 @@ class _StockHandoverPageState extends ConsumerState<StockHandoverPage> {
                     const Icon(Icons.verified_user_rounded, color: Color(0xFF2563EB), size: 18),
                     const SizedBox(width: 8),
                     Text(
-                      'Supervisor Dispatch Authorization',
+                      'Supervisor Dispatch Allocation',
                       style: GoogleFonts.inter(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
@@ -436,49 +415,25 @@ class _StockHandoverPageState extends ConsumerState<StockHandoverPage> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                Row(
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            trf.senderName ?? 'DC Station Supervisor',
-                            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Dispatched: ${trf.dispatchedAt?.toLocal().toString().substring(0, 16) ?? 'Pending handover'}',
-                            style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
-                          ),
-                          if (trf.notes != null && trf.notes!.isNotEmpty) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              trf.notes!,
-                              style: GoogleFonts.inter(fontSize: 11, fontStyle: FontStyle.italic, color: const Color(0xFF64748B)),
-                            ),
-                          ],
-                        ],
-                      ),
+                    Text(
+                      trf.senderName ?? 'DC Station Supervisor',
+                      style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600),
                     ),
-                    if (trf.senderSignatureUrl != null && trf.senderSignatureUrl!.isNotEmpty)
-                      Container(
-                        width: 90,
-                        height: 50,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFCBD5E1)),
-                        ),
-                        child: Image.network(
-                          trf.senderSignatureUrl!,
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => const Center(
-                            child: Icon(Icons.verified_rounded, color: Color(0xFF10B981), size: 18),
-                          ),
-                        ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Dispatched: ${trf.dispatchedAt?.toLocal().toString().substring(0, 16) ?? 'Pending handover'}',
+                      style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                    ),
+                    if (trf.notes != null && trf.notes!.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        trf.notes!,
+                        style: GoogleFonts.inter(fontSize: 11, fontStyle: FontStyle.italic, color: const Color(0xFF64748B)),
                       ),
+                    ],
                   ],
                 ),
               ],
@@ -641,9 +596,9 @@ class _StockHandoverPageState extends ConsumerState<StockHandoverPage> {
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  icon: const Icon(Icons.draw_rounded, color: Colors.white, size: 18),
+                  icon: const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
                   label: Text(
-                    _isSubmitting ? 'Signing...' : 'Sign on Glass & Accept Custody',
+                    _isSubmitting ? 'Accepting Custody...' : 'Accept Stock Custody',
                     style: GoogleFonts.inter(
                       fontSize: 13.5,
                       fontWeight: FontWeight.bold,
