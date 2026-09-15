@@ -300,23 +300,24 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
         debugPrint('[STOCK_DATASOURCE] ⚠️ orders query error: $e');
       }
 
-      // 3. Fetch transfer allocations and vehicle custody for riders
       final Map<String, int> riderAllocatedUnits = {};
       final Map<String, Map<String, dynamic>> agentInventoryMap = {};
+      String? riderDcId;
       try {
         if (validAgentId != null && validAgentId.isNotEmpty) {
-          // Resolve both agent id and user id for resilient lookup
+          // Resolve both agent id, user id, and host DC for resilient lookup
           String agentId = validAgentId;
           String? linkedUserId;
           try {
             final da = await dbClient
                 .from('delivery_agents')
-                .select('id, user_id')
+                .select('id, user_id, distribution_center_id')
                 .or('id.eq.$validAgentId,user_id.eq.$validAgentId')
                 .limit(1);
             if ((da as List).isNotEmpty) {
               agentId = da.first['id']?.toString() ?? validAgentId;
               linkedUserId = da.first['user_id']?.toString();
+              riderDcId = da.first['distribution_center_id']?.toString();
             }
           } catch (_) {}
 
@@ -418,7 +419,8 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
 
       final List<StockItemModel> resultItems = [];
       final Set<String> processedNames = {};
-      final dcStateMap = (validDcId != null && validDcId.isNotEmpty)
+      final checkDcId = (validDcId != null && validDcId.isNotEmpty) ? validDcId : riderDcId;
+      final dcStateMap = (checkDcId != null && checkDcId.isNotEmpty)
           ? await _resolveDcStateMap(dbClient)
           : <String, String>{};
 
@@ -465,7 +467,38 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
         final int availableCount;
         final int assignedCount;
         final int totalInCustody;
-        bool isCoveredByThisDc = true;
+        bool isCoveredByTargetDc = true;
+
+        final dbQty = (json['stock_quantity'] as num?)?.toInt() ?? 0;
+        final pDesc = json['description']?.toString() ?? '';
+
+        if (checkDcId != null && checkDcId.isNotEmpty) {
+          Map<String, int> dcStocks = {};
+          if (json['dc_stocks'] is Map && (json['dc_stocks'] as Map).isNotEmpty) {
+            final rawMap = json['dc_stocks'] as Map;
+            dcStocks = rawMap.map((k, v) => MapEntry(k.toString(), (v as num).toInt()));
+          } else {
+            dcStocks = _parseDcStocks(pDesc);
+          }
+          final originDc = _parseOriginDc(pDesc);
+          final coveringStates = _parseCoveringStates(pDesc);
+
+          if (coveringStates.isNotEmpty || dcStocks.isNotEmpty) {
+            final dcState = dcStateMap[checkDcId] ?? '';
+            final bool matchesDcState = coveringStates.any((st) => _stateMatches(dcState, st));
+            final bool matchesExplicitDc = dcStocks.containsKey(checkDcId) || originDc == checkDcId;
+
+            isCoveredByTargetDc = matchesDcState || matchesExplicitDc;
+          } else {
+            // Legacy untagged products
+            const otukpoDcId = '00000000-0000-4000-8000-788825051520';
+            if (pSku == 'SKU-02900' || pName.toLowerCase().contains('grazer')) {
+              isCoveredByTargetDc = (checkDcId == otukpoDcId);
+            } else {
+              isCoveredByTargetDc = true;
+            }
+          }
+        }
 
         if (validAgentId != null) {
           if (agentInventoryMap.containsKey(pId)) {
@@ -486,9 +519,6 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
           }
         } else {
           // DC Supervisor View: Warehouse shelf stock strictly scoped to this DC
-          final dbQty = (json['stock_quantity'] as num?)?.toInt() ?? 0;
-          final pDesc = json['description']?.toString() ?? '';
-
           int scopedQty = 0;
           if (validDcId != null && validDcId.isNotEmpty) {
             Map<String, int> dcStocks = {};
@@ -499,31 +529,11 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
               dcStocks = _parseDcStocks(pDesc);
             }
             final originDc = _parseOriginDc(pDesc);
-            final coveringStates = _parseCoveringStates(pDesc);
 
-            if (coveringStates.isNotEmpty || dcStocks.isNotEmpty) {
-              final dcState = dcStateMap[validDcId] ?? '';
-              final bool matchesDcState = coveringStates.any((st) => _stateMatches(dcState, st));
-              final bool matchesExplicitDc = dcStocks.containsKey(validDcId) || originDc == validDcId;
-
-              if (matchesDcState || matchesExplicitDc) {
-                isCoveredByThisDc = true;
-                scopedQty = dcStocks[validDcId] ?? (originDc == validDcId ? dbQty : 0);
-              } else {
-                isCoveredByThisDc = false;
-                scopedQty = 0;
-              }
+            if (isCoveredByTargetDc) {
+              scopedQty = dcStocks[validDcId] ?? (originDc == validDcId ? dbQty : 0);
             } else {
-              // Legacy untagged products
-              const otukpoDcId = '00000000-0000-4000-8000-788825051520';
-              const wuseDcId = '22222222-2222-4222-8222-222222222222';
-              if (pSku == 'SKU-02900' || pName.toLowerCase().contains('grazer')) {
-                scopedQty = (validDcId == otukpoDcId) ? dbQty : 0;
-              } else if (validDcId == wuseDcId) {
-                scopedQty = dbQty;
-              } else {
-                scopedQty = 0;
-              }
+              scopedQty = 0;
             }
             availableCount = scopedQty.clamp(0, 999999);
           } else {
@@ -536,12 +546,27 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
         }
 
         // When viewing a specific DC, products with defined covering states that exclude this DC MUST NOT appear!
-        if (validDcId != null && validDcId.isNotEmpty && !isCoveredByThisDc) {
+        if (validDcId != null && validDcId.isNotEmpty && !isCoveredByTargetDc) {
           continue;
         }
 
-        // In DC Overview, all covered products are visible (even with availableCount 0 awaiting initial supply)
-        if (validAgentId == null || availableCount > 0 || totalAllocatedToRider > 0 || deliveredQty > 0 || inTransitQty > 0) {
+        // For Rider view, exclude products that are completely out of regional scope and have 0 custody
+        if (validAgentId != null && !isCoveredByTargetDc && availableCount <= 0 && totalAllocatedToRider <= 0) {
+          continue;
+        }
+
+        // Include product:
+        // - DC Supervisor: all products covered by DC (even 0 shelf stock awaiting supply)
+        // - Rider: all products covered by rider's DC (even 0 vehicle stock, to allow viewing packages & requesting restock)
+        //          plus any products with active custody in vehicle
+        final bool shouldInclude = (validAgentId == null) ||
+            isCoveredByTargetDc ||
+            availableCount > 0 ||
+            totalAllocatedToRider > 0 ||
+            deliveredQty > 0 ||
+            inTransitQty > 0;
+
+        if (shouldInclude) {
           json['assigned_count'] = assignedCount;
           json['delivered_count'] = deliveredQty;
           json['available_count'] = availableCount;
@@ -1774,10 +1799,63 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
         'p_verified_items': verifiedItems,
         'p_notes': notes ?? '',
       });
-      return Map<String, dynamic>.from(res as Map);
+      final resMap = Map<String, dynamic>.from(res as Map);
+
+      // Post-receive fallback: ensure destination DC warehouse stock is explicitly credited
+      try {
+        final trf = await dbClient
+            .from('stock_transfers')
+            .select('destination_dc_id')
+            .eq('id', transferId)
+            .maybeSingle();
+        final destDcId = trf?['destination_dc_id']?.toString();
+        if (destDcId != null && destDcId.isNotEmpty) {
+          for (final item in verifiedItems) {
+            final pId = item['product_id']?.toString();
+            final recQty = (item['quantity_received'] as num?)?.toInt() ?? 0;
+            if (pId != null && pId.isNotEmpty && recQty > 0) {
+              await _ensureDcStockCredited(dbClient, destDcId, pId, recQty);
+            }
+          }
+        }
+      } catch (fallbackErr) {
+        debugPrint('[STOCK_DATASOURCE] ℹ️ post-receive fallback note: $fallbackErr');
+      }
+
+      return resMap;
     } catch (e) {
       debugPrint('[STOCK_DATASOURCE] ⚠️ receiveClientSupply error: $e');
       rethrow;
+    }
+  }
+
+  Future<void> _ensureDcStockCredited(
+    SupabaseClient dbClient,
+    String dcId,
+    String productId,
+    int receivedQty,
+  ) async {
+    try {
+      final pRow = await dbClient
+          .from('products')
+          .select('id, stock_quantity, dc_stocks')
+          .eq('id', productId)
+          .maybeSingle();
+      if (pRow != null) {
+        final rawMap = pRow['dc_stocks'] is Map ? (pRow['dc_stocks'] as Map) : {};
+        final Map<String, dynamic> dcStocks =
+            rawMap.map((k, v) => MapEntry(k.toString(), (v as num).toInt()));
+        final currentDcStock = (dcStocks[dcId] as num?)?.toInt() ?? 0;
+        if (currentDcStock < receivedQty) {
+          dcStocks[dcId] = currentDcStock + receivedQty;
+          await dbClient.from('products').update({
+            'dc_stocks': dcStocks,
+          }).eq('id', productId);
+          debugPrint('[STOCK_DATASOURCE] ✅ Fallback: Credited $receivedQty units to DC $dcId (New total: ${dcStocks[dcId]})');
+        }
+      }
+    } catch (e) {
+      debugPrint('[STOCK_DATASOURCE] ⚠️ _ensureDcStockCredited note: $e');
     }
   }
 
@@ -1828,7 +1906,46 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
         'p_verified_items': verifiedItems,
         'p_notes': notes ?? '',
       });
-      return Map<String, dynamic>.from(res as Map);
+      final resMap = Map<String, dynamic>.from(res as Map);
+
+      // Post-accept fallback: Ensure agent_inventory has custody record
+      try {
+        final itemsRes = await dbClient
+            .from('stock_transfer_items')
+            .select('product_id, quantity_shipped, quantity_received')
+            .eq('transfer_id', transferId);
+        for (final row in itemsRes as List) {
+          final pId = row['product_id']?.toString();
+          final rec = (row['quantity_received'] as num?)?.toInt() ??
+              (row['quantity_shipped'] as num?)?.toInt() ??
+              0;
+          if (pId != null && pId.isNotEmpty && rec > 0) {
+            final existing = await dbClient
+                .from('agent_inventory')
+                .select('id, total_in_custody, available_count')
+                .eq('delivery_agent_id', riderId)
+                .eq('product_id', pId)
+                .maybeSingle();
+            if (existing == null) {
+              await dbClient.from('agent_inventory').insert({
+                'delivery_agent_id': riderId,
+                'product_id': pId,
+                'total_in_custody': rec,
+                'available_count': rec,
+                'reserved_count': 0,
+                'delivered_count_today': 0,
+                'returned_count': 0,
+                'awaiting_return_count': 0,
+              });
+              debugPrint('[STOCK_DATASOURCE] ✅ Fallback: Created agent_inventory for rider $riderId with $rec units');
+            }
+          }
+        }
+      } catch (postErr) {
+        debugPrint('[STOCK_DATASOURCE] ℹ️ post-accept fallback note: $postErr');
+      }
+
+      return resMap;
     } catch (e) {
       debugPrint('[STOCK_DATASOURCE] ⚠️ acceptRiderStockHandover error: $e');
       rethrow;

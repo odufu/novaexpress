@@ -424,7 +424,30 @@ class StockDetailsGrazerPage extends ConsumerWidget {
 
                   const SizedBox(height: 24),
 
-                  // 4. ACTION BUTTONS (Return to DC & Reconcile Stock)
+                  // 4. ACTION BUTTONS (Request Stock, Return to DC & Reconcile Stock)
+                  if (inVehicle <= (item?.lowStockThreshold ?? 3)) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () => context.push('/stock/request'),
+                        icon: const Icon(Icons.add_shopping_cart_rounded, size: 18, color: Colors.white),
+                        label: Text(
+                          inVehicle == 0 ? 'Request Stock Replenishment (Out of Stock)' : 'Report Low Stock & Request Restock',
+                          style: GoogleFonts.inter(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: inVehicle == 0 ? const Color(0xFFE11D48) : const Color(0xFFEA580C),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   Row(
                     children: [
                       Expanded(

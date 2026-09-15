@@ -2229,6 +2229,29 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                       ],
                     ),
                   ),
+                  if (item.availableCount <= 0) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEF4444).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.warning_amber_rounded, color: Color(0xFFEF4444), size: 22),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Zero stock available on DC warehouse shelves. Receive an inbound consignment or hub transfer first before assigning stock to fleet drivers.',
+                              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFFEF4444)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 14),
                   DropdownButtonFormField<String>(
                     value: uniqueDrivers.containsKey(selectedRiderId) ? selectedRiderId : driverList.first.id,
@@ -2256,7 +2279,7 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                         ),
                       );
                     }).toList(),
-                    onChanged: (val) {
+                    onChanged: item.availableCount <= 0 ? null : (val) {
                       if (val != null) {
                         setDialogState(() => selectedRiderId = val);
                       }
@@ -2265,23 +2288,28 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                   const SizedBox(height: 12),
                   TextField(
                     controller: qtyCtrl,
+                    enabled: item.availableCount > 0,
                     keyboardType: TextInputType.number,
                     decoration: InputDecoration(
                       labelText: 'Quantity to Transfer (Units) *',
-                      helperText: 'Max available in warehouse: ${item.availableCount} units',
+                      helperText: item.availableCount > 0
+                          ? 'Max available in warehouse: ${item.availableCount} units'
+                          : 'No stock available to assign',
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      _buildQuickQtyButton('+1', () => qtyCtrl.text = '1'),
-                      _buildQuickQtyButton('+5', () => qtyCtrl.text = '5'),
-                      _buildQuickQtyButton('+10', () => qtyCtrl.text = '10'),
-                      _buildQuickQtyButton('All (${item.availableCount})', () => qtyCtrl.text = '${item.availableCount}'),
-                    ],
-                  ),
+                  if (item.availableCount > 0) ...[
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        _buildQuickQtyButton('+1', () => qtyCtrl.text = '1'),
+                        _buildQuickQtyButton('+5', () => qtyCtrl.text = '5'),
+                        _buildQuickQtyButton('+10', () => qtyCtrl.text = '10'),
+                        _buildQuickQtyButton('All (${item.availableCount})', () => qtyCtrl.text = '${item.availableCount}'),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -2292,7 +2320,7 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-              onPressed: () async {
+              onPressed: item.availableCount <= 0 ? null : () async {
                 final qty = int.tryParse(qtyCtrl.text) ?? 0;
                 if (qty <= 0) {
                   messenger.showSnackBar(
@@ -2408,47 +2436,99 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
 
                                     if (!confirmCtx.mounted) return;
                                     setConfirmState(() => isSubmitting = true);
-                                    final res = await showAppLoadingDialog(
-                                      context: confirmCtx,
-                                      message: 'Authorizing Stock Handover...',
-                                      subMessage: 'Reserving $qty units for ${targetDriver.name}...',
-                                      isDark: isDark,
-                                      task: () => ref.read(stockProvider.notifier).issueDcStockToRiderWithSignature(
-                                            dcId: dcId,
-                                            riderId: targetDriver.id,
-                                            items: [
-                                              {
-                                                'product_id': item.id,
-                                                'quantity': qty,
-                                              }
-                                            ],
-                                            senderId: supervisorId,
-                                            senderName: supervisorName,
-                                            senderSignatureUrl: '',
-                                            notes: 'DC Handover to ${targetDriver.name} (${targetDriver.driverCode})',
-                                          ),
-                                    );
 
-                                    if (res?['success'] == true) {
-                                      if (confirmCtx.mounted) Navigator.of(confirmCtx).pop();
-                                      if (ctx.mounted) Navigator.of(ctx).pop();
-                                      messenger.showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            '✅ Stock issued! $qty units reserved. Awaiting ${targetDriver.name} verification & custody acceptance on PDA.',
+                                    try {
+                                      final res = await showAppLoadingDialog(
+                                        context: confirmCtx,
+                                        message: 'Authorizing Stock Handover...',
+                                        subMessage: 'Reserving $qty units for ${targetDriver.name}...',
+                                        isDark: isDark,
+                                        task: () => ref.read(stockProvider.notifier).issueDcStockToRiderWithSignature(
+                                              dcId: dcId,
+                                              riderId: targetDriver.id,
+                                              items: [
+                                                {
+                                                  'product_id': item.id,
+                                                  'quantity': qty,
+                                                }
+                                              ],
+                                              senderId: supervisorId,
+                                              senderName: supervisorName,
+                                              senderSignatureUrl: '',
+                                              notes: 'DC Handover to ${targetDriver.name} (${targetDriver.driverCode})',
+                                            ),
+                                      );
+
+                                      if (res?['success'] == true) {
+                                        if (confirmCtx.mounted) Navigator.of(confirmCtx).pop();
+                                        if (ctx.mounted) Navigator.of(ctx).pop();
+                                        messenger.showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              '✅ Stock issued! $qty units reserved. Awaiting ${targetDriver.name} verification & custody acceptance on PDA.',
+                                            ),
+                                            backgroundColor: const Color(0xFF10B981),
+                                            duration: const Duration(seconds: 4),
                                           ),
-                                          backgroundColor: const Color(0xFF10B981),
-                                          duration: const Duration(seconds: 4),
-                                        ),
-                                      );
-                                    } else {
+                                        );
+                                      } else {
+                                        setConfirmState(() => isSubmitting = false);
+                                        final errorMsg = res?['message']?.toString() ?? 'Failed to issue stock handover.';
+                                        if (confirmCtx.mounted) {
+                                          showDialog<void>(
+                                            context: confirmCtx,
+                                            builder: (errCtx) => AlertDialog(
+                                              backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                              title: const Row(
+                                                children: [
+                                                  Icon(Icons.error_outline_rounded, color: Color(0xFFEF4444)),
+                                                  SizedBox(width: 8),
+                                                  Text('Handover Failed', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                                ],
+                                              ),
+                                              content: Text(
+                                                errorMsg,
+                                                style: GoogleFonts.inter(fontSize: 13),
+                                              ),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () => Navigator.of(errCtx).pop(),
+                                                  child: const Text('OK'),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        }
+                                      }
+                                    } catch (err) {
                                       setConfirmState(() => isSubmitting = false);
-                                      messenger.showSnackBar(
-                                        SnackBar(
-                                          content: Text(res?['message']?.toString() ?? '❌ Failed to issue stock handover.'),
-                                          backgroundColor: const Color(0xFFEF4444),
-                                        ),
-                                      );
+                                      if (confirmCtx.mounted) {
+                                        showDialog<void>(
+                                          context: confirmCtx,
+                                          builder: (errCtx) => AlertDialog(
+                                            backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                            title: const Row(
+                                              children: [
+                                                Icon(Icons.error_outline_rounded, color: Color(0xFFEF4444)),
+                                                SizedBox(width: 8),
+                                                Text('Error Issuing Stock', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                              ],
+                                            ),
+                                            content: Text(
+                                              'Failed to issue stock: $err',
+                                              style: GoogleFonts.inter(fontSize: 13),
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () => Navigator.of(errCtx).pop(),
+                                                child: const Text('OK'),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      }
                                     }
                                   },
                             icon: isSubmitting
@@ -2472,10 +2552,10 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF2563EB),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
-              child: const Text('Confirm Transfer to Vehicle', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              child: const Text('Continue to Handover', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             ),
           ],
         ),

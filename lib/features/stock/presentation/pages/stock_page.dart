@@ -1197,43 +1197,71 @@ class _ProductInventoryCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            // Bottom Action View Details Button
-            Align(
-              alignment: Alignment.centerRight,
-              child: SizedBox(
-                height: 32,
-                child: OutlinedButton(
-                  onPressed: onViewDetails,
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
-                    side: BorderSide(
-                      color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'View Details',
+            // Bottom Action Bar: Request Stock (if low/out of stock) + View Details
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                if (item.availableCount <= item.lowStockThreshold) ...[
+                  SizedBox(
+                    height: 32,
+                    child: ElevatedButton.icon(
+                      onPressed: () => context.push('/stock/request'),
+                      icon: const Icon(Icons.add_shopping_cart_rounded, size: 13, color: Colors.white),
+                      label: Text(
+                        'Request Stock',
                         style: GoogleFonts.inter(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: isDark ? Colors.white : const Color(0xFF334155),
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
                         ),
                       ),
-                      const SizedBox(width: 4),
-                      Icon(
-                        Icons.arrow_forward_rounded,
-                        size: 14,
-                        color: isDark ? Colors.white : const Color(0xFF334155),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: item.availableCount == 0 ? const Color(0xFFE11D48) : const Color(0xFFEA580C),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
-                    ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                SizedBox(
+                  height: 32,
+                  child: OutlinedButton(
+                    onPressed: onViewDetails,
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+                      side: BorderSide(
+                        color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'View Details',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? Colors.white : const Color(0xFF334155),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.arrow_forward_rounded,
+                          size: 14,
+                          color: isDark ? Colors.white : const Color(0xFF334155),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
+              ],
             ),
           ],
         ),

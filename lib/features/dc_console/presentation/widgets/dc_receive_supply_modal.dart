@@ -47,8 +47,9 @@ class _DcReceiveSupplyModalState extends ConsumerState<DcReceiveSupplyModal> {
   void initState() {
     super.initState();
     for (final item in widget.transfer.items) {
+      final initialQty = item.quantityShipped > 0 ? item.quantityShipped : item.quantity;
       _receivedControllers[item.id] =
-          TextEditingController(text: item.quantity.toString());
+          TextEditingController(text: initialQty > 0 ? initialQty.toString() : '0');
       _damagedControllers[item.id] = TextEditingController(text: '0');
       _missingControllers[item.id] = TextEditingController(text: '0');
     }
@@ -86,9 +87,9 @@ class _DcReceiveSupplyModalState extends ConsumerState<DcReceiveSupplyModal> {
       for (final item in widget.transfer.items) {
         final rawRec = int.tryParse(_receivedControllers[item.id]?.text.trim() ?? '');
         final shipped = item.quantityShipped > 0 ? item.quantityShipped : item.quantity;
-        final rec = (rawRec != null && rawRec >= 0) ? rawRec : shipped;
         final dam = int.tryParse(_damagedControllers[item.id]?.text.trim() ?? '') ?? 0;
         final mis = int.tryParse(_missingControllers[item.id]?.text.trim() ?? '') ?? 0;
+        final rec = (rawRec != null && rawRec > 0) ? rawRec : ((dam == 0 && mis == 0) ? shipped : (rawRec ?? shipped));
 
         verifiedItems.add({
           'item_id': item.id,
