@@ -9,7 +9,20 @@ import '../providers/pipeline_chat_provider.dart';
 import 'order_pipeline_chat_sheet.dart';
 
 class ConversationListModal extends ConsumerStatefulWidget {
-  const ConversationListModal({super.key});
+  final String? initialOrderId;
+  final String? initialOrderNumber;
+  final String? initialCustomerName;
+  final String? initialCustomerPhone;
+  final String? initialMessage;
+
+  const ConversationListModal({
+    super.key,
+    this.initialOrderId,
+    this.initialOrderNumber,
+    this.initialCustomerName,
+    this.initialCustomerPhone,
+    this.initialMessage,
+  });
 
   static Future<void> show(BuildContext context) {
     return showModalBottomSheet(
@@ -17,6 +30,28 @@ class ConversationListModal extends ConsumerStatefulWidget {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => const ConversationListModal(),
+    );
+  }
+
+  static Future<void> showForOrder(
+    BuildContext context, {
+    required String orderId,
+    required String orderNumber,
+    required String customerName,
+    String? customerPhone,
+    String? initialMessage,
+  }) {
+    return showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => ConversationListModal(
+        initialOrderId: orderId,
+        initialOrderNumber: orderNumber,
+        initialCustomerName: customerName,
+        initialCustomerPhone: customerPhone,
+        initialMessage: initialMessage,
+      ),
     );
   }
 
@@ -28,9 +63,21 @@ class _ConversationListModalState extends ConsumerState<ConversationListModal> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
+  String? _activeOrderId;
+  String? _activeOrderNumber;
+  String? _activeCustomerName;
+  String? _activeCustomerPhone;
+  String? _activeInitialMessage;
+
   @override
   void initState() {
     super.initState();
+    _activeOrderId = widget.initialOrderId;
+    _activeOrderNumber = widget.initialOrderNumber;
+    _activeCustomerName = widget.initialCustomerName;
+    _activeCustomerPhone = widget.initialCustomerPhone;
+    _activeInitialMessage = widget.initialMessage;
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(pipelineChatProvider.notifier).loadScopedConversations();
     });
@@ -72,6 +119,48 @@ class _ConversationListModalState extends ConsumerState<ConversationListModal> {
 
   @override
   Widget build(BuildContext context) {
+    final isChatView = _activeOrderId != null;
+
+    return PopScope(
+      canPop: !isChatView,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && isChatView) {
+          setState(() {
+            _activeOrderId = null;
+            _activeOrderNumber = null;
+            _activeCustomerName = null;
+            _activeCustomerPhone = null;
+            _activeInitialMessage = null;
+          });
+          ref.read(pipelineChatProvider.notifier).loadScopedConversations();
+        }
+      },
+      child: isChatView
+          ? OrderPipelineChatSheet(
+              key: ValueKey(_activeOrderId!),
+              orderId: _activeOrderId!,
+              orderNumber: _activeOrderNumber ?? '',
+              customerName: _activeCustomerName ?? 'Customer',
+              customerPhone: _activeCustomerPhone,
+              initialMessage: _activeInitialMessage,
+              showBackButton: true,
+              onBack: () {
+                setState(() {
+                  _activeOrderId = null;
+                  _activeOrderNumber = null;
+                  _activeCustomerName = null;
+                  _activeCustomerPhone = null;
+                  _activeInitialMessage = null;
+                });
+                ref.read(pipelineChatProvider.notifier).loadScopedConversations();
+              },
+              onClose: () => Navigator.of(context).pop(),
+            )
+          : _buildConversationListView(context),
+    );
+  }
+
+  Widget _buildConversationListView(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final chatState = ref.watch(pipelineChatProvider);
@@ -123,11 +212,11 @@ class _ConversationListModalState extends ConsumerState<ConversationListModal> {
 
           // Modal Header
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(7),
                   decoration: BoxDecoration(
                     color: const Color(0xFF0D9488).withValues(alpha: 0.12),
                     shape: BoxShape.circle,
@@ -135,28 +224,33 @@ class _ConversationListModalState extends ConsumerState<ConversationListModal> {
                   child: const Icon(
                     Icons.forum_rounded,
                     color: Color(0xFF0D9488),
-                    size: 22,
+                    size: 20,
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Row(
                         children: [
-                          Text(
-                            'Order Pipeline Chats',
-                            style: GoogleFonts.inter(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          Flexible(
+                            child: Text(
+                              'Order Pipeline Chats',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.inter(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                              ),
                             ),
                           ),
                           if (totalUnread > 0) ...[
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 6),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFEF4444),
                                 borderRadius: BorderRadius.circular(10),
@@ -164,7 +258,7 @@ class _ConversationListModalState extends ConsumerState<ConversationListModal> {
                               child: Text(
                                 '$totalUnread new',
                                 style: GoogleFonts.inter(
-                                  fontSize: 11,
+                                  fontSize: 10,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.white,
                                 ),
@@ -173,11 +267,13 @@ class _ConversationListModalState extends ConsumerState<ConversationListModal> {
                           ],
                         ],
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 1),
                       Text(
                         'Live coordination between Merchant, DC & Rider',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.inter(
-                          fontSize: 12,
+                          fontSize: 11,
                           color: const Color(0xFF94A3B8),
                         ),
                       ),
@@ -185,22 +281,29 @@ class _ConversationListModalState extends ConsumerState<ConversationListModal> {
                   ),
                 ),
                 IconButton(
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  padding: const EdgeInsets.all(6),
+                  visualDensity: VisualDensity.compact,
                   onPressed: () => ref.read(pipelineChatProvider.notifier).loadScopedConversations(),
                   icon: const Icon(Icons.refresh_rounded, size: 20, color: Color(0xFF94A3B8)),
                   tooltip: 'Refresh Conversations',
                 ),
                 IconButton(
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  padding: const EdgeInsets.all(6),
+                  visualDensity: VisualDensity.compact,
                   onPressed: () => Navigator.of(context).pop(),
                   icon: const Icon(Icons.close_rounded, size: 20, color: Color(0xFF94A3B8)),
+                  tooltip: 'Close',
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
 
           // Search Bar
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: TextField(
               controller: _searchController,
               onChanged: (val) => setState(() => _searchQuery = val.trim()),
@@ -231,7 +334,7 @@ class _ConversationListModalState extends ConsumerState<ConversationListModal> {
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           const Divider(height: 1),
 
           // Conversations List Body
@@ -336,18 +439,14 @@ class _ConversationListModalState extends ConsumerState<ConversationListModal> {
         // Mark conversation as read
         ref.read(pipelineChatProvider.notifier).markConversationAsRead(conv.id, userRole);
 
-        // Close modal sheet
-        Navigator.of(context).pop();
-
-        // Open chat sheet for this order with callback returning to conversations list
-        OrderPipelineChatSheet.show(
-          context,
-          orderId: conv.orderId,
-          orderNumber: conv.orderNumber,
-          customerName: conv.customerName,
-          showBackButton: true,
-          onBack: () => ConversationListModal.show(context),
-        );
+        // Seamlessly switch to the chat view within the same modal
+        setState(() {
+          _activeOrderId = conv.orderId;
+          _activeOrderNumber = conv.orderNumber;
+          _activeCustomerName = conv.customerName;
+          _activeCustomerPhone = null;
+          _activeInitialMessage = null;
+        });
       },
       borderRadius: BorderRadius.circular(14),
       child: AnimatedContainer(
@@ -431,8 +530,11 @@ class _ConversationListModalState extends ConsumerState<ConversationListModal> {
                   ),
                   const SizedBox(height: 3),
 
-                  // Row 2: Subtle Order ID & Status tag
-                  Row(
+                  // Row 2: Subtle Order ID & Status tag with wrap support
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 6,
+                    runSpacing: 3,
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
@@ -449,7 +551,6 @@ class _ConversationListModalState extends ConsumerState<ConversationListModal> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                         decoration: BoxDecoration(
@@ -465,19 +566,16 @@ class _ConversationListModalState extends ConsumerState<ConversationListModal> {
                           ),
                         ),
                       ),
-                      if (conv.currentProductName != null) ...[
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            '• ${conv.currentProductName}',
-                            style: GoogleFonts.inter(
-                              fontSize: 10.5,
-                              color: const Color(0xFF94A3B8),
-                            ),
-                            overflow: TextOverflow.ellipsis,
+                      if (conv.currentProductName != null && conv.currentProductName!.isNotEmpty)
+                        Text(
+                          '• ${conv.currentProductName}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            fontSize: 10.5,
+                            color: const Color(0xFF94A3B8),
                           ),
                         ),
-                      ],
                     ],
                   ),
                   const SizedBox(height: 5),

@@ -19,6 +19,7 @@ class OrderPipelineChatSheet extends ConsumerStatefulWidget {
   final String? initialMessage;
   final bool showBackButton;
   final VoidCallback? onBack;
+  final VoidCallback? onClose;
 
   const OrderPipelineChatSheet({
     super.key,
@@ -29,6 +30,7 @@ class OrderPipelineChatSheet extends ConsumerStatefulWidget {
     this.initialMessage,
     this.showBackButton = true,
     this.onBack,
+    this.onClose,
   });
 
   static Future<void> showForOrder(
@@ -38,15 +40,13 @@ class OrderPipelineChatSheet extends ConsumerStatefulWidget {
     bool showBackButton = true,
     VoidCallback? onBack,
   }) {
-    return show(
+    return ConversationListModal.showForOrder(
       context,
       orderId: order.id,
       orderNumber: order.orderNumber,
       customerName: order.customerName,
       customerPhone: order.customerPhone,
       initialMessage: initialMessage,
-      showBackButton: showBackButton,
-      onBack: onBack,
     );
   }
 
@@ -60,19 +60,13 @@ class OrderPipelineChatSheet extends ConsumerStatefulWidget {
     bool showBackButton = true,
     VoidCallback? onBack,
   }) {
-    return showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => OrderPipelineChatSheet(
-        orderId: orderId,
-        orderNumber: orderNumber,
-        customerName: customerName,
-        customerPhone: customerPhone,
-        initialMessage: initialMessage,
-        showBackButton: showBackButton,
-        onBack: onBack,
-      ),
+    return ConversationListModal.showForOrder(
+      context,
+      orderId: orderId,
+      orderNumber: orderNumber,
+      customerName: customerName,
+      customerPhone: customerPhone,
+      initialMessage: initialMessage,
     );
   }
 
@@ -193,25 +187,26 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
   }
 
   Widget _buildHeader(BuildContext context, OrderConversationEntity? conv, bool isDark) {
+    final authState = ref.watch(authProvider);
+    final userRole = authState.user?.role.toLowerCase() ?? '';
+    final isDcOperations = userRole.contains('dc') ||
+        userRole.contains('manager') ||
+        userRole.contains('admin') ||
+        userRole.contains('operation') ||
+        userRole.contains('supervisor');
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
           if (widget.showBackButton) ...[
             Tooltip(
               message: 'Back to Conversations',
               child: InkWell(
-                onTap: () {
-                  Navigator.of(context).pop();
-                  if (widget.onBack != null) {
-                    widget.onBack!();
-                  } else {
-                    ConversationListModal.show(context);
-                  }
-                },
+                onTap: widget.onBack ?? () => Navigator.of(context).pop(),
                 borderRadius: BorderRadius.circular(10),
                 child: Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(7),
                   decoration: BoxDecoration(
                     color: isDark ? const Color(0xFF334155).withValues(alpha: 0.5) : const Color(0xFFF1F5F9),
                     borderRadius: BorderRadius.circular(10),
@@ -221,28 +216,29 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                   ),
                   child: Icon(
                     Icons.arrow_back_ios_new_rounded,
-                    size: 15,
+                    size: 14,
                     color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
                   ),
                 ),
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
           ],
 
           // Order / Customer Avatar
           UserAvatarWidget(
             fullName: widget.customerName,
-            radius: 20,
+            radius: 18,
             backgroundColor: const Color(0xFF0D9488),
             textColor: Colors.white,
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
 
-          // Order Number & Participants
+          // Order Number & Customer Name
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Row(
                   children: [
@@ -252,15 +248,15 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.inter(
-                          fontSize: 15,
+                          fontSize: 14,
                           fontWeight: FontWeight.w800,
                           color: isDark ? Colors.white : const Color(0xFF0F172A),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                       decoration: BoxDecoration(
                         color: const Color(0xFF10B981).withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(4),
@@ -278,7 +274,9 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Customer: ${widget.customerName} • 3-Way Order Hub',
+                  'Customer: ${widget.customerName}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.inter(
                     fontSize: 11,
                     color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
@@ -289,83 +287,39 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
           ),
 
           // Action: Switch Product (Restricted to DC Operations & Managers)
-          Builder(
-            builder: (context) {
-              final authState = ref.watch(authProvider);
-              final userRole = authState.user?.role.toLowerCase() ?? '';
-              final isDcOperations = userRole.contains('dc') ||
-                  userRole.contains('manager') ||
-                  userRole.contains('admin') ||
-                  userRole.contains('operation') ||
-                  userRole.contains('supervisor');
-
-              if (isDcOperations) {
-                return TextButton.icon(
-                  onPressed: () {
-                    showDialog(
-                      context: context,
-                      builder: (ctx) => OrderProductSwitchModal(
-                        orderId: widget.orderId,
-                        orderNumber: widget.orderNumber,
-                        currentProductName: conv?.currentProductName ?? 'Current Product',
-                        currentPackageName: conv?.currentPackageName,
-                        currentTotalAmount: conv?.currentTotalAmount ?? 0.0,
-                        currentClientId: conv?.clientId ?? '',
-                        currentClientName: conv?.clientName ?? '',
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.swap_horiz_rounded, size: 16, color: Color(0xFF6366F1)),
-                  label: Text(
-                    'Switch Product',
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: const Color(0xFF6366F1),
-                    ),
-                  ),
-                  style: TextButton.styleFrom(
-                    backgroundColor: const Color(0xFF6366F1).withValues(alpha: 0.08),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          if (isDcOperations) ...[
+            IconButton(
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              padding: const EdgeInsets.all(6),
+              visualDensity: VisualDensity.compact,
+              tooltip: 'Switch Product',
+              icon: const Icon(Icons.swap_horiz_rounded, size: 20, color: Color(0xFF6366F1)),
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (ctx) => OrderProductSwitchModal(
+                    orderId: widget.orderId,
+                    orderNumber: widget.orderNumber,
+                    currentProductName: conv?.currentProductName ?? 'Current Product',
+                    currentPackageName: conv?.currentPackageName,
+                    currentTotalAmount: conv?.currentTotalAmount ?? 0.0,
+                    currentClientId: conv?.clientId ?? '',
+                    currentClientName: conv?.clientName ?? '',
                   ),
                 );
-              }
-
-              // Rider / Delivery Agent View: Tag Operations Button
-              return TextButton.icon(
-                onPressed: () {
-                  if (!_msgController.text.contains('@Operations')) {
-                    _msgController.text = '@Operations Customer requested to change product/package: ${_msgController.text}'.trim();
-                    _msgController.selection = TextSelection.fromPosition(TextPosition(offset: _msgController.text.length));
-                  }
-                  _msgFocusNode.requestFocus();
-                },
-                icon: const Icon(Icons.alternate_email_rounded, size: 15, color: Color(0xFF0D9488)),
-                label: Text(
-                  'Tag @Operations',
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF0D9488),
-                  ),
-                ),
-                style: TextButton.styleFrom(
-                  backgroundColor: const Color(0xFF0D9488).withValues(alpha: 0.08),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-              );
-            },
-          ),
-          const SizedBox(width: 6),
+              },
+            ),
+          ],
 
           // Close button
           IconButton(
-            onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.close_rounded),
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            padding: const EdgeInsets.all(6),
+            visualDensity: VisualDensity.compact,
+            onPressed: widget.onClose ?? () => Navigator.of(context).pop(),
+            icon: const Icon(Icons.close_rounded, size: 20),
             color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-            iconSize: 20,
+            tooltip: 'Close',
           ),
         ],
       ),
@@ -376,52 +330,43 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
     final currency = NumberFormat.currency(locale: 'en_NG', symbol: '₦', decimalDigits: 0);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
       color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // Product & Package
-          Expanded(
-            child: Row(
-              children: [
-                const Icon(Icons.inventory_2_outlined, size: 16, color: Color(0xFF0D9488)),
-                const SizedBox(width: 6),
-                Flexible(
-                  child: Text(
-                    '${conv.currentProductName ?? 'Product'} (${conv.currentPackageName ?? 'Standard'})',
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  currency.format(conv.currentTotalAmount),
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    color: const Color(0xFF0D9488),
-                  ),
-                ),
-              ],
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.inventory_2_outlined, size: 14, color: Color(0xFF0D9488)),
+            const SizedBox(width: 5),
+            Text(
+              '${conv.currentProductName ?? 'Product'} (${conv.currentPackageName ?? 'Standard'})',
+              style: GoogleFonts.inter(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+              ),
             ),
-          ),
-
-          // Participants Pills
-          Row(
-            children: [
-              _buildParticipantPill('Client', conv.clientName, const Color(0xFF0D9488)),
-              const SizedBox(width: 6),
-              _buildParticipantPill('DC', conv.distributionCenterName ?? 'DC', const Color(0xFF6366F1)),
-              const SizedBox(width: 6),
-              _buildParticipantPill('Rider', conv.deliveryAgentName ?? 'Unassigned', const Color(0xFFF59E0B)),
-            ],
-          ),
-        ],
+            const SizedBox(width: 8),
+            Text(
+              currency.format(conv.currentTotalAmount),
+              style: GoogleFonts.inter(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF0D9488),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Container(width: 1, height: 12, color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+            const SizedBox(width: 10),
+            _buildParticipantPill('Client', conv.clientName, const Color(0xFF0D9488)),
+            const SizedBox(width: 5),
+            _buildParticipantPill('DC', conv.distributionCenterName ?? 'DC', const Color(0xFF6366F1)),
+            const SizedBox(width: 5),
+            _buildParticipantPill('Rider', conv.deliveryAgentName ?? 'Unassigned', const Color(0xFFF59E0B)),
+          ],
+        ),
       ),
     );
   }
