@@ -6,6 +6,8 @@ import '../../../../core/theme/theme_provider.dart';
 import '../widgets/client_order_tracking_modal.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../providers/client_portal_provider.dart';
+import '../../../../core/helpers/formatters.dart';
+import '../widgets/client_daily_accumulator_modal.dart';
 import '../widgets/client_create_order_modal.dart';
 import '../../../pipeline_chat/presentation/widgets/order_pipeline_chat_sheet.dart';
 
@@ -221,6 +223,8 @@ class _ClientOrdersPageState extends ConsumerState<ClientOrdersPage> {
                       const SizedBox(width: 6),
                       _buildStatusFilterChip('delivered', 'Delivered (${state.deliveredOrdersCount})', isDark),
                       const SizedBox(width: 6),
+                      _buildStatusFilterChip('awaiting_closeout', 'Awaiting 10 PM (${state.todayCompletedOrdersCount})', isDark),
+                      const SizedBox(width: 6),
                       _buildStatusFilterChip('failed', 'Failed (${state.failedOrdersCount})', isDark),
                     ],
                   ),
@@ -229,6 +233,12 @@ class _ClientOrdersPageState extends ConsumerState<ClientOrdersPage> {
             ),
           ),
           const SizedBox(height: 16),
+
+          // Daily 10:00 PM Closeout Cash Holding Alert Banner
+          if (state.todayCompletedOrdersCount > 0) ...[
+            _buildDailyCloseoutAlertBanner(context, state, isDark),
+            const SizedBox(height: 16),
+          ],
 
           // Orders List: Responsive Table for Desktop vs Clean Cards for Mobile/Tablet
           if (orders.isEmpty)
@@ -376,6 +386,96 @@ class _ClientOrdersPageState extends ConsumerState<ClientOrdersPage> {
             color: isSelected ? Colors.white : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildDailyCloseoutAlertBanner(BuildContext context, ClientPortalState state, bool isDark) {
+    String formatMoney(double amt) => CurrencyFormatter.formatNaira(amt).replaceAll('NGN', '').replaceAll('₦', '').trim();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isDark
+              ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
+              : [const Color(0xFFF0FDF4), const Color(0xFFDCFCE7)],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFF86EFAC)),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isWide = constraints.maxWidth >= 640;
+          final content = Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0D9488).withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.nightlight_round, color: Color(0xFF0D9488), size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Delivered Today: ${state.todayCompletedOrdersCount} Orders Awaiting 10 PM Closeout',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: isDark ? Colors.white : const Color(0xFF065F46),
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Gross: ₦${formatMoney(state.todayGrossCashHolding)} • Deductions: -₦${formatMoney(state.todayTotalChargesDeducted)} • Net Expected: ₦${formatMoney(state.todayNetExpectedPayout)}',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF047857),
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+
+          final actionBtn = ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0D9488),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              elevation: 0,
+            ),
+            onPressed: () => ClientDailyAccumulatorModal.show(context),
+            icon: const Icon(Icons.account_balance_wallet_rounded, size: 14),
+            label: Text('Breakdown', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold)),
+          );
+
+          return isWide
+              ? Row(
+                  children: [
+                    Expanded(child: content),
+                    const SizedBox(width: 12),
+                    actionBtn,
+                  ],
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    content,
+                    const SizedBox(height: 10),
+                    SizedBox(width: double.infinity, child: actionBtn),
+                  ],
+                );
+        },
       ),
     );
   }

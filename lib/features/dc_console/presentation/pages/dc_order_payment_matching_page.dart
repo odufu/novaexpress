@@ -160,9 +160,12 @@ class DCOrderPaymentMatchingPageState
     for (final rem in allRemittances) {
       if (rem.isVerified) {
         for (final ao in rem.associatedOrders) {
-          if (ao.orderId.isNotEmpty) verifiedOrderNumbers.add(ao.orderId);
-          if (ao.orderNumber.isNotEmpty)
+          if (ao.orderId.isNotEmpty) {
+            verifiedOrderNumbers.add(ao.orderId);
+          }
+          if (ao.orderNumber.isNotEmpty) {
             verifiedOrderNumbers.add(ao.orderNumber);
+          }
         }
       }
     }
@@ -547,16 +550,23 @@ class DCOrderPaymentMatchingPageState
     return items.where((item) {
       // 1. Status Filter (Remitted vs Not Remitted)
       if (selectedFilter == 'not_remitted' &&
-          (item.isVerified || item.isDirectTransfer)) return false;
-      if (selectedFilter == 'remitted' &&
-          (!item.isVerified || item.isDirectTransfer)) return false;
-      if (selectedFilter == 'direct_paystack' && !item.isDirectTransfer)
+          (item.isVerified || item.isDirectTransfer)) {
         return false;
+      }
+      if (selectedFilter == 'remitted' &&
+          (!item.isVerified || item.isDirectTransfer)) {
+        return false;
+      }
+      if (selectedFilter == 'direct_paystack' && !item.isDirectTransfer) {
+        return false;
+      }
 
       // 2. Rider Filter
       if (selectedRiderFilter != null && selectedRiderFilter.isNotEmpty) {
         if (item.riderCode != selectedRiderFilter &&
-            item.riderId != selectedRiderFilter) return false;
+            item.riderId != selectedRiderFilter) {
+          return false;
+        }
       }
 
       // 3. Opening Date Filter
@@ -566,8 +576,9 @@ class DCOrderPaymentMatchingPageState
       } else if (dateFilter == 'yesterday') {
         final yesterdayStart = todayStart.subtract(const Duration(days: 1));
         final yesterdayEnd = todayStart.subtract(const Duration(seconds: 1));
-        if (date.isBefore(yesterdayStart) || date.isAfter(yesterdayEnd))
+        if (date.isBefore(yesterdayStart) || date.isAfter(yesterdayEnd)) {
           return false;
+        }
       } else if (dateFilter == 'this_week') {
         final weekStart = todayStart.subtract(Duration(days: now.weekday - 1));
         if (date.isBefore(weekStart)) return false;

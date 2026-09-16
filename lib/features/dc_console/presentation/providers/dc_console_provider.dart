@@ -843,6 +843,36 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     }
   }
 
+  Future<ClientProfile> updateClientFinancialTariffs({
+    required String clientId,
+    required double customDeliveryFee,
+    required double customFailedAttemptFee,
+    required double customPlatformFee,
+    String? bankName,
+    String? bankAccountNumber,
+    String? bankAccountName,
+  }) async {
+    try {
+      final updatedClient = await _repository.updateClientFinancialTariffs(
+        clientId: clientId,
+        customDeliveryFee: customDeliveryFee,
+        customFailedAttemptFee: customFailedAttemptFee,
+        customPlatformFee: customPlatformFee,
+        bankName: bankName,
+        bankAccountNumber: bankAccountNumber,
+        bankAccountName: bankAccountName,
+      );
+
+      final updatedList = state.clients.map((c) => c.id == clientId ? updatedClient : c).toList();
+      state = state.copyWith(clients: updatedList);
+      debugPrint('[DC_CONSOLE_PROVIDER] 💰 Updated financial agreements for client "${updatedClient.companyName}": Delivery: ₦$customDeliveryFee, Failed: ₦$customFailedAttemptFee, Platform: ₦$customPlatformFee.');
+      return updatedClient;
+    } catch (e) {
+      debugPrint('[DC_CONSOLE_PROVIDER] ❌ updateClientFinancialTariffs error: $e');
+      rethrow;
+    }
+  }
+
   Future<void> loadFinanceSettingsFromDatabase() async {
     if (isTestEnvironment) return;
 

@@ -10,6 +10,7 @@ import '../../../orders/domain/entities/order.dart';
 import '../../domain/entities/client_settlement.dart';
 import '../providers/client_portal_provider.dart';
 import '../widgets/client_order_tracking_modal.dart';
+import '../widgets/client_daily_accumulator_modal.dart';
 
 class ClientFinancePage extends ConsumerStatefulWidget {
   const ClientFinancePage({super.key});
@@ -59,6 +60,13 @@ class _ClientFinancePageState extends ConsumerState<ClientFinancePage> {
     // Filter ledger orders
     final ledgerOrders = state.financeOrders.where((o) {
       if (_selectedLedgerStatus != 'all') {
+        if (_selectedLedgerStatus == 'today_closeout') {
+          if (!o.isDelivered) return false;
+          final fs = o.financialSettlementStatus.toLowerCase();
+          final rs = o.remittanceStatus.toLowerCase();
+          final isSettled = fs == 'client_settled' || fs == 'settled' || rs == 'remitted' || rs == 'cleared';
+          if (isSettled) return false;
+        }
         if (_selectedLedgerStatus == 'remitted' && (!o.isDelivered || !o.isRemitted)) {
           return false;
         }
@@ -124,7 +132,7 @@ class _ClientFinancePageState extends ConsumerState<ClientFinancePage> {
           const SizedBox(height: 24),
 
           // Detailed Financial Transaction Ledger
-          _buildFinancialLedgerSection(context, ledgerOrders, isDark),
+          _buildFinancialLedgerSection(context, state, ledgerOrders, isDark),
         ],
       ),
     );
@@ -788,6 +796,7 @@ class _ClientFinancePageState extends ConsumerState<ClientFinancePage> {
 
   Widget _buildFinancialLedgerSection(
     BuildContext context,
+    ClientPortalState state,
     List<OrderEntity> orders,
     bool isDark,
   ) {
@@ -867,8 +876,10 @@ class _ClientFinancePageState extends ConsumerState<ClientFinancePage> {
           // Ledger Category Filter Chips
           Wrap(
             spacing: 8,
+            runSpacing: 6,
             children: [
               _buildLedgerStatusChip('all', 'All Transactions', orders.length, isDark),
+              _buildLedgerStatusChip('today_closeout', 'Awaiting 10 PM Closeout', state.todayCompletedOrdersCount, isDark),
               _buildLedgerStatusChip('remitted', 'Remitted to Bank', orders.where((o) => o.isDelivered && o.isRemitted).length, isDark),
               _buildLedgerStatusChip('custody', 'In DC Custody (Ready)', orders.where((o) => o.isDelivered && !o.isRemitted && o.isCashPod).length, isDark),
               _buildLedgerStatusChip('in_field', 'In Field (COD Active)', orders.where((o) => !o.isDelivered && !o.isFailed && o.isCashPod).length, isDark),
@@ -1005,7 +1016,7 @@ class _ClientFinancePageState extends ConsumerState<ClientFinancePage> {
       return _badge('Remitted to Bank', const Color(0xFF10B981));
     }
     if (order.isDelivered) {
-      return _badge('In DC Custody (Ready)', const Color(0xFF2563EB));
+      return _badge('In Custody (10 PM Closeout)', const Color(0xFF0D9488));
     }
     if (order.isFailed) {
       return _badge('Delivery Failed / Return', const Color(0xFFEF4444));
@@ -1038,10 +1049,13 @@ class _ClientFinancePageState extends ConsumerState<ClientFinancePage> {
 
     final hours = difference.inHours;
     final minutes = difference.inMinutes % 60;
-    final pendingOrdersCount = state.financeOrders.where((o) => o.isDelivered && !o.isRemitted).length;
+    final awaitingCount = state.todayCompletedOrdersCount;
+    final grossHolding = state.todayGrossCashHolding;
+    final totalCharges = state.todayTotalChargesDeducted;
+    final netExpected = state.todayNetExpectedPayout;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: isDark
@@ -1054,58 +1068,191 @@ class _ClientFinancePageState extends ConsumerState<ClientFinancePage> {
         border: Border.all(
           color: isDark ? const Color(0xFF334155) : const Color(0xFF86EFAC),
         ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFF0D9488).withValues(alpha: 0.15),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.nightlight_round, color: Color(0xFF0D9488), size: 28),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Wrap(
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 10,
-                  runSpacing: 4,
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0D9488).withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.nightlight_round, color: Color(0xFF0D9488), size: 28),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      '10:00 PM Daily Remittance Closeout',
-                      style: GoogleFonts.inter(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: isDark ? Colors.white : const Color(0xFF065F46),
-                      ),
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 10,
+                      runSpacing: 4,
+                      children: [
+                        Text(
+                          '10:00 PM Daily Remittance Closeout',
+                          style: GoogleFonts.inter(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: isDark ? Colors.white : const Color(0xFF065F46),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0D9488),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            'Next Batch in ${hours}h ${minutes}m',
+                            style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                          ),
+                        ),
+                      ],
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0D9488),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        'Next Batch in ${hours}h ${minutes}m',
-                        style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                    const SizedBox(height: 4),
+                    Text(
+                      'All orders completed today before 10:00 PM accumulate live in DC custody. Tonight\'s reconciliation will deduct itemized logistics & processing charges, remitting net proceeds directly to your designated bank account.',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF047857),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'All orders delivered today before 10:00 PM are automatically reconciled, fee-deducted, and scheduled for bank disbursement. Currently, $pendingOrdersCount orders are queued for tonight\'s closeout.',
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF047857),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+          const Divider(height: 1),
+          const SizedBox(height: 16),
+
+          // Live Metrics & Action Button Row
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isWide = constraints.maxWidth >= 700;
+              final metricsWidget = Wrap(
+                spacing: 16,
+                runSpacing: 10,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  // Net Expected Payout
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Expected Net Settlement',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF047857),
+                        ),
+                      ),
+                      Text(
+                        '₦${_formatMoney(netExpected)}',
+                        style: GoogleFonts.inter(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                          color: const Color(0xFF0D9488),
+                        ),
+                      ),
+                    ],
                   ),
+
+                  // Gross Holding
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Gross Collections ($awaitingCount Orders)',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                        ),
+                      ),
+                      Text(
+                        '₦${_formatMoney(grossHolding)}',
+                        style: GoogleFonts.inter(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // Charges Deducted
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Operational Charges',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                        ),
+                      ),
+                      Text(
+                        '-₦${_formatMoney(totalCharges)}',
+                        style: GoogleFonts.inter(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFFDC2626),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              );
+
+              final openModalButton = ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0D9488),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  elevation: 0,
                 ),
-              ],
-            ),
+                onPressed: () => ClientDailyAccumulatorModal.show(context),
+                icon: const Icon(Icons.analytics_rounded, size: 18),
+                label: Text(
+                  'Live Accumulator & Charges Breakdown',
+                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+              );
+
+              return isWide
+                  ? Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(child: metricsWidget),
+                        const SizedBox(width: 14),
+                        openModalButton,
+                      ],
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        metricsWidget,
+                        const SizedBox(height: 14),
+                        SizedBox(width: double.infinity, child: openModalButton),
+                      ],
+                    );
+            },
           ),
         ],
       ),

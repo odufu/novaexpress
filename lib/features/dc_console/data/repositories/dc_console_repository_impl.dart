@@ -301,4 +301,25 @@ class DCConsoleRepositoryImpl implements DCConsoleRepository {
       dcId: dcId,
     );
   }
+
+  @override
+  Future<ClientProfile> updateClientFinancialTariffs({
+    required String clientId,
+    required double customDeliveryFee,
+    required double customFailedAttemptFee,
+    required double customPlatformFee,
+    String? bankName,
+    String? bankAccountNumber,
+    String? bankAccountName,
+  }) async {
+    return await _remoteDataSource.updateClientFinancialTariffs(
+      clientId: clientId,
+      customDeliveryFee: customDeliveryFee,
+      customFailedAttemptFee: customFailedAttemptFee,
+      customPlatformFee: customPlatformFee,
+      bankName: bankName,
+      bankAccountNumber: bankAccountNumber,
+      bankAccountName: bankAccountName,
+    );
+  }
 }

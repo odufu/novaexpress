@@ -180,11 +180,11 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
           settlementAccountNumber: _accountNumberController.text.trim(),
           settlementAccountName: _accountNameController.text.trim(),
           autoReconcileWebhooks: draft.autoReconcile,
-          defaultClientDeliveryFee: double.tryParse(_clientDeliveryFeeController.text) ?? 3500.0,
+          defaultClientDeliveryFee: double.tryParse(_clientDeliveryFeeController.text) ?? 5000.0,
           platformFeeType: _platformFeeType,
           platformFeeValue: double.tryParse(_platformFeeValueController.text) ?? 500.0,
           paystackFeeAbsorbedBy: _paystackFeeAbsorbedBy,
-          failedOrderCharge: double.tryParse(_failedOrderChargeController.text) ?? 500.0,
+          failedOrderCharge: double.tryParse(_failedOrderChargeController.text) ?? 1000.0,
           dailySettlementCutoffTime: _dailyCutoffTimeController.text.trim().isNotEmpty ? _dailyCutoffTimeController.text.trim() : '22:00',
         );
 
@@ -1105,7 +1105,7 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
   // TAB 3: MERCHANT BILLING & ORDER CHARGES
   // ==========================================
   Widget _buildMerchantBillingTab(bool isDark, bool isMobile) {
-    final clientDeliveryFee = double.tryParse(_clientDeliveryFeeController.text) ?? 3500.0;
+    final clientDeliveryFee = double.tryParse(_clientDeliveryFeeController.text) ?? 5000.0;
     final platformFeeVal = double.tryParse(_platformFeeValueController.text) ?? 500.0;
 
     // Simulation calculation with sample ₦35,000 order
@@ -1150,7 +1150,7 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Standard Logistics Delivery Fee', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold)),
-                        Text('Base fee deducted from client sales revenue per delivered order.', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
+                        Text('Base logistics tariff deducted from client sales revenue per delivered order.', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
                       ],
                     ),
                   ),
@@ -1160,9 +1160,9 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
               _buildInputField(
                 label: 'Default Delivery Fee (₦ / order)',
                 controller: _clientDeliveryFeeController,
-                hint: '3500',
+                hint: '5000',
                 isDark: isDark,
-                helper: 'Standard fee applied when merchant has no custom rate override.',
+                helper: 'Standard fee applied when merchant has no custom rate override (Standard: ₦5,000).',
               ),
             ],
           ),
@@ -1189,15 +1189,15 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
                       color: const Color(0xFFF37021).withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(Icons.percent_rounded, color: Color(0xFFF37021), size: 18),
+                    child: const Icon(Icons.hub_outlined, color: Color(0xFFF37021), size: 18),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Platform Commission Charge', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold)),
-                        Text('Operational margin earned by NovaExpress per completed order.', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
+                        Text('Platform Charge (App Operational Finance)', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold)),
+                        Text('Dedicated App Operational Finance for platform maintenance, tech team, upgrades, and feature additions.', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
                       ],
                     ),
                   ),
@@ -1213,7 +1213,7 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Commission Structure',
+                          'Charge Structure',
                           style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w600, color: isDark ? Colors.white : const Color(0xFF0F172A)),
                         ),
                         const SizedBox(height: 4),
@@ -1252,7 +1252,7 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
                       controller: _platformFeeValueController,
                       hint: _platformFeeType == 'flat' ? '500' : '2.5',
                       isDark: isDark,
-                      helper: _platformFeeType == 'flat' ? 'Fixed fee per delivered order' : '% of order retail total',
+                      helper: _platformFeeType == 'flat' ? 'Fixed fee per delivered order (App Operational Finance)' : '% of order retail total',
                     ),
                   ),
                 ],
@@ -1261,9 +1261,9 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
               _buildInputField(
                 label: 'Failed Delivery Surcharge (₦ / failed drop)',
                 controller: _failedOrderChargeController,
-                hint: '500',
+                hint: '1000',
                 isDark: isDark,
-                helper: 'Administrative return handling fee charged for rejected or customer-unavailable deliveries.',
+                helper: 'Administrative reverse transit & return handling fee charged for rejected or customer-unavailable deliveries (Standard: ₦1,000).',
               ),
             ],
           ),

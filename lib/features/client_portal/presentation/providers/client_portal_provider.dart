@@ -374,6 +374,13 @@ class ClientPortalState {
             s != 'completed') {
           return false;
         }
+        if (selectedStatusFilter == 'awaiting_closeout') {
+          final isDelivered = s == 'delivered' || s == 'completed';
+          final fs = o.financialSettlementStatus.toLowerCase();
+          final rs = o.remittanceStatus.toLowerCase();
+          final isSettled = fs == 'client_settled' || fs == 'settled' || rs == 'remitted' || rs == 'cleared';
+          if (!isDelivered || isSettled) return false;
+        }
         if (selectedStatusFilter == 'failed' &&
             s != 'failed' &&
             s != 'cancelled' &&
@@ -512,6 +519,96 @@ class ClientPortalState {
       ));
     }
     return list;
+  }
+
+  // --- Live Daily Cash Accumulation & 10:00 PM Closeout Getters ---
+
+  /// List of completed (delivered) orders awaiting 10:00 PM daily settlement closeout
+  List<OrderEntity> get completedOrdersAwaitingRemittance {
+    return orders.where((o) {
+      if (!o.isDelivered) return false;
+      final fs = o.financialSettlementStatus.toLowerCase();
+      final rs = o.remittanceStatus.toLowerCase();
+      final isSettled = fs == 'client_settled' || fs == 'settled' || rs == 'remitted' || rs == 'cleared';
+      return !isSettled;
+    }).toList();
+  }
+
+  /// Total count of completed orders awaiting 10 PM payout
+  int get todayCompletedOrdersCount => completedOrdersAwaitingRemittance.length;
+
+  /// Gross cash holding accumulated across completed orders awaiting 10 PM payout
+  double get todayGrossCashHolding => completedOrdersAwaitingRemittance.fold(
+        0.0,
+        (sum, o) => sum + o.totalAmount,
+      );
+
+  /// Physical COD cash in custody within DC vaults awaiting bank deposit & settlement
+  double get todayPhysicalCodInVault => completedOrdersAwaitingRemittance
+      .where((o) => o.isPod)
+      .fold(0.0, (sum, o) => sum + o.totalAmount);
+
+  /// Digital transfers / Paystack card payments verified directly into merchant account
+  double get todayDigitalDirectTransfers => completedOrdersAwaitingRemittance
+      .where((o) => o.isDirectTransfer)
+      .fold(0.0, (sum, o) => sum + o.totalAmount);
+
+  /// Total last-mile logistics delivery fees deducted from completed orders
+  double get todayLogisticsDeliveryFees {
+    final tariff = clientProfile.customDeliveryFee;
+    return completedOrdersAwaitingRemittance.fold(
+      0.0,
+      (sum, o) => sum + (tariff ?? (o.clientDeliveryFee > 0 ? o.clientDeliveryFee : 5000.0)),
+    );
+  }
+
+  /// Count of failed orders today awaiting daily reconciliation
+  int get todayFailedOrdersCount {
+    final now = DateTime.now();
+    return orders.where((o) {
+      if (!o.isFailed) return false;
+      final dt = o.deliveredAt ?? o.createdAt;
+      return dt.year == now.year && dt.month == now.month && dt.day == now.day;
+    }).length;
+  }
+
+  /// Surcharge on failed delivery attempts today (e.g. ₦1,000 per failed drop)
+  double get todayFailedAttemptFees {
+    final fee = clientProfile.customFailedAttemptFee ?? 1000.0;
+    return todayFailedOrdersCount * fee;
+  }
+
+  /// Third-party provider gateway & transfer switch fees (1.5% on digital direct transfer orders)
+  double get todayThirdPartySwitchFees {
+    return completedOrdersAwaitingRemittance
+        .where((o) => o.isDirectTransfer)
+        .fold(0.0, (sum, o) => sum + math.min(2000.0, o.totalAmount * 0.015));
+  }
+
+  /// Dedicated App Operational Finance for platform maintenance, engineering technical team, upgrades, and feature additions
+  double get todaySystemOperationCharges {
+    final tariff = clientProfile.customPlatformFeeValue ?? 500.0;
+    if (clientProfile.customPlatformFeeType == 'percentage') {
+      return todayGrossCashHolding * (tariff / 100.0);
+    }
+    return tariff * todayCompletedOrdersCount;
+  }
+
+  /// Platform Charge = Third-Party Provider Switch Fee + System Operation Charge
+  double get todayPlatformClearingFees =>
+      todayThirdPartySwitchFees + todaySystemOperationCharges;
+
+  /// Payment Gateway / Card Switch fees backward compatibility alias
+  double get todayGatewayProcessingFees => todayThirdPartySwitchFees;
+
+  /// Total operational deductions & charges to be deducted at 10 PM closeout
+  double get todayTotalChargesDeducted =>
+      todayLogisticsDeliveryFees + todayFailedAttemptFees + todayPlatformClearingFees;
+
+  /// Net liquid payout expected by the client at the 10:00 PM closing of the workday
+  double get todayNetExpectedPayout {
+    final net = todayGrossCashHolding - todayTotalChargesDeducted;
+    return net > 0 ? net : 0.0;
   }
 }
 

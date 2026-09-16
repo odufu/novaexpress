@@ -126,4 +126,15 @@ abstract class DCConsoleRepository {
     required String clientId,
     String? dcId,
   });
+
+  /// Updates client financial agreements and tariffs
+  Future<ClientProfile> updateClientFinancialTariffs({
+    required String clientId,
+    required double customDeliveryFee,
+    required double customFailedAttemptFee,
+    required double customPlatformFee,
+    String? bankName,
+    String? bankAccountNumber,
+    String? bankAccountName,
+  });
 }

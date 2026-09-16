@@ -39,11 +39,11 @@ class DCFinanceSettings {
     this.settlementAccountNumber = '0098234123',
     this.settlementAccountName = 'NovaExpress Logistics Limited',
     this.autoReconcileWebhooks = true,
-    this.defaultClientDeliveryFee = 3500.0,
+    this.defaultClientDeliveryFee = 5000.0,
     this.platformFeeType = 'flat',
     this.platformFeeValue = 500.0,
     this.paystackFeeAbsorbedBy = 'merchant',
-    this.failedOrderCharge = 500.0,
+    this.failedOrderCharge = 1000.0,
     this.dailySettlementCutoffTime = '22:00',
   });
 
@@ -134,11 +134,11 @@ class DCFinanceSettings {
       settlementAccountNumber: json['settlement_account_number']?.toString() ?? '0098234123',
       settlementAccountName: json['settlement_account_name']?.toString() ?? 'NovaExpress Logistics Limited',
       autoReconcileWebhooks: json['auto_reconcile_webhooks'] ?? json['autoReconcileWebhooks'] ?? true,
-      defaultClientDeliveryFee: (json['default_client_delivery_fee'] as num?)?.toDouble() ?? 3500.0,
+      defaultClientDeliveryFee: (json['default_client_delivery_fee'] as num?)?.toDouble() ?? 5000.0,
       platformFeeType: json['platform_fee_type']?.toString() ?? 'flat',
       platformFeeValue: (json['platform_fee_value'] as num?)?.toDouble() ?? 500.0,
       paystackFeeAbsorbedBy: json['paystack_fee_absorbed_by']?.toString() ?? 'merchant',
-      failedOrderCharge: (json['failed_order_charge'] as num?)?.toDouble() ?? 500.0,
+      failedOrderCharge: (json['failed_order_charge'] as num?)?.toDouble() ?? 1000.0,
       dailySettlementCutoffTime: json['daily_settlement_cutoff_time']?.toString() ?? '22:00',
     );
   }

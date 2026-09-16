@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../../core/helpers/formatters.dart';
 import '../providers/client_portal_provider.dart';
 import '../widgets/client_create_order_modal.dart';
 import '../widgets/client_order_tracking_modal.dart';
+import '../widgets/client_daily_accumulator_modal.dart';
 
 class ClientDashboardPage extends ConsumerWidget {
   final VoidCallback onNavigateToOrders;
@@ -28,6 +30,10 @@ class ClientDashboardPage extends ConsumerWidget {
         children: [
           // Welcome & Quick Action Header
           _buildWelcomeBanner(context, ref, state),
+          const SizedBox(height: 18),
+
+          // Today's Live Cash Accumulator & 10:00 PM Closeout Card
+          _buildDailyCashAccumulatorCard(context, state),
           const SizedBox(height: 24),
 
           // KPI Metric Summary Grid
@@ -167,6 +173,225 @@ class ClientDashboardPage extends ConsumerWidget {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDailyCashAccumulatorCard(BuildContext context, ClientPortalState state) {
+    final now = DateTime.now();
+    final closeoutTime = DateTime(now.year, now.month, now.day, 22, 0); // 10:00 PM
+    final isPastCloseout = now.isAfter(closeoutTime);
+    final difference = isPastCloseout
+        ? closeoutTime.add(const Duration(days: 1)).difference(now)
+        : closeoutTime.difference(now);
+    final hours = difference.inHours;
+    final minutes = difference.inMinutes % 60;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    String formatMoney(double amt) => CurrencyFormatter.formatNaira(amt).replaceAll('NGN', '').replaceAll('₦', '').trim();
+
+    final awaitingCount = state.todayCompletedOrdersCount;
+    final gross = state.todayGrossCashHolding;
+    final deductions = state.todayTotalChargesDeducted;
+    final netExpected = state.todayNetExpectedPayout;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isDark
+              ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
+              : [const Color(0xFFF0FDF4), const Color(0xFFE6F4EA)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFF86EFAC),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0D9488).withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.nightlight_round, color: Color(0xFF0D9488), size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            'Live Cash Accumulator (Awaiting 10 PM Closeout)',
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                              color: isDark ? Colors.white : const Color(0xFF065F46),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Reconciliation batch in ${hours}h ${minutes}m • Live cash in DC vault',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF047857),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0D9488),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Text(
+                  '$awaitingCount Delivered',
+                  style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          const Divider(height: 1),
+          const SizedBox(height: 14),
+
+          // 3 Responsive Metrics
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isWide = constraints.maxWidth >= 640;
+              final metrics = Wrap(
+                spacing: 20,
+                runSpacing: 10,
+                children: [
+                  // Expected Net Settlement
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Expected Net Bank Settlement',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF047857),
+                        ),
+                      ),
+                      Text(
+                        '₦${formatMoney(netExpected)}',
+                        style: GoogleFonts.inter(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          color: const Color(0xFF0D9488),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // Gross Collections
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Gross Collections',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                        ),
+                      ),
+                      Text(
+                        '₦${formatMoney(gross)}',
+                        style: GoogleFonts.inter(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // Deductions
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Itemized Charges',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                        ),
+                      ),
+                      Text(
+                        '-₦${formatMoney(deductions)}',
+                        style: GoogleFonts.inter(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFFDC2626),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              );
+
+              final btn = OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF0D9488),
+                  side: const BorderSide(color: Color(0xFF0D9488)),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: () => ClientDailyAccumulatorModal.show(context),
+                icon: const Icon(Icons.receipt_long_rounded, size: 16),
+                label: Text(
+                  'Breakdown & Charges',
+                  style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold),
+                ),
+              );
+
+              return isWide
+                  ? Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(child: metrics),
+                        const SizedBox(width: 12),
+                        btn,
+                      ],
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        metrics,
+                        const SizedBox(height: 12),
+                        SizedBox(width: double.infinity, child: btn),
+                      ],
+                    );
+            },
+          ),
         ],
       ),
     );

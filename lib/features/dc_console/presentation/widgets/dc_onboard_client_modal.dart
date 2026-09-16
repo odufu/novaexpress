@@ -60,6 +60,10 @@ class _DCOnboardClientModalState extends ConsumerState<DCOnboardClientModal> {
     super.initState();
     _passwordController.text = 'ClientPass2026!';
     _confirmPasswordController.text = 'ClientPass2026!';
+    _customDeliveryFeeController.text = '5000';
+    _customFailedAttemptFeeController.text = '1000';
+    _customPlatformFeeController.text = '500';
+    _showCustomFeeOverrides = true;
     _companyNameController.addListener(_onCompanyNameChanged);
     _emailController.addListener(_onEmailInputChanged);
   }
@@ -1076,15 +1080,14 @@ Initial Password: ${_createdPassword ?? 'ClientPass2026!'}
         ),
         const SizedBox(height: 16),
 
-        // Custom Billing & Charges Overrides (Optional)
+        // Negotiated Operational Charges & Tariff Agreements
         Container(
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: _showCustomFeeOverrides
-                  ? const Color(0xFF0D9488)
-                  : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+              color: const Color(0xFF0D9488),
+              width: 1.5,
             ),
           ),
           child: Column(
@@ -1096,10 +1099,10 @@ Initial Password: ${_createdPassword ?? 'ClientPass2026!'}
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   child: Row(
                     children: [
-                      Icon(
-                        Icons.tune_rounded,
-                        size: 18,
-                        color: _showCustomFeeOverrides ? const Color(0xFF0D9488) : const Color(0xFF64748B),
+                      const Icon(
+                        Icons.handshake_rounded,
+                        size: 20,
+                        color: Color(0xFF0D9488),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -1107,23 +1110,23 @@ Initial Password: ${_createdPassword ?? 'ClientPass2026!'}
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Custom Merchant Tariff Overrides (Optional)',
+                              'Negotiated Operational Charges & Agreement',
                               style: GoogleFonts.inter(
                                 fontSize: 13,
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w800,
                                 color: isDark ? Colors.white : const Color(0xFF0F172A),
                               ),
                             ),
                             Text(
-                              'Leave blank to inherit standard hub default pricing & commissions',
-                              style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                              'Preset to standard tariffs (Delivery: ₦5,000, Failed: ₦1,000, Platform: ₦500)',
+                              style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF0D9488), fontWeight: FontWeight.w600),
                             ),
                           ],
                         ),
                       ),
                       Icon(
                         _showCustomFeeOverrides ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                        color: const Color(0xFF64748B),
+                        color: const Color(0xFF0D9488),
                       ),
                     ],
                   ),
@@ -1134,6 +1137,7 @@ Initial Password: ${_createdPassword ?? 'ClientPass2026!'}
                 Padding(
                   padding: const EdgeInsets.all(14),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
@@ -1141,14 +1145,14 @@ Initial Password: ${_createdPassword ?? 'ClientPass2026!'}
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildLabel('Custom Delivery Fee (₦)', isDark),
+                                _buildLabel('1. Delivery Fee (₦ / successful order)', isDark),
                                 const SizedBox(height: 6),
                                 TextFormField(
                                   controller: _customDeliveryFeeController,
                                   keyboardType: TextInputType.number,
                                   style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13),
                                   decoration: _inputDecoration(
-                                    hintText: 'e.g. 3500 (default: DC tariff)',
+                                    hintText: '5000',
                                     icon: Icons.local_shipping_rounded,
                                     isDark: isDark,
                                   ),
@@ -1161,15 +1165,15 @@ Initial Password: ${_createdPassword ?? 'ClientPass2026!'}
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildLabel('Custom Platform Fee (₦)', isDark),
+                                _buildLabel('2. Failed Attempt Fee (₦ / failed drop)', isDark),
                                 const SizedBox(height: 6),
                                 TextFormField(
-                                  controller: _customPlatformFeeController,
+                                  controller: _customFailedAttemptFeeController,
                                   keyboardType: TextInputType.number,
                                   style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13),
                                   decoration: _inputDecoration(
-                                    hintText: 'e.g. 500 (default: 500 flat)',
-                                    icon: Icons.hub_rounded,
+                                    hintText: '1000',
+                                    icon: Icons.cancel_presentation_rounded,
                                     isDark: isDark,
                                   ),
                                 ),
@@ -1182,19 +1186,45 @@ Initial Password: ${_createdPassword ?? 'ClientPass2026!'}
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildLabel('Custom Failed Attempt Fee (₦)', isDark),
+                          _buildLabel('3. System Operation Charge (₦ / order)', isDark),
                           const SizedBox(height: 6),
                           TextFormField(
-                            controller: _customFailedAttemptFeeController,
+                            controller: _customPlatformFeeController,
                             keyboardType: TextInputType.number,
                             style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13),
                             decoration: _inputDecoration(
-                              hintText: 'e.g. 500 (absorbed/billed per failed delivery attempt)',
-                              icon: Icons.cancel_presentation_rounded,
+                              hintText: '500',
+                              icon: Icons.hub_rounded,
                               isDark: isDark,
                             ),
                           ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Dedicated App Operational Finance for platform maintenance, tech team, upgrades, and feature additions.',
+                            style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
+                          ),
                         ],
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF6366F1).withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.2)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.info_outline_rounded, color: Color(0xFF6366F1), size: 16),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Third-party switch fee (1.5% digital / electronic COD remittance transfer) applies separately from App Operational Finance.',
+                                style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF6366F1), fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),

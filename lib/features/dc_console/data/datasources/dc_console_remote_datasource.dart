@@ -90,6 +90,15 @@ abstract class DCConsoleRemoteDataSource {
     required String clientId,
     String? dcId,
   });
+  Future<ClientProfile> updateClientFinancialTariffs({
+    required String clientId,
+    required double customDeliveryFee,
+    required double customFailedAttemptFee,
+    required double customPlatformFee,
+    String? bankName,
+    String? bankAccountNumber,
+    String? bankAccountName,
+  });
 }
 
 class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
@@ -884,6 +893,44 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
         'success': false,
         'error': e.toString(),
       };
+    }
+  }
+
+  @override
+  Future<ClientProfile> updateClientFinancialTariffs({
+    required String clientId,
+    required double customDeliveryFee,
+    required double customFailedAttemptFee,
+    required double customPlatformFee,
+    String? bankName,
+    String? bankAccountNumber,
+    String? bankAccountName,
+  }) async {
+    final adminDb = _getAdminClient();
+    try {
+      final updatePayload = <String, dynamic>{
+        'custom_delivery_fee': customDeliveryFee,
+        'custom_failed_attempt_fee': customFailedAttemptFee,
+        'custom_platform_fee': customPlatformFee,
+        'custom_platform_fee_value': customPlatformFee,
+        if (bankName != null && bankName.trim().isNotEmpty) 'bank_name': bankName.trim(),
+        if (bankAccountNumber != null && bankAccountNumber.trim().isNotEmpty) 'account_number': bankAccountNumber.trim(),
+        if (bankAccountName != null && bankAccountName.trim().isNotEmpty) 'account_name': bankAccountName.trim(),
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+
+      final response = await adminDb
+          .from('clients')
+          .update(updatePayload)
+          .eq('id', clientId)
+          .select('*, client_closers(id, is_active)')
+          .single();
+
+      debugPrint('[DC_CONSOLE] ✅ Successfully updated financial agreements for client $clientId in Supabase.');
+      return ClientProfile.fromJson(response);
+    } catch (e) {
+      debugPrint('[DC_CONSOLE] ❌ updateClientFinancialTariffs error: $e');
+      rethrow;
     }
   }
 }
