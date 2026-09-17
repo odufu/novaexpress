@@ -107,6 +107,7 @@ class _DCClientAssetPortfolioModalState
     // Financial Metrics
     final totalOrderValue = clientOrders.fold(0.0, (sum, o) => sum + o.totalAmount);
     final deliveredOrders = clientOrders.where((o) => o.status.toLowerCase() == 'delivered').toList();
+    final unsettledDeliveredOrders = deliveredOrders.where((o) => !o.isClientSettled).toList();
     final codCollected = deliveredOrders.fold(0.0, (sum, o) => sum + o.totalAmount);
 
     return Dialog(
@@ -292,7 +293,7 @@ class _DCClientAssetPortfolioModalState
                   _buildProductsAndPackagesTab(clientProducts, isDark, currency),
                   _buildHubInventoryTab(clientStockItems, isDark),
                   _buildOrdersTab(clientOrders, isDark, currency),
-                  _buildFinancialsTab(codCollected, totalOrderValue, deliveredOrders, isDark, currency),
+                  _buildFinancialsTab(codCollected, totalOrderValue, deliveredOrders, unsettledDeliveredOrders, isDark, currency),
                   _buildClientSettingsTab(isDark, currency),
                 ],
               ),
@@ -665,7 +666,7 @@ class _DCClientAssetPortfolioModalState
   }
 
   Widget _buildFinancialsTab(
-      double codCollected, double totalOrderValue, List<OrderEntity> deliveredOrders, bool isDark, NumberFormat currency) {
+      double codCollected, double totalOrderValue, List<OrderEntity> deliveredOrders, List<OrderEntity> unsettledDeliveredOrders, bool isDark, NumberFormat currency) {
     final effectiveDeliveryFee = _client.customDeliveryFee ?? 5000.0;
     final effectiveFailedFee = _client.customFailedAttemptFee ?? 1000.0;
     final effectivePlatformFee = _client.customPlatformFeeValue ?? 500.0;
@@ -838,7 +839,7 @@ class _DCClientAssetPortfolioModalState
                     ),
                   ),
                   Text(
-                    '${deliveredOrders.length} delivered orders awaiting 10:00 PM batch payout',
+                    '${unsettledDeliveredOrders.length} delivered orders awaiting client settlement',
                     style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
                   ),
                 ],
@@ -848,12 +849,12 @@ class _DCClientAssetPortfolioModalState
                   DCDailyMerchantSettlementModal.show(
                     context: context,
                     client: _client,
-                    eligibleOrders: deliveredOrders,
+                    eligibleOrders: unsettledDeliveredOrders,
                   );
                 },
                 icon: const Icon(Icons.verified_rounded, size: 16, color: Colors.white),
                 label: Text(
-                  'Initiate Daily Settlement',
+                  'Initiate Client Settlement',
                   style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white),
                 ),
                 style: ElevatedButton.styleFrom(
@@ -932,7 +933,7 @@ class _DCClientAssetPortfolioModalState
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Update the negotiated financial tariffs for ${_client.companyName}. These rules dictate automatic daily 10:00 PM settlement deductions across delivery commissions, failed drop handling, and platform maintenance.',
+                        'Update the negotiated financial tariffs for ${_client.companyName}. These rules dictate automatic daily client settlement deductions across delivery commissions, failed drop handling, and platform maintenance.',
                         style: GoogleFonts.inter(
                           fontSize: 11,
                           color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
@@ -1023,7 +1024,7 @@ class _DCClientAssetPortfolioModalState
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Platform Charge = Paystack/third-party switch charge + System Operation Charge. Digital card/transfer payments incur 1.5% switch fee. Cash on Delivery (COD) in DC vault is remitted to merchant bank via electronic bank transfer switch at 10:00 PM.',
+                        'Platform Charge = Paystack/third-party switch charge + System Operation Charge. Digital card/transfer payments incur 1.5% switch fee. Cash on Delivery (COD) in DC vault is remitted to merchant bank via electronic bank transfer switch upon client settlement.',
                         style: GoogleFonts.inter(
                           fontSize: 11,
                           color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
@@ -1057,7 +1058,7 @@ class _DCClientAssetPortfolioModalState
                   label: 'Settlement Bank Name',
                   controller: _bankNameController,
                   hint: 'Access Bank',
-                  helper: 'Commercial bank where merchant receives 10:00 PM daily remittance payouts.',
+                  helper: 'Commercial bank where merchant receives daily client settlement payouts.',
                   isDark: isDark,
                 ),
                 const SizedBox(height: 14),

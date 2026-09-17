@@ -228,13 +228,22 @@ class OrderEntity {
   String? get merchantId => clientId;
   String get paymentMethod => isDirectTransfer ? 'direct_transfer' : (isPod ? 'cash' : paymentType);
   String get financeSettlementStatus => financialSettlementStatus;
+  bool get isClientSettled {
+    final fs = financialSettlementStatus.toLowerCase();
+    return fs == 'client_settled' || fs == 'settled';
+  }
 
   double get netMerchantSettlement {
     final net = totalAmount - agentEntitlement - transportFee;
     return net > 0 ? net : 0.0;
   }
 
-  int get totalPhysicalQuantity => paidQuantity + freeQuantity > 0 ? paidQuantity + freeQuantity : quantity;
+  int get totalPhysicalQuantity {
+    if (quantity > 1 && paidQuantity <= 1 && freeQuantity == 0) {
+      return quantity;
+    }
+    return paidQuantity + freeQuantity > 0 ? paidQuantity + freeQuantity : quantity;
+  }
   bool get hasCoordinates => latitude != null && longitude != null && latitude != 0.0 && longitude != 0.0;
   bool get hasSignature => customerSignatureUrl != null && customerSignatureUrl!.isNotEmpty;
   bool get hasPhotoProof => photoProofUrl != null && photoProofUrl!.isNotEmpty;

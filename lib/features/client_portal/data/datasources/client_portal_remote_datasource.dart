@@ -395,8 +395,11 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
           .eq('client_id', clientId)
           .order('settled_at', ascending: false);
 
-      return (response as List).map((item) => ClientSettlement.fromJson(item)).toList();
-    } catch (_) {
+      return (response as List)
+          .map((item) => ClientSettlement.fromJson(Map<String, dynamic>.from(item as Map)))
+          .toList();
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] ❌ fetchClientSettlements error: $e');
       return [];
     }
   }

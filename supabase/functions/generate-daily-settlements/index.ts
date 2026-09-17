@@ -11,6 +11,7 @@ interface SettlementTriggerPayload {
   dcId?: string;
   periodStart?: string;
   periodEnd?: string;
+  orderIds?: string[];
   customDeductions?: Record<string, any>;
 }
 
@@ -21,7 +22,7 @@ serve(async (req: Request) => {
 
   try {
     const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "https://qpcafevjsrbauweuiiyq.supabase.co",
+      Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
@@ -33,9 +34,8 @@ serve(async (req: Request) => {
     } catch (_) {}
 
     const now = new Date();
-    // Default period: yesterday 22:00:00 to today 22:00:00 (or up to now if executed during/after 10 PM)
-    const defaultStart = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
-    const periodStart = payload.periodStart || defaultStart;
+    // Default period: covers all pending delivered orders up to current cutoff
+    const periodStart = payload.periodStart || null;
     const periodEnd = payload.periodEnd || now.toISOString();
 
     const results: Array<any> = [];
@@ -49,6 +49,7 @@ serve(async (req: Request) => {
         p_period_start: periodStart,
         p_period_end: periodEnd,
         p_custom_deductions: payload.customDeductions || {},
+        p_order_ids: payload.orderIds || null,
       });
 
       if (error) {
@@ -80,15 +81,20 @@ serve(async (req: Request) => {
     const defaultDcId = payload.dcId || "22222222-2222-4222-8222-222222222222";
 
     for (const client of clients) {
-      // Check if client has un-settled delivered orders in window
-      const { count } = await supabaseClient
+      // Check if client has un-settled delivered orders
+      let ordersQuery = supabaseClient
         .from("orders")
         .select("id", { count: "exact", head: true })
         .eq("client_id", client.id)
         .eq("status", "delivered")
         .or("financial_settlement_status.is.null,financial_settlement_status.neq.client_settled")
-        .gte("delivered_at", periodStart)
         .lte("delivered_at", periodEnd);
+
+      if (periodStart) {
+        ordersQuery = ordersQuery.gte("delivered_at", periodStart);
+      }
+
+      const { count } = await ordersQuery;
 
       if (count && count > 0) {
         const { data: settleRes, error: settleErr } = await supabaseClient.rpc("fn_generate_merchant_daily_settlement", {
@@ -97,9 +103,10 @@ serve(async (req: Request) => {
           p_period_start: periodStart,
           p_period_end: periodEnd,
           p_custom_deductions: {},
+          p_order_ids: null,
         });
 
-        if (!settleErr && settleRes) {
+        if (!settleErr && settleRes && settleRes.success !== false) {
           results.push({
             clientId: client.id,
             clientName: client.company_name,
@@ -112,7 +119,7 @@ serve(async (req: Request) => {
     return new Response(
       JSON.stringify({
         success: true,
-        message: `10:00 PM Daily Settlement Closeout executed successfully. ${results.length} merchant batches generated.`,
+        message: `Daily Client Settlement executed successfully. ${results.length} merchant batches generated.`,
         settlementsGenerated: results.length,
         batches: results,
       }),

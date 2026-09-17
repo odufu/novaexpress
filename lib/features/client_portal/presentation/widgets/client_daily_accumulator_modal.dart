@@ -226,7 +226,7 @@ class _ClientDailyAccumulatorModalState extends ConsumerState<ClientDailyAccumul
                           ),
                           const SizedBox(width: 5),
                           Text(
-                            '10:00 PM Closeout',
+                            'Client Settlement',
                             style: GoogleFonts.inter(
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
@@ -296,7 +296,7 @@ class _ClientDailyAccumulatorModalState extends ConsumerState<ClientDailyAccumul
                       const Icon(Icons.account_balance_wallet_rounded, color: Color(0xFF2DD4BF), size: 18),
                       const SizedBox(width: 8),
                       Text(
-                        'EXPECTED NET BANK SETTLEMENT (10:00 PM)',
+                        'EXPECTED NET CLIENT SETTLEMENT',
                         style: GoogleFonts.inter(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
@@ -798,7 +798,7 @@ class _ClientDailyAccumulatorModalState extends ConsumerState<ClientDailyAccumul
             Row(
               children: [
                 Text(
-                  'Delivered Orders Awaiting Closeout',
+                  'Delivered Orders Awaiting Settlement',
                   style: GoogleFonts.inter(
                     fontSize: 15,
                     fontWeight: FontWeight.w800,
@@ -876,7 +876,7 @@ class _ClientDailyAccumulatorModalState extends ConsumerState<ClientDailyAccumul
           ),
           const SizedBox(height: 4),
           Text(
-            'All orders completed by riders today will appear here along with cash accumulation awaiting the 10:00 PM closeout.',
+            'All orders completed by riders today will appear here along with cash accumulation awaiting client settlement.',
             textAlign: TextAlign.center,
             style: GoogleFonts.inter(
               fontSize: 12,

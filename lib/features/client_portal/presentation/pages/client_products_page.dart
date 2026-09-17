@@ -9,6 +9,7 @@ import '../../../dc_console/domain/entities/product_package.dart';
 import '../../../dc_console/presentation/providers/product_catalog_provider.dart';
 import '../providers/client_portal_provider.dart';
 import '../widgets/client_add_product_modal.dart';
+import '../widgets/client_add_package_modal.dart';
 import '../widgets/client_consignments_modal.dart';
 import '../widgets/client_create_order_modal.dart';
 import '../widgets/client_product_detail_modal.dart';
@@ -321,6 +322,20 @@ class _ClientProductsPageState extends ConsumerState<ClientProductsPage> {
           spacing: 8,
           runSpacing: 8,
           children: [
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF2563EB),
+                side: const BorderSide(color: Color(0xFF2563EB)),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () => ClientAddPackageModal.show(context),
+              icon: const Icon(Icons.add_shopping_cart, size: 18),
+              label: Text(
+                'New Package Deal',
+                style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700),
+              ),
+            ),
             OutlinedButton.icon(
               style: OutlinedButton.styleFrom(
                 foregroundColor: const Color(0xFF10B981),

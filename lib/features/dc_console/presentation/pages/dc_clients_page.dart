@@ -494,7 +494,7 @@ class DCClientsPage extends ConsumerWidget {
                           o.paymentMethod.toLowerCase() == 'direct_transfer' ||
                           o.paymentType == 'direct_transfer') &&
                       o.status.toLowerCase() == 'delivered' &&
-                      o.financeSettlementStatus != 'settled'
+                      !o.isClientSettled
                     ).toList();
                     DCDailyMerchantSettlementModal.show(
                       context: context,
@@ -502,9 +502,9 @@ class DCClientsPage extends ConsumerWidget {
                       eligibleOrders: eligible,
                     );
                   },
-                  icon: const Icon(Icons.payments_outlined, size: 14, color: Colors.white),
+                  icon: const Icon(Icons.account_balance_wallet_rounded, size: 14, color: Colors.white),
                   label: Text(
-                    '10 PM Settlement',
+                    'Client Settlement',
                     style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -707,7 +707,7 @@ class DCClientsPage extends ConsumerWidget {
                         o.paymentMethod.toLowerCase() == 'direct_transfer' ||
                         o.paymentType == 'direct_transfer') &&
                     o.status.toLowerCase() == 'delivered' &&
-                    o.financeSettlementStatus != 'settled'
+                    !o.isClientSettled
                   ).toList();
                   DCDailyMerchantSettlementModal.show(
                     context: context,
@@ -715,9 +715,9 @@ class DCClientsPage extends ConsumerWidget {
                     eligibleOrders: eligible,
                   );
                 },
-                icon: const Icon(Icons.payments_outlined, size: 14, color: Colors.white),
+                icon: const Icon(Icons.account_balance_wallet_rounded, size: 14, color: Colors.white),
                 label: Text(
-                  '10 PM Settlement',
+                  'Client Settlement',
                   style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
                 ),
                 style: ElevatedButton.styleFrom(

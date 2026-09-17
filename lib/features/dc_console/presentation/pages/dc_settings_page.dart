@@ -1297,7 +1297,7 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Gateway Absorption & 10:00 PM Cutoff', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold)),
+                        Text('Gateway Absorption & Client Settlement Cutoff', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold)),
                         Text('Payment gateway fees allocation and scheduled daily batch closeout time.', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
                       ],
                     ),
@@ -1342,11 +1342,11 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
               ),
               const SizedBox(height: 12),
               _buildInputField(
-                label: 'Daily Remittance Closeout Cutoff Time (24h Format)',
+                label: 'Daily Client Settlement Cutoff Time (24h Format)',
                 controller: _dailyCutoffTimeController,
                 hint: '22:00',
                 isDark: isDark,
-                helper: 'Default 22:00 (10:00 PM WAT). Orders delivered before cutoff are batched for daily payout.',
+                helper: 'Default 22:00 (Close of work WAT). Orders delivered before cutoff are batched for daily payout.',
               ),
             ],
           ),
@@ -1371,7 +1371,7 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Daily 10:00 PM Merchant Settlement Preview (Sample Order: ₦35,000)',
+                      'Daily Client Settlement Preview (Sample Order: ₦35,000)',
                       style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
                     ),
                   ),

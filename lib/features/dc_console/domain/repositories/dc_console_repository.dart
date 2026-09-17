@@ -106,13 +106,14 @@ abstract class DCConsoleRepository {
     String? supervisorId,
   });
 
-  /// Generates the Daily 10:00 PM Merchant Settlement batch atomically
+  /// Generates the Daily Client Settlement batch atomically
   Future<Map<String, dynamic>> generateDailyMerchantSettlement({
     required String clientId,
     required String dcId,
     required DateTime periodStart,
     required DateTime periodEnd,
     Map<String, dynamic>? customDeductions,
+    List<String>? orderIds,
   });
 
   /// Fetches client settlement history for the DC

@@ -21,10 +21,22 @@ class SupabaseConstants {
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFwY2FmZXZqc3JiYXV3ZXVpaXlxIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4ODc4NjM2NCwiZXhwIjoyMTA0MzYyMzY0fQ.RM1BJWKYWnhI7kkDVACqAxDj8U9shpWxQX8h8_K7UiU';
 
   // --- ACTIVE CONNECTION ---
-  // Currently set to: ENVIRONMENT 2 (Testing)
-  static const String supabaseUrl = testingUrl;
-  static const String supabaseAnonKey = testingAnonKey;
-  static const String supabaseServiceRoleKey = testingServiceRoleKey;
+  // Default is set to ENVIRONMENT 2 (Testing).
+  // Can be overridden at build-time using:
+  //   flutter run --dart-define=SUPABASE_URL=... --dart-define=SUPABASE_ANON_KEY=...
+  // Or switched using scripts/switch_supabase_env.py
+  static const String _defaultUrl = 'https://qpcafevjsrbauweuiiyq.supabase.co';
+  static const String _defaultAnonKey =
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFwY2FmZXZqc3JiYXV3ZXVpaXlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3ODYzNjQsImV4cCI6MjEwNDM2MjM2NH0.L07TBq9gfNjLPYnaAjA7F9IGXN1_UoyOcelgsofnXK8';
+  static const String _defaultServiceRoleKey =
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFwY2FmZXZqc3JiYXV3ZXVpaXlxIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4ODc4NjM2NCwiZXhwIjoyMTA0MzYyMzY0fQ.RM1BJWKYWnhI7kkDVACqAxDj8U9shpWxQX8h8_K7UiU';
+
+  static const String supabaseUrl =
+      String.fromEnvironment('SUPABASE_URL', defaultValue: _defaultUrl);
+  static const String supabaseAnonKey =
+      String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: _defaultAnonKey);
+  static const String supabaseServiceRoleKey =
+      String.fromEnvironment('SUPABASE_SERVICE_ROLE_KEY', defaultValue: _defaultServiceRoleKey);
 
   // Primary Agent ID
   static const String defaultDeliveryAgentId = 'b1111111-1111-4111-8111-111111111111';
@@ -43,7 +55,7 @@ class SupabaseConstants {
   // Paystack Credentials
   static const String paystackSecretKey = 'sk_test_94f116e6e978f0e75dc42f8a789837931b487006';
   static const String paystackPublicKey = 'pk_test_0ac140673685b32b2e9613b548991cd9563e917a';
-  static const String paystackWebhookUrl = 'https://vacyxnehxpqvwtaimkgc.supabase.co/functions/v1/paystack-webhook';
+  static String get paystackWebhookUrl => '$supabaseUrl/functions/v1/paystack-webhook';
 
   // Storage Buckets
   static const String avatarsBucket = 'avatars';

@@ -237,12 +237,12 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
               children: [
                 _buildNavItem(0, 'Dashboard', Icons.dashboard_rounded, state.activeTabIndex == 0, isCollapsed, isDrawer),
                 _buildNavItem(1, 'Deliveries & Orders', Icons.local_shipping_rounded, state.activeTabIndex == 1, isCollapsed, isDrawer),
-                _buildNavItem(2, 'Remittances', Icons.payments_rounded, state.activeTabIndex == 2, isCollapsed, isDrawer),
+                _buildNavItem(2, 'Payment Matching (COD)', Icons.price_check_rounded, state.activeTabIndex == 2, isCollapsed, isDrawer),
                 _buildNavItem(3, 'Inventory & Stock', Icons.inventory_2_rounded, state.activeTabIndex == 3, isCollapsed, isDrawer),
-                _buildNavItem(4, 'Cash & Remittances', Icons.account_balance_wallet_rounded, state.activeTabIndex == 4, isCollapsed, isDrawer),
-                _buildNavItem(5, 'Transactions & Ledger', Icons.receipt_long_rounded, state.activeTabIndex == 5, isCollapsed, isDrawer),
+                _buildNavItem(4, 'Vault Cash & Settlements', Icons.account_balance_wallet_rounded, state.activeTabIndex == 4, isCollapsed, isDrawer),
+                _buildNavItem(5, 'Audit Ledger', Icons.receipt_long_rounded, state.activeTabIndex == 5, isCollapsed, isDrawer),
                 _buildNavItem(6, 'Returns & QC Desk', Icons.assignment_return_rounded, state.activeTabIndex == 6, isCollapsed, isDrawer),
-                _buildNavItem(7, 'Rider Payouts', Icons.payments_rounded, state.activeTabIndex == 7, isCollapsed, isDrawer),
+                _buildNavItem(7, 'Rider Payout Claims', Icons.payments_rounded, state.activeTabIndex == 7, isCollapsed, isDrawer),
                 _buildNavItem(8, 'Riders & Fleet', Icons.badge_rounded, state.activeTabIndex == 8, isCollapsed, isDrawer),
                 if (isPrimaryDc)
                   _buildNavItem(9, 'Distribution Centers', Icons.apartment_rounded, state.activeTabIndex == 9, isCollapsed, isDrawer),
@@ -401,25 +401,27 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
       case 0:
         return 'Distribution Dashboard';
       case 1:
-        return 'Master Orders Directory';
+        return 'Deliveries & Master Orders';
       case 2:
-        return 'Payment Reconciliation';
+        return 'Payment Matching (COD)';
       case 3:
-        return 'Stock Inventory';
+        return 'Inventory & Stock';
       case 4:
-        return 'Financial Overview';
+        return 'Vault Cash & Settlements';
       case 5:
-        return 'Transactions Ledger';
+        return 'Audit Ledger';
       case 6:
-        return 'Returns & Exchanges';
+        return 'Returns & QC Desk';
       case 7:
-        return 'Driver Payouts';
+        return 'Rider Payout Claims';
       case 8:
-        return 'Fleet & Riders';
+        return 'Riders & Fleet';
       case 9:
         return 'Distribution Centers';
       case 10:
-        return 'DC Settings';
+        return 'Policy & Settings';
+      case 11:
+        return 'Clients & Merchants';
       default:
         return 'Distribution Center';
     }

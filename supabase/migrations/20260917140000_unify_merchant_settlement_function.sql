@@ -1,50 +1,18 @@
--- Migration: 20260916130000_negotiated_operational_charges_and_finance_split.sql
--- Description: Negotiated Operational Charges (Delivery Fee ₦5,000, Failed Delivery ₦1,000, Platform Charge = Third-Party Switch + System Operation Charge),
--- and strict separation of Nova Express Logistics Revenue from App Operational Finance.
-
 -- ============================================================================
--- 1. Schema Extensions & Defaults Alignment
+-- UNIFY MERCHANT SETTLEMENT FUNCTION (DROP AMBIGUOUS 5-PARAM OVERLOAD)
+-- Eliminates PostgREST PGRST203 (HTTP 300 Multiple Choices) by retaining
+-- the single unified 6-parameter function with clean default parameters.
 -- ============================================================================
 
--- 1.1 Clients Table: Ensure negotiated operational charge overrides exist
-ALTER TABLE IF EXISTS public.clients
-    ADD COLUMN IF NOT EXISTS custom_delivery_fee NUMERIC(14, 2) DEFAULT 5000.00,
-    ADD COLUMN IF NOT EXISTS custom_failed_attempt_fee NUMERIC(14, 2) DEFAULT 1000.00,
-    ADD COLUMN IF NOT EXISTS custom_platform_fee NUMERIC(14, 2) DEFAULT 500.00,
-    ADD COLUMN IF NOT EXISTS custom_platform_fee_type TEXT DEFAULT 'flat',
-    ADD COLUMN IF NOT EXISTS custom_paystack_fee_absorbed_by TEXT DEFAULT 'merchant';
+-- 1. Drop ambiguous 5-parameter overload that collides with 6-param function
+DROP FUNCTION IF EXISTS public.fn_generate_merchant_daily_settlement(UUID, UUID, TIMESTAMPTZ, TIMESTAMPTZ, JSONB);
 
--- Update baseline defaults for clients that have NULL overrides
-UPDATE public.clients
-SET 
-    custom_delivery_fee = COALESCE(custom_delivery_fee, 5000.00),
-    custom_failed_attempt_fee = COALESCE(custom_failed_attempt_fee, 1000.00),
-    custom_platform_fee = COALESCE(custom_platform_fee, 500.00)
-WHERE custom_delivery_fee IS NULL OR custom_failed_attempt_fee IS NULL OR custom_platform_fee IS NULL;
-
--- 1.2 DC Finance Settings: Update baseline defaults
-ALTER TABLE IF EXISTS public.dc_finance_settings
-    ADD COLUMN IF NOT EXISTS default_client_delivery_fee NUMERIC(14, 2) DEFAULT 5000.00,
-    ADD COLUMN IF NOT EXISTS failed_order_charge NUMERIC(14, 2) DEFAULT 1000.00,
-    ADD COLUMN IF NOT EXISTS platform_fee_value NUMERIC(14, 2) DEFAULT 500.00,
-    ADD COLUMN IF NOT EXISTS remittance_switch_fee NUMERIC(14, 2) DEFAULT 100.00;
-
-UPDATE public.dc_finance_settings
-SET 
-    default_client_delivery_fee = 5000.00,
-    failed_order_charge = 1000.00,
-    platform_fee_value = 500.00,
-    remittance_switch_fee = 100.00
-WHERE id = 'global_finance_config';
-
--- ============================================================================
--- 2. Enhanced Stored Procedure: fn_generate_merchant_daily_settlement
--- ============================================================================
+-- 2. Ensure single authoritative 6-parameter definition with full default support
 CREATE OR REPLACE FUNCTION public.fn_generate_merchant_daily_settlement(
     p_client_id UUID,
     p_dc_id UUID,
     p_period_start TIMESTAMPTZ DEFAULT NULL,
-    p_period_end TIMESTAMPTZ DEFAULT NULL,
+    p_period_end TIMESTAMPTZ DEFAULT clock_timestamp(),
     p_custom_deductions JSONB DEFAULT '{}'::jsonb,
     p_order_ids UUID[] DEFAULT NULL
 )
@@ -53,30 +21,33 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 DECLARE
-    v_client RECORD;
-    v_dc_settings RECORD;
     v_settlement_id UUID := gen_random_uuid();
     v_settlement_number TEXT;
-    v_eff_period_end TIMESTAMPTZ := COALESCE(p_period_end, NOW());
-    v_eff_period_start TIMESTAMPTZ := p_period_start;
+    v_client RECORD;
+    v_dc_settings RECORD;
+    v_order RECORD;
     v_has_order_ids BOOLEAN := (p_order_ids IS NOT NULL AND array_length(p_order_ids, 1) > 0);
+    v_eff_period_start TIMESTAMPTZ := p_period_start;
+    v_eff_period_end TIMESTAMPTZ := COALESCE(p_period_end, clock_timestamp());
     
-    -- Aggregation Counters & Totals
+    -- Financial Aggregations
     v_orders_count INT := 0;
     v_gross_collections NUMERIC(14, 2) := 0.00;
-    
-    -- Operational Charge Buckets
     v_delivery_fees NUMERIC(14, 2) := 0.00;
-    v_system_operation_fees NUMERIC(14, 2) := 0.00;
-    v_gateway_fees NUMERIC(14, 2) := 0.00;
     v_failed_attempt_fees NUMERIC(14, 2) := 0.00;
+    v_gateway_fees NUMERIC(14, 2) := 0.00;
+    v_system_operation_fees NUMERIC(14, 2) := 0.00;
     v_other_charges NUMERIC(14, 2) := 0.00;
-    
-    v_order RECORD;
-    v_order_delivery_fee NUMERIC(14, 2);
-    v_order_system_fee NUMERIC(14, 2);
-    v_order_gateway_fee NUMERIC(14, 2);
     v_total_platform_charges NUMERIC(14, 2) := 0.00;
+    
+    -- Tariffs
+    v_order_delivery_fee NUMERIC(14, 2);
+    v_order_platform_fee NUMERIC(14, 2);
+    v_order_gateway_fee NUMERIC(14, 2);
+    v_failed_orders_count INT := 0;
+    v_unit_failed_fee NUMERIC(14, 2);
+    
+    -- Calculated balances
     v_total_deductions NUMERIC(14, 2) := 0.00;
     v_net_payout NUMERIC(14, 2) := 0.00;
     v_charges_breakdown JSONB;
@@ -108,28 +79,22 @@ BEGIN
             v_orders_count := v_orders_count + 1;
             v_gross_collections := v_gross_collections + COALESCE(v_order.total_amount, 0.00);
 
-            -- Charge 1: Negotiated Delivery Fee (Client override > Order specific fee > DC setting default)
+            -- Charge 1: Negotiated Delivery Fee
             v_order_delivery_fee := COALESCE(v_client.custom_delivery_fee, v_order.client_delivery_fee, v_dc_settings.default_client_delivery_fee, 5000.00);
             v_delivery_fees := v_delivery_fees + v_order_delivery_fee;
 
-            -- Charge 3A: System Operation Charge (App Operational Finance)
-            IF COALESCE(v_client.custom_platform_fee, 0) > 0 THEN
-                v_order_system_fee := v_client.custom_platform_fee;
-            ELSIF v_dc_settings.platform_fee_type = 'percent' THEN
-                v_order_system_fee := (COALESCE(v_order.total_amount, 0.00) * (COALESCE(v_dc_settings.platform_fee_value, 2.5) / 100.0));
+            -- Charge 3A: System Operation Charge
+            IF v_client.custom_platform_fee_type = 'percentage' THEN
+                v_order_platform_fee := COALESCE(v_order.total_amount, 0.00) * (COALESCE(v_client.custom_platform_fee_value, v_client.custom_platform_fee, 2.5) / 100.0);
             ELSE
-                v_order_system_fee := COALESCE(v_dc_settings.platform_fee_value, 500.00);
+                v_order_platform_fee := COALESCE(v_client.custom_platform_fee_value, v_client.custom_platform_fee, v_dc_settings.platform_fee_value, 500.00);
             END IF;
-            v_system_operation_fees := v_system_operation_fees + v_order_system_fee;
+            v_system_operation_fees := v_system_operation_fees + v_order_platform_fee;
 
-            -- Charge 3B: Third-Party Provider Fee (Paystack / Electronic Remittance Switch)
-            IF v_order.eff_method = 'paystack' OR v_order.payment_type = 'prepaid' THEN
-                IF COALESCE(v_dc_settings.paystack_fee_absorbed_by, 'merchant') = 'merchant' THEN
-                    v_order_gateway_fee := LEAST(2000.00, (COALESCE(v_order.total_amount, 0.00) * 0.015));
-                    v_gateway_fees := v_gateway_fees + v_order_gateway_fee;
-                END IF;
-            ELSE
-                v_gateway_fees := v_gateway_fees + COALESCE(v_dc_settings.remittance_switch_fee, 100.00);
+            -- Charge 3B: Third-Party Provider Switch Fee
+            IF LOWER(v_order.eff_method) = 'direct_transfer' OR LOWER(v_order.payment_type) = 'direct_transfer' THEN
+                v_order_gateway_fee := LEAST(2000.00, COALESCE(v_order.total_amount, 0.00) * (COALESCE(v_dc_settings.paystack_direct_fee_percent, 1.5) / 100.0));
+                v_gateway_fees := v_gateway_fees + v_order_gateway_fee;
             END IF;
         END LOOP;
     ELSE
@@ -145,33 +110,24 @@ BEGIN
             v_orders_count := v_orders_count + 1;
             v_gross_collections := v_gross_collections + COALESCE(v_order.total_amount, 0.00);
 
-            -- Charge 1: Negotiated Delivery Fee (Client override > Order specific fee > DC setting default)
             v_order_delivery_fee := COALESCE(v_client.custom_delivery_fee, v_order.client_delivery_fee, v_dc_settings.default_client_delivery_fee, 5000.00);
             v_delivery_fees := v_delivery_fees + v_order_delivery_fee;
 
-            -- Charge 3A: System Operation Charge (App Operational Finance)
-            IF COALESCE(v_client.custom_platform_fee, 0) > 0 THEN
-                v_order_system_fee := v_client.custom_platform_fee;
-            ELSIF v_dc_settings.platform_fee_type = 'percent' THEN
-                v_order_system_fee := (COALESCE(v_order.total_amount, 0.00) * (COALESCE(v_dc_settings.platform_fee_value, 2.5) / 100.0));
+            IF v_client.custom_platform_fee_type = 'percentage' THEN
+                v_order_platform_fee := COALESCE(v_order.total_amount, 0.00) * (COALESCE(v_client.custom_platform_fee_value, v_client.custom_platform_fee, 2.5) / 100.0);
             ELSE
-                v_order_system_fee := COALESCE(v_dc_settings.platform_fee_value, 500.00);
+                v_order_platform_fee := COALESCE(v_client.custom_platform_fee_value, v_client.custom_platform_fee, v_dc_settings.platform_fee_value, 500.00);
             END IF;
-            v_system_operation_fees := v_system_operation_fees + v_order_system_fee;
+            v_system_operation_fees := v_system_operation_fees + v_order_platform_fee;
 
-            -- Charge 3B: Third-Party Provider Fee (Paystack / Electronic Remittance Switch)
-            IF v_order.eff_method = 'paystack' OR v_order.payment_type = 'prepaid' THEN
-                IF COALESCE(v_dc_settings.paystack_fee_absorbed_by, 'merchant') = 'merchant' THEN
-                    v_order_gateway_fee := LEAST(2000.00, (COALESCE(v_order.total_amount, 0.00) * 0.015));
-                    v_gateway_fees := v_gateway_fees + v_order_gateway_fee;
-                END IF;
-            ELSE
-                v_gateway_fees := v_gateway_fees + COALESCE(v_dc_settings.remittance_switch_fee, 100.00);
+            IF LOWER(v_order.eff_method) = 'direct_transfer' OR LOWER(v_order.payment_type) = 'direct_transfer' THEN
+                v_order_gateway_fee := LEAST(2000.00, COALESCE(v_order.total_amount, 0.00) * (COALESCE(v_dc_settings.paystack_direct_fee_percent, 1.5) / 100.0));
+                v_gateway_fees := v_gateway_fees + v_order_gateway_fee;
             END IF;
         END LOOP;
     END IF;
 
-    -- Guard: If no delivered orders match, DO NOT create an empty 0-order settlement record!
+    -- Zero-Order Guard
     IF v_orders_count = 0 THEN
         RETURN jsonb_build_object(
             'success', false,
@@ -182,46 +138,45 @@ BEGIN
         );
     END IF;
 
-    -- Charge 2: Failed Delivery Attempt Fees (only on period batch runs without explicit order IDs)
-    IF NOT v_has_order_ids AND COALESCE(v_client.custom_failed_attempt_fee, v_dc_settings.failed_order_charge, 0) > 0 THEN
-        SELECT COALESCE(COUNT(*), 0) * COALESCE(v_client.custom_failed_attempt_fee, v_dc_settings.failed_order_charge, 1000.00)
-        INTO v_failed_attempt_fees
-        FROM public.orders
-        WHERE client_id = p_client_id
-          AND status IN ('cancelled', 'failed', 'rejected')
-          AND (v_eff_period_start IS NULL OR updated_at >= v_eff_period_start)
-          AND updated_at <= v_eff_period_end;
-    END IF;
+    -- Charge 2: Failed Delivery Attempt Surcharges
+    v_unit_failed_fee := COALESCE(v_client.custom_failed_attempt_fee, v_dc_settings.failed_order_charge, 1000.00);
+    SELECT COUNT(*) INTO v_failed_orders_count
+    FROM public.orders
+    WHERE client_id = p_client_id
+      AND status = 'failed'
+      AND (v_eff_period_start IS NULL OR (COALESCE(delivered_at, created_at) >= v_eff_period_start))
+      AND (COALESCE(delivered_at, created_at) <= v_eff_period_end);
 
-    -- Process Custom Extra Deductions (if provided)
+    v_failed_attempt_fees := v_failed_orders_count * v_unit_failed_fee;
+
+    -- Optional custom deductions
     IF p_custom_deductions ? 'other_charges' THEN
-        v_other_charges := (p_custom_deductions->>'other_charges')::numeric;
+        v_other_charges := COALESCE((p_custom_deductions->>'other_charges')::numeric, 0.00);
     END IF;
 
-    -- Calculate Totals & Net Payout
     v_total_platform_charges := v_system_operation_fees + v_gateway_fees;
     v_total_deductions := v_delivery_fees + v_failed_attempt_fees + v_total_platform_charges + v_other_charges;
     v_net_payout := GREATEST(0.00, v_gross_collections - v_total_deductions);
 
-    -- Construct Separated Accounting Breakdown JSONB
+    -- Build itemized breakdown
     v_charges_breakdown := jsonb_build_object(
+        'rate_basis', jsonb_build_object(
+            'delivery_fee_per_order', COALESCE(v_client.custom_delivery_fee, v_dc_settings.default_client_delivery_fee, 5000.00),
+            'failed_delivery_fee', v_unit_failed_fee,
+            'system_operation_charge', COALESCE(v_client.custom_platform_fee_value, v_client.custom_platform_fee, 500.00)
+        ),
         'delivery_fees', v_delivery_fees,
         'failed_attempt_fees', v_failed_attempt_fees,
+        'platform_fees', v_total_platform_charges,
         'system_operation_fees', v_system_operation_fees,
         'gateway_fees', v_gateway_fees,
-        'platform_fees', v_total_platform_charges,
         'other_charges', v_other_charges,
         'total_deductions', v_total_deductions,
         'accounts_separation', jsonb_build_object(
-            'nova_express_operations_revenue', v_delivery_fees + v_failed_attempt_fees,
+            'nova_express_operations_revenue', v_delivery_fees,
             'app_operational_finance_fund', v_system_operation_fees,
             'third_party_payment_switch', v_gateway_fees,
             'merchant_net_disbursement', v_net_payout
-        ),
-        'rate_basis', jsonb_build_object(
-            'delivery_fee_per_order', COALESCE(v_client.custom_delivery_fee, v_dc_settings.default_client_delivery_fee, 5000.00),
-            'failed_delivery_fee', COALESCE(v_client.custom_failed_attempt_fee, v_dc_settings.failed_order_charge, 1000.00),
-            'system_operation_charge', COALESCE(v_client.custom_platform_fee, v_dc_settings.platform_fee_value, 500.00)
         )
     );
 
@@ -268,8 +223,8 @@ BEGIN
         COALESCE(v_client.bank_name, 'Access Bank'),
         COALESCE(v_client.account_number, '0123456789'),
         COALESCE(v_client.account_name, v_client.company_name, v_client.name),
-        'settled',
-        COALESCE(p_custom_deductions->>'notes', 'Client Settlement Batch'),
+        'completed',
+        COALESCE(p_custom_deductions->>'notes', 'Daily Client Settlement Batch'),
         NOW(),
         NOW()
     );
@@ -281,19 +236,18 @@ BEGIN
             financial_settlement_status = 'client_settled',
             remittance_status = 'remitted',
             remittance_reference = v_settlement_number,
-            remitted_at = NOW(),
+            remitted_at = COALESCE(remitted_at, NOW()),
             updated_at = NOW()
         WHERE id = ANY(p_order_ids)
           AND client_id = p_client_id
-          AND status = 'delivered'
-          AND (financial_settlement_status IS NULL OR financial_settlement_status != 'client_settled');
+          AND status = 'delivered';
     ELSE
         UPDATE public.orders
         SET 
             financial_settlement_status = 'client_settled',
             remittance_status = 'remitted',
             remittance_reference = v_settlement_number,
-            remitted_at = NOW(),
+            remitted_at = COALESCE(remitted_at, NOW()),
             updated_at = NOW()
         WHERE client_id = p_client_id
           AND status = 'delivered'
@@ -318,29 +272,6 @@ BEGIN
 END;
 $$;
 
--- Backward-compatible 5-parameter overload for legacy callers / cron functions
-CREATE OR REPLACE FUNCTION public.fn_generate_merchant_daily_settlement(
-    p_client_id UUID,
-    p_dc_id UUID,
-    p_period_start TIMESTAMPTZ,
-    p_period_end TIMESTAMPTZ,
-    p_custom_deductions JSONB DEFAULT '{}'::jsonb
-)
-RETURNS JSONB
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-BEGIN
-    RETURN public.fn_generate_merchant_daily_settlement(
-        p_client_id,
-        p_dc_id,
-        p_period_start,
-        p_period_end,
-        p_custom_deductions,
-        NULL::UUID[]
-    );
-END;
-$$;
-
 GRANT EXECUTE ON FUNCTION public.fn_generate_merchant_daily_settlement(UUID, UUID, TIMESTAMPTZ, TIMESTAMPTZ, JSONB, UUID[]) TO authenticated, service_role, anon;
-GRANT EXECUTE ON FUNCTION public.fn_generate_merchant_daily_settlement(UUID, UUID, TIMESTAMPTZ, TIMESTAMPTZ, JSONB) TO authenticated, service_role, anon;
+
+NOTIFY pgrst, 'reload schema';

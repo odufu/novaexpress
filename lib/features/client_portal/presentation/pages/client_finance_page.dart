@@ -62,10 +62,7 @@ class _ClientFinancePageState extends ConsumerState<ClientFinancePage> {
       if (_selectedLedgerStatus != 'all') {
         if (_selectedLedgerStatus == 'today_closeout') {
           if (!o.isDelivered) return false;
-          final fs = o.financialSettlementStatus.toLowerCase();
-          final rs = o.remittanceStatus.toLowerCase();
-          final isSettled = fs == 'client_settled' || fs == 'settled' || rs == 'remitted' || rs == 'cleared';
-          if (isSettled) return false;
+          if (o.isClientSettled) return false;
         }
         if (_selectedLedgerStatus == 'remitted' && (!o.isDelivered || !o.isRemitted)) {
           return false;
@@ -879,7 +876,7 @@ class _ClientFinancePageState extends ConsumerState<ClientFinancePage> {
             runSpacing: 6,
             children: [
               _buildLedgerStatusChip('all', 'All Transactions', orders.length, isDark),
-              _buildLedgerStatusChip('today_closeout', 'Awaiting 10 PM Closeout', state.todayCompletedOrdersCount, isDark),
+              _buildLedgerStatusChip('today_closeout', 'Awaiting Client Settlement', state.todayCompletedOrdersCount, isDark),
               _buildLedgerStatusChip('remitted', 'Remitted to Bank', orders.where((o) => o.isDelivered && o.isRemitted).length, isDark),
               _buildLedgerStatusChip('custody', 'In DC Custody (Ready)', orders.where((o) => o.isDelivered && !o.isRemitted && o.isCashPod).length, isDark),
               _buildLedgerStatusChip('in_field', 'In Field (COD Active)', orders.where((o) => !o.isDelivered && !o.isFailed && o.isCashPod).length, isDark),
@@ -1016,7 +1013,10 @@ class _ClientFinancePageState extends ConsumerState<ClientFinancePage> {
       return _badge('Remitted to Bank', const Color(0xFF10B981));
     }
     if (order.isDelivered) {
-      return _badge('In Custody (10 PM Closeout)', const Color(0xFF0D9488));
+      if (order.isClientSettled) {
+        return _badge('Settled to Client', const Color(0xFF10B981));
+      }
+      return _badge('In Custody (Awaiting Settlement)', const Color(0xFF0D9488));
     }
     if (order.isFailed) {
       return _badge('Delivery Failed / Return', const Color(0xFFEF4444));
@@ -1101,7 +1101,7 @@ class _ClientFinancePageState extends ConsumerState<ClientFinancePage> {
                       runSpacing: 4,
                       children: [
                         Text(
-                          '10:00 PM Daily Remittance Closeout',
+                          'Daily Client Settlement',
                           style: GoogleFonts.inter(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
@@ -1123,7 +1123,7 @@ class _ClientFinancePageState extends ConsumerState<ClientFinancePage> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'All orders completed today before 10:00 PM accumulate live in DC custody. Tonight\'s reconciliation will deduct itemized logistics & processing charges, remitting net proceeds directly to your designated bank account.',
+                      'All orders completed today accumulate live in DC custody. The daily client settlement reconciliation will deduct itemized logistics & processing charges, remitting net proceeds directly to your designated bank account.',
                       style: GoogleFonts.inter(
                         fontSize: 12,
                         color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF047857),
@@ -1365,7 +1365,7 @@ class _ClientFinancePageState extends ConsumerState<ClientFinancePage> {
                     _buildSubDetailRow('Physical COD in DC Vaults', currency.format(codInVault)),
                     _buildSubDetailRow('Digital Transfers in Paystack', currency.format(directInPaystack)),
                     const SizedBox(height: 6),
-                    Text('Disbursed daily at 10:00 PM closeout.', style: GoogleFonts.inter(fontSize: 11, fontStyle: FontStyle.italic, color: const Color(0xFF64748B))),
+                    Text('Disbursed via daily client settlement.', style: GoogleFonts.inter(fontSize: 11, fontStyle: FontStyle.italic, color: const Color(0xFF64748B))),
                   ],
                 ),
               );
@@ -1560,7 +1560,7 @@ class _ClientFinancePageState extends ConsumerState<ClientFinancePage> {
               const Icon(Icons.receipt_long_outlined, size: 40, color: Color(0xFF94A3B8)),
               const SizedBox(height: 10),
               Text('No Daily Settlement Batches Yet', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold)),
-              Text('Batches finalized at 10:00 PM will appear here with itemized deductions and payment receipts.', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+              Text('Batches finalized upon client settlement will appear here with itemized deductions and payment receipts.', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
             ],
           ),
         ),
@@ -1805,7 +1805,7 @@ NET DISBURSED TO BANK: ${currency.format(s.netPayoutAmount)}
                     _buildSettlementDetailRow('Auxiliary Charges', '- ${currency.format(s.otherChargesDeducted)}', isNegative: true),
                   const Divider(height: 16),
                   _buildSettlementDetailRow('Total Cleared Orders', '${s.totalOrdersCount} Completed Deliveries'),
-                  _buildSettlementDetailRow('Settlement Cutoff Time', DateFormat('MMM dd, yyyy - 10:00 PM').format(s.periodEnd)),
+                  _buildSettlementDetailRow('Settlement Cutoff Time', DateFormat('MMM dd, yyyy - hh:mm a').format(s.periodEnd)),
                   _buildSettlementDetailRow('Cleared At', formattedDate),
                 ],
               ),

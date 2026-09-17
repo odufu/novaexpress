@@ -81,6 +81,7 @@ abstract class DCConsoleRemoteDataSource {
     required DateTime periodStart,
     required DateTime periodEnd,
     Map<String, dynamic>? customDeductions,
+    List<String>? orderIds,
   });
   Future<List<ClientSettlement>> fetchDcClientSettlements({
     required String dcId,
@@ -833,6 +834,7 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
     required DateTime periodStart,
     required DateTime periodEnd,
     Map<String, dynamic>? customDeductions,
+    List<String>? orderIds,
   }) async {
     final adminDb = _getAdminClient();
     try {
@@ -842,9 +844,10 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
         'p_period_start': periodStart.toIso8601String(),
         'p_period_end': periodEnd.toIso8601String(),
         if (customDeductions != null) 'p_custom_deductions': customDeductions,
+        if (orderIds != null && orderIds.isNotEmpty) 'p_order_ids': orderIds,
       });
 
-      debugPrint('[DC_CONSOLE] ✅ 10:00 PM Merchant settlement generated: ${response['settlement_number']}');
+      debugPrint('[DC_CONSOLE] ✅ Client settlement generated: ${response['settlement_number']}');
       return Map<String, dynamic>.from(response as Map);
     } catch (e) {
       debugPrint('[DC_CONSOLE] ❌ generateDailyMerchantSettlement error: $e');

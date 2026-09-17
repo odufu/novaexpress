@@ -160,9 +160,9 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
               const SizedBox(width: 12),
               ElevatedButton.icon(
                 onPressed: () => _openMerchantSettlementPicker(context, ref, dcState, ordersState.orders),
-                icon: const Icon(Icons.nightlight_round, size: 16, color: Colors.white),
+                icon: const Icon(Icons.account_balance_wallet_rounded, size: 16, color: Colors.white),
                 label: Text(
-                  '10:00 PM Daily Settlement',
+                  'Client Settlement',
                   style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700, color: Colors.white),
                 ),
                 style: ElevatedButton.styleFrom(
@@ -426,7 +426,7 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
             o.paymentMethod.toLowerCase() == 'direct_transfer' ||
             o.paymentType == 'direct_transfer') &&
         o.status.toLowerCase() == 'delivered' &&
-        o.financeSettlementStatus != 'settled'
+        !o.isClientSettled
       ).toList();
       DCDailyMerchantSettlementModal.show(
         context: context,
@@ -445,11 +445,11 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: Row(
             children: [
-              const Icon(Icons.nightlight_round, color: Color(0xFF0284C7), size: 22),
+              const Icon(Icons.account_balance_wallet_rounded, color: Color(0xFF0284C7), size: 22),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Daily Merchant Settlement',
+                  'Client Settlement',
                   style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -484,7 +484,7 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
                             o.paymentMethod.toLowerCase() == 'direct_transfer' ||
                             o.paymentType == 'direct_transfer') &&
                         o.status.toLowerCase() == 'delivered' &&
-                        o.financeSettlementStatus != 'settled'
+                        !o.isClientSettled
                       ).toList();
 
                       final unsettledSum = eligibleOrders.fold(0.0, (sum, o) => sum + o.totalAmount);

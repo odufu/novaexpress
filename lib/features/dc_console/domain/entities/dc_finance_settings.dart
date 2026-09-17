@@ -15,7 +15,7 @@ class DCFinanceSettings {
   final String settlementAccountName; // 'NovaExpress Logistics Limited'
   final bool autoReconcileWebhooks; // true
 
-  // Merchant Billing & Daily 10:00 PM Closeout Settings
+  // Merchant Billing & Daily Client Settlement Settings
   final double defaultClientDeliveryFee; // e.g. 3500.0
   final String platformFeeType; // 'flat' or 'percent'
   final double platformFeeValue; // e.g. 500.0 or 2.5

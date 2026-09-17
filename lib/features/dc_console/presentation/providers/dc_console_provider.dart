@@ -1550,6 +1550,7 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     required DateTime periodStart,
     required DateTime periodEnd,
     Map<String, dynamic>? customDeductions,
+    List<String>? orderIds,
   }) async {
     final result = await _repository.generateDailyMerchantSettlement(
       clientId: clientId,
@@ -1557,6 +1558,7 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
       periodStart: periodStart,
       periodEnd: periodEnd,
       customDeductions: customDeductions,
+      orderIds: orderIds,
     );
     await _initDrivers();
     return result;

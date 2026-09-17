@@ -223,7 +223,7 @@ class _ClientOrdersPageState extends ConsumerState<ClientOrdersPage> {
                       const SizedBox(width: 6),
                       _buildStatusFilterChip('delivered', 'Delivered (${state.deliveredOrdersCount})', isDark),
                       const SizedBox(width: 6),
-                      _buildStatusFilterChip('awaiting_closeout', 'Awaiting 10 PM (${state.todayCompletedOrdersCount})', isDark),
+                      _buildStatusFilterChip('awaiting_closeout', 'Awaiting Settlement (${state.todayCompletedOrdersCount})', isDark),
                       const SizedBox(width: 6),
                       _buildStatusFilterChip('failed', 'Failed (${state.failedOrdersCount})', isDark),
                     ],
@@ -422,7 +422,7 @@ class _ClientOrdersPageState extends ConsumerState<ClientOrdersPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Delivered Today: ${state.todayCompletedOrdersCount} Orders Awaiting 10 PM Closeout',
+                      'Delivered Today: ${state.todayCompletedOrdersCount} Orders Awaiting Client Settlement',
                       style: GoogleFonts.inter(
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
@@ -575,7 +575,7 @@ class _ClientOrdersPageState extends ConsumerState<ClientOrdersPage> {
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
-                          order.distributionCenterId != null ? 'Wuse Central DC' : 'Auto Routing...',
+                          order.distributionCenterName ?? (order.distributionCenterId != null ? 'Assigned DC Hub' : 'Auto Routing...'),
                           style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFF37021)),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,

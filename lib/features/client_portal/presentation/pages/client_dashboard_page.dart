@@ -6,6 +6,7 @@ import '../providers/client_portal_provider.dart';
 import '../widgets/client_create_order_modal.dart';
 import '../widgets/client_order_tracking_modal.dart';
 import '../widgets/client_daily_accumulator_modal.dart';
+import '../widgets/client_add_package_modal.dart';
 
 class ClientDashboardPage extends ConsumerWidget {
   final VoidCallback onNavigateToOrders;
@@ -20,6 +21,8 @@ class ClientDashboardPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(clientPortalProvider);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final screenWidth = MediaQuery.of(context).size.width;
     final isCompact = screenWidth < 650;
 
@@ -37,15 +40,15 @@ class ClientDashboardPage extends ConsumerWidget {
           const SizedBox(height: 24),
 
           // KPI Metric Summary Grid
-          _buildKpiMetricsGrid(context, state),
+          _buildKpiMetricsGrid(context, state, isDark),
           const SizedBox(height: 24),
 
           // Action Shortcuts & Bulk Import Bar
-          _buildQuickActionsRow(context, ref),
+          _buildQuickActionsRow(context, ref, state, isDark),
           const SizedBox(height: 24),
 
           // Live Active Shipments Section
-          _buildLiveOrdersSection(context, state, ref),
+          _buildLiveOrdersSection(context, state, ref, isDark),
         ],
       ),
     );
@@ -240,7 +243,7 @@ class ClientDashboardPage extends ConsumerWidget {
                       children: [
                         Flexible(
                           child: Text(
-                            'Live Cash Accumulator (Awaiting 10 PM Closeout)',
+                            'Live Cash Accumulator (Awaiting Client Settlement)',
                             style: GoogleFonts.inter(
                               fontSize: 14,
                               fontWeight: FontWeight.w800,
@@ -397,7 +400,7 @@ class ClientDashboardPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildKpiMetricsGrid(BuildContext context, ClientPortalState state) {
+  Widget _buildKpiMetricsGrid(BuildContext context, ClientPortalState state, bool isDark) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final crossAxisCount = constraints.maxWidth > 900 ? 4 : (constraints.maxWidth > 550 ? 2 : 1);
@@ -416,6 +419,7 @@ class ClientDashboardPage extends ConsumerWidget {
               subtitle: '${state.pendingOrdersCount} awaiting dispatch',
               icon: Icons.inventory_2_outlined,
               color: const Color(0xFF2563EB),
+              isDark: isDark,
             ),
             _buildKpiCard(
               title: 'Active In-Transit',
@@ -423,6 +427,7 @@ class ClientDashboardPage extends ConsumerWidget {
               subtitle: 'Dispatched to field riders',
               icon: Icons.two_wheeler_rounded,
               color: const Color(0xFFF59E0B),
+              isDark: isDark,
             ),
             _buildKpiCard(
               title: 'Delivered Today',
@@ -430,6 +435,7 @@ class ClientDashboardPage extends ConsumerWidget {
               subtitle: 'Success Rate: ${state.deliverySuccessRate.toStringAsFixed(1)}%',
               icon: Icons.check_circle_outline_rounded,
               color: const Color(0xFF10B981),
+              isDark: isDark,
             ),
             _buildKpiCard(
               title: 'Gross Delivered Value',
@@ -437,6 +443,7 @@ class ClientDashboardPage extends ConsumerWidget {
               subtitle: 'COD Pending: ₦${_formatMoney(state.pendingCodRemittances)}',
               icon: Icons.account_balance_wallet_outlined,
               color: const Color(0xFF8B5CF6),
+              isDark: isDark,
             ),
           ],
         );
@@ -450,16 +457,17 @@ class ClientDashboardPage extends ConsumerWidget {
     required String subtitle,
     required IconData icon,
     required Color color,
+    required bool isDark,
   }) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF151D36) : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),
@@ -471,7 +479,7 @@ class ClientDashboardPage extends ConsumerWidget {
             width: 46,
             height: 46,
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
+              color: color.withValues(alpha: isDark ? 0.2 : 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, color: color, size: 24),
@@ -484,12 +492,12 @@ class ClientDashboardPage extends ConsumerWidget {
               children: [
                 Text(
                   title,
-                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500, color: const Color(0xFF64748B)),
+                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   value,
-                  style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                  style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -507,13 +515,13 @@ class ClientDashboardPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildQuickActionsRow(BuildContext context, WidgetRef ref) {
+  Widget _buildQuickActionsRow(BuildContext context, WidgetRef ref, ClientPortalState state, bool isDark) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF151D36) : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
       ),
       child: Wrap(
         spacing: 12,
@@ -528,7 +536,7 @@ class ClientDashboardPage extends ConsumerWidget {
               const SizedBox(width: 8),
               Text(
                 'Quick Merchant Actions',
-                style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF1E293B)),
+                style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF1E293B)),
               ),
             ],
           ),
@@ -540,28 +548,37 @@ class ClientDashboardPage extends ConsumerWidget {
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  side: BorderSide(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFCBD5E1)),
                 ),
                 onPressed: () => ClientCreateOrderModal.show(context),
                 icon: const Icon(Icons.add_box_outlined, size: 16, color: Color(0xFF0D9488)),
-                label: const Text('Create Order'),
+                label: Text('Create Order', style: GoogleFonts.inter(color: isDark ? Colors.white : const Color(0xFF1E293B))),
               ),
               OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  side: BorderSide(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFCBD5E1)),
                 ),
-                onPressed: onNavigateToProducts,
+                onPressed: () {
+                  if (state.products.isNotEmpty) {
+                    ClientAddPackageModal.show(context, product: state.products.first);
+                  } else {
+                    onNavigateToProducts();
+                  }
+                },
                 icon: const Icon(Icons.add_shopping_cart, size: 16, color: Color(0xFF2563EB)),
-                label: const Text('Add Package Deal'),
+                label: Text('Add Package Deal', style: GoogleFonts.inter(color: isDark ? Colors.white : const Color(0xFF1E293B))),
               ),
               OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  side: BorderSide(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFCBD5E1)),
                 ),
                 onPressed: onNavigateToOrders,
                 icon: const Icon(Icons.list_alt_rounded, size: 16, color: Color(0xFF475569)),
-                label: const Text('View All Orders'),
+                label: Text('View All Orders', style: GoogleFonts.inter(color: isDark ? Colors.white : const Color(0xFF1E293B))),
               ),
             ],
           ),
@@ -570,15 +587,15 @@ class ClientDashboardPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildLiveOrdersSection(BuildContext context, ClientPortalState state, WidgetRef ref) {
+  Widget _buildLiveOrdersSection(BuildContext context, ClientPortalState state, WidgetRef ref, bool isDark) {
     final recentOrders = state.orders.take(6).toList();
 
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF151D36) : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -592,7 +609,7 @@ class ClientDashboardPage extends ConsumerWidget {
                   children: [
                     Text(
                       'Real-Time Shipments & Dispatch Pipeline',
-                      style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                      style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
@@ -642,7 +659,7 @@ class ClientDashboardPage extends ConsumerWidget {
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: recentOrders.length,
-                  separatorBuilder: (context, index) => const Divider(color: Color(0xFFF1F5F9), height: 16),
+                  separatorBuilder: (context, index) => Divider(color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9), height: 16),
                   itemBuilder: (context, index) {
                     final order = recentOrders[index];
                     return InkWell(
@@ -670,7 +687,7 @@ class ClientDashboardPage extends ConsumerWidget {
                                       children: [
                                         Text(
                                           order.orderNumber,
-                                          style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: const Color(0xFF0F172A)),
+                                          style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: isDark ? Colors.white : const Color(0xFF0F172A)),
                                         ),
                                         Text(
                                           '${order.customerName} • ${order.deliveryLga ?? "AMAC"}, ${order.deliveryState}',
@@ -688,7 +705,7 @@ class ClientDashboardPage extends ConsumerWidget {
                                       children: [
                                         Text(
                                           '${order.productName} (${order.packageName ?? "${order.quantity} units"})',
-                                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500, color: const Color(0xFF1E293B)),
+                                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500, color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF1E293B)),
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                         ),
@@ -708,7 +725,7 @@ class ClientDashboardPage extends ConsumerWidget {
                                       children: [
                                         Text(
                                           order.assignedAgentName ?? (order.distributionCenterName ?? 'Station DC'),
-                                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF0F172A)),
+                                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? Colors.white : const Color(0xFF0F172A)),
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                         ),
@@ -719,6 +736,7 @@ class ClientDashboardPage extends ConsumerWidget {
                                       ],
                                     ),
                                   ),
+                                  const SizedBox(width: 8),
                                   _buildStatusBadge(order.status),
                                   const SizedBox(width: 8),
                                   IconButton(
@@ -731,9 +749,9 @@ class ClientDashboardPage extends ConsumerWidget {
                             : Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFF8FAFC),
+                                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                                   borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                                  border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
                                 ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -743,7 +761,7 @@ class ClientDashboardPage extends ConsumerWidget {
                                       children: [
                                         Text(
                                           order.orderNumber,
-                                          style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: const Color(0xFF0F172A)),
+                                          style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: isDark ? Colors.white : const Color(0xFF0F172A)),
                                         ),
                                         _buildStatusBadge(order.status),
                                       ],
@@ -751,7 +769,7 @@ class ClientDashboardPage extends ConsumerWidget {
                                     const SizedBox(height: 6),
                                     Text(
                                       order.customerName,
-                                      style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF1E293B)),
+                                      style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: isDark ? Colors.white : const Color(0xFF1E293B)),
                                     ),
                                     Text(
                                       '${order.customerPhone} • ${order.deliveryLga ?? "AMAC"}, ${order.deliveryState}',
@@ -766,7 +784,7 @@ class ClientDashboardPage extends ConsumerWidget {
                                         Expanded(
                                           child: Text(
                                             '${order.productName} (${order.packageName ?? "${order.quantity} units"})',
-                                            style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w500, color: const Color(0xFF334155)),
+                                            style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w500, color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155)),
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                           ),

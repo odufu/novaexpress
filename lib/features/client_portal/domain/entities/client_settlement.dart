@@ -54,7 +54,9 @@ class ClientSettlement {
     required this.createdAt,
   });
 
-  bool get isCompleted => status.toLowerCase() == 'completed';
+  bool get isCompleted =>
+      status.toLowerCase() == 'completed' ||
+      status.toLowerCase() == 'settled';
   bool get isPending => status.toLowerCase() == 'pending';
   bool get isProcessing => status.toLowerCase() == 'processing';
 
@@ -79,8 +81,8 @@ class ClientSettlement {
       failedAttemptFeesDeducted: (json['failed_attempt_fees_deducted'] as num?)?.toDouble() ?? 0.0,
       otherChargesDeducted: (json['other_charges_deducted'] as num?)?.toDouble() ?? 0.0,
       netPayoutAmount: (json['net_payout_amount'] as num?)?.toDouble() ?? 0.0,
-      chargesBreakdown: json['charges_breakdown'] is Map<String, dynamic>
-          ? json['charges_breakdown'] as Map<String, dynamic>
+      chargesBreakdown: json['charges_breakdown'] is Map
+          ? Map<String, dynamic>.from(json['charges_breakdown'] as Map)
           : {},
       destinationBankName: json['destination_bank_name']?.toString() ?? '',
       destinationAccountNumber: json['destination_account_number']?.toString() ?? '',

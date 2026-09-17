@@ -270,6 +270,7 @@ class DCConsoleRepositoryImpl implements DCConsoleRepository {
     required DateTime periodStart,
     required DateTime periodEnd,
     Map<String, dynamic>? customDeductions,
+    List<String>? orderIds,
   }) async {
     return await _remoteDataSource.generateDailyMerchantSettlement(
       clientId: clientId,
@@ -277,6 +278,7 @@ class DCConsoleRepositoryImpl implements DCConsoleRepository {
       periodStart: periodStart,
       periodEnd: periodEnd,
       customDeductions: customDeductions,
+      orderIds: orderIds,
     );
   }
 

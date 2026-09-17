@@ -297,6 +297,7 @@ void main() {
           paymentStatus: 'collected',
           paymentType: 'pay_on_delivery',
           remittanceStatus: 'remitted',
+          financialSettlementStatus: 'client_settled',
           totalAmount: 50000.0,
           basePrice: 50000.0,
           upsellAmount: 0.0,

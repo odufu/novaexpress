@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/widgets/app_loading_overlay.dart';
 import '../../../client_portal/domain/entities/client_profile.dart';
 import '../../../orders/domain/entities/order.dart';
+import '../../../orders/presentation/providers/orders_provider.dart';
 import '../providers/dc_console_provider.dart';
 
 class DCDailyMerchantSettlementModal extends ConsumerStatefulWidget {
@@ -135,7 +136,7 @@ class _DCDailyMerchantSettlementModalState extends ConsumerState<DCDailyMerchant
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Daily Merchant Settlement',
+                            'Client Settlement',
                             style: GoogleFonts.inter(
                               fontSize: isMobile ? 16 : 18,
                               fontWeight: FontWeight.w800,
@@ -395,21 +396,26 @@ class _DCDailyMerchantSettlementModalState extends ConsumerState<DCDailyMerchant
               onPressed: activeOrders.isEmpty ? null : () async {
                 await showAppLoadingDialog(
                   context: context,
-                  message: 'Finalizing 10:00 PM Closeout...',
+                  message: 'Finalizing Client Settlement...',
                   subMessage: 'Locking ${activeOrders.length} orders & generating settlement receipt...',
                   isDark: isDark,
                   task: () async {
                     final now = DateTime.now();
+                    final selectedIds = activeOrders.map((o) => o.id).toList();
                     await ref.read(dcConsoleProvider.notifier).executeDailyMerchantSettlement(
                       clientId: widget.client.id,
                       dcId: activeDcId,
-                      periodStart: now.subtract(const Duration(days: 1)),
+                      periodStart: now.subtract(const Duration(days: 60)),
                       periodEnd: now,
                       customDeductions: {
                         'other_charges': otherCharges,
-                        'notes': _notesController.text,
+                        'notes': _notesController.text.isNotEmpty
+                            ? _notesController.text
+                            : 'Client Settlement Batch',
                       },
+                      orderIds: selectedIds,
                     );
+                    await ref.read(ordersProvider.notifier).fetchOrders();
                   },
                 );
                 if (mounted) {
@@ -417,7 +423,7 @@ class _DCDailyMerchantSettlementModalState extends ConsumerState<DCDailyMerchant
                 }
               },
               icon: const Icon(Icons.check_circle_rounded, color: Colors.white),
-              label: Text('Finalize 10:00 PM Closeout', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: Colors.white)),
+              label: Text('Finalize Client Settlement', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: Colors.white)),
             ),
           ),
         ],
