@@ -11,7 +11,7 @@ void main() {
   group('Remittance Financial Accuracy & Batch Calculation Tests', () {
     const user = UserEntity(
       id: 'c32c038f-ff3d-4a4f-867d-a749092fb2a9',
-      email: 'joel.odufu@novaexpress.ng',
+      email: 'joel.odufu@novaxpress.ng',
       phone: '08031234567',
       firstName: 'Joel',
       lastName: 'Odufu',

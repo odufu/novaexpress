@@ -311,7 +311,7 @@ class _ClientSupplyStockModalState extends ConsumerState<ClientSupplyStockModal>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Supply Stock to NovaExpress',
+                          'Supply Stock to NovaXpress',
                           style: GoogleFonts.inter(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
@@ -1173,7 +1173,7 @@ class _ClientSupplyStockModalState extends ConsumerState<ClientSupplyStockModal>
                           ? 'Supplying Consignment...'
                           : _isSingleDcMode
                               ? 'Confirm & Supply to Hub'
-                              : 'Confirm & Supply to NovaExpress',
+                              : 'Confirm & Supply to NovaXpress',
                       style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700),
                     ),
                   ),

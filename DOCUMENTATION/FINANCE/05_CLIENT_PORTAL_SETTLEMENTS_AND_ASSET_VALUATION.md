@@ -4,7 +4,7 @@
 
 The **Client Portal Finance Subsystem** provides merchants with complete financial transparency, eliminating disputes through verifiable accounting trails. It accomplishes two primary goals:
 1. **Daily Settlement Visibility**: Communicating the **10:00 PM Daily Remittance Closeout** status, showing orders gathered for the night's batch and itemizing all operational deductions.
-2. **Asset Custody & Inventory Valuation**: Tracking total merchant capital held by NovaExpress in two distinct forms:
+2. **Asset Custody & Inventory Valuation**: Tracking total merchant capital held by NovaXpress in two distinct forms:
    - **Liquid Cash in Custody**: Physical COD collections held in DC vaults and digital funds held in Paystack escrow.
    - **In-Kind Inventory Holdings**: Physical stock stored in DC distribution warehouses and rider vehicle mini-hubs, valued using a sophisticated dual-valuation model.
 
@@ -16,7 +16,7 @@ The **Client Portal Finance Subsystem** provides merchants with complete financi
 Merchants frequently sell goods in tiered multi-packs (e.g., 1 bottle for ₦12,000; 2 bottles for ₦20,000; 3 bottles for ₦28,000). Evaluating inventory strictly by multiplying physical units by the single-unit price results in an inflated valuation, while using raw cost price understates operational asset value.
 
 ### 2.2 Mathematical Model
-NovaExpress computes and displays two complementary asset values:
+NovaXpress computes and displays two complementary asset values:
 
 1. **Conservative Base Liquidation Value**:
    $$\text{Valuation}_{\text{base}} = \sum_{i=1}^{N} \Big(\text{Units Held}_i \times \text{Base Unit Price}_i\Big)$$
@@ -179,7 +179,7 @@ Widget _buildAssetCustodyCard(BuildContext context, Map<String, dynamic> custody
                   style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A)),
                 ),
                 Text(
-                  'Liquid funds in NovaExpress custody + In-kind warehouse inventory valuation',
+                  'Liquid funds in NovaXpress custody + In-kind warehouse inventory valuation',
                   style: GoogleFonts.inter(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                 ),
               ],

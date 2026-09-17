@@ -78,7 +78,7 @@ void main() {
   group('Paystack Remittance & Direct Transfer Verification Suite', () {
     const testRider = UserModel(
       id: 'b1111111-1111-4111-8111-111111111111',
-      email: 'joel.odufu@novaexpress.ng',
+      email: 'joel.odufu@novaxpress.ng',
       firstName: 'Joel',
       lastName: 'Odufu',
       phone: '08031234567',
@@ -213,7 +213,7 @@ void main() {
               body: PaystackTransferModal(
                 orderNumber: 'ORD-9821',
                 amount: 25000.0,
-                customerEmail: 'customer@novaexpress.ng',
+                customerEmail: 'customer@novaxpress.ng',
                 customerName: 'Alhaji Gambo',
                 onPaymentConfirmed: () {
                   wasConfirmed = true;
@@ -362,11 +362,11 @@ void main() {
         'paystack_bank': 'Titan Trust Bank / Paystack',
         'paystack_auth_code': 'AUTH_PSTK_991823',
         'payer_name': 'Joel Odufu',
-        'payer_email': 'joel.odufu@novaexpress.ng',
+        'payer_email': 'joel.odufu@novaxpress.ng',
         'gateway_response': 'Approved / Successful (200 OK)',
         'destination_bank_name': 'Zenith Bank',
         'destination_account_number': '1012398412',
-        'destination_account_name': 'NovaExpress Logistics Limited',
+        'destination_account_name': 'NovaXpress Logistics Limited',
         'created_at': now.toIso8601String(),
         'paystack_paid_at': now.toIso8601String(),
       };
@@ -377,7 +377,7 @@ void main() {
       expect(model.paystackBank, equals('Titan Trust Bank / Paystack'));
       expect(model.paystackAuthCode, equals('AUTH_PSTK_991823'));
       expect(model.payerName, equals('Joel Odufu'));
-      expect(model.payerEmail, equals('joel.odufu@novaexpress.ng'));
+      expect(model.payerEmail, equals('joel.odufu@novaxpress.ng'));
       expect(model.gatewayResponse, equals('Approved / Successful (200 OK)'));
       expect(model.destinationBankName, equals('Zenith Bank'));
 
@@ -386,7 +386,7 @@ void main() {
       expect(json['paystack_bank'], equals('Titan Trust Bank / Paystack'));
       expect(json['paystack_auth_code'], equals('AUTH_PSTK_991823'));
       expect(json['payer_name'], equals('Joel Odufu'));
-      expect(json['payer_email'], equals('joel.odufu@novaexpress.ng'));
+      expect(json['payer_email'], equals('joel.odufu@novaxpress.ng'));
     });
 
     testWidgets('10. RemittanceDetailsPage renders reconciliation matrix and Paystack audit metadata', (WidgetTester tester) async {

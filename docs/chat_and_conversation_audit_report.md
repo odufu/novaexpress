@@ -1,4 +1,4 @@
-# NovaExpress Chat & Conversation System Comprehensive Audit Report
+# NovaXpress Chat & Conversation System Comprehensive Audit Report
 
 **Date**: September 13, 2026  
 **Auditor**: Antigravity Autonomous Agentic AI  
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-A comprehensive architectural and functional audit of the NovaExpress Chat and Conversation System was conducted across five critical dimensions:
+A comprehensive architectural and functional audit of the NovaXpress Chat and Conversation System was conducted across five critical dimensions:
 1. **Mobile Friendliness & UX Responsiveness**: Bottom sheet sizing, soft keyboard insets (`viewInsets.bottom`), home gesture bar safe area padding, touch target sizing, and drag dismiss behavior.
 2. **Tagging & Notification Engine**: Detection of `@Operations`, `@Rider`, `@Client`, and `@Manager` mentions, automatic insertion of targeted alerts into `public.notifications`, and Supabase Realtime push to listening mobile PDAs and web consoles.
 3. **Automatic Order Status Lifecycle Triggers**: Automated milestone broadcast generation in `order_conversation_messages` across order lifecycle events (`rider_assigned`, `in_transit`, `confirmed`, `delivered`, `delivery_failed`, `rescheduled`, `product_changed`, and `ownership_transferred`).

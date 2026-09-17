@@ -39,7 +39,7 @@ sequenceDiagram
     App-->>Rider: Displays "Pending Verification" Yellow Badge
 
     Note over DB,Finance: DC Finance Verification
-    Finance->>Bank: Verifies ₦25,000 credit in NovaExpress Corporate Account
+    Finance->>Bank: Verifies ₦25,000 credit in NovaXpress Corporate Account
     Finance->>DB: UPDATE cash_remittances SET status = 'verified', verified_by = supervisor_id
     
     DB->>DB: UPDATE delivery_agents SET current_cod_balance -= 25000
@@ -59,7 +59,7 @@ sequenceDiagram
    * **Option A**: Bank Branch / CDM (Cash Deposit Machine)
    * **Option B**: POS Agent Terminal
    * **Option C**: Direct Physical Cash Handover to DC Finance Cashier.
-3. Rider deposits `₦25,000.00` into NovaExpress Corporate Bank Account.
+3. Rider deposits `₦25,000.00` into NovaXpress Corporate Bank Account.
 4. Collects printed receipt/teller slip.
 
 ### Step 2: Remittance Logging on Mobile PDA

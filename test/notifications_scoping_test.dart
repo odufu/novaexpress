@@ -24,7 +24,7 @@ void main() {
       // 2. Simulate newly registered rider welcome notification
       final welcomeNotif = AppNotificationEntity(
         id: 'notif-welcome-$newAgentId',
-        title: 'Welcome to NovaExpress Delivery! 🛵',
+        title: 'Welcome to NovaXpress Delivery! 🛵',
         message: 'Your rider account is active. Explore your daily manifest, track your commission & allowances, and verify custody stock before departing the DC.',
         category: NotificationCategory.system,
         createdAt: DateTime.now(),
@@ -38,7 +38,7 @@ void main() {
       final cached = await storageService.getCachedNotifications(newAgentId);
       expect(cached, isNotNull);
       expect(cached!.length, equals(1));
-      expect(cached.first.title, contains('Welcome to NovaExpress'));
+      expect(cached.first.title, contains('Welcome to NovaXpress'));
       expect(cached.first.category, equals(NotificationCategory.system));
       expect(cached.first.isRead, isFalse);
     });

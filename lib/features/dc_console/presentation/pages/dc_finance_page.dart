@@ -932,7 +932,7 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
                               overflow: TextOverflow.ellipsis,
                             ),
                             Text(
-                              'NovaExpress Distribution Center Financial Pool',
+                              'NovaXpress Distribution Center Financial Pool',
                               style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -1228,7 +1228,7 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
                         onPressed: () {
                           final receiptText = '''
 ========================================
-NOVAEXPRESS REMITTANCE SETTLEMENT RECEIPT
+NOVAXPRESS REMITTANCE SETTLEMENT RECEIPT
 ========================================
 Reference: $refCode
 Rider: $riderName ($riderCode)
@@ -1241,7 +1241,7 @@ Destination: ${rem.destinationAccountName} (${rem.destinationBankName})
 Timestamp: $timestampFormatted
 Verification: Approved by Paystack Settlement Engine
 ========================================
-NovaExpress Distribution Center Audit
+NovaXpress Distribution Center Audit
 ''';
                           Clipboard.setData(ClipboardData(text: receiptText));
                           ScaffoldMessenger.of(context).showSnackBar(

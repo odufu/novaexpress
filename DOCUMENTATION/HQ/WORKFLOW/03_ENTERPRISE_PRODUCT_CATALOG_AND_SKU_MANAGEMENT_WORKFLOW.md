@@ -6,7 +6,7 @@ This document details the configuration of master product SKUs, client catalog a
 
 ## 🎯 Overview & Objectives
 
-* **Primary Goal**: Maintain an enterprise-grade master catalog of all physical products distributed across the NovaExpress network, linking each SKU to its merchant owner (BR-001), configuring pricing, and defining vehicle distribution rules.
+* **Primary Goal**: Maintain an enterprise-grade master catalog of all physical products distributed across the NovaXpress network, linking each SKU to its merchant owner (BR-001), configuring pricing, and defining vehicle distribution rules.
 * **Primary Actors**: HQ Product Catalog Manager, Merchant Account Representative, Supabase Database.
 * **Database Tables**: `products`, `clients`, `companies`, `product_batches`, `agent_inventory`.
 

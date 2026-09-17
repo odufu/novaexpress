@@ -14,7 +14,7 @@ The DC Console is a modern enterprise web and tablet dashboard designed for **DC
 ┌──────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
 │  SIDEBAR (Collapsible 255px / 76px)  │  TOP APP BAR (Global Search, Hub Switcher, Theme, Notifications, Avatar)  │
 ├──────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────┤
-│  🏢 NovaExpress DC                   │  🔍 Search orders, waybills, packages, or riders...                       │
+│  🏢 NovaXpress DC                   │  🔍 Search orders, waybills, packages, or riders...                       │
 │  Hub Operations Console              │  [ 🏢 Wuse Distribution Center (DC-WUSE-01) ▼ ]  [ ☀️/🌙 ]  [ 🔔(3) ]    │
 │                                      ├───────────────────────────────────────────────────────────────────────────┤
 │  📊 Dashboard (Active)               │  MAIN CONTENT AREA (Operational Business Tabs & Controls)                 │

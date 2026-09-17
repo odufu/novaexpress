@@ -60,7 +60,7 @@ class StockDetailsGrazerPage extends ConsumerWidget {
     final double unitPrice = item?.price ?? 0.0;
     final String? barcode = item?.barcode;
     final double? weightKg = item?.weightKg;
-    final String ownerName = item?.ownerName.isNotEmpty == true ? item!.ownerName : 'NovaExpress DC';
+    final String ownerName = item?.ownerName.isNotEmpty == true ? item!.ownerName : 'NovaXpress DC';
     final String? imageAsset = item?.imageAsset;
 
     // 2. Find commercial packages for this product

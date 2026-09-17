@@ -35,7 +35,7 @@ void main() {
         city: 'Asokoro',
         address: '14 Nelson Mandela Way',
         contactPhone: '+234 811 222 3333',
-        contactEmail: 'asokoro@novaexpress.com',
+        contactEmail: 'asokoro@novaxpress.com',
         managerName: 'Chidi Okonkwo',
         isHub: false,
         isActive: true,
@@ -101,7 +101,7 @@ void main() {
         isHub: false,
         operatingZones: ['VI', 'Oniru'],
         storageCapacityUnits: 20000,
-        supervisorEmail: 'sup.vi.test@novaexpress.ng',
+        supervisorEmail: 'sup.vi.test@novaxpress.ng',
       );
 
       expect(created.code, 'DC-LOS-05');

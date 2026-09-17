@@ -132,7 +132,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
                   ),
                   const SizedBox(height: 28),
                   Text(
-                    'NOVAEXPRESS LOGISTICS',
+                    'NOVAXPRESS LOGISTICS',
                     style: GoogleFonts.inter(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,

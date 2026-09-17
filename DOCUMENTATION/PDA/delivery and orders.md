@@ -4,7 +4,7 @@ The key is to avoid treating it as just an "order list." It needs to handle the 
 
 **Assigned → Accepted → Out for Delivery → Delivered / Failed → Payment → Remittance / Return**
 
-# NOVAEXPRESS PDA APP — DELIVERY / ORDERS MODULE
+# NOVAXPRESS PDA APP — DELIVERY / ORDERS MODULE
 
 ## 1. Delivery Module Structure
 
@@ -347,7 +347,7 @@ Useful when working with external navigation apps.
 
 # 13. PACKAGE / PRODUCT INFORMATION
 
-This section is extremely important because NovaExpress has distributed inventory.
+This section is extremely important because NovaXpress has distributed inventory.
 
 Example:
 
@@ -544,7 +544,7 @@ The exact values should come from the configured business rules.
 The PDA doesn't need to see complicated accounting such as:
 
 * Client payable
-* NovaExpress revenue
+* NovaXpress revenue
 * Client settlement ledger
 
 unless operationally necessary.
@@ -1408,13 +1408,13 @@ When a delivery is completed and payment is due on delivery (POD), the customer 
    - The app instantly retrieves a **dynamic virtual bank account number (powered by Monnify)** generated uniquely for that specific order (`NX-XXXXXX`).
    - The screen clearly displays:
      - **Bank Name**: e.g., Wema Bank / Moniepoint / Providus
-     - **Account Name**: `NovaExpress - [Order #]`
+     - **Account Name**: `NovaXpress - [Order #]`
      - **Account Number**: 10-digit virtual account
      - **Exact Amount Payable**: `₦XX,XXX.00`
      - **Payment Status**: *Listening for instant transfer webhook...*
 2. **Instant Webhook Reconciliation**:
-   - As soon as the customer completes the bank transfer, Monnify emits a webhook event to NovaExpress backend.
+   - As soon as the customer completes the bank transfer, Monnify emits a webhook event to NovaXpress backend.
    - The rider's app automatically detects successful payment confirmation and marks the POD collection as complete.
 3. **Remittance Exemption & Rider Compensation**:
-   - Because the funds are received directly in NovaExpress's company bank account, the rider holds **₦0.00 cash** for this order and is exempt from remitting cash.
+   - Because the funds are received directly in NovaXpress's company bank account, the rider holds **₦0.00 cash** for this order and is exempt from remitting cash.
    - The delivery commission and transport allowance earned by the rider for this delivery are credited to the rider's **"My Balance" (Rider Balance)** ledger.

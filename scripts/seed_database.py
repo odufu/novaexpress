@@ -41,7 +41,7 @@ def make_request(endpoint, data=None, method="GET"):
 
 def seed_database():
     print("==================================================")
-    print("🚀 NovaExpress Logistics: Seeding Supabase Database")
+    print("🚀 NovaXpress Logistics: Seeding Supabase Database")
     print("==================================================")
 
     # 1. Primary Company
@@ -52,7 +52,7 @@ def seed_database():
     companies = [
         {
             "id": nova_company_id,
-            "name": "NovaExpress Logistics HQ",
+            "name": "NovaXpress Logistics HQ",
             "type": "logistics",
             "company_type": "ecommerce",
             "is_active": True,
@@ -87,7 +87,7 @@ def seed_database():
         {
             "id": dc_abuja_id,
             "company_id": nova_company_id,
-            "name": "Abuja Regional Hub (NovaExpress)",
+            "name": "Abuja Regional Hub (NovaXpress)",
             "type": "agency_hub",
             "location_state": "Abuja (FCT)",
             "address": "Plot 402 Aminu Kano Crescent, Wuse 2, Abuja",
@@ -387,7 +387,7 @@ def seed_database():
             "deposit_receipt_url": "https://novexps.storage/receipts/rec-88201.jpg",
             "status": "verified",
             "verified_by_finance_user_id": agent_user_id,
-            "notes": "Bank Transfer to NovaExpress GTBank (Ref: TRF/NVA/889201). Verified by Lagos DC Finance.",
+            "notes": "Bank Transfer to NovaXpress GTBank (Ref: TRF/NVA/889201). Verified by Lagos DC Finance.",
             "created_at": (now - timedelta(days=2, hours=3)).isoformat(),
             "verified_at": (now - timedelta(days=2, hours=1)).isoformat(),
         },

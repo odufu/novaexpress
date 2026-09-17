@@ -169,7 +169,7 @@ export default function TechnicalStack() {
           marginBottom: '1rem',
           boxShadow: 'var(--shadow-sm)',
         }}>
-          <img src="./square_logo.png" alt="NovaExpress" style={{ width: '42px', height: '42px', objectFit: 'contain' }} />
+          <img src="./square_logo.png" alt="NovaXpress" style={{ width: '42px', height: '42px', objectFit: 'contain' }} />
         </div>
         <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.8rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
           Ready to Test the Live Operations Platform?

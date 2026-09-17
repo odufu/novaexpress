@@ -377,7 +377,7 @@ void main() {
       expect(ekitiStock.any((i) => i.sku == productSku), isFalse);
     });
 
-    test('2. Client supplies physical stock quantities to NovaExpress covering DCs', () async {
+    test('2. Client supplies physical stock quantities to NovaXpress covering DCs', () async {
       const productName = 'Respira Herbal Cleanse';
       const productSku = 'SKU-RESP-CLN';
       const coveringStates = ['Federal Capital Territory', 'Benue'];

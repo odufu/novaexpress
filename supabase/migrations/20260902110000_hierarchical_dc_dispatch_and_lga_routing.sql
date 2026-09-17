@@ -1,5 +1,5 @@
 -- ============================================================================
--- NOVAEXPRESS LOGISTICS PLATFORM - HIERARCHICAL DC & LGA DISPATCH ENGINE
+-- NOVAXPRESS LOGISTICS PLATFORM - HIERARCHICAL DC & LGA DISPATCH ENGINE
 -- Production-grade schema & triggers for:
 --   1. Grand DC vs Regional Station DC designation
 --   2. Order state & LGA multi-zone dispatching

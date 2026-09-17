@@ -1,5 +1,5 @@
 -- ============================================================================
--- NovaExpress Logistics Management System
+-- NovaXpress Logistics Management System
 -- Dynamic Notifications Engine & Automated Ledger Triggers
 -- ============================================================================
 

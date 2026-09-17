@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Automated Deployment Script for all NovaExpress Supabase Edge Functions.
+    Automated Deployment Script for all NovaXpress Supabase Edge Functions.
 .DESCRIPTION
     Deploys all 12 Edge Functions in supabase/functions to a specified or linked Supabase project.
 .PARAMETER ProjectRef

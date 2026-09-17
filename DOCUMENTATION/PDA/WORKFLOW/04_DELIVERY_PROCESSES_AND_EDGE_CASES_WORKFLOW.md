@@ -116,7 +116,7 @@ sequenceDiagram
 3. PDA displays dynamic virtual account generated specifically for order `TRK-8925`:
    * **Bank Name**: Wema Bank / Monnify
    * **Account Number**: `7890892501`
-   * **Account Name**: `NovaExpress / Novacare`
+   * **Account Name**: `NovaXpress / Novacare`
    * **Amount Expected**: `₦35,000.00`
 4. Customer transfers `₦35,000.00` using their bank app.
 5. Monnify sends real-time webhook notification to `monnify-webhook` Edge Function.

@@ -40,7 +40,7 @@ def make_request(endpoint, data=None, method="GET"):
 
 def wipe_mock_data():
     print("==================================================")
-    print("🧹 NovaExpress: Wiping Mock Seed Records from Supabase")
+    print("🧹 NovaXpress: Wiping Mock Seed Records from Supabase")
     print("==================================================")
 
     tables_to_clear = [

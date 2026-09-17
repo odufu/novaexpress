@@ -1,4 +1,4 @@
-# NovaExpress PDA App — Inventory Screen
+# NovaXpress PDA App — Inventory Screen
 
 The **Inventory module** is the PDA's stock-custody center.
 
@@ -10,7 +10,7 @@ It should answer five questions:
 > **What stock is coming to me?**
 > **What stock have I received, delivered, returned, damaged, or lost?**
 
-For NovaExpress, this is especially important because a PDA may hold **client-owned distributed inventory** such as **Respira, Grazer Herbal Tea and Alpha Man** and can request additional stock from **any authorized Distribution Center**.
+For NovaXpress, this is especially important because a PDA may hold **client-owned distributed inventory** such as **Respira, Grazer Herbal Tea and Alpha Man** and can request additional stock from **any authorized Distribution Center**.
 
 ---
 
@@ -200,7 +200,7 @@ Tap the card to open **Product Inventory Details**.
 
 # 8. CLIENT OWNERSHIP MUST BE VISIBLE
 
-This is particularly important for NovaExpress.
+This is particularly important for NovaXpress.
 
 Instead of simply:
 
@@ -237,7 +237,7 @@ For example:
 
 or:
 
-### NovaExpress Inventory
+### NovaXpress Inventory
 
 **Packaging Materials**
 

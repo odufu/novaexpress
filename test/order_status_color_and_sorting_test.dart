@@ -184,7 +184,7 @@ void main() {
 
     const testUser = UserModel(
       id: 'agent-1',
-      email: 'joel.odufu@novaexpress.ng',
+      email: 'joel.odufu@novaxpress.ng',
       firstName: 'Joel',
       lastName: 'Odufu',
       phone: '08031234567',

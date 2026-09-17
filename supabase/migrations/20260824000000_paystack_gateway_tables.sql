@@ -1,5 +1,5 @@
 -- ============================================================================
--- NOVAEXPRESS LOGISTICS PLATFORM - PAYSTACK GATEWAY SCHEMA
+-- NOVAXPRESS LOGISTICS PLATFORM - PAYSTACK GATEWAY SCHEMA
 -- Table Definitions & Indexing for Paystack Remittances & Direct Transfers
 -- ============================================================================
 
@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS paystack_virtual_accounts (
     account_reference VARCHAR(100) UNIQUE NOT NULL,
     account_number VARCHAR(50) NOT NULL,
     bank_name VARCHAR(100) NOT NULL DEFAULT 'Titan Trust Bank / Paystack',
-    account_name VARCHAR(255) NOT NULL DEFAULT 'NovaExpress Logistics / Settlement',
+    account_name VARCHAR(255) NOT NULL DEFAULT 'NovaXpress Logistics / Settlement',
     expected_amount NUMERIC(14, 2) NOT NULL,
     amount_paid NUMERIC(14, 2) DEFAULT 0.00,
     status VARCHAR(50) NOT NULL DEFAULT 'active', -- 'active', 'paid', 'expired'

@@ -10,7 +10,7 @@
 
 1. **Instant Order Ingestion**: Seamless bulk order ingestion via drag-and-drop Excel/CSV uploads or direct REST API webhook integration.
 2. **End-to-End Live Tracking**: Real-time package tracking with instant proof-of-delivery (POD) photo and signature access.
-3. **Multi-DC Stock Visibility**: Live inventory counts of merchant products stored across all NovaExpress Distribution Centers.
+3. **Multi-DC Stock Visibility**: Live inventory counts of merchant products stored across all NovaXpress Distribution Centers.
 4. **Transparent Financial Settlements**: Real-time visibility into COD collections, delivery fee deductions, and weekly wire transfer settlement statements.
 
 ---
@@ -35,7 +35,7 @@ graph TD
 * **Merchant Profile Header**: Client Logo, Name (*Novacare Limited*), Account Tier (*Enterprise SLA*).
 * **Key Performance Metric Cards**:
   * **Total Orders This Month**: Counter (`1,420 Drops`) with 96.2% fulfillment rate ring.
-  * **Gross COD Cash Collected**: Total value (`₦35,500,000.00`) safely held by NovaExpress.
+  * **Gross COD Cash Collected**: Total value (`₦35,500,000.00`) safely held by NovaXpress.
   * **Net Settlement Balance Pending**: Owed to client (`₦28,400,000.00`).
   * **Live Active In-Transit Deliveries**: Pulse counter (`42 Deliveries Active`).
 * **Recent Deliveries Feed**: Interactive table showing recent status transitions with clickable tracking links.
@@ -46,7 +46,7 @@ graph TD
   * Downloadable template button: `[ 📥 Download Sample Excel Template ]`.
   * Real-time Validation Table: Parses uploaded file, highlights invalid phone numbers or missing addresses in red before final confirmation.
 * **Single Order Manual Entry**: Clean modal for dispatching individual emergency orders.
-* **Action Button**: `[ 🚀 Upload & Dispatch 150 Orders to NovaExpress ]`.
+* **Action Button**: `[ 🚀 Upload & Dispatch 150 Orders to NovaXpress ]`.
 
 ### Screen 3: Real-Time Order Tracking & POD Viewer
 * **Search & Filter Bar**: Search by Tracking Number (`TRK-8924`), Customer Phone, or Recipient Name.

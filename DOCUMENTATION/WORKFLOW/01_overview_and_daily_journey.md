@@ -1,7 +1,7 @@
 # Module 1: Daily Operational Journey & Fulfillment Models 🌅🚀
 
 ## 1. Overview & Operational Fulfillment Models
-The Personal Distribution Agent (PDA) is the primary field logistics operational agent for NovaExpress in Nigeria. The PDA operates under three main fulfillment scenarios:
+The Personal Distribution Agent (PDA) is the primary field logistics operational agent for NovaXpress in Nigeria. The PDA operates under three main fulfillment scenarios:
 
 1. **Scenario 1: Standard Order-First Fulfillment**: Orders assigned at DC ➔ Picked up at DC ➔ Delivered to customer.
 2. **Scenario 2: Failed Delivery & Reattempt/Return**: Failed delivery attempt ➔ Reattempt scheduled or physical package returned to DC.
@@ -15,7 +15,7 @@ The Personal Distribution Agent (PDA) is the primary field logistics operational
 sequenceDiagram
     autonumber
     actor PDA as Field Agent (PDA)
-    participant App as NovaExpress PDA App
+    participant App as NovaXpress PDA App
     participant DC as Distribution Center (DC)
     participant Cust as Customer
     participant Fin as DC Finance

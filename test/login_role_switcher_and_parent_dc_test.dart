@@ -38,7 +38,7 @@ import 'package:novexps/features/notifications/presentation/providers/notificati
 class _MockAuthRemoteDS implements AuthRemoteDataSource {
   final UserModel riderUser = const UserModel(
     id: 'a1111111-1111-4111-8111-111111111111',
-    email: 'emeka.rider@novaexpress.ng',
+    email: 'emeka.rider@novaxpress.ng',
     firstName: 'Emeka',
     lastName: 'Rider',
     phone: '08031234567',
@@ -51,7 +51,7 @@ class _MockAuthRemoteDS implements AuthRemoteDataSource {
 
   final UserModel dcUser = const UserModel(
     id: 'a2222222-2222-4222-8222-222222222222',
-    email: 'dc.supervisor@novaexpress.ng',
+    email: 'dc.supervisor@novaxpress.ng',
     firstName: 'Adekunle',
     lastName: 'Supervisor',
     phone: '08091112233',
@@ -246,21 +246,21 @@ void main() {
       await tester.tap(find.text('DC Operations Supervisor'));
       await tester.pumpAndSettle();
 
-      expect(find.text('dc.supervisor@novaexpress.ng'), findsOneWidget);
+      expect(find.text('dc.supervisor@novaxpress.ng'), findsOneWidget);
       expect(find.text('Sign In to DC Console'), findsOneWidget);
 
       // Tap back to Rider
       await tester.tap(find.text('Field Delivery Agent (PDA)'));
       await tester.pumpAndSettle();
 
-      expect(find.text('emeka.rider@novaexpress.ng'), findsOneWidget);
+      expect(find.text('emeka.rider@novaxpress.ng'), findsOneWidget);
       expect(find.text('Sign In to PDA App'), findsOneWidget);
     });
 
     test('3. Verifies that Wuse Distribution Center is the common parent entity for both PDA and DC', () {
       const rider = UserEntity(
         id: 'a1111111-1111-4111-8111-111111111111',
-        email: 'emeka.rider@novaexpress.ng',
+        email: 'emeka.rider@novaxpress.ng',
         firstName: 'Emeka',
         lastName: 'Rider',
         role: 'delivery_agent',
@@ -272,7 +272,7 @@ void main() {
 
       const dcSupervisor = UserEntity(
         id: 'a2222222-2222-4222-8222-222222222222',
-        email: 'dc.supervisor@novaexpress.ng',
+        email: 'dc.supervisor@novaxpress.ng',
         firstName: 'Adekunle',
         lastName: 'Supervisor',
         role: 'dc_manager',
@@ -325,7 +325,7 @@ void main() {
 
       // Verify Confirm Logout Dialog appears
       expect(find.text('Confirm Logout'), findsOneWidget);
-      expect(find.text('Are you sure you want to log out of the NovaExpress Rider Terminal?'), findsOneWidget);
+      expect(find.text('Are you sure you want to log out of the NovaXpress Rider Terminal?'), findsOneWidget);
       expect(find.text('Cancel'), findsOneWidget);
       expect(find.text('Logout'), findsOneWidget);
 
@@ -396,7 +396,7 @@ void main() {
       final textFields = find.byType(TextFormField);
       expect(textFields, findsNWidgets(2));
 
-      await tester.enterText(textFields.first, 'sanni.abacha@novaexpress.ng');
+      await tester.enterText(textFields.first, 'sanni.abacha@novaxpress.ng');
       await tester.enterText(textFields.last, 'Password123!');
       await tester.pumpAndSettle();
 

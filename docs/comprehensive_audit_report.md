@@ -68,7 +68,7 @@ A deep-dive, holistic audit of the NoveXPS platform was conducted across all tie
   - Line 288: `product_name VARCHAR(255) DEFAULT 'Respira Detox Tea'`
   - Line 299: `client_delivery_fee NUMERIC(14, 2) DEFAULT 5000.00`
   - Line 300: `agent_entitlement NUMERIC(14, 2) DEFAULT 2500.00`
-  - Line 326: `account_name VARCHAR(255) NOT NULL DEFAULT 'NovaExpress / Novacare'`
+  - Line 326: `account_name VARCHAR(255) NOT NULL DEFAULT 'NovaXpress / Novacare'`
   - Line 327: `bank_name VARCHAR(100) NOT NULL DEFAULT 'Wema Bank / Monnify'`
   *Impact*: Any order row inserted without explicit values silently receives obsolete brand names (`Novacare`, `Respira Detox Tea`) and fixed delivery fees.
 

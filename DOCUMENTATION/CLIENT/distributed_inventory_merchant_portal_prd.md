@@ -1,7 +1,7 @@
 # 🏢 Distributed Inventory Client-Facing Portal (Merchant PRD)
 
 **Document Type:** Client Portal Product Requirements Document (PRD)  
-**Product:** NovaExpress Merchant Admin & Telesales Platform  
+**Product:** NovaXpress Merchant Admin & Telesales Platform  
 **Target Audience:** E-Commerce Merchants, D2C Health/Beauty Brands, Telesales Confirmation Reps, Finance Officers  
 **Market:** Nigeria (NGN ₦)
 
@@ -9,10 +9,10 @@
 
 ## 1. Executive Summary
 
-Merchants using NovaExpress's **Distributed Inventory Fulfillment model** stock inventory in bulk across multiple regional Distribution Centers (e.g. Abuja DC, Lagos DC, Port Harcourt DC). 
+Merchants using NovaXpress's **Distributed Inventory Fulfillment model** stock inventory in bulk across multiple regional Distribution Centers (e.g. Abuja DC, Lagos DC, Port Harcourt DC). 
 
 This portal provides merchants with:
-1. **A Telesales / Order Confirmation Call Center**: Where sales agents take unconfirmed web leads (Shopify, WooCommerce, ClickFunnels, landing page webhooks), call customers to confirm orders, refine delivery addresses and landmark hints, pitch upsells, and push confirmed orders directly to the nearest NovaExpress Distribution Center for same-day dispatch.
+1. **A Telesales / Order Confirmation Call Center**: Where sales agents take unconfirmed web leads (Shopify, WooCommerce, ClickFunnels, landing page webhooks), call customers to confirm orders, refine delivery addresses and landmark hints, pitch upsells, and push confirmed orders directly to the nearest NovaXpress Distribution Center for same-day dispatch.
 2. **A Business Intelligence & Executive Dashboard**: Where merchant business owners monitor sales velocity, delivery success rates (PODs), failed delivery root-causes, inventory stock levels across all DCs, and reconcile Cash-on-Delivery (COD) remittances against withdrawal balances.
 
 ---
@@ -23,7 +23,7 @@ This portal provides merchants with:
 |---|---|
 | **Client Owner / Super Admin** | Full access to business metrics, SKU pricing, bank account settings, withdrawal requests, multi-DC stock audit, and user invitation (Admins, Telesales). |
 | **Telesales Agent (`sales_agent`)** | Access to **Leads Inbox**, Call-to-Confirm modal, address refinement, upsell selector, and "Push to DC Fulfillment" action. Cannot view bank payout accounts or profit margins. |
-| **Inventory Manager (`inventory_manager`)** | Manages SKU definitions, product batches, restock requisitions to NovaExpress DCs, and monitors in-transit stock vs. DC shelf stock. |
+| **Inventory Manager (`inventory_manager`)** | Manages SKU definitions, product batches, restock requisitions to NovaXpress DCs, and monitors in-transit stock vs. DC shelf stock. |
 | **Finance Auditor (`finance_auditor`)** | Views COD remittance ledgers, delivery fee deductions, return fees, and generates financial settlement statements. |
 
 ---
@@ -80,7 +80,7 @@ The Client Admin dashboard provides real-time operational transparency:
 
 ### 3.3. Financial Settlements & COD Remittance Reconciliation
 
-- **Gross COD Collected**: Total cash collected from customers by NovaExpress PDAs on behalf of the client.
+- **Gross COD Collected**: Total cash collected from customers by NovaXpress PDAs on behalf of the client.
 - **Logistics Fee Deductions**: Automatically calculates agreed client delivery fees (e.g., ₦3,500/delivery) and return handling fees.
 - **Net Merchant Wallet Balance**: Instant withdrawal to linked Nigerian bank accounts (Monnify / Paystack automated transfer).
 

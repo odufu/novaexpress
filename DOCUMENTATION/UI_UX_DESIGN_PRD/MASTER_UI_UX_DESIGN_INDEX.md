@@ -1,6 +1,6 @@
 # 🎨 NoveXPS Master UI/UX Product Requirement Documents (PRD) Suite
 
-Welcome to the **NovaExpress Logistics Management System (NoveXPS) Master UI/UX Design Specification & PRD Suite**. This documentation provides complete, screen-by-screen product requirement documents tailored specifically for UI/UX product designers, Figma creators, and frontend engineering teams.
+Welcome to the **NovaXpress Logistics Management System (NoveXPS) Master UI/UX Design Specification & PRD Suite**. This documentation provides complete, screen-by-screen product requirement documents tailored specifically for UI/UX product designers, Figma creators, and frontend engineering teams.
 
 ---
 

@@ -1,6 +1,6 @@
 # 📘 NoveXPS PDA Complete Operational Workflow Guide & Sitemap
 
-Welcome to the **NovaExpress Logistics Management System (NoveXPS) Personal Digital Assistant (PDA) Operational Workflow Guide**. This master index organizes end-to-end operational workflows for delivery riders, distribution center supervisors, treasury personnel, and backend Edge Functions.
+Welcome to the **NovaXpress Logistics Management System (NoveXPS) Personal Digital Assistant (PDA) Operational Workflow Guide**. This master index organizes end-to-end operational workflows for delivery riders, distribution center supervisors, treasury personnel, and backend Edge Functions.
 
 ---
 

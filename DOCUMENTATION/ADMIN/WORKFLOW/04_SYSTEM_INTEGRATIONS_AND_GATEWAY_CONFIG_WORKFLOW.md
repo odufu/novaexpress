@@ -51,7 +51,7 @@ graph TD
    * **Sender ID**: `NOVEXPS`
    * **API Key**: Encrypted token for transactional SMS.
    * **Automated Triggers**:
-     - *Order Dispatched*: "Your NovaExpress order TRK-8924 is in transit with Rider Emeka."
+     - *Order Dispatched*: "Your NovaXpress order TRK-8924 is in transit with Rider Emeka."
      - *Delivery Completed*: "Thank you! Your order TRK-8924 was delivered successfully."
      - *Monnify Transfer Prompt*: "Pay ₦35,000 for order TRK-8925 to Wema Bank / 7890892501."
 

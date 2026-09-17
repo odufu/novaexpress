@@ -1372,7 +1372,7 @@ class _CashPageState extends ConsumerState<CashPage> {
                         _buildDetailRow(
                           icon: Icons.person_outline_rounded,
                           label: 'Remitted To',
-                          value: rem.verifiedByName ?? (rem.isPending ? 'Wuse DC Receiving Desk' : 'NovaExpress Main Account'),
+                          value: rem.verifiedByName ?? (rem.isPending ? 'Wuse DC Receiving Desk' : 'NovaXpress Main Account'),
                           isBoldValue: false,
                           theme: theme,
                         ),
@@ -1668,7 +1668,7 @@ class _CashPageState extends ConsumerState<CashPage> {
             ),
             const SizedBox(height: 16),
             Text(
-              'NovaExpress Remittance Guidelines',
+              'NovaXpress Remittance Guidelines',
               style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),

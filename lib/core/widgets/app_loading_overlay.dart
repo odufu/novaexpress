@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 /// A universal loading overlay widget that wraps any widget tree.
 /// When [isLoading] is true, it displays a blurred backdrop with an elegant
-/// NovaExpress branded loading card and status message.
+/// NovaXpress branded loading card and status message.
 class AppLoadingOverlay extends StatelessWidget {
   final bool isLoading;
   final String message;

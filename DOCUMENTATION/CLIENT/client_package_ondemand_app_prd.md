@@ -1,7 +1,7 @@
 # 📦 Client Package On-Demand Dispatch App (P2P PRD)
 
 **Document Type:** On-Demand Customer Product Requirements Document (PRD)  
-**Product:** NovaExpress On-Demand Package Delivery ("NovaDrop")  
+**Product:** NovaXpress On-Demand Package Delivery ("NovaDrop")  
 **Target Audience:** Direct Consumers, Social Commerce Vendors (Instagram/WhatsApp sellers), Corporate Offices, Boutiques  
 **Market:** Nigeria (NGN ₦)
 
@@ -9,7 +9,7 @@
 
 ## 1. Executive Summary
 
-While the **Distributed Inventory model** caters to merchants warehousing bulk stock in DCs, the **Client Package On-Demand model** caters to senders who have a physical parcel in hand and need an active, nearby NovaExpress Rider/PDA immediately dispatched for instant pickup and same-day delivery.
+While the **Distributed Inventory model** caters to merchants warehousing bulk stock in DCs, the **Client Package On-Demand model** caters to senders who have a physical parcel in hand and need an active, nearby NovaXpress Rider/PDA immediately dispatched for instant pickup and same-day delivery.
 
 ---
 
@@ -45,7 +45,7 @@ While the **Distributed Inventory model** caters to merchants warehousing bulk s
 ## 3. Core Features & Functional Specifications
 
 ### 3.1. 1-Tap Rider Discovery & Spatial Radar
-- Uses the NovaExpress GIS Proximity engine (`find_closest_available_rider`) to discover on-duty riders within the sender's vicinity.
+- Uses the NovaXpress GIS Proximity engine (`find_closest_available_rider`) to discover on-duty riders within the sender's vicinity.
 - Displays realistic Rider ETA (e.g., *"Emeka Rider (Bajaj Boxer) is 4 mins away"*).
 
 ### 3.2. Dynamic Fare Matrix

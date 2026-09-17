@@ -119,7 +119,7 @@ void main() {
         driverCode: 'PDA-7000',
         name: 'Emeka Rider',
         phone: '08031234567',
-        email: 'rider.emeka@novaexpress.com',
+        email: 'rider.emeka@novaxpress.com',
         avatarUrl: '',
         vehicleModel: 'Bajaj Boxer',
         vehiclePlate: 'ABJ-204-XY',
@@ -139,7 +139,7 @@ void main() {
 
     test('1. Editing rider commission and transport updates in-memory and caches custom terms', () async {
       final initialDriver = notifier.state.drivers.firstWhere(
-        (d) => d.email == 'rider.emeka@novaexpress.com' || d.driverCode == 'PDA-7000',
+        (d) => d.email == 'rider.emeka@novaxpress.com' || d.driverCode == 'PDA-7000',
       );
 
       expect(initialDriver.commissionRate, equals(1000.0));
@@ -180,7 +180,7 @@ void main() {
         driverCode: 'PDA-7000',
         name: 'Emeka Rider',
         phone: '08031234567',
-        email: 'rider.emeka@novaexpress.com',
+        email: 'rider.emeka@novaxpress.com',
         avatarUrl: '',
         vehicleModel: 'Bajaj Boxer',
         vehiclePlate: 'ABJ-204-XY',
@@ -210,7 +210,7 @@ void main() {
         'users': {
           'first_name': 'Emeka',
           'last_name': 'Rider',
-          'email': 'rider.emeka@novaexpress.com',
+          'email': 'rider.emeka@novaxpress.com',
           'phone_number': '08031234567',
         },
         // Notice: NO commission_rate or transport_allowance in raw DB row
@@ -223,7 +223,7 @@ void main() {
 
       // 3. Now simulate intelligent merge in loadDriversFromDatabase
       final cachedTerms = await mockStorage.getCachedDriverCompensationTerms();
-      final terms = cachedTerms?['pda-7000'] ?? cachedTerms?['rider.emeka@novaexpress.com'];
+      final terms = cachedTerms?['pda-7000'] ?? cachedTerms?['rider.emeka@novaxpress.com'];
 
       expect(terms, isNotNull);
       final mergedDriver = dbParsedDriver.copyWith(

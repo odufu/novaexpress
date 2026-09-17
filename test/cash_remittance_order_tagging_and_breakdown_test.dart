@@ -377,7 +377,7 @@ void main() {
 
       final user = activeUser ?? UserEntity(
         id: agentId,
-        email: 'rider.pda@novaexpress.ng',
+        email: 'rider.pda@novaxpress.ng',
         firstName: 'Joel',
         lastName: 'Odufu',
         phone: '08012345678',

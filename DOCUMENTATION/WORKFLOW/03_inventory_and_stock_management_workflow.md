@@ -3,7 +3,7 @@
 ## 1. Overview & Business Principles
 Every Personal Distribution Agent (PDA) maintains an individual physical inventory balance representing all products currently held in their delivery vehicle. 
 
-NovaExpress supports two physical stock distribution patterns:
+NovaXpress supports two physical stock distribution patterns:
 1. **Order-First Intake (Scenario 1)**: Packages picked up at DC after customer order placement.
 2. **Major Client Pre-Circulated Float Model (Scenario 3)**: Bulk stock loaded into vehicle float buffers **BEFORE** orders arrive, allowing instant on-demand order matching and delivery in the field!
 

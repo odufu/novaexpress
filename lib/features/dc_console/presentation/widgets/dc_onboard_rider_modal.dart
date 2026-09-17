@@ -360,12 +360,12 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
   }
 
   void _autoUpdateEmail() {
-    if (_emailController.text.isEmpty || _emailController.text.contains('@novaexpress.ng')) {
+    if (_emailController.text.isEmpty || _emailController.text.contains('@novaxpress.ng')) {
       final f = _firstNameController.text.trim().toLowerCase();
       final l = _lastNameController.text.trim().toLowerCase();
       if (f.isNotEmpty || l.isNotEmpty) {
         final prefix = '${f.isNotEmpty ? f : "rider"}.${l.isNotEmpty ? l : "agent"}';
-        _emailController.text = '$prefix@novaexpress.ng';
+        _emailController.text = '$prefix@novaxpress.ng';
       }
     }
   }
@@ -442,7 +442,7 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
     final fullName = '$firstName $lastName';
     final phone = _phoneController.text.trim().isEmpty ? '08031234567' : _phoneController.text.trim();
     final email = _emailController.text.trim().toLowerCase().isEmpty
-        ? '${firstName.toLowerCase()}.${lastName.toLowerCase()}@novaexpress.ng'
+        ? '${firstName.toLowerCase()}.${lastName.toLowerCase()}@novaxpress.ng'
         : _emailController.text.trim().toLowerCase();
     final tempPassword = _tempPasswordController.text.trim().isEmpty ? 'Password123!' : _tempPasswordController.text.trim();
     final tempPin = _tempPinController.text.trim().isEmpty ? '1234' : _tempPinController.text.trim();
@@ -841,7 +841,7 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                     typeKey: 'in_house_rider',
                     title: 'In-House Delivery Rider',
                     badge: 'Company Bike',
-                    description: 'Uses NovaExpress company fleet vehicle. Operates on base salary + fuel allowance & delivery milestone bonuses.',
+                    description: 'Uses NovaXpress company fleet vehicle. Operates on base salary + fuel allowance & delivery milestone bonuses.',
                     icon: Icons.delivery_dining_rounded,
                     isSelected: draftState.personnelType == 'in_house_rider',
                     onTap: () => _onPersonnelTypeChanged('in_house_rider'),
@@ -893,7 +893,7 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                 keyboardType: TextInputType.emailAddress,
                 decoration: InputDecoration(
                   labelText: 'Contact Email *',
-                  hintText: 'samuel.okon@novaexpress.ng',
+                  hintText: 'samuel.okon@novaxpress.ng',
                   prefixIcon: const Icon(Icons.email_outlined, size: 18),
                   suffixIcon: _isCheckingEmail
                       ? const SizedBox(width: 16, height: 16, child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(strokeWidth: 2)))
@@ -1147,7 +1147,7 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
         ),
         const SizedBox(height: 6),
         Text(
-          'The credentials configured here will be used by the delivery agent to log into the NovaExpress Rider App.',
+          'The credentials configured here will be used by the delivery agent to log into the NovaXpress Rider App.',
           style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
         ),
         const SizedBox(height: 16),
@@ -1157,7 +1157,7 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
           keyboardType: TextInputType.emailAddress,
           decoration: InputDecoration(
             labelText: 'Rider Login Email Address *',
-            hintText: 'e.g. samuel.okon@novaexpress.ng',
+            hintText: 'e.g. samuel.okon@novaxpress.ng',
             prefixIcon: const Icon(Icons.email_outlined, size: 18),
             suffixIcon: _isCheckingEmail
                 ? const SizedBox(width: 16, height: 16, child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(strokeWidth: 2)))
@@ -1707,7 +1707,7 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
                         width: isNarrow ? double.infinity : (btnConstraints.maxWidth - 12) / 2,
                         child: OutlinedButton.icon(
                           onPressed: () {
-                            final credText = 'NovaExpress Rider Credentials\nAgent Code: ${slip['driverCode']}\nName: ${slip['name']}\nEmail: ${slip['email']}\nTemporary Password: ${slip['password']}\nSecurity PIN: ${slip['pin']}\nHub: ${slip['hub']}';
+                            final credText = 'NovaXpress Rider Credentials\nAgent Code: ${slip['driverCode']}\nName: ${slip['name']}\nEmail: ${slip['email']}\nTemporary Password: ${slip['password']}\nSecurity PIN: ${slip['pin']}\nHub: ${slip['hub']}';
                             Clipboard.setData(ClipboardData(text: credText));
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(content: Text('📋 Credentials copied to clipboard!')),

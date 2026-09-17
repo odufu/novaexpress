@@ -73,13 +73,13 @@ void main() {
       );
       final authDataSource = AuthRemoteDataSourceImpl(dbClient);
 
-      final user = await authDataSource.login('client.novacale@novaexpress.ng', 'ClientPass123!');
+      final user = await authDataSource.login('client.novacale@novaxpress.ng', 'ClientPass123!');
 
       expect(user, isNotNull);
       expect(user.role, equals('client'));
       expect(user.isClient, isTrue);
       expect(user.clientCompanyName, equals('Novacale Limited'));
-      expect(user.email, equals('client.novacale@novaexpress.ng'));
+      expect(user.email, equals('client.novacale@novaxpress.ng'));
       dbClient.dispose();
     });
 
@@ -221,7 +221,7 @@ void main() {
 
       const mockClientUser = UserEntity(
         id: 'cli-admin-01',
-        email: 'client.novacale@novaexpress.ng',
+        email: 'client.novacale@novaxpress.ng',
         firstName: 'Chuka',
         lastName: 'Okafor',
         phone: '08034455667',
@@ -249,7 +249,7 @@ void main() {
                   id: '33333333-3333-4333-8333-333333333333',
                   companyName: 'Novacale Limited',
                   contactPerson: 'Dr. Chuka Okafor',
-                  email: 'client.novacale@novaexpress.ng',
+                  email: 'client.novacale@novaxpress.ng',
                   phone: '08034455667',
                   address: 'Plot 12, Commercial Avenue, Central Business District, Abuja',
                   city: 'Abuja',

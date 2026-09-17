@@ -1,6 +1,6 @@
-# NovaExpress Logistics — PDA Application Phase-by-Phase End-to-End Implementation Plan
+# NovaXpress Logistics — PDA Application Phase-by-Phase End-to-End Implementation Plan
 
-**Product:** NovaExpress Logistics PDA Mobile Application  
+**Product:** NovaXpress Logistics PDA Mobile Application  
 **Target Market:** Nigeria (Currency: ₦ NGN)  
 **Architecture:** Feature-First Clean Architecture (Flutter + Supabase)  
 **Execution Rule:** Every phase is implemented strictly in 3 layers — **1. Database** (Schema, RLS, Seed Data) $\rightarrow$ **2. Backend/Services** (Supabase SDK, Datasources, Repositories, Edge Functions/RPCs) $\rightarrow$ **3. UI/Presentation** (Connected live with Zero Mock Data) — and fully tested before advancing to the next phase.
@@ -32,7 +32,7 @@ flowchart TD
 #### 1. Database Layer
 - Table `public.users`: Schema with `auth_user_id`, `email`, `first_name`, `last_name`, `phone`, `role` (`delivery_agent`), `is_active`.
 - Table `public.delivery_agents`: Schema with `user_id`, `agency_id`, `coverage_states`, `current_cod_balance`, `max_cod_credit_limit`.
-- Seed Data: Delivery Agent Emeka Rider (`rider.emeka@novaexpress.com`).
+- Seed Data: Delivery Agent Emeka Rider (`rider.emeka@novaxpress.com`).
 
 #### 2. Backend & Services Layer
 - `AuthRemoteDataSource`: Supabase Auth `signInWithPassword`, `signOut`, `getCurrentUser`.
@@ -45,7 +45,7 @@ flowchart TD
 - Profile details screen displaying Agent ID, Coverage Area, assigned DC, and app build version.
 
 #### 4. Verification & Test Criteria
-- Successful login with `rider.emeka@novaexpress.com` / `Password123!`.
+- Successful login with `rider.emeka@novaxpress.com` / `Password123!`.
 - Persistence of user session across app restarts.
 - Clean logout clearing session state.
 

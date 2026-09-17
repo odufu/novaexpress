@@ -28,7 +28,7 @@ class PaystackCheckoutOverlay extends ConsumerStatefulWidget {
     required this.email,
     required this.reference,
     this.title = 'Paystack Secure Checkout',
-    this.subtitle = 'NovaExpress Logistics Settlement',
+    this.subtitle = 'NovaXpress Logistics Settlement',
     required this.payerName,
     this.payerCode,
     this.agentId,
@@ -43,7 +43,7 @@ class PaystackCheckoutOverlay extends ConsumerStatefulWidget {
     required String email,
     required String reference,
     String title = 'Paystack Secure Checkout',
-    String subtitle = 'NovaExpress Logistics Settlement',
+    String subtitle = 'NovaXpress Logistics Settlement',
     required String payerName,
     String? payerCode,
     String? agentId,
@@ -152,7 +152,7 @@ class _PaystackCheckoutOverlayState extends ConsumerState<PaystackCheckoutOverla
     try {
       final res = await _paystackService.initializeTransaction(
         amount: widget.amount,
-        email: widget.email.isNotEmpty ? widget.email : 'rider.${(widget.payerCode ?? 'rdr').toLowerCase()}@novaexpress.ng',
+        email: widget.email.isNotEmpty ? widget.email : 'rider.${(widget.payerCode ?? 'rdr').toLowerCase()}@novaxpress.ng',
         reference: widget.reference,
         metadata: {
           'payer_name': widget.payerName,

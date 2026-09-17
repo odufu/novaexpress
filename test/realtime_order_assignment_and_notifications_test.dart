@@ -163,7 +163,7 @@ void main() {
 
     const joelUser = UserModel(
       id: 'agent-joel-odufu-uuid',
-      email: 'joel.odufu@novaexpress.ng',
+      email: 'joel.odufu@novaxpress.ng',
       firstName: 'Joel',
       lastName: 'Odufu',
       role: 'pda',

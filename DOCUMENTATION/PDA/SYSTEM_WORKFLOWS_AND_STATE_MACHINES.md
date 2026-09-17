@@ -1,6 +1,6 @@
-# NovaExpress PDA — System Workflows & State Machines
+# NovaXpress PDA — System Workflows & State Machines
 
-This document outlines the core business workflows, transaction state machines, and sequence diagrams governing the NovaExpress PDA ecosystem.
+This document outlines the core business workflows, transaction state machines, and sequence diagrams governing the NovaXpress PDA ecosystem.
 
 ---
 

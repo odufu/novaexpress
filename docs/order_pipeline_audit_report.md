@@ -1,4 +1,4 @@
-# NovaExpress Order Pipeline & System Comprehensive Audit Report
+# NovaXpress Order Pipeline & System Comprehensive Audit Report
 
 **Date**: September 13, 2026  
 **Auditor**: Antigravity Autonomous Agentic AI  
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-A comprehensive, ground-up architectural and functional audit of the NovaExpress Order Pipeline was conducted across all six lifecycle stages:
+A comprehensive, ground-up architectural and functional audit of the NovaXpress Order Pipeline was conducted across all six lifecycle stages:
 1. **Order Intake & Ingestion**: Direct Creation, CSV Bulk Import, and Closer Portal Submissions.
 2. **Hierarchical Geographic Routing**: State and LGA routing to Handling Distribution Centers (Station DCs) and Hub/Grand DC escalation.
 3. **Automated & Manual Fleet Dispatch**: Routing to on-duty PDA delivery agents via LGA JSONB matching and duty verification.

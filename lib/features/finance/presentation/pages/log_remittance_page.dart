@@ -470,7 +470,7 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Remit easily via Card, Dedicated Virtual NUBAN Account, or USSD (*737#). Once paid, NovaExpress automatically updates your cash in custody without manual DC receipts.',
+                            'Remit easily via Card, Dedicated Virtual NUBAN Account, or USSD (*737#). Once paid, NovaXpress automatically updates your cash in custody without manual DC receipts.',
                             style: GoogleFonts.inter(
                               fontSize: 11.5,
                               color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
@@ -586,7 +586,7 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
     final riderCode = user?.deliveryAgentCode ?? user?.riderCode ?? user?.deliveryAgentId ?? 'RDR';
     final riderEmail = (user?.email != null && user!.email.isNotEmpty)
         ? user.email
-        : 'rider.${riderCode.toLowerCase()}@novaexpress.ng';
+        : 'rider.${riderCode.toLowerCase()}@novaxpress.ng';
 
     void onPaymentConfirmed(String confirmedRef) async {
       final reason = ref.read(logRemittanceDiscrepancyReasonProvider) ??

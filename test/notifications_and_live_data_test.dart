@@ -116,7 +116,7 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
   @override
   Future<UserModel> login(String email, String password) async => const UserModel(
         id: '70000000-0000-4000-8000-000000000007',
-        email: 'rider.emeka@novaexpress.com',
+        email: 'rider.emeka@novaxpress.com',
         firstName: 'Emeka',
         lastName: 'Rider',
         phone: '+2348037778899',
@@ -196,7 +196,7 @@ class MockAuthNotifier extends AuthNotifier {
     state = const AuthState(
       user: UserEntity(
         id: '70000000-0000-4000-8000-000000000007',
-        email: 'rider.emeka@novaexpress.com',
+        email: 'rider.emeka@novaxpress.com',
         firstName: 'Emeka',
         lastName: 'Rider',
         phone: '+2348037778899',

@@ -4,8 +4,8 @@ import '../core/router/app_router.dart';
 import '../core/theme/app_theme.dart';
 import '../core/theme/theme_provider.dart';
 
-class NovaExpressApp extends ConsumerWidget {
-  const NovaExpressApp({super.key});
+class NovaXpressApp extends ConsumerWidget {
+  const NovaXpressApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -13,7 +13,7 @@ class NovaExpressApp extends ConsumerWidget {
     final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
-      title: 'NovaExpress PDA',
+      title: 'NovaXpress PDA',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,

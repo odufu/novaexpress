@@ -18,7 +18,7 @@ END $$;
 -- 2. Backfill client_id for known client users
 UPDATE public.users 
 SET client_id = '33333333-3333-4333-8333-333333333333' 
-WHERE email = 'client.novacale@novaexpress.ng' 
+WHERE email = 'client.novacale@novaxpress.ng' 
    OR (role = 'client' AND email ILIKE '%novacale%');
 
 UPDATE public.users 

@@ -53,7 +53,7 @@ export const OPERATIONAL_MATRIX = [
     payment: 'Non-POD (Prepaid)',
     badgeColor: 'cyan',
     title: 'Client Package • Non-POD',
-    description: 'Merchant supplies pre-packed, pre-paid parcels. NovaExpress acts as pure last-mile courier. Zero cash collected at doorstep.',
+    description: 'Merchant supplies pre-packed, pre-paid parcels. NovaXpress acts as pure last-mile courier. Zero cash collected at doorstep.',
     steps: ['Merchant Prep', 'DC Hub Ingestion', 'Rider Route Assignment', 'Doorstep POD Signature'],
     settlement: 'Platform fee billed to merchant monthly. Zero rider cash liability.',
   },
@@ -273,9 +273,9 @@ export const MERMAID_ROLE_WORKFLOWS = {
     chart: `graph TD
     A([💼 1. Login to Client Merchant Portal]) --> B[📑 2. Upload Daily Orders via Bulk CSV]
     B --> C[🏷️ 3. Select SKU Bundles & Pricing Tiers]
-    C --> D[📦 4. NovaExpress Regional DCs Fulfill Orders]
+    C --> D[📦 4. NovaXpress Regional DCs Fulfill Orders]
     D --> E[📍 5. Real-Time Telemetry Tracking of Doorstep POD]
-    E --> F[💵 6. NovaExpress Collects COD / Virtual Bank Transfer]
+    E --> F[💵 6. NovaXpress Collects COD / Virtual Bank Transfer]
     F --> G[📊 7. Live Audit of Accrued Remittance Balances]
     G --> H([🏦 8. Weekly Automated Corporate Bank Settlement])
     style A fill:#006C4C,stroke:#004D36,color:#fff

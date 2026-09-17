@@ -13,7 +13,7 @@ void main() {
 
   final testRider = UserModel(
     id: 'user-joel-1234',
-    email: 'joel.odufu@novaexpress.ng',
+    email: 'joel.odufu@novaxpress.ng',
     firstName: 'Joel',
     lastName: 'Odufu',
     phone: '08085040146',
@@ -68,7 +68,7 @@ void main() {
     // Verify Classified Sections
     expect(find.text('Personal & Contact Details'), findsOneWidget);
     expect(find.text('08085040146'), findsOneWidget);
-    expect(find.text('joel.odufu@novaexpress.ng'), findsOneWidget);
+    expect(find.text('joel.odufu@novaxpress.ng'), findsOneWidget);
     expect(find.text('Wuse II, Abuja (FCT)'), findsOneWidget);
 
     expect(find.text('Compensation & Settlement Bank'), findsOneWidget);

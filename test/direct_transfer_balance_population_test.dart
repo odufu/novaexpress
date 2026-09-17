@@ -8,7 +8,7 @@ void main() {
   group('Direct Transfer & "My Balance" Population Verification Suite', () {
     const testRider = UserModel(
       id: 'b1111111-1111-4111-8111-111111111111',
-      email: 'joel.odufu@novaexpress.ng',
+      email: 'joel.odufu@novaxpress.ng',
       firstName: 'Joel',
       lastName: 'Odufu',
       phone: '08031234567',

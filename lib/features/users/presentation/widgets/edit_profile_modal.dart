@@ -777,7 +777,7 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> with Single
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
-                                    'Role jurisdiction and hub permissions are synchronized with the central NovaExpress logistics network.',
+                                    'Role jurisdiction and hub permissions are synchronized with the central NovaXpress logistics network.',
                                     style: GoogleFonts.inter(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                                   ),
                                 ),

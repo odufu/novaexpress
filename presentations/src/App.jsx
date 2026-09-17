@@ -184,8 +184,8 @@ export default function App() {
         color: 'var(--text-muted)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <img src="./square_logo.png" alt="NovaExpress" style={{ width: '22px', height: '22px', objectFit: 'contain' }} />
-          <span>NovaExpress Logistics • React + Vite Interactive Master Deck • Confidential</span>
+          <img src="./square_logo.png" alt="NovaXpress" style={{ width: '22px', height: '22px', objectFit: 'contain' }} />
+          <span>NovaXpress Logistics • React + Vite Interactive Master Deck • Confidential</span>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>

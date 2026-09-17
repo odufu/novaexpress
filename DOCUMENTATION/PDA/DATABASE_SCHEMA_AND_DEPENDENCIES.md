@@ -1,8 +1,8 @@
-# NovaExpress PDA (Rider Application) — Database Schema & Entity Interdependence
+# NovaXpress PDA (Rider Application) — Database Schema & Entity Interdependence
 
 ## 1. Architectural Overview & Design Philosophy
 
-The NovaExpress Logistics Management System (NoveXPS) PDA platform is engineered with a strict **Multi-Tenant, Ledger-Accurate, State-Driven Relational Schema** running on PostgreSQL and Supabase.
+The NovaXpress Logistics Management System (NoveXPS) PDA platform is engineered with a strict **Multi-Tenant, Ledger-Accurate, State-Driven Relational Schema** running on PostgreSQL and Supabase.
 
 The schema balances three critical operational vectors:
 1. **Physical Asset Tracking**: Real-time vehicle inventory custody, batch allocations, stock requests, physical handovers, and return logistics.

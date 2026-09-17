@@ -237,7 +237,7 @@ class _DCOnboardClientModalState extends ConsumerState<DCOnboardClientModal> {
     if (_createdClient == null) return;
     final text = '''
 =================================================
-NovaExpress Platform — Client Account Credentials
+NovaXpress Platform — Client Account Credentials
 =================================================
 Company: ${_createdClient!.companyName}
 Client Code: ${_createdClient!.code}
@@ -770,7 +770,7 @@ Initial Password: ${_createdPassword ?? 'ClientPass2026!'}
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        'An account with "$_lastCheckedEmail" already exists on NovaExpress. Because clients authenticate using their unique email address, this client cannot reuse an existing login identifier.',
+                        'An account with "$_lastCheckedEmail" already exists on NovaXpress. Because clients authenticate using their unique email address, this client cannot reuse an existing login identifier.',
                         style: GoogleFonts.inter(
                           fontSize: 11.5,
                           color: const Color(0xFFB91C1C),
@@ -1333,7 +1333,7 @@ Initial Password: ${_createdPassword ?? 'ClientPass2026!'}
           ),
           const SizedBox(height: 6),
           Text(
-            '${client.companyName} (${client.code}) is now authenticated on NovaExpress',
+            '${client.companyName} (${client.code}) is now authenticated on NovaXpress',
             style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B)),
             textAlign: TextAlign.center,
           ),

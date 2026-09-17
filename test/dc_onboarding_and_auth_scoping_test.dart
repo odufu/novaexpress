@@ -159,7 +159,7 @@ void main() {
         address: 'Plot 18, Industrial Estate, Sokoto',
         contactPhone: '+234 803 111 4455',
         managerName: 'Kabiru Sanusi',
-        supervisorEmail: 'supervisor.sokoto@novaexpress.ng',
+        supervisorEmail: 'supervisor.sokoto@novaxpress.ng',
         supervisorPassword: 'Password123!',
         operatingZones: const ['Sokoto North', 'Sokoto South', 'Wamakko'],
         storageCapacityUnits: 60000,
@@ -174,8 +174,8 @@ void main() {
       expect(newDc.operatingZones.contains('Sokoto North'), isTrue);
 
       // Verify that the supervisor was registered in the Auth layer
-      final loggedInSupervisor = await fakeAuthDS.login('supervisor.sokoto@novaexpress.ng', 'Password123!');
-      expect(loggedInSupervisor.email, 'supervisor.sokoto@novaexpress.ng');
+      final loggedInSupervisor = await fakeAuthDS.login('supervisor.sokoto@novaxpress.ng', 'Password123!');
+      expect(loggedInSupervisor.email, 'supervisor.sokoto@novaxpress.ng');
       expect(loggedInSupervisor.role, 'dc_manager');
       expect(loggedInSupervisor.firstName, 'Kabiru');
       expect(loggedInSupervisor.lastName, 'Sanusi');
@@ -185,7 +185,7 @@ void main() {
 
     test('2. DC Supervisor login loads scoped UserModel and allows independent hub switching', () async {
       await fakeAuthDS.registerDistributionCenterSupervisor(
-        email: 'supervisor.ibadan@novaexpress.ng',
+        email: 'supervisor.ibadan@novaxpress.ng',
         password: 'Password123!',
         firstName: 'Olumide',
         lastName: 'Akinwale',
@@ -196,10 +196,10 @@ void main() {
         operatingCity: 'Ibadan',
       );
 
-      final user = await authRepo.login('supervisor.ibadan@novaexpress.ng', 'Password123!');
+      final user = await authRepo.login('supervisor.ibadan@novaxpress.ng', 'Password123!');
 
       expect(user.role, 'dc_manager');
-      expect(user.email, 'supervisor.ibadan@novaexpress.ng');
+      expect(user.email, 'supervisor.ibadan@novaxpress.ng');
       expect(user.distributionCenterId, 'dc_ibd_01');
       expect(user.distributionCenterName, 'Ibadan Regional Depot');
 

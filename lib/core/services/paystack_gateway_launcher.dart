@@ -73,7 +73,7 @@ class PaystackGatewayLauncher {
     try {
       final res = await _paystackService.initializeTransaction(
         amount: amount,
-        email: email.isNotEmpty ? email : 'rider.${(payerCode ?? 'rdr').toLowerCase()}@novaexpress.ng',
+        email: email.isNotEmpty ? email : 'rider.${(payerCode ?? 'rdr').toLowerCase()}@novaxpress.ng',
         reference: reference,
         metadata: {
           'payer_name': payerName,
@@ -100,7 +100,7 @@ class PaystackGatewayLauncher {
       // WEB: Popup the authentic Paystack Checkout modal directly on the current screen!
       launchPaystackInlineJs(
         publicKey: PaystackConstants.publicKey,
-        email: email.isNotEmpty ? email : 'rider.${(payerCode ?? 'rdr').toLowerCase()}@novaexpress.ng',
+        email: email.isNotEmpty ? email : 'rider.${(payerCode ?? 'rdr').toLowerCase()}@novaxpress.ng',
         amountKobo: (amount * 100).round(),
         reference: reference,
         authorizationUrl: authUrl,

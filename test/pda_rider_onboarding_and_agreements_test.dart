@@ -224,7 +224,7 @@ void main() {
 
       // 1. Register new PDA rider
       final registeredUser = await mockAuthDS.registerDeliveryAgent(
-        email: 'chinedu.pda@novaexpress.ng',
+        email: 'chinedu.pda@novaxpress.ng',
         password: 'Password123!',
         firstName: 'Chinedu',
         lastName: 'Okafor',
@@ -244,15 +244,15 @@ void main() {
         assignedZone: 'Wuse II',
       );
 
-      expect(registeredUser.email, equals('chinedu.pda@novaexpress.ng'));
+      expect(registeredUser.email, equals('chinedu.pda@novaxpress.ng'));
       expect(registeredUser.role, equals('delivery_agent'));
       expect(registeredUser.commissionRate, equals(1200.0));
       expect(registeredUser.transportAllowance, equals(1500.0));
 
       // 2. Perform Login with the exact email and password
-      final loggedInUser = await mockAuthDS.login('chinedu.pda@novaexpress.ng', 'Password123!');
+      final loggedInUser = await mockAuthDS.login('chinedu.pda@novaxpress.ng', 'Password123!');
 
-      expect(loggedInUser.email, equals('chinedu.pda@novaexpress.ng'));
+      expect(loggedInUser.email, equals('chinedu.pda@novaxpress.ng'));
       expect(loggedInUser.role, equals('delivery_agent'));
       expect(loggedInUser.isPda, isTrue);
       expect(loggedInUser.isDcManager, isFalse);

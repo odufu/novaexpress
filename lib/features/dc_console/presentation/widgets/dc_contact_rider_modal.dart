@@ -107,7 +107,7 @@ class _DCContactRiderModalState extends ConsumerState<DCContactRiderModal> {
     final customNote = _customNoteController.text.trim();
     final message = '''Hello ${widget.riderName.trim()} (${widget.riderCode.trim()}),
 
-This is DC Supervisor Adekunle from NovaExpress Logistics Command regarding Order #${widget.order.orderNumber}.
+This is DC Supervisor Adekunle from NovaXpress Logistics Command regarding Order #${widget.order.orderNumber}.
 
 • Customer: ${widget.order.customerName}
 • Delivery Address: ${widget.order.deliveryAddress}

@@ -341,8 +341,8 @@ class OrderEntity {
 
   /// Generates the prefilled message body requesting customer live location pin
   String getWhatsAppLocationRequestText({String? riderName}) {
-    final name = riderName != null && riderName.isNotEmpty ? riderName : 'your NovaExpress Dispatcher';
-    return '''Hello ${customerName.trim()}, this is $name from NovaExpress Logistics regarding your order ($orderNumber - $productName) 📦.
+    final name = riderName != null && riderName.isNotEmpty ? riderName : 'your NovaXpress Dispatcher';
+    return '''Hello ${customerName.trim()}, this is $name from NovaXpress Logistics regarding your order ($orderNumber - $productName) 📦.
 
 I am currently en route / preparing your delivery to:
 "${deliveryAddress.trim()}".

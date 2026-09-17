@@ -1,4 +1,4 @@
-# NovaExpress PDA App — Remittance Screen
+# NovaXpress PDA App — Remittance Screen
 
 The **Remittance** module is one of the most financially sensitive parts of the PDA app.
 
@@ -6,7 +6,7 @@ Its purpose is to let the agent clearly understand:
 
 > **How much money have I collected? How much am I entitled to deduct? How much must I remit? How much have I already remitted? And what is still outstanding?**
 
-For NovaExpress, this should **not** be treated simply as a "send money" screen. It is a **cash-accountability and settlement module**.
+For NovaXpress, this should **not** be treated simply as a "send money" screen. It is a **cash-accountability and settlement module**.
 
 ---
 
@@ -126,7 +126,7 @@ from:
 
 and:
 
-**Money belonging to NovaExpress / client.**
+**Money belonging to NovaXpress / client.**
 
 For example:
 
@@ -308,7 +308,7 @@ A successful POD delivery might be:
 
 A failed delivery might generate:
 
-> Client owes NovaExpress ₦1,500.
+> Client owes NovaXpress ₦1,500.
 
 Those are **different financial events**.
 
@@ -394,7 +394,7 @@ The PDA confirms it.
 
 # 14. SALARY-BASED PDA
 
-This is important because NovaExpress can configure agents differently.
+This is important because NovaXpress can configure agents differently.
 
 If the PDA is **salary-based**, don't show:
 
@@ -510,7 +510,7 @@ Options:
 * POS / Agent Transfer
 * Other approved method
 
-The available options should be controlled by NovaExpress.
+The available options should be controlled by NovaXpress.
 
 ---
 
@@ -526,7 +526,7 @@ Amount:
 
 Bank:
 
-**[Select/Configured NovaExpress Account]**
+**[Select/Configured NovaXpress Account]**
 
 Account:
 
@@ -955,7 +955,7 @@ Tracks:
 
 Tracks:
 
-> **Money the PDA owes NovaExpress/client and has actually remitted.**
+> **Money the PDA owes NovaXpress/client and has actually remitted.**
 
 ### Expense/Deduction Ledger
 
@@ -965,7 +965,7 @@ Tracks:
 
 These should **not be one single balance field**.
 
-That separation will make the NovaExpress accounting much easier to audit and will allow the business to change compensation arrangements later without redesigning the entire financial system.
+That separation will make the NovaXpress accounting much easier to audit and will allow the business to change compensation arrangements later without redesigning the entire financial system.
 
 ---
 
@@ -994,23 +994,23 @@ Again, several of these can be **states of the same screen or bottom sheets**, r
 
 The most important UX principle is:
 
-> **The PDA should never have to calculate what they owe NovaExpress. The system calculates it from completed deliveries, collected payments, the agent's compensation arrangement, approved transport allowances, and other configured financial rules.**
+> **The PDA should never have to calculate what they owe NovaXpress. The system calculates it from completed deliveries, collected payments, the agent's compensation arrangement, approved transport allowances, and other configured financial rules.**
 
 ---
 
 # 32. Direct Company Transfers (Monnify) vs. Physical Cash POD
 
-An essential operational distinction in the NovaExpress financial flow:
+An essential operational distinction in the NovaXpress financial flow:
 
 ### Scenario A: Physical Cash POD
 1. Customer pays physical cash in hand to the rider.
 2. The rider holds the physical funds in their personal custody.
-3. **Remittance is REQUIRED**: The rider must remit the net amount (`Gross Cash Collected - Commission Earned - Transport Allowance`) to NovaExpress via bank transfer or DC cash handover before 6:00 PM.
+3. **Remittance is REQUIRED**: The rider must remit the net amount (`Gross Cash Collected - Commission Earned - Transport Allowance`) to NovaXpress via bank transfer or DC cash handover before 6:00 PM.
 
 ### Scenario B: Direct Company Transfer (Monnify Virtual Account)
 1. At the completion of delivery, the customer chooses to pay via instant bank transfer.
 2. The PDA generates and displays a **dynamic virtual bank account number (powered by Monnify)** generated uniquely for that specific delivery order.
-3. The customer transfers funds directly into NovaExpress’s Monnify account.
+3. The customer transfers funds directly into NovaXpress’s Monnify account.
 4. Once verified via Monnify webhook:
    - **Rider Holds ₦0.00 physical cash**.
    - **NO Cash Remittance is required from the rider** for this order.

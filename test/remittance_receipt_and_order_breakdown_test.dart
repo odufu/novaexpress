@@ -345,7 +345,7 @@ void main() {
 
       const mockUser = UserEntity(
         id: 'usr-01',
-        email: 'rider@novaexpress.ng',
+        email: 'rider@novaxpress.ng',
         firstName: 'Joel',
         lastName: 'Odufu',
         phone: '08012345678',

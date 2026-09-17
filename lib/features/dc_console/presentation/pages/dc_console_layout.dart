@@ -160,7 +160,7 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
       duration: const Duration(milliseconds: 200),
       width: isDrawer ? 280.0 : width,
       decoration: const BoxDecoration(
-        color: Color(0xFF031632), // NovaExpress Enterprise Deep Navy
+        color: Color(0xFF031632), // NovaXpress Enterprise Deep Navy
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -174,7 +174,7 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF37021), // NovaExpress Signature Orange
+                    color: const Color(0xFFF37021), // NovaXpress Signature Orange
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Icon(Icons.warehouse_rounded, color: Colors.white, size: 20),
@@ -187,7 +187,7 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          'NovaExpress DC',
+                          'NovaXpress DC',
                           style: GoogleFonts.inter(
                             color: Colors.white,
                             fontSize: 15,

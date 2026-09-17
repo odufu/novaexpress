@@ -1,5 +1,5 @@
 -- ============================================================================
--- NOVAEXPRESS LOGISTICS - ENFORCE DC SCOPING, ISOLATION & AUTO-NOTIFICATIONS
+-- NOVAXPRESS LOGISTICS - ENFORCE DC SCOPING, ISOLATION & AUTO-NOTIFICATIONS
 -- 1. Synchronize users.distribution_center_id with delivery_agents.distribution_center_id
 -- 2. Restrict rider auto-matching strictly to the matched DC
 -- 3. Synchronize both delivery_agent_id and assigned_agent_id on orders

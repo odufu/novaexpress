@@ -22,7 +22,7 @@ sequenceDiagram
     participant Auth as Supabase Auth Server
     participant DB as Supabase PostgreSQL
 
-    Admin->>Portal: Enters Corporate Credentials (admin@novaexpress.ng) & MFA Token
+    Admin->>Portal: Enters Corporate Credentials (admin@novaxpress.ng) & MFA Token
     Portal->>Auth: signInWithPassword(email, password)
     
     Auth-->>Portal: Returns JWT Token & User Metadata (role = 'super_admin')
@@ -49,7 +49,7 @@ sequenceDiagram
 
 ### Step 1: Corporate MFA Authentication
 1. The Super Admin or HQ Manager accesses the **NoveXPS Enterprise Admin Portal**.
-2. Enters corporate credentials (`admin@novaexpress.ng` + Password) and 6-digit Time-Based One-Time Password (TOTP MFA).
+2. Enters corporate credentials (`admin@novaxpress.ng` + Password) and 6-digit Time-Based One-Time Password (TOTP MFA).
 3. Supabase Auth validates credentials and generates an access token with global administrative claims.
 
 ### Step 2: Global Authority Scope Hydration

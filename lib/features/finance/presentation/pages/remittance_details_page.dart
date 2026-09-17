@@ -84,7 +84,7 @@ class _RemittanceDetailsPageState extends ConsumerState<RemittanceDetailsPage> {
         paystackAuthCode: 'AUTH_89127391',
         gatewayResponse: 'Approved / Successful (200 OK)',
         payerName: 'Joel Odufu',
-        payerEmail: 'joel.odufu@novaexpress.ng',
+        payerEmail: 'joel.odufu@novaxpress.ng',
         verifiedByName: 'Paystack Settlement Engine',
         notes: 'TXN-88372921 • Auto-verified via Paystack Instant Remittance',
         createdAt: DateTime.now().subtract(const Duration(hours: 2)),
@@ -132,7 +132,7 @@ class _RemittanceDetailsPageState extends ConsumerState<RemittanceDetailsPage> {
         paystackAuthCode: 'AUTH_89127391',
         gatewayResponse: 'Approved / Successful (200 OK)',
         payerName: 'Joel Odufu',
-        payerEmail: 'joel.odufu@novaexpress.ng',
+        payerEmail: 'joel.odufu@novaxpress.ng',
         verifiedByName: 'Paystack Settlement Engine',
         notes: 'TXN-88372921 • Auto-verified via Paystack Instant Remittance',
         createdAt: DateTime.now().subtract(const Duration(days: 1)),
@@ -194,7 +194,7 @@ class _RemittanceDetailsPageState extends ConsumerState<RemittanceDetailsPage> {
     final riderName = currentUser != null && currentUser.fullName.toString().isNotEmpty
         ? currentUser.fullName.toString()
         : 'Joel Odufu';
-    final riderEmail = currentUser?.email ?? 'joel.odufu@novaexpress.ng';
+    final riderEmail = currentUser?.email ?? 'joel.odufu@novaxpress.ng';
 
     final associated = effectiveOrders.map((o) {
       return RemittanceOrderItem(
@@ -409,7 +409,7 @@ class _RemittanceDetailsPageState extends ConsumerState<RemittanceDetailsPage> {
 
     final receiptText = '''
 ========================================
-   NOVAEXPRESS OFFICIAL REMITTANCE RECEIPT
+   NOVAXPRESS OFFICIAL REMITTANCE RECEIPT
 ========================================
 Reference: ${remit.referenceNumber}
 Status: SUCCESSFUL / SETTLED
@@ -543,7 +543,7 @@ Thank you for your timely settlement!
 
     final payerEmail = paystackTxn?['payer_email']?.toString() ??
         remit.payerEmail ??
-        (user?.email ?? 'joel.odufu@novaexpress.ng');
+        (user?.email ?? 'joel.odufu@novaxpress.ng');
 
     final formattedTimestamp = '${remit.createdAt.day} ${_monthName(remit.createdAt.month)} ${remit.createdAt.year} • ${remit.createdAt.hour.toString().padLeft(2, '0')}:${remit.createdAt.minute.toString().padLeft(2, '0')}';
 
@@ -694,7 +694,7 @@ Thank you for your timely settlement!
                           const SizedBox(height: 6),
 
                           Text(
-                            'Auto-reconciled via Paystack • Credited to NovaExpress Treasury',
+                            'Auto-reconciled via Paystack • Credited to NovaXpress Treasury',
                             style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
                             textAlign: TextAlign.center,
                           ),

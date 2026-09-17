@@ -1,5 +1,5 @@
 -- ============================================================================
--- NOVAEXPRESS LOGISTICS PLATFORM - RIDER COMPENSATION & DC FINANCE SETTINGS
+-- NOVAXPRESS LOGISTICS PLATFORM - RIDER COMPENSATION & DC FINANCE SETTINGS
 -- Production-grade schema for multi-device sync of:
 --   1. Rider compensation terms (commission, transport, failed delivery, salary, personnel type)
 --   2. DC hub finance & POS rules (charge mode, tier fee, flat rate, caps, defaults)

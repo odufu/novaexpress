@@ -23,7 +23,7 @@ sequenceDiagram
     participant DB as Supabase PostgreSQL
 
     Admin->>Portal: Opens "Global User & RBAC Management"
-    Admin->>Portal: Searches User: "Adekunle Supervisor" (dc.supervisor@novaexpress.ng)
+    Admin->>Portal: Searches User: "Adekunle Supervisor" (dc.supervisor@novaxpress.ng)
     
     alt Role Promotion (Promote DC Supervisor to DC Manager)
         Admin->>Portal: Selects New Role: 'dc_manager' -> Assigns Hub: 'Wuse DC'
@@ -61,7 +61,7 @@ sequenceDiagram
 1. Super Admin navigates to **User Management Page** $\rightarrow$ Clicks **[ + Create User ]**.
 2. Inputs user identity:
    * **Full Name**: `Adekunle Supervisor`
-   * **Corporate Email**: `dc.supervisor@novaexpress.ng`
+   * **Corporate Email**: `dc.supervisor@novaxpress.ng`
    * **Phone Number**: `08091112233`
    * **Role**: `dc_manager`
    * **Assigned Hub**: `Wuse Distribution Center`

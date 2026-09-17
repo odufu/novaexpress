@@ -98,7 +98,7 @@ class _PaystackRemittanceModalState extends ConsumerState<PaystackRemittanceModa
   void _initPaystackSession() async {
     final res = await _paystackService.initializeTransaction(
       amount: widget.amount,
-      email: widget.riderEmail ?? 'rider.${widget.riderCode.toLowerCase()}@novaexpress.ng',
+      email: widget.riderEmail ?? 'rider.${widget.riderCode.toLowerCase()}@novaxpress.ng',
       reference: _paymentReference,
       metadata: {
         'type': 'remittance',
@@ -120,7 +120,7 @@ class _PaystackRemittanceModalState extends ConsumerState<PaystackRemittanceModa
 
       launchPaystackInlineJs(
         publicKey: PaystackConstants.publicKey,
-        email: widget.riderEmail ?? 'rider.${widget.riderCode.toLowerCase()}@novaexpress.ng',
+        email: widget.riderEmail ?? 'rider.${widget.riderCode.toLowerCase()}@novaxpress.ng',
         amountKobo: amountKobo,
         reference: _paymentReference,
         metadata: {
@@ -182,7 +182,7 @@ class _PaystackRemittanceModalState extends ConsumerState<PaystackRemittanceModa
             amount: widget.amount,
             transactionType: 'remittance',
             deliveryAgentId: widget.agentId,
-            payerEmail: widget.riderEmail ?? 'rider@novaexpress.ng',
+            payerEmail: widget.riderEmail ?? 'rider@novaxpress.ng',
             payerName: widget.riderName,
             channel: verifyRes.channel ?? 'dedicated_nuban',
             responseData: verifyRes.rawData,

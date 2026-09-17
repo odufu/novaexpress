@@ -1,6 +1,6 @@
-# NovaExpress Logistics — Field Agent Training & Workflow Guide 🚚📘
+# NovaXpress Logistics — Field Agent Training & Workflow Guide 🚚📘
 
-Welcome to the official **NovaExpress Personal Distribution Agent (PDA) Operational Training & Workflow Manual**. This documentation directory serves as the comprehensive field guide for training Personal Distribution Agents (PDAs) operating across Nigeria (Abuja, Lagos, Port Harcourt, and regional Distribution Centers).
+Welcome to the official **NovaXpress Personal Distribution Agent (PDA) Operational Training & Workflow Manual**. This documentation directory serves as the comprehensive field guide for training Personal Distribution Agents (PDAs) operating across Nigeria (Abuja, Lagos, Port Harcourt, and regional Distribution Centers).
 
 ---
 

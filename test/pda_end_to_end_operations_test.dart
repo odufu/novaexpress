@@ -99,7 +99,7 @@ class MockNotificationsRemoteDataSource implements NotificationsRemoteDataSource
 class MockAuthRemoteDataSource implements AuthRemoteDataSource {
   static const testUserModel = UserModel(
     id: 'a1111111-1111-4111-8111-111111111111',
-    email: 'emeka.rider@novaexpress.ng',
+    email: 'emeka.rider@novaxpress.ng',
     firstName: 'Emeka',
     lastName: 'Rider',
     phone: '08031234567',
@@ -248,7 +248,7 @@ void main() {
 
       testPdaUser = const UserEntity(
         id: 'a1111111-1111-4111-8111-111111111111',
-        email: 'emeka.rider@novaexpress.ng',
+        email: 'emeka.rider@novaxpress.ng',
         firstName: 'Emeka',
         lastName: 'Rider',
         phone: '08031234567',
@@ -350,7 +350,7 @@ void main() {
           paymentMethod: 'bank_transfer',
           status: 'verified',
           verifiedByName: 'Wuse DC — Operations',
-          notes: 'Bank Transfer to NovaExpress GTBank (Ref: TRX-829101). Fully verified.',
+          notes: 'Bank Transfer to NovaXpress GTBank (Ref: TRX-829101). Fully verified.',
           createdAt: now,
         ),
       ];

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-NovaExpress Supabase Data Import Tool
+NovaXpress Supabase Data Import Tool
 Imports an exported JSON database backup into a target Supabase project using conflict-safe upserts.
 """
 
@@ -93,7 +93,7 @@ def upsert_table_data(base_url, service_key, table_name, records):
 
 def main():
     import argparse
-    parser = argparse.ArgumentParser(description="Import NovaExpress Supabase Database Backup")
+    parser = argparse.ArgumentParser(description="Import NovaXpress Supabase Database Backup")
     parser.add_argument("--file", type=str, required=True, help="Path to exported backup JSON file")
     parser.add_argument("--url", type=str, help="Target Supabase Project URL")
     parser.add_argument("--service-key", type=str, help="Target Supabase Service Role Key")

@@ -174,8 +174,8 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
     final orderNumClean = order.orderNumber.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '');
     final refCode = 'PSTK-POD-$orderNumClean-$timestamp';
     final customerEmail = (order.customerPhone.isNotEmpty)
-        ? '${order.customerPhone.replaceAll(RegExp(r'[^0-9]'), '')}@customer.novaexpress.ng'
-        : 'customer@novaexpress.ng';
+        ? '${order.customerPhone.replaceAll(RegExp(r'[^0-9]'), '')}@customer.novaxpress.ng'
+        : 'customer@novaxpress.ng';
 
     void onPaymentSuccess(String confirmedRef) {
       if (mounted) {
@@ -630,7 +630,7 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                 const SizedBox(height: 8),
                 Text(
                   isDirectTransfer
-                      ? 'Payment of ${CurrencyFormatter.formatNaira(order.totalAmount)} was paid directly to NovaExpress via Paystack.\n(₦0.00 cash held by you).'
+                      ? 'Payment of ${CurrencyFormatter.formatNaira(order.totalAmount)} was paid directly to NovaXpress via Paystack.\n(₦0.00 cash held by you).'
                       : 'Shipment #${order.orderNumber} successfully marked as delivered. ₦${order.totalAmount.toStringAsFixed(0)} cash in custody for remittance.',
                   textAlign: TextAlign.center,
                   style: TextStyle(

@@ -1,6 +1,6 @@
-# NovaExpress PDA — Complete Function to Database & API Mapping
+# NovaXpress PDA — Complete Function to Database & API Mapping
 
-This document provides a comprehensive mapping of every screen, widget, user interaction, Riverpod provider, and backend database interaction across the entire NovaExpress PDA application.
+This document provides a comprehensive mapping of every screen, widget, user interaction, Riverpod provider, and backend database interaction across the entire NovaXpress PDA application.
 
 ---
 

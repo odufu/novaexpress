@@ -146,9 +146,9 @@ void main() {
 
     // 10. Delete extra Users (preserve ONLY Emeka Rider, Adekunle Supervisor, Novacare Client, Amaka Chioma Closer)
     const preservedEmails = [
-      'emeka.rider@novaexpress.ng',
-      'dc.supervisor@novaexpress.ng',
-      'client.novacale@novaexpress.ng',
+      'emeka.rider@novaxpress.ng',
+      'dc.supervisor@novaxpress.ng',
+      'client.novacale@novaxpress.ng',
       'orders@novacare.ng',
       'closer.amaka@novacale.ng',
     ];

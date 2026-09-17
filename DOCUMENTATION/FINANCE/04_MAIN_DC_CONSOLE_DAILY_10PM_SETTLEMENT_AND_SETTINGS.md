@@ -2,7 +2,7 @@
 
 ## 1. Executive Role of the Main Grand DC Console
 
-In the NovaExpress multi-DC architecture, the **Main Grand DC Console** serves as the central clearinghouse. While branch DCs manage day-to-day rider dispatching and physical package sorting, the Main DC Console exclusively executes:
+In the NovaXpress multi-DC architecture, the **Main Grand DC Console** serves as the central clearinghouse. While branch DCs manage day-to-day rider dispatching and physical package sorting, the Main DC Console exclusively executes:
 1. **Global & Merchant Billing Configuration**: Setting base delivery rates, platform fees, payment gateway fee allocations, and failed delivery charges.
 2. **Daily 10:00 PM Merchant Settlement Closeouts**: Reconciling all gross collections (physical COD in DC vaults and digital transfers in Paystack) and generating official batch payouts to clients.
 3. **Escrow & Cash Vault Custody Audits**: Auditing liquid cash held vs. in-kind inventory valuation across the entire network.
@@ -86,7 +86,7 @@ Widget _buildMerchantBillingTab(bool isDark, bool isMobile) {
                   child: _buildSettingCard(
                     isDark: isDark,
                     title: 'Platform Commission Charge',
-                    subtitle: 'Operational margin earned by NovaExpress per completed order.',
+                    subtitle: 'Operational margin earned by NovaXpress per completed order.',
                     child: Column(
                       children: [
                         Row(
@@ -132,7 +132,7 @@ Widget _buildMerchantBillingTab(bool isDark, bool isMobile) {
                       value: _paystackFeeAbsorbedBy,
                       items: const [
                         DropdownMenuItem(value: 'merchant', child: Text('Merchant / Client (Deducted from Payout)')),
-                        DropdownMenuItem(value: 'company', child: Text('Company / NovaExpress (Absorbed)')),
+                        DropdownMenuItem(value: 'company', child: Text('Company / NovaXpress (Absorbed)')),
                         DropdownMenuItem(value: 'shared', child: Text('Shared 50/50 Split')),
                       ],
                       onChanged: (val) => setState(() => _paystackFeeAbsorbedBy = val ?? 'merchant'),

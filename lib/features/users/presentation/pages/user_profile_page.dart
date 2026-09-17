@@ -998,7 +998,7 @@ class UserProfilePage extends ConsumerWidget {
           ],
         ),
         content: Text(
-          'Are you sure you want to log out of your NovaExpress operations account?',
+          'Are you sure you want to log out of your NovaXpress operations account?',
           style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF64748B)),
         ),
         actions: [

@@ -43,7 +43,7 @@ class _MockNotificationsRemoteDS implements NotificationsRemoteDataSource {
 class _MockAuthRemoteDS implements AuthRemoteDataSource {
   static const testUser = UserModel(
     id: 'admin-001',
-    email: 'dc.supervisor@novaexpress.ng',
+    email: 'dc.supervisor@novaxpress.ng',
     firstName: 'Adekunle',
     lastName: 'Supervisor',
     phone: '08099887766',

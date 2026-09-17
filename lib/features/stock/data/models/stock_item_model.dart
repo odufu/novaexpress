@@ -89,8 +89,8 @@ class StockItemModel extends StockItemEntity {
         : 5;
 
     final rawInvType = json['inventory_type']?.toString();
-    final invType = rawInvType == 'novaexpress_inventory' 
-        ? InventoryType.novaExpressInventory 
+    final invType = (rawInvType == 'novaxpress_inventory' || rawInvType == 'novaexpress_inventory')
+        ? InventoryType.novaXpressInventory 
         : InventoryType.distributedInventory;
 
     String? imageAsset = json['image_asset']?.toString() ?? json['image_url']?.toString();
@@ -165,7 +165,7 @@ class StockItemModel extends StockItemEntity {
       'damaged_count': damagedCount,
       if (clientId != null && clientId!.isNotEmpty) 'client_id': clientId,
       'owner_name': ownerName,
-      'inventory_type': inventoryType == InventoryType.novaExpressInventory ? 'novaexpress_inventory' : 'distributed_inventory',
+      'inventory_type': inventoryType == InventoryType.novaXpressInventory ? 'novaxpress_inventory' : 'distributed_inventory',
       'total_in_custody': totalInCustody,
       'reserved_count': reservedCount,
       'assigned_count': assignedCount,

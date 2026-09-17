@@ -45,7 +45,7 @@ graph TD
 * **Emergency Action Trigger**: Crimson Red Button in top right header: `[ 🚨 System Emergency Lockdown ]`.
 
 ### Screen 2: Multi-Company Tenancy & Hub Provisioning Manager
-* **Tenant Companies Grid**: Cards for corporate entities (`NovaExpress Logistics Limited`, `Novacare Logistics Subsidiary`).
+* **Tenant Companies Grid**: Cards for corporate entities (`NovaXpress Logistics Limited`, `Novacare Logistics Subsidiary`).
 * **Regional Distribution Centers Table**:
   * Hub Name (*Wuse DC*, *Ikeja DC*, *Kano Central DC*), Code (`DC-KANO-01`), State, City.
   * Facility Address, Appointed DC Manager, Active Warehouse Stock Count.

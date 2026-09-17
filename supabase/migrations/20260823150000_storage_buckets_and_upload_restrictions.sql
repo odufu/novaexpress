@@ -1,5 +1,5 @@
 -- ==============================================================================
--- NOVAEXPRESS LOGISTICS: SUPABASE STORAGE BUCKETS & UPLOAD SECURITY RESTRICTIONS
+-- NOVAXPRESS LOGISTICS: SUPABASE STORAGE BUCKETS & UPLOAD SECURITY RESTRICTIONS
 -- ==============================================================================
 
 -- 1. Create and configure 'avatars' bucket with 5MB limit and image restrictions

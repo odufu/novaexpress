@@ -627,7 +627,7 @@ class ClientSettlement {
 Location: `lib/features/client_portal/presentation/providers/client_portal_provider.dart`
 
 **Critical Fixes Applied**:
-1. **Prepaid Direct Orders Fee Deduction**: For direct transfer orders, the client delivery fee **must be deducted** from the net client payout (`o.totalAmount - o.clientDeliveryFee`), because the customer paid the total gross price to NovaExpress directly.
+1. **Prepaid Direct Orders Fee Deduction**: For direct transfer orders, the client delivery fee **must be deducted** from the net client payout (`o.totalAmount - o.clientDeliveryFee`), because the customer paid the total gross price to NovaXpress directly.
 2. **Proper Classification of Awaiting Closeout vs. Remitted**: Delivered direct transfer orders are held in the company's Paystack account and remain in `awaitingRemittance` until the 10:00 PM settlement closeout processes them into `remittedToBank`.
 
 ```dart

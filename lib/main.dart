@@ -7,7 +7,7 @@ void main() async {
   await bootstrapApp();
   runApp(
     const ProviderScope(
-      child: NovaExpressApp(),
+      child: NovaXpressApp(),
     ),
   );
 }

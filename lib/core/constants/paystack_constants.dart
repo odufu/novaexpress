@@ -9,5 +9,5 @@ class PaystackConstants {
 
   // Bank & Settlement defaults
   static const String defaultBankName = 'Titan Trust Bank / Paystack';
-  static const String defaultAccountName = 'NovaExpress Logistics - Settlement';
+  static const String defaultAccountName = 'NovaXpress Logistics - Settlement';
 }

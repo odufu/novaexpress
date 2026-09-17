@@ -1,5 +1,5 @@
 -- ============================================================================
--- NOVAEXPRESS LOGISTICS PLATFORM - ENTERPRISE CLIENTS & CLOSER HIERARCHY
+-- NOVAXPRESS LOGISTICS PLATFORM - ENTERPRISE CLIENTS & CLOSER HIERARCHY
 -- Migration for:
 --   1. Enterprise Client Tiering & Closer Capacity Limits
 --   2. Client Closers / Telesales Agents Directory

@@ -40,7 +40,7 @@ export default function HeroOverview({ goToSlide }) {
         }}>
           <img
             src="./square_logo.png"
-            alt="NovaExpress"
+            alt="NovaXpress"
             style={{ width: '48px', height: '48px', objectFit: 'contain' }}
             onError={(e) => { e.target.style.display = 'none'; }}
           />
@@ -52,7 +52,7 @@ export default function HeroOverview({ goToSlide }) {
               color: 'var(--brand-primary)',
               lineHeight: 1.1,
             }}>
-              NovaExpress Logistics
+              NovaXpress Logistics
             </div>
             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Nigerian Distribution & Cash Settlement Network

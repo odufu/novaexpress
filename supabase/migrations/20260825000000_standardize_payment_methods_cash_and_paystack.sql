@@ -1,5 +1,5 @@
 -- ============================================================================
--- NOVAEXPRESS LOGISTICS PLATFORM - STANDARDIZE PAYMENT METHODS MIGRATION
+-- NOVAXPRESS LOGISTICS PLATFORM - STANDARDIZE PAYMENT METHODS MIGRATION
 -- Standardize operational payment options strictly to:
 --   1. 'cash' (Pay On Delivery with physical cash custody for later remittance)
 --   2. 'bank_transfer' (Direct Transfer via Paystack with instant company settlement)

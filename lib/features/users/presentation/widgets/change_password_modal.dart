@@ -124,7 +124,7 @@ class _ChangePasswordModalState extends ConsumerState<ChangePasswordModal> {
               const Divider(height: 20),
 
               Text(
-                'Update your login password for NovaExpress Field Terminal and Delivery Console.',
+                'Update your login password for NovaXpress Field Terminal and Delivery Console.',
                 style: GoogleFonts.inter(fontSize: 12.5, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
               ),
               const SizedBox(height: 16),

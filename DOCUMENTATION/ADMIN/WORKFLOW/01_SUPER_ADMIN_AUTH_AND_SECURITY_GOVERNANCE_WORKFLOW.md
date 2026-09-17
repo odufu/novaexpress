@@ -1,6 +1,6 @@
 # 🔐 Admin Workflow 01: Super Admin Authentication & Master Security Governance
 
-This document outlines the authentication protocol, hardware multi-factor authentication (MFA), IP whitelisting, session lifetime governance, and emergency break-glass procedures for the Overall / Super Administrator of NovaExpress.
+This document outlines the authentication protocol, hardware multi-factor authentication (MFA), IP whitelisting, session lifetime governance, and emergency break-glass procedures for the Overall / Super Administrator of NovaXpress.
 
 ---
 

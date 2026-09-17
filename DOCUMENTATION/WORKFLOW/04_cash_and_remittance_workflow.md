@@ -1,7 +1,7 @@
 # Module 4: Cash Collection & Remittance Workflow 💰🏦
 
 ## 1. Overview & Financial Rules
-For Pay-on-Delivery (POD) customer orders, field agents are responsible for collecting cash or verifying bank transfers from customers, holding collected funds securely, and remitting money to NovaExpress Central Finance.
+For Pay-on-Delivery (POD) customer orders, field agents are responsible for collecting cash or verifying bank transfers from customers, holding collected funds securely, and remitting money to NovaXpress Central Finance.
 
 ### Core Financial Rules
 1. **Currency**: All monetary values are strictly formatted in **Nigerian Naira (₦ / NGN)**.
@@ -55,7 +55,7 @@ Navigating to **Tab 3 (CASH)** on the bottom navigation bar presents the **Cash 
    - Type the exact amount being remitted (e.g. `65000`).
 4. **Select Remittance Channel**:
    - 💵 **Cash Handover to DC Cashier**: Physical cash handed over at DC office.
-   - 🏦 **Direct Bank Transfer**: Transfer made to NovaExpress corporate bank account.
+   - 🏦 **Direct Bank Transfer**: Transfer made to NovaXpress corporate bank account.
 5. **Enter Payment Reference**:
    - If **Bank Transfer**, enter the transaction reference / RRR code (e.g. `NEX-BNK-992019`).
    - If **Cash Handover**, select DC Cashier location (e.g. *Wuse DC Finance Desk*).

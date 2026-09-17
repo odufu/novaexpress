@@ -1,5 +1,5 @@
 -- ============================================================================
--- NOVAEXPRESS LOGISTICS PLATFORM - CLIENT & MERCHANT PORTAL SCHEMA
+-- NOVAXPRESS LOGISTICS PLATFORM - CLIENT & MERCHANT PORTAL SCHEMA
 -- Migration for:
 --   1. Clients / Merchants Table
 --   2. Commercial Product Packages Table
@@ -45,7 +45,7 @@ VALUES (
   'Novacale Limited',
   'Novacale Limited',
   'Dr. Chuka Okafor',
-  'client.novacale@novaexpress.ng',
+  'client.novacale@novaxpress.ng',
   '08034455667',
   'Plot 12, Commercial Avenue, Central Business District, Abuja',
   'Abuja',
@@ -65,7 +65,7 @@ INSERT INTO users (id, company_id, email, phone_number, first_name, last_name, r
 VALUES (
   '33333333-3333-4333-8333-333333333333'::uuid,
   '11111111-1111-4111-8111-111111111111',
-  'client.novacale@novaexpress.ng',
+  'client.novacale@novaxpress.ng',
   '08034455667',
   'Chuka',
   'Okafor (Novacale)',

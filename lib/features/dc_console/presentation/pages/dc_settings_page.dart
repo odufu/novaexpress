@@ -242,7 +242,7 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('🔄 Reset to default NovaExpress standard policies.'),
+        content: Text('🔄 Reset to default NovaXpress standard policies.'),
         backgroundColor: Color(0xFF2563EB),
       ),
     );
@@ -933,7 +933,7 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
               _buildInputField(
                 label: 'Account Name',
                 controller: _accountNameController,
-                hint: 'NovaExpress Logistics Limited',
+                hint: 'NovaXpress Logistics Limited',
                 isDark: isDark,
               ),
             ],
@@ -1327,7 +1327,7 @@ class _DCSettingsPageState extends ConsumerState<DCSettingsPage> with SingleTick
                         dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
                         items: const [
                           DropdownMenuItem(value: 'merchant', child: Text('Merchant / Client (Deducted from Daily Settlement)')),
-                          DropdownMenuItem(value: 'company', child: Text('Company / NovaExpress (Absorbed)')),
+                          DropdownMenuItem(value: 'company', child: Text('Company / NovaXpress (Absorbed)')),
                           DropdownMenuItem(value: 'shared', child: Text('Shared 50/50 Split')),
                         ],
                         onChanged: (val) {

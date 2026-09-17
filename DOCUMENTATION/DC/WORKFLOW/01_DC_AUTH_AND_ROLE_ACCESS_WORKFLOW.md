@@ -22,7 +22,7 @@ sequenceDiagram
     participant Auth as Supabase Auth Server
     participant DB as Supabase PostgreSQL
 
-    Supervisor->>Portal: Enters Corporate Email (dc.supervisor@novaexpress.ng) & Password
+    Supervisor->>Portal: Enters Corporate Email (dc.supervisor@novaxpress.ng) & Password
     Portal->>Auth: signInWithPassword(email, password)
     
     alt Invalid Credentials
@@ -53,7 +53,7 @@ sequenceDiagram
 
 ### Step 1: Credentials Entry & Hub Scope Resolution
 1. The DC Supervisor opens the NoveXPS Management Web Portal or DC Terminal App.
-2. Inputs corporate credentials (`dc.supervisor@novaexpress.ng` + Password).
+2. Inputs corporate credentials (`dc.supervisor@novaxpress.ng` + Password).
 3. System authenticates via Supabase Auth.
 
 ### Step 2: Role & Permission Validation

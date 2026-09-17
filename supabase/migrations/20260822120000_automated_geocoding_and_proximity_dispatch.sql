@@ -1,5 +1,5 @@
 -- ============================================================================
--- NovaExpress Logistics Management System (NoveXPS)
+-- NovaXpress Logistics Management System (NoveXPS)
 -- Database Migration: Automated Geocoding, Proximity Dispatch & Spatial Indexing
 -- ============================================================================
 
@@ -299,7 +299,7 @@ SET
   current_latitude = 9.0765,
   current_longitude = 7.4832,
   last_location_update = NOW()
-WHERE email = 'emeka.rider@novaexpress.ng';
+WHERE email = 'emeka.rider@novaxpress.ng';
 
 -- Update Sample Orders with Geocoded Locations & Verification
 UPDATE orders

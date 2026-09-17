@@ -23,7 +23,7 @@ class MapLauncherHelper {
     // 1. Prepare candidate URIs
     final String label = customerName != null && customerName.isNotEmpty
         ? customerName
-        : 'NovaExpress Customer';
+        : 'NovaXpress Customer';
     final String encodedLabel = Uri.encodeComponent(label);
 
     // Strategy 1: Android native geo URI (Only routes to Map apps, never to OPay / shopping apps)

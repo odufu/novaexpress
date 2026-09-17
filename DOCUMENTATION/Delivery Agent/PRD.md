@@ -1,8 +1,8 @@
-# NovaExpress Logistics
+# NovaXpress Logistics
 
 # Product Requirements Document — PDA / Delivery Agent App
 
-**Product:** NovaExpress Logistics
+**Product:** NovaXpress Logistics
 **Module:** PDA / Delivery Agent Mobile Application
 **Version:** 1.0
 **Market:** Nigeria
@@ -14,7 +14,7 @@
 
 # 1. Document Purpose
 
-This PRD defines the complete requirements for the **NovaExpress PDA / Delivery Agent application**.
+This PRD defines the complete requirements for the **NovaXpress PDA / Delivery Agent application**.
 
 The application will be used by two categories of delivery personnel:
 
@@ -27,7 +27,7 @@ The application will be used by two categories of delivery personnel:
 
 2. **In-House Rider**
 
-   * Uses a NovaExpress-owned motorcycle/bike.
+   * Uses a NovaXpress-owned motorcycle/bike.
    * May be commission-based, salary-based, or hybrid.
    * May receive commission, fuel allowance, failed-delivery stipend, or other configured compensation.
 
@@ -41,7 +41,7 @@ The PDA/Delivery Agent app should allow delivery personnel to independently mana
 
 > **Receive → Pick Up → Deliver → Collect → Record Outcome → Return → Remit → Reconcile → Track Earnings**
 
-The app must provide the agent with everything required to execute deliveries while giving NovaExpress accurate visibility into:
+The app must provide the agent with everything required to execute deliveries while giving NovaXpress accurate visibility into:
 
 * Delivery status
 * Package custody
@@ -97,9 +97,9 @@ A Personal Distribution Agent who:
 
 ## 4.2 In-House Rider
 
-An internal NovaExpress delivery rider who:
+An internal NovaXpress delivery rider who:
 
-* Uses a NovaExpress motorcycle/bike.
+* Uses a NovaXpress motorcycle/bike.
 * Receives delivery assignments.
 * Delivers packages/products.
 * Collects POD payments.
@@ -193,9 +193,9 @@ Agent collects the money.
 
 **Distributed Inventory + Non-POD**
 
-Client provides products to NovaExpress.
+Client provides products to NovaXpress.
 
-NovaExpress distributes the inventory.
+NovaXpress distributes the inventory.
 
 Customer does not pay on delivery.
 
@@ -207,7 +207,7 @@ Customer does not pay on delivery.
 
 Client provides products.
 
-NovaExpress stores/distributes them.
+NovaXpress stores/distributes them.
 
 Customer pays upon delivery.
 
@@ -543,7 +543,7 @@ Special instructions
 
 POD amount if applicable
 
-The PDA does not treat the package as NovaExpress-owned inventory.
+The PDA does not treat the package as NovaXpress-owned inventory.
 
 ---
 
@@ -817,7 +817,7 @@ Depending on business rules, the app may require:
 * Call attempt
 * Other evidence
 
-This protects NovaExpress and its clients from false delivery attempts.
+This protects NovaXpress and its clients from false delivery attempts.
 
 ---
 
@@ -1548,7 +1548,7 @@ Personal vehicle details.
 
 For rider:
 
-Assigned NovaExpress bike where applicable.
+Assigned NovaXpress bike where applicable.
 
 ---
 
@@ -1562,7 +1562,7 @@ Call/message assigned DC.
 
 ### Operations Support
 
-Contact NovaExpress operations.
+Contact NovaXpress operations.
 
 ### Report a Problem
 
@@ -1980,7 +1980,7 @@ If the PDA can answer those five questions from the app without confusion, the c
 
 # 85. Final Product Definition
 
-The NovaExpress PDA/Delivery Agent app is **not simply a delivery tracking application**.
+The NovaXpress PDA/Delivery Agent app is **not simply a delivery tracking application**.
 
 It is a field-operational application that connects:
 
@@ -2000,8 +2000,8 @@ It is a field-operational application that connects:
 
 → **Performance**
 
-while continuously synchronizing with the NovaExpress **DC, HQ, Operations and Finance systems**.
+while continuously synchronizing with the NovaXpress **DC, HQ, Operations and Finance systems**.
 
 The most important architectural rule is that **delivery pricing and agent compensation remain configurable**. A PDA's current ₦1,000 commission, ₦1,500 transport allowance, or any other amount must never be treated as permanent business logic. The same applies to the current ₦5,000 successful-delivery and ₦1,500 failed-delivery client charges.
 
-This allows NovaExpress to change client agreements, change agent arrangements, introduce new products, add HQs/DCs, move an agent from commission to salary, or create special compensation arrangements **without redesigning the PDA application or rewriting the core system.**
+This allows NovaXpress to change client agreements, change agent arrangements, introduce new products, add HQs/DCs, move an agent from commission to salary, or create special compensation arrangements **without redesigning the PDA application or rewriting the core system.**

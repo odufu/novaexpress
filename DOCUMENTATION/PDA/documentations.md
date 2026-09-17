@@ -1,8 +1,8 @@
-# NovaExpress Logistics
+# NovaXpress Logistics
 
 ## Product Requirements Document — Phase 1: PDA Mobile Application
 
-**Product:** NovaExpress Logistics PDA App  
+**Product:** NovaXpress Logistics PDA App  
 **Phase:** Phase 1 — Personal Distribution Agent (PDA)  
 **Market:** Nigeria  
 **Currency:** Nigerian Naira (₦ / NGN)  
@@ -24,9 +24,9 @@
 
 Phase 1 focuses exclusively on the **Personal Distribution Agent (PDA)** mobile application.
 
-The PDA is the field agent responsible for taking customer orders from a NovaExpress Distribution Center (DC) and delivering them to customers across Nigeria.
+The PDA is the field agent responsible for taking customer orders from a NovaXpress Distribution Center (DC) and delivering them to customers across Nigeria.
 
-For Pay on Delivery (POD) orders, the PDA is also responsible for collecting the customer's payment and subsequently remitting the collected money to NovaExpress according to the company's operating procedure.
+For Pay on Delivery (POD) orders, the PDA is also responsible for collecting the customer's payment and subsequently remitting the collected money to NovaXpress according to the company's operating procedure.
 
 The PDA application must therefore provide a simple, fast, field-oriented workflow for:
 
@@ -51,7 +51,7 @@ The PDA should **not** have access to complex headquarters, Distribution Center,
 
 The primary goal of the PDA application is:
 
-> **Enable a NovaExpress PDA to receive, carry, deliver, account for, and return physical customer orders while maintaining accurate records of products and POD cash.**
+> **Enable a NovaXpress PDA to receive, carry, deliver, account for, and return physical customer orders while maintaining accurate records of products and POD cash.**
 
 The application should allow a PDA to complete their daily work with as little friction as possible.
 
@@ -61,7 +61,7 @@ The most important workflow is:
 
 For POD:
 
-**Customer → PDA → NovaExpress**
+**Customer → PDA → NovaXpress**
 
 The system must maintain an accurate digital record of both flows.
 
@@ -69,7 +69,7 @@ The system must maintain an accurate digital record of both flows.
 
 # 3. Nigerian-First Requirement
 
-The PDA application is strictly designed for NovaExpress operations in Nigeria.
+The PDA application is strictly designed for NovaXpress operations in Nigeria.
 
 All interface, data, financial and delivery assumptions must reflect Nigerian operations.
 
@@ -122,7 +122,7 @@ FCT Abuja must be represented as **FCT Abuja**, not as a conventional state.
 
 # 4. PDA Role
 
-A PDA is a field-level NovaExpress logistics agent assigned to a specific Distribution Center.
+A PDA is a field-level NovaXpress logistics agent assigned to a specific Distribution Center.
 
 The PDA's responsibilities are:
 
@@ -160,7 +160,7 @@ The PDA must **not** be able to:
 * View company-wide financial reports
 * Modify users or permissions
 
-The PDA operates within the boundaries assigned by NovaExpress.
+The PDA operates within the boundaries assigned by NovaXpress.
 
 ---
 
@@ -238,7 +238,7 @@ Some of these can be implemented as states, bottom sheets, or confirmation dialo
 
 ## 8.1 Login
 
-The PDA should authenticate using credentials supplied by NovaExpress.
+The PDA should authenticate using credentials supplied by NovaXpress.
 
 Possible fields:
 
@@ -654,7 +654,7 @@ The application should not require the PDA to manually copy the number into the 
 
 The application should provide a way to open the customer's location in the PDA's available navigation application.
 
-The NovaExpress application does not necessarily need to provide its own full navigation system.
+The NovaXpress application does not necessarily need to provide its own full navigation system.
 
 It should provide the customer location/address information required for navigation.
 
@@ -720,7 +720,7 @@ Initial methods:
 * Cash
 * Bank Transfer
 
-The exact allowed methods should be configurable by NovaExpress.
+The exact allowed methods should be configurable by NovaXpress.
 
 ---
 
@@ -788,7 +788,7 @@ This prevents accidental cash collection from prepaid customers.
 
 # 32. Delivery Confirmation
 
-Depending on NovaExpress's final operational policy, successful delivery may require one or more of:
+Depending on NovaXpress's final operational policy, successful delivery may require one or more of:
 
 * PDA confirmation
 * Customer OTP
@@ -884,7 +884,7 @@ The PDA may provide additional notes.
 
 # 36. Failed Delivery Evidence
 
-Depending on NovaExpress policy, the system may capture:
+Depending on NovaXpress policy, the system may capture:
 
 * Timestamp
 * GPS location
@@ -912,7 +912,7 @@ The system should display:
 * Notes
 * Next delivery date/time if scheduled
 
-The PDA should not arbitrarily change delivery schedules if NovaExpress requires DC authorization.
+The PDA should not arbitrarily change delivery schedules if NovaXpress requires DC authorization.
 
 ---
 
@@ -1374,7 +1374,7 @@ These are simply the current products.
 
 The interface must dynamically support future products.
 
-For example, if NovaExpress adds another product, the PDA should automatically be able to see it when that product is assigned to an order.
+For example, if NovaXpress adds another product, the PDA should automatically be able to see it when that product is assigned to an order.
 
 ---
 
@@ -1653,7 +1653,7 @@ The final Figma deliverable for Phase 1 should contain:
 
 **20. Success States**
 
-The designer should treat **POD payment, physical stock accountability, free-product quantities, and delivery status** as the highest-priority interaction areas because these are where NovaExpress has the greatest operational and financial risk.
+The designer should treat **POD payment, physical stock accountability, free-product quantities, and delivery status** as the highest-priority interaction areas because these are where NovaXpress has the greatest operational and financial risk.
 
 ---
 
@@ -1661,7 +1661,7 @@ The designer should treat **POD payment, physical stock accountability, free-pro
 
 ### Direct Transfer via Monnify Dynamic Virtual Account
 * At the end of every delivery where the customer opts to pay via bank transfer, the PDA app fetches/generates a **dynamic virtual bank account number (powered by Monnify)** specific to that delivery order.
-* The customer transfers funds directly into NovaExpress's company account.
+* The customer transfers funds directly into NovaXpress's company account.
 * Once the transfer is confirmed via webhook:
   - **No physical cash remittance is required from the rider** (rider holds ₦0.00 cash).
   - The company credits the rider's earned delivery commission and transport allowance to the **"My Balance" (Rider Balance)** ledger.

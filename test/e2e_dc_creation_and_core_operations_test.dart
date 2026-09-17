@@ -407,11 +407,11 @@ void main() {
         address: '12 Ahmadu Bello Way, Commercial District, Kaduna',
         managerName: 'Shehu Sani',
         contactPhone: '+234 806 777 8899',
-        contactEmail: 'kaduna.dc@novaexpress.ng',
+        contactEmail: 'kaduna.dc@novaxpress.ng',
         isHub: false,
         storageCapacityUnits: 35000,
         operatingZones: const ['Kaduna North', 'Kaduna South', 'Chikun', 'Barnawa', 'Kakuri'],
-        supervisorEmail: 'supervisor.dc-kad-01@novaexpress.ng',
+        supervisorEmail: 'supervisor.dc-kad-01@novaxpress.ng',
         supervisorPassword: 'KadunaPassword123!',
         authDataSource: mockAuthDS,
       );
@@ -446,7 +446,7 @@ void main() {
 
       // Register supervisor in mock auth DS
       await mockAuthDS.registerDistributionCenterSupervisor(
-        email: 'supervisor.dc-kan-01@novaexpress.ng',
+        email: 'supervisor.dc-kan-01@novaxpress.ng',
         password: 'KanoPassword123!',
         firstName: 'Ibrahim',
         lastName: 'Danladi',
@@ -458,7 +458,7 @@ void main() {
       );
 
       final authNotifier = container.read(authProvider.notifier);
-      await authNotifier.login('supervisor.dc-kan-01@novaexpress.ng', 'KanoPassword123!');
+      await authNotifier.login('supervisor.dc-kan-01@novaxpress.ng', 'KanoPassword123!');
 
       final authState = container.read(authProvider);
       expect(authState.isAuthenticated, isTrue);
@@ -484,7 +484,7 @@ void main() {
         driverCode: 'RDR-KAN-01',
         name: 'Mustapha Kano Rider',
         phone: '08031234567',
-        email: 'mustapha.kano@novaexpress.com',
+        email: 'mustapha.kano@novaxpress.com',
         avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
         distributionCenterId: 'dc-dc-kan-01',
         status: 'active',
@@ -609,7 +609,7 @@ void main() {
           driverCode: 'RDR-KAN-01',
           name: 'Mustapha Kano Rider',
           phone: '08031234567',
-          email: 'mustapha.kano@novaexpress.com',
+          email: 'mustapha.kano@novaxpress.com',
           avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
           distributionCenterId: 'dc-dc-kan-01',
           status: 'active',
@@ -745,7 +745,7 @@ void main() {
         paymentType: 'pay_on_delivery',
         paymentMethod: 'cash',
         amountCollected: 25000.0,
-        customerSignatureUrl: 'https://storage.novaexpress.ng/pod/sig-8801.png',
+        customerSignatureUrl: 'https://storage.novaxpress.ng/pod/sig-8801.png',
         notes: 'Delivered in good condition at Bompai office.',
       );
 
@@ -950,7 +950,7 @@ void main() {
 
       const mockSupervisor = UserEntity(
         id: 'usr-dc-sup-01',
-        email: 'adekunle@novaexpress.com',
+        email: 'adekunle@novaxpress.com',
         firstName: 'Adekunle',
         lastName: 'Supervisor',
         phone: '08023456789',
@@ -1004,7 +1004,7 @@ void main() {
 
       const mockSupervisor = UserEntity(
         id: 'usr-dc-sup-01',
-        email: 'adekunle@novaexpress.com',
+        email: 'adekunle@novaxpress.com',
         firstName: 'Adekunle',
         lastName: 'Supervisor',
         phone: '08023456789',

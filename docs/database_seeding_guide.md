@@ -1,7 +1,7 @@
 # Supabase Database Seeding & Schema Integrity Guide
 
 ## Overview
-This document defines the strict relational dependency rules and operational procedures for seeding real data into the NovaExpress Supabase PostgreSQL database (`https://oygtaeriljuelhshfvkv.supabase.co`).
+This document defines the strict relational dependency rules and operational procedures for seeding real data into the NovaXpress Supabase PostgreSQL database (`https://oygtaeriljuelhshfvkv.supabase.co`).
 
 ---
 
@@ -34,7 +34,7 @@ To preserve PostgreSQL foreign key constraints (`FOREIGN KEY REFERENCES`), recor
 
 | Table | Entity Name | Primary Key (UUID) | Dependency Foreign Keys |
 | :--- | :--- | :--- | :--- |
-| `companies` | NovaExpress Logistics Limited | `11111111-1111-4111-8111-111111111111` | N/A |
+| `companies` | NovaXpress Logistics Limited | `11111111-1111-4111-8111-111111111111` | N/A |
 | `distribution_centers` | Wuse Distribution Center | `22222222-2222-4222-8222-222222222222` | `company_id: 11111111-1111-4111-8111-111111111111` |
 | `users` | Emeka Rider (PDA) | `a1111111-1111-4111-8111-111111111111` | `company_id`, `distribution_center_id` |
 | `delivery_agents` | PDA-7000 | `b1111111-1111-4111-8111-111111111111` | `user_id`, `distribution_center_id` |

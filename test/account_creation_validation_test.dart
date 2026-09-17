@@ -27,20 +27,20 @@ void main() {
           stateName: 'Federal Capital Territory',
           city: 'Abuja Municipal (AMAC)',
           address: 'Plot 100 Test St',
-          supervisorEmail: 'dc.supervisor@novaexpress.ng', // Existing supervisor email
+          supervisorEmail: 'dc.supervisor@novaxpress.ng', // Existing supervisor email
           supervisorPassword: 'Password123!',
           authDataSource: authDataSource,
         ),
         throwsA(predicate((e) =>
             e.toString().contains('already exists') &&
-            e.toString().contains('dc.supervisor@novaexpress.ng'))),
+            e.toString().contains('dc.supervisor@novaxpress.ng'))),
       );
     });
 
     test('Registering Rider with existing email throws clear duplicate exception', () async {
       expect(
         () async => await authDataSource.registerDeliveryAgent(
-          email: 'emeka.rider@novaexpress.ng', // Existing rider email
+          email: 'emeka.rider@novaxpress.ng', // Existing rider email
           password: 'Password123!',
           firstName: 'Duplicate',
           lastName: 'Emeka',
@@ -61,7 +61,7 @@ void main() {
         ),
         throwsA(predicate((e) =>
             e.toString().contains('already exists') &&
-            e.toString().contains('emeka.rider@novaexpress.ng'))),
+            e.toString().contains('emeka.rider@novaxpress.ng'))),
       );
     });
 
@@ -72,7 +72,7 @@ void main() {
         () async => await notifier.createClient(
           companyName: 'Test Novacare Duplicate',
           contactPerson: 'Dr. Test',
-          email: 'client.novacale@novaexpress.ng', // Existing client email
+          email: 'client.novacale@novaxpress.ng', // Existing client email
           phone: '08000000000',
           address: 'Plot 12 Test Avenue',
           city: 'Abuja',
@@ -81,7 +81,7 @@ void main() {
         ),
         throwsA(predicate((e) =>
             e.toString().contains('already exists') &&
-            e.toString().contains('client.novacale@novaexpress.ng'))),
+            e.toString().contains('client.novacale@novaxpress.ng'))),
       );
     });
 

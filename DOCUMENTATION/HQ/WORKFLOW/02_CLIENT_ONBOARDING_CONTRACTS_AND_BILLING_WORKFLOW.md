@@ -87,7 +87,7 @@ sequenceDiagram
 
 ### Step 4: Merchant Portal Provisioning
 1. System provisions a client dashboard user account with `role = 'client_admin'`.
-2. Merchant gains access to the **NovaExpress Merchant Portal** allowing them to:
+2. Merchant gains access to the **NovaXpress Merchant Portal** allowing them to:
    * Upload order manifests via CSV/Excel or REST API webhook.
    * Track real-time delivery status of orders (`In Transit`, `Delivered`, `Failed`).
    * View live distributed stock balances across all regional DCs (*Wuse DC*, *Ikeja DC*).

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-NovaExpress Supabase Data Export Tool
+NovaXpress Supabase Data Export Tool
 Exports all active tables and records from a Supabase project into a structured JSON backup.
 """
 
@@ -80,7 +80,7 @@ def fetch_table_data(base_url, service_key, table_name):
 
 def main():
     import argparse
-    parser = argparse.ArgumentParser(description="Export NovaExpress Supabase Database Data")
+    parser = argparse.ArgumentParser(description="Export NovaXpress Supabase Database Data")
     parser.add_argument("--url", type=str, help="Source Supabase Project URL")
     parser.add_argument("--service-key", type=str, help="Source Supabase Service Role Key")
     parser.add_argument("--out", type=str, help="Output JSON file path")
@@ -121,7 +121,7 @@ def main():
         "metadata": {
             "source_url": base_url,
             "exported_at": datetime.now().isoformat(),
-            "generator": "NovaExpress Migration Toolkit v2"
+            "generator": "NovaXpress Migration Toolkit v2"
         },
         "tables": {}
     }

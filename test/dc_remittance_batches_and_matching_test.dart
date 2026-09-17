@@ -181,7 +181,7 @@ void main() {
 
   const testSupervisor = UserEntity(
     id: 'dc-sup-01',
-    email: 'adekunle.dc@novaexpress.ng',
+    email: 'adekunle.dc@novaxpress.ng',
     phone: '08099887766',
     firstName: 'Adekunle',
     lastName: 'Supervisor',

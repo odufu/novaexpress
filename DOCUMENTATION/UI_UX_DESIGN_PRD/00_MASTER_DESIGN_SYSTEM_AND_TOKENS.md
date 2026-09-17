@@ -1,6 +1,6 @@
 # 🎨 NoveXPS Master Design System, Style Guide & UI Tokens for UI/UX Designers
 
-This document defines the overarching design system, visual identity, color tokens, typography scales, spacing units, and component patterns for the entire **NovaExpress Logistics Management System (NoveXPS)** across Mobile (PDA), Tablet (DC Terminals), and Desktop Web (HQ / Admin Portals).
+This document defines the overarching design system, visual identity, color tokens, typography scales, spacing units, and component patterns for the entire **NovaXpress Logistics Management System (NoveXPS)** across Mobile (PDA), Tablet (DC Terminals), and Desktop Web (HQ / Admin Portals).
 
 ---
 

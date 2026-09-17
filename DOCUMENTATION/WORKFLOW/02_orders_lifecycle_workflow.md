@@ -1,7 +1,7 @@
 # Module 2: End-to-End Orders Lifecycle & Delivery Workflows 📦📍
 
 ## 1. Overview & Fulfillment Scenarios
-The **Orders Module** is the core operational workspace for NovaExpress field agents across Nigeria. NovaExpress operates under **three distinct fulfillment scenarios** depending on client requirements and operational speed:
+The **Orders Module** is the core operational workspace for NovaXpress field agents across Nigeria. NovaXpress operates under **three distinct fulfillment scenarios** depending on client requirements and operational speed:
 
 ---
 

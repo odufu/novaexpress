@@ -6,7 +6,7 @@ enum StockStatus {
 
 enum InventoryType {
   distributedInventory,
-  novaExpressInventory,
+  novaXpressInventory,
 }
 
 class StockItemEntity {
@@ -137,8 +137,8 @@ class StockItemEntity {
     switch (inventoryType) {
       case InventoryType.distributedInventory:
         return 'Distributed Inventory';
-      case InventoryType.novaExpressInventory:
-        return 'NovaExpress Inventory';
+      case InventoryType.novaXpressInventory:
+        return 'NovaXpress Inventory';
     }
   }
 

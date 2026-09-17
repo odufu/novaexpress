@@ -160,7 +160,7 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
       duration: const Duration(milliseconds: 200),
       width: isDrawer ? 280.0 : width,
       decoration: const BoxDecoration(
-        color: Color(0xFF031632), // NovaExpress Enterprise Deep Navy matching DC Console
+        color: Color(0xFF031632), // NovaXpress Enterprise Deep Navy matching DC Console
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -174,7 +174,7 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF37021), // NovaExpress Signature Orange
+                    color: const Color(0xFFF37021), // NovaXpress Signature Orange
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
@@ -191,7 +191,7 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          isCloser ? 'NovaExpress Sales' : 'NovaExpress Merchant',
+                          isCloser ? 'NovaXpress Sales' : 'NovaXpress Merchant',
                           style: GoogleFonts.inter(
                             color: Colors.white,
                             fontSize: 15,

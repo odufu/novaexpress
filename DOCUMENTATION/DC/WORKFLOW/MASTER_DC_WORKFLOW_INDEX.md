@@ -1,6 +1,6 @@
 # 🏭 NoveXPS Distribution Center (DC) Complete Operational Workflow Guide & Sitemap
 
-Welcome to the **NovaExpress Logistics Management System (NoveXPS) Distribution Center (DC) Operational Workflow Guide**. This document details all warehouse management, bulk receiving, rider inventory allocation, cash/remittance audit, customer return processing, and fleet management activities taking place at Distribution Centers.
+Welcome to the **NovaXpress Logistics Management System (NoveXPS) Distribution Center (DC) Operational Workflow Guide**. This document details all warehouse management, bulk receiving, rider inventory allocation, cash/remittance audit, customer return processing, and fleet management activities taking place at Distribution Centers.
 
 ---
 

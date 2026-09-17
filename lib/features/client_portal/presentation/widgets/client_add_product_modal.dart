@@ -920,7 +920,7 @@ class _ClientAddProductModalState extends ConsumerState<ClientAddProductModal> {
                                   )),
                             ] else ...[
                               Text(
-                                'No distribution centers currently match your selected states. NovaExpress is rapidly expanding hubs across Nigeria. Select additional covering states like "Federal Capital Territory" or "Benue" to connect with active hubs.',
+                                'No distribution centers currently match your selected states. NovaXpress is rapidly expanding hubs across Nigeria. Select additional covering states like "Federal Capital Territory" or "Benue" to connect with active hubs.',
                                 style: GoogleFonts.inter(fontSize: 11, color: isDark ? Colors.white70 : const Color(0xFF64748B)),
                               ),
                             ],

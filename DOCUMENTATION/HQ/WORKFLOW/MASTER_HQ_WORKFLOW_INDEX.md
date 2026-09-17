@@ -1,6 +1,6 @@
 # 🏛️ NoveXPS Headquarters (HQ) & Super Admin Master Operational Workflow Guide
 
-Welcome to the **NovaExpress Logistics Management System (NoveXPS) Headquarters (HQ) & Super Administration Operational Workflow Guide**. This master document details enterprise-level governance, merchant client management, national inventory distribution, compensation rate setting, central treasury disbursements, and multi-DC administrative supervisory operations.
+Welcome to the **NovaXpress Logistics Management System (NoveXPS) Headquarters (HQ) & Super Administration Operational Workflow Guide**. This master document details enterprise-level governance, merchant client management, national inventory distribution, compensation rate setting, central treasury disbursements, and multi-DC administrative supervisory operations.
 
 ---
 

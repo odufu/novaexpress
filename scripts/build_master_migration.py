@@ -6,7 +6,7 @@ print("Building complete master migration script...")
 schema_sql = """-- ============================================================================
 -- NOVEXPS MASTER DATABASE REPRODUCTION SCHEMA & SEED SCRIPT
 -- Single-File Deployment for Fresh Supabase Projects / Accounts
--- Target: Complete NovaExpress logistics, finance, inventory & chat backend
+-- Target: Complete NovaXpress logistics, finance, inventory & chat backend
 -- Generated: 2026-09-16
 -- ============================================================================
 
@@ -719,7 +719,7 @@ CREATE TABLE IF NOT EXISTS dc_finance_settings (
     daily_settlement_cutoff_time VARCHAR(20) DEFAULT '22:00',
     settlement_bank_name VARCHAR(100) DEFAULT 'Titan Trust Bank',
     settlement_account_number VARCHAR(50) DEFAULT '0098234123',
-    settlement_account_name VARCHAR(255) DEFAULT 'NovaExpress Logistics Limited',
+    settlement_account_name VARCHAR(255) DEFAULT 'NovaXpress Logistics Limited',
     auto_reconcile_webhooks BOOLEAN DEFAULT true,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -2993,9 +2993,9 @@ END $$;
 INSERT INTO public.companies (id, name, code, email, phone, address, currency)
 VALUES (
     '11111111-1111-4111-8111-111111111111',
-    'NovaExpress Logistics Limited',
+    'NovaXpress Logistics Limited',
     'NOVEXPS',
-    'operations@novaexpress.ng',
+    'operations@novaxpress.ng',
     '+2348000000000',
     'Plot 102 Central Business District, Abuja, Nigeria',
     'NGN'
@@ -3109,7 +3109,7 @@ INSERT INTO public.dc_finance_settings (
     '22:00',
     'Titan Trust Bank',
     '0098234123',
-    'NovaExpress Logistics Limited',
+    'NovaXpress Logistics Limited',
     true
 ) ON CONFLICT (id) DO UPDATE SET
     default_client_delivery_fee = 5000.00,
@@ -3126,7 +3126,7 @@ INSERT INTO public.users (
     '11111111-1111-4111-8111-111111111111',
     '22222222-2222-4222-8222-222222222222',
     'Wuse Central Distribution Hub',
-    'admin@novaexpress.ng',
+    'admin@novaxpress.ng',
     '+2348030000001',
     'Super',
     'Admin',
@@ -3137,7 +3137,7 @@ INSERT INTO public.users (
     '11111111-1111-4111-8111-111111111111',
     '22222222-2222-4222-8222-222222222222',
     'Wuse Central Distribution Hub',
-    'manager.wuse@novaexpress.ng',
+    'manager.wuse@novaxpress.ng',
     '+2348030000002',
     'Aliyu',
     'Mohammed',
@@ -3148,7 +3148,7 @@ INSERT INTO public.users (
     '11111111-1111-4111-8111-111111111111',
     '22222222-2222-4222-8222-222222222222',
     'Wuse Central Distribution Hub',
-    'rider1@novaexpress.ng',
+    'rider1@novaxpress.ng',
     '+2348030000003',
     'Ibrahim',
     'Musa',
@@ -3337,7 +3337,7 @@ END $$;
 NOTIFY pgrst, 'reload schema';
 
 -- ============================================================================
--- SETUP COMPLETE: Backend is 100% operational and ready for NovaExpress clients
+-- SETUP COMPLETE: Backend is 100% operational and ready for NovaXpress clients
 -- ============================================================================
 """
 

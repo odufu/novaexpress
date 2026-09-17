@@ -76,7 +76,7 @@ void main() {
     city: 'Otukpo',
     address: '42 Commercial Avenue, Otukpo',
     contactPhone: '+234 808 123 4567',
-    contactEmail: 'otukpo.hub@novaexpress.ng',
+    contactEmail: 'otukpo.hub@novaxpress.ng',
     managerName: 'Audu Ogbeh',
     isGrandDc: true,
     isHub: true,

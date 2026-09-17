@@ -1,7 +1,7 @@
-# NovaExpress Logistics — Master Product Requirements Document (PRD)
+# NovaXpress Logistics — Master Product Requirements Document (PRD)
 
 **Document Type:** Master System PRD
-**Product:** NovaExpress Logistics Management System
+**Product:** NovaXpress Logistics Management System
 **Market:** Nigeria
 **Currency:** Nigerian Naira (₦)
 **Current Products:** Grazer Herbal Tea, Respira, Alpha Man
@@ -12,7 +12,7 @@
 
 # 1. Product Overview
 
-NovaExpress is a Nigerian logistics and distribution company that operates a network of:
+NovaXpress is a Nigerian logistics and distribution company that operates a network of:
 
 * Headquarters
 * Distribution Centers (DCs)
@@ -23,8 +23,8 @@ NovaExpress is a Nigerian logistics and distribution company that operates a net
 
 The system will manage both:
 
-1. **Traditional package delivery**, where a client gives NovaExpress a physical package to deliver.
-2. **Distributed inventory fulfillment**, where a client supplies products in bulk and NovaExpress stores and distributes those products through its logistics network.
+1. **Traditional package delivery**, where a client gives NovaXpress a physical package to deliver.
+2. **Distributed inventory fulfillment**, where a client supplies products in bulk and NovaXpress stores and distributes those products through its logistics network.
 
 Both models may operate as:
 
@@ -84,17 +84,17 @@ This structure must be used throughout the system.
 
 # 3. Business Scenario 1 — Client Package, Non-POD
 
-A client gives NovaExpress a package that has already been prepared.
+A client gives NovaXpress a package that has already been prepared.
 
 Example:
 
-> Client gives NovaExpress a package to deliver to John in Lagos.
+> Client gives NovaXpress a package to deliver to John in Lagos.
 
 The customer does not need to pay anything.
 
 ### Workflow
 
-Client → NovaExpress → DC → Delivery Personnel → Customer
+Client → NovaXpress → DC → Delivery Personnel → Customer
 
 The system tracks:
 
@@ -115,7 +115,7 @@ No POD collection is required.
 
 # 4. Business Scenario 2 — Client Package, POD
 
-A client gives NovaExpress a package to deliver.
+A client gives NovaXpress a package to deliver.
 
 The customer must pay upon delivery.
 
@@ -127,11 +127,11 @@ The delivery personnel collects the money.
 
 ### Workflow
 
-Client → NovaExpress → DC → Delivery Personnel → Customer
+Client → NovaXpress → DC → Delivery Personnel → Customer
 
 Financial workflow:
 
-Customer → Delivery Personnel → NovaExpress → Client
+Customer → Delivery Personnel → NovaXpress → Client
 
 The system must separately track:
 
@@ -148,7 +148,7 @@ The package itself is tracked through **custody**, not product inventory.
 
 # 5. Business Scenario 3 — Distributed Inventory, Non-POD
 
-A client supplies products in bulk to NovaExpress.
+A client supplies products in bulk to NovaXpress.
 
 Example:
 
@@ -156,7 +156,7 @@ NovaCare supplies:
 
 > 10,000 units of Respira.
 
-NovaExpress distributes the products through its network.
+NovaXpress distributes the products through its network.
 
 A customer orders:
 
@@ -164,7 +164,7 @@ A customer orders:
 
 and payment has already been made.
 
-NovaExpress fulfills the order using its managed inventory.
+NovaXpress fulfills the order using its managed inventory.
 
 ### Physical flow
 
@@ -176,7 +176,7 @@ Inventory must be deducted as the product moves through the system.
 
 # 6. Business Scenario 4 — Distributed Inventory, POD
 
-This is one of NovaExpress's major operating models.
+This is one of NovaXpress's major operating models.
 
 Example:
 
@@ -190,14 +190,14 @@ Customer orders:
 
 Customer pays upon delivery.
 
-NovaExpress delivers the product and collects the customer's money.
+NovaXpress delivers the product and collects the customer's money.
 
 Under the current NovaCare commercial arrangement:
 
-* Successful delivery generates a **₦5,000 NovaExpress delivery charge**
-* NovaExpress retains its agreed delivery charge
+* Successful delivery generates a **₦5,000 NovaXpress delivery charge**
+* NovaXpress retains its agreed delivery charge
 * The remaining customer collection is payable to NovaCare
-* NovaCare does not pay NovaExpress upfront for successful POD fulfillment
+* NovaCare does not pay NovaXpress upfront for successful POD fulfillment
 * Failed delivery generates a **₦1,500 charge to NovaCare**
 * The product is returned to stock after a failed delivery
 
@@ -273,7 +273,7 @@ The system should support a hierarchy of pricing rules:
 
 ### Level 1 — System Default
 
-General NovaExpress rate.
+General NovaXpress rate.
 
 ### Level 2 — Client Rate
 
@@ -291,7 +291,7 @@ Changing a rate in the future must **not alter historical transactions**.
 
 # 10. Delivery Personnel
 
-NovaExpress has two types of delivery personnel.
+NovaXpress has two types of delivery personnel.
 
 ## Type 1 — PDA
 
@@ -305,13 +305,13 @@ They may use:
 * Car
 * Other approved means
 
-NovaExpress does not provide their primary delivery vehicle.
+NovaXpress does not provide their primary delivery vehicle.
 
 ---
 
 ## Type 2 — In-House Rider
 
-An employee/contracted rider who uses a **NovaExpress-owned motorcycle/bike**.
+An employee/contracted rider who uses a **NovaXpress-owned motorcycle/bike**.
 
 The company is responsible for providing the operational vehicle.
 
@@ -582,7 +582,7 @@ These must remain completely separate.
 
 For example:
 
-### Client pays NovaExpress
+### Client pays NovaXpress
 
 ₦5,000 delivery charge.
 
@@ -744,7 +744,7 @@ For distributed inventory:
 
 The product belongs commercially to the client.
 
-NovaExpress holds it as a logistics custodian.
+NovaXpress holds it as a logistics custodian.
 
 Example:
 
@@ -1007,7 +1007,7 @@ What was actually collected.
 
 ### Remitted Amount
 
-What was handed back to NovaExpress.
+What was handed back to NovaXpress.
 
 ### Variance
 
@@ -1306,7 +1306,7 @@ Filters:
 
 # 49. Headquarters
 
-NovaExpress can have multiple HQs.
+NovaXpress can have multiple HQs.
 
 The system must therefore support:
 
@@ -1540,7 +1540,7 @@ The settlement system should show:
 
 ₦20,000
 
-### NovaExpress Delivery Revenue
+### NovaXpress Delivery Revenue
 
 ₦5,000
 
@@ -1578,7 +1578,7 @@ Every adjustment must have a reason and audit trail.
 
 ---
 
-# 60. NovaExpress Profitability
+# 60. NovaXpress Profitability
 
 Eventually management should be able to calculate:
 
@@ -1600,7 +1600,7 @@ minus:
 
 ### Gross Operational Contribution
 
-This allows NovaExpress to determine which clients/routes/personnel are actually profitable.
+This allows NovaXpress to determine which clients/routes/personnel are actually profitable.
 
 ---
 
@@ -1727,7 +1727,7 @@ External/personal delivery agent.
 
 ### In-House Rider
 
-NovaExpress rider.
+NovaXpress rider.
 
 ### Finance Officer
 
@@ -1825,7 +1825,7 @@ General Operations sees everything they are authorized to access.
 
 | Area           | PDA                             | In-House Rider           |
 | -------------- | ------------------------------- | ------------------------ |
-| Vehicle        | Own means                       | NovaExpress bike         |
+| Vehicle        | Own means                       | NovaXpress bike         |
 | Commission     | Configurable                    | Configurable             |
 | Salary         | Possible                        | Possible                 |
 | Transport      | Configurable                    | Fuel-based               |
@@ -2066,7 +2066,7 @@ Accrued − Paid/Deducted = Outstanding
 
 ### Client Settlement
 
-Gross Collection − NovaExpress Charges ± Adjustments = Client Payable
+Gross Collection − NovaXpress Charges ± Adjustments = Client Payable
 
 These should be system-calculated.
 
@@ -2179,7 +2179,7 @@ Now that the master model is defined, I would structure development by **operati
 
 The most important thing for the development team is this:
 
-> **NovaExpress is not simply a delivery app.**
+> **NovaXpress is not simply a delivery app.**
 
 It is a **logistics network + inventory management + delivery execution + cash collection + agent compensation + client settlement platform.**
 
@@ -2191,7 +2191,7 @@ Instead:
 
 **Client Agreement**
 
-→ defines what NovaExpress charges the client
+→ defines what NovaXpress charges the client
 
 **Rate Card**
 
@@ -2213,7 +2213,7 @@ Instead:
 
 → maintains the historical truth.
 
-That architecture will allow NovaExpress to change its pricing, negotiate different client agreements, change a PDA's commission, move someone from commission to salary, introduce new products, add new HQs/DCs, and add new delivery personnel **without rebuilding the system.**
+That architecture will allow NovaXpress to change its pricing, negotiate different client agreements, change a PDA's commission, move someone from commission to salary, introduce new products, add new HQs/DCs, and add new delivery personnel **without rebuilding the system.**
 
 ---
 

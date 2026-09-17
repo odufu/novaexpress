@@ -60,7 +60,7 @@ class _MockNotificationsRemoteDS implements NotificationsRemoteDataSource {
 class _MockAuthRemoteDS implements AuthRemoteDataSource {
   static const testUser = UserModel(
     id: 'admin-001',
-    email: 'dc.supervisor@novaexpress.ng',
+    email: 'dc.supervisor@novaxpress.ng',
     firstName: 'Adekunle',
     lastName: 'Supervisor',
     phone: '08099887766',
@@ -203,7 +203,7 @@ void main() {
   group('Distribution Center (DC) Console UI & Business Operations Verification Suite', () {
     const mockUser = UserEntity(
       id: 'admin-001',
-      email: 'dc.supervisor@novaexpress.ng',
+      email: 'dc.supervisor@novaxpress.ng',
       firstName: 'Adekunle',
       lastName: 'Supervisor',
       role: 'dc_manager',
@@ -327,7 +327,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(DCConsoleLayout), findsOneWidget);
-      expect(find.text('NovaExpress DC'), findsOneWidget);
+      expect(find.text('NovaXpress DC'), findsOneWidget);
       expect(find.text('Hub Operations Command'), findsOneWidget);
       expect(find.text('Dashboard'), findsWidgets);
       expect(find.text('Deliveries & Orders'), findsOneWidget);

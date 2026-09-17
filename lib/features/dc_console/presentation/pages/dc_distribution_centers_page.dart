@@ -1310,7 +1310,7 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
     bool emailManuallyEdited = false;
 
     if (!isEditing) {
-      supervisorEmailCtrl.text = 'supervisor.dc@novaexpress.ng';
+      supervisorEmailCtrl.text = 'supervisor.dc@novaxpress.ng';
     }
 
     supervisorEmailCtrl.addListener(() {
@@ -1324,7 +1324,7 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
       if (!emailManuallyEdited && !isEditing) {
         final c = codeCtrl.text.trim().toLowerCase().replaceAll('dc-', '').replaceAll(RegExp(r'[^a-z0-9]'), '');
         if (c.isNotEmpty) {
-          supervisorEmailCtrl.text = 'supervisor.$c@novaexpress.ng';
+          supervisorEmailCtrl.text = 'supervisor.$c@novaxpress.ng';
         }
       }
     });
@@ -1576,7 +1576,7 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
                                   keyboardType: TextInputType.emailAddress,
                                   decoration: const InputDecoration(
                                     labelText: 'Supervisor Login Email *',
-                                    hintText: 'supervisor.dc@novaexpress.ng',
+                                    hintText: 'supervisor.dc@novaxpress.ng',
                                     prefixIcon: Icon(Icons.email_outlined, size: 16),
                                   ),
                                 ),
@@ -1911,7 +1911,7 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
                           isDark: isDark,
                           dc: savedDc,
                           isEditing: isEditing,
-                          supervisorEmail: supEmail.isNotEmpty ? supEmail : 'supervisor.${code.toLowerCase()}@novaexpress.ng',
+                          supervisorEmail: supEmail.isNotEmpty ? supEmail : 'supervisor.${code.toLowerCase()}@novaxpress.ng',
                           supervisorPassword: supPass.isNotEmpty ? supPass : 'Password123!',
                         );
                       }
@@ -2066,13 +2066,13 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
                           child: OutlinedButton.icon(
                             onPressed: () {
                               Clipboard.setData(ClipboardData(
-                                text: 'NovaExpress DC Supervisor Credentials\n'
+                                text: 'NovaXpress DC Supervisor Credentials\n'
                                     'Hub: ${dc.name} (${dc.code})\n'
                                     'State: ${dc.state}\n'
                                     'Role: DC Supervisor\n'
                                     'Email: $supervisorEmail\n'
                                     'Password: $supervisorPassword\n'
-                                    'Portal: https://novaexpress.ng/dc',
+                                    'Portal: https://novaxpress.ng/dc',
                               ));
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(

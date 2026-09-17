@@ -924,7 +924,7 @@ class _ClientProductDetailModalState extends ConsumerState<ClientProductDetailMo
                       ),
                     ),
                     Text(
-                      'Physical shelf stock distributed across NovaExpress fulfillment hubs',
+                      'Physical shelf stock distributed across NovaXpress fulfillment hubs',
                       style: GoogleFonts.inter(
                         fontSize: 12,
                         color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),

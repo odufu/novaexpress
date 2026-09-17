@@ -1580,7 +1580,7 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
 
       final String? validClientId = uuidRegex.hasMatch(clientId) ? clientId : null;
       if (clientCompany.isEmpty) {
-        clientCompany = 'NovaExpress Merchant';
+        clientCompany = 'NovaXpress Merchant';
       }
 
       // Update state client profile if it was previously empty
@@ -1657,7 +1657,7 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
     }
   }
 
-  /// Supply product stock / inbound consignment to NovaExpress covering DCs
+  /// Supply product stock / inbound consignment to NovaXpress covering DCs
   Future<void> supplyProductStock({
     required String productId,
     required String sku,

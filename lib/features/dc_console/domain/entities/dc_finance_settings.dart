@@ -12,7 +12,7 @@ class DCFinanceSettings {
   final double defaultFailedStipend; // e.g. 500.0
   final String settlementBankName; // 'Titan Trust Bank'
   final String settlementAccountNumber; // '0098234123'
-  final String settlementAccountName; // 'NovaExpress Logistics Limited'
+  final String settlementAccountName; // 'NovaXpress Logistics Limited'
   final bool autoReconcileWebhooks; // true
 
   // Merchant Billing & Daily Client Settlement Settings
@@ -37,7 +37,7 @@ class DCFinanceSettings {
     this.defaultFailedStipend = 500.0,
     this.settlementBankName = 'Titan Trust Bank',
     this.settlementAccountNumber = '0098234123',
-    this.settlementAccountName = 'NovaExpress Logistics Limited',
+    this.settlementAccountName = 'NovaXpress Logistics Limited',
     this.autoReconcileWebhooks = true,
     this.defaultClientDeliveryFee = 5000.0,
     this.platformFeeType = 'flat',
@@ -132,7 +132,7 @@ class DCFinanceSettings {
       defaultFailedStipend: (json['default_failed_delivery_allowance'] as num?)?.toDouble() ?? (json['default_failed_stipend'] as num?)?.toDouble() ?? (json['defaultFailedStipend'] as num?)?.toDouble() ?? 500.0,
       settlementBankName: json['settlement_bank_name']?.toString() ?? 'Titan Trust Bank',
       settlementAccountNumber: json['settlement_account_number']?.toString() ?? '0098234123',
-      settlementAccountName: json['settlement_account_name']?.toString() ?? 'NovaExpress Logistics Limited',
+      settlementAccountName: json['settlement_account_name']?.toString() ?? 'NovaXpress Logistics Limited',
       autoReconcileWebhooks: json['auto_reconcile_webhooks'] ?? json['autoReconcileWebhooks'] ?? true,
       defaultClientDeliveryFee: (json['default_client_delivery_fee'] as num?)?.toDouble() ?? 5000.0,
       platformFeeType: json['platform_fee_type']?.toString() ?? 'flat',

@@ -140,7 +140,7 @@
     const deliveryRevenue = monthlyOrders * avgDeliveryFeePerOrder;
 
     // Personnel Compensation (Commission ₦1,000 + Fuel Allowance ₦1,500) = ₦2,500 total payout liability
-    // In distributed inventory models, merchant subsidizes or NovaExpress charges delivery fee + commission spread
+    // In distributed inventory models, merchant subsidizes or NovaXpress charges delivery fee + commission spread
     const commissionPerOrder = 1000;
     const transportPerOrder = 750; // blent average across urban and inter-hub dispatch
     const riderTotalPayouts = monthlyOrders * (commissionPerOrder + transportPerOrder);

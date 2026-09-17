@@ -57,7 +57,7 @@ sequenceDiagram
 1. The Rider launches the NoveXPS PDA Mobile App.
 2. If an unexpired session exists in `FlutterSecureStorage`, the app skips login and proceeds directly to **Step 5 (Profile Hydration)**.
 3. If no session exists, the app displays the Login Screen requesting:
-   * **Email / Phone**: e.g., `emeka.rider@novaexpress.ng`
+   * **Email / Phone**: e.g., `emeka.rider@novaxpress.ng`
    * **Password**: User secret credentials.
 4. Client-side validation checks that fields are non-empty and formatted correctly.
 
@@ -109,6 +109,6 @@ The Rider is redirected to `MainBottomNavShell`, presenting:
 | Scenario / Risk | Cause | Handling / System Behavior |
 |---|---|---|
 | **No Network Connection at Login** | Device offline | If saved JWT token exists, log in using cached offline profile. Otherwise, display "Internet Connection Required for Initial Login". |
-| **User Role Mismatch** | Non-rider account (e.g. Client / DC Manager) | Revoke token, clear storage, display modal: *"This application is restricted to NovaExpress Field Delivery Agents."* |
+| **User Role Mismatch** | Non-rider account (e.g. Client / DC Manager) | Revoke token, clear storage, display modal: *"This application is restricted to NovaXpress Field Delivery Agents."* |
 | **Token Expiry during Operation** | JWT token expired after 1 hour | Supabase SDK automatically uses `refresh_token` in background without disrupting rider workflow. |
 | **Account Deactivated** | `users.is_active = false` | Server returns `403 Forbidden`. App logs user out immediately and displays *"Account Suspended. Contact HR/Operations."* |

@@ -39,7 +39,7 @@ class _QuickAccount {
 
 class _LoginFormState extends ConsumerState<LoginForm> {
   final _formKey = GlobalKey<FormState>();
-  final _agentIdController = TextEditingController(text: 'dc.supervisor@novaexpress.ng');
+  final _agentIdController = TextEditingController(text: 'dc.supervisor@novaxpress.ng');
   final _passwordController = TextEditingController(text: 'Password123!');
   String? _selectedDemoRole = 'dc_manager';
 
@@ -59,7 +59,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
       title: 'DC Supervisor',
       personName: 'Ahmed Bello',
       badge: 'Wuse Central Hub',
-      email: 'dc.supervisor@novaexpress.ng',
+      email: 'dc.supervisor@novaxpress.ng',
       password: 'Password123!',
       icon: Icons.warehouse_rounded,
       themeColor: Color(0xFF1E3A8A),
@@ -69,7 +69,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
       title: 'Field Rider (PDA)',
       personName: 'Emeka Rider',
       badge: 'PDA-7000 (Abuja)',
-      email: 'rider.emeka@novaexpress.com',
+      email: 'rider.emeka@novaxpress.com',
       password: 'Password123!',
       icon: Icons.two_wheeler_rounded,
       themeColor: Color(0xFFEA580C),
@@ -306,16 +306,16 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                       ),
                     ),
                     _buildMiniChip(
-                      label: 'client@novaexpress.ng',
+                      label: 'client@novaxpress.ng',
                       roleKey: 'client_alt',
                       color: const Color(0xFF0D9488),
-                      onTap: () => _quickFill('client', 'client@novaexpress.ng', 'Password123!'),
+                      onTap: () => _quickFill('client', 'client@novaxpress.ng', 'Password123!'),
                     ),
                     _buildMiniChip(
-                      label: 'emeka.rider@novaexpress.ng',
+                      label: 'emeka.rider@novaxpress.ng',
                       roleKey: 'rider_alt',
                       color: const Color(0xFFEA580C),
-                      onTap: () => _quickFill('rider', 'emeka.rider@novaexpress.ng', 'Password123!'),
+                      onTap: () => _quickFill('rider', 'emeka.rider@novaxpress.ng', 'Password123!'),
                     ),
                   ],
                 ),
@@ -363,7 +363,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
             controller: _agentIdController,
             style: const TextStyle(color: Color(0xFF181C1E), fontSize: 14),
             decoration: InputDecoration(
-              hintText: 'e.g. name@novaexpress.ng or PDA-7000',
+              hintText: 'e.g. name@novaxpress.ng or PDA-7000',
               hintStyle: const TextStyle(color: Color(0xFF75777E), fontSize: 13.5),
               filled: true,
               fillColor: const Color(0xFFF8FAFC),

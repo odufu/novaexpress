@@ -89,7 +89,7 @@ While the foundational schema supports individual transactions, this audit ident
   - There is **zero functionality** in DC Console or backend to create, preview, calculate, or approve daily settlements.
 
 ### 2.4 Cash Held (Liquid) vs. In-Kind Asset (Inventory) Custody
-- Merchants need visibility into their complete balance sheet within NovaExpress:
+- Merchants need visibility into their complete balance sheet within NovaXpress:
   1. **Liquid Cash in Custody**:
      - **Paystack Direct Escrow**: Cash collected via Paystack virtual accounts for delivered orders awaiting 10 PM payout.
      - **DC Vault / Cash on Hand**: Cash remitted by riders to DC for client orders awaiting bank transfer.

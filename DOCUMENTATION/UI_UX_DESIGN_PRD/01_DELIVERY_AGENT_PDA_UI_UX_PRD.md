@@ -67,7 +67,7 @@ graph TD
 * **Submit Button**: High-visibility green slider or button: `[ 🚀 Submit POD & Complete Delivery ]`.
 
 ### Screen 4: Monnify Direct Bank Transfer View
-* **Dynamic Account Display**: Large readable card showing **Monnify Virtual Account Number (`7890892401`)**, Bank Name (`Wema Bank / NovaExpress`), and Exact Amount (`₦35,000.00`).
+* **Dynamic Account Display**: Large readable card showing **Monnify Virtual Account Number (`7890892401`)**, Bank Name (`Wema Bank / NovaXpress`), and Exact Amount (`₦35,000.00`).
 * **Copy Account Number Button**: One-tap clipboard copy.
 * **Real-time Payment Listener Animation**: Pulsing circular loader: *"Listening for customer transfer..."*. Transitions to full-screen green confetti animation when webhook succeeds.
 

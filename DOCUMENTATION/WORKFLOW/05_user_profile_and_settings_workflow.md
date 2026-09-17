@@ -46,7 +46,7 @@ Navigating to **Tab 4 (PROFILE)** on the bottom navigation bar presents the **Ag
 ## 4. Step-by-Step Profile & Customization Workflows
 
 ### Workflow 5.1: Switching System Theme (Light Mode vs Industrial Dark Mode)
-NovaExpress PDA features full dynamic color tokening across all 100% of pages:
+NovaXpress PDA features full dynamic color tokening across all 100% of pages:
 
 1. **Locate Theme Switcher**:
    - On the **Profile** tab, scroll to **App Preferences**.

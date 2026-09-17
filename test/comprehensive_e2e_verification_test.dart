@@ -75,7 +75,7 @@ class MockNotificationsRemoteDS implements NotificationsRemoteDataSource {
 class MockAuthRemoteDS implements AuthRemoteDataSource {
   static const testUser = UserModel(
     id: 'd3a629c4-33dc-414b-b037-5abd074367ee',
-    email: 'rider.emeka@novaexpress.com',
+    email: 'rider.emeka@novaxpress.com',
     firstName: 'Emeka',
     lastName: 'Rider',
     phone: '08031234567',
@@ -189,7 +189,7 @@ void main() {
     final now = DateTime.now();
     final testUserEntity = UserEntity(
       id: 'd3a629c4-33dc-414b-b037-5abd074367ee',
-      email: 'rider.emeka@novaexpress.com',
+      email: 'rider.emeka@novaxpress.com',
       firstName: 'Emeka',
       lastName: 'Rider',
       phone: '08031234567',

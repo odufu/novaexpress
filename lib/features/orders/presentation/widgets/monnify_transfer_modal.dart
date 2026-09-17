@@ -49,7 +49,7 @@ class _MonnifyTransferModalState extends ConsumerState<MonnifyTransferModal>
 
   late String _virtualAccountNumber;
   final String _bankName = 'Wema Bank';
-  final String _accountName = 'NovaExpress / Customer Settlement';
+  final String _accountName = 'NovaXpress / Customer Settlement';
 
   @override
   void initState() {

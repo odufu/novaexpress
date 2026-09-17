@@ -1,4 +1,4 @@
-# 🌐 NovaExpress Strategic Roadmap: Client-Facing Portals & On-Demand Dispatch
+# 🌐 NovaXpress Strategic Roadmap: Client-Facing Portals & On-Demand Dispatch
 
 This document outlines the architectural blueprint, data schema, role hierarchy, and operational workflows for the two core client-facing expansion verticals:
 1. **Distributed Inventory Merchant Portal (B2B E-Commerce & Telesales Hub)**
@@ -10,7 +10,7 @@ This document outlines the architectural blueprint, data schema, role hierarchy,
 
 ```
                                   ┌─────────────────────────────────────────┐
-                                  │      NovaExpress Core Cloud Platform     │
+                                  │      NovaXpress Core Cloud Platform     │
                                   │  (Supabase DB, GIS Radar, Remittances)  │
                                   └────┬──────────────┬──────────────┬──────┘
                                        │              │              │
@@ -41,7 +41,7 @@ This document outlines the architectural blueprint, data schema, role hierarchy,
 ## 🏛️ VERTICAL 1: Distributed Inventory Merchant Portal
 
 ### 🎯 Objective
-Enable e-commerce merchants and direct-to-consumer (D2C) brands who store physical stock across NovaExpress Distribution Centers to manage order lifecycles, run internal call centers (telesales), track delivery success velocity, and reconcile Cash-on-Delivery (COD) remittances.
+Enable e-commerce merchants and direct-to-consumer (D2C) brands who store physical stock across NovaXpress Distribution Centers to manage order lifecycles, run internal call centers (telesales), track delivery success velocity, and reconcile Cash-on-Delivery (COD) remittances.
 
 ### 👥 User Roles & Permissions
 
@@ -51,7 +51,7 @@ Enable e-commerce merchants and direct-to-consumer (D2C) brands who store physic
   - 1-click dialer with customer script.
   - Address refinement (identifying Nigerian landmark hints & LGA).
   - Upsell & Cross-sell injection (adding promo items or extra units).
-- **Push to Fulfillment**: Transitions order status from `lead_unconfirmed` $\rightarrow$ `confirmed_for_dispatch`, instantly placing it into the local NovaExpress Distribution Center's unassigned pool.
+- **Push to Fulfillment**: Transitions order status from `lead_unconfirmed` $\rightarrow$ `confirmed_for_dispatch`, instantly placing it into the local NovaXpress Distribution Center's unassigned pool.
 
 #### B. Client Admin / Business Owner
 - **Sales Effect & Performance Dashboard**:
@@ -63,7 +63,7 @@ Enable e-commerce merchants and direct-to-consumer (D2C) brands who store physic
   - Expiry date & lot monitoring.
   - Stock restock requisition alerts when inventory dips below minimum threshold.
 - **Financial Remittance & Settlement**:
-  - Total Gross COD collected by NovaExpress riders.
+  - Total Gross COD collected by NovaXpress riders.
   - Delivery fees and return penalty deductions.
   - Instant wallet balance payouts directly to merchant Nigerian bank accounts.
 
@@ -72,7 +72,7 @@ Enable e-commerce merchants and direct-to-consumer (D2C) brands who store physic
 ## 📦 VERTICAL 2: Client Package On-Demand Dispatch App
 
 ### 🎯 Objective
-Empower individuals, social commerce vendors (Instagram/WhatsApp vendors), and corporate offices to summon an on-duty NovaExpress delivery rider for immediate point-to-point package pickup and same-day delivery.
+Empower individuals, social commerce vendors (Instagram/WhatsApp vendors), and corporate offices to summon an on-duty NovaXpress delivery rider for immediate point-to-point package pickup and same-day delivery.
 
 ### ⚙️ Core Operational Mechanics
 

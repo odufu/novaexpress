@@ -1,5 +1,5 @@
 -- ============================================================================
--- NovaExpress Logistics Management System (NoveXPS)
+-- NovaXpress Logistics Management System (NoveXPS)
 -- Complete Database Seed Data for PDA App & Operational Workflows
 -- ============================================================================
 
@@ -157,9 +157,9 @@ ALTER TABLE IF EXISTS rider_transactions ADD COLUMN IF NOT EXISTS description TE
 INSERT INTO companies (id, name, code, email, phone, address, currency)
 VALUES (
     '11111111-1111-4111-8111-111111111111',
-    'NovaExpress Logistics Limited',
+    'NovaXpress Logistics Limited',
     'NOVEXPS',
-    'operations@novaexpress.ng',
+    'operations@novaxpress.ng',
     '+2348000000000',
     'Plot 102 Central Business District, Abuja, Nigeria',
     'NGN'
@@ -198,7 +198,7 @@ VALUES
 (
     'a1111111-1111-4111-8111-111111111111',
     '11111111-1111-4111-8111-111111111111',
-    'emeka.rider@novaexpress.ng',
+    'emeka.rider@novaxpress.ng',
     '08031234567',
     'Emeka',
     'Rider',
@@ -207,7 +207,7 @@ VALUES
 (
     'a2222222-2222-4222-8222-222222222222',
     '11111111-1111-4111-8111-111111111111',
-    'dc.supervisor@novaexpress.ng',
+    'dc.supervisor@novaxpress.ng',
     '08091112233',
     'Adekunle',
     'Supervisor',
@@ -527,7 +527,7 @@ INSERT INTO monnify_virtual_accounts (
     '20202020-2020-4020-8020-202020202020',
     'MNFY-TRK-8924',
     '7890892401',
-    'NovaExpress / Novacare Limited',
+    'NovaXpress / Novacare Limited',
     'Wema Bank / Monnify',
     55000.00,
     'active'

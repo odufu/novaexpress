@@ -68,7 +68,7 @@ abstract class AuthRemoteDataSource {
 class MockAuthRemoteDataSource implements AuthRemoteDataSource {
   UserModel? _currentUser = const UserModel(
     id: 'b1111111-1111-4111-8111-111111111111',
-    email: 'rider.emeka@novaexpress.com',
+    email: 'rider.emeka@novaxpress.com',
     firstName: 'Emeka',
     lastName: 'Rider',
     phone: '08012345678',
@@ -92,13 +92,13 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
     }
 
     // 2. Verified Demo / Seed Accounts
-    if (clean == 'client.novacale@novaexpress.ng') {
+    if (clean == 'client.novacale@novaxpress.ng') {
       if (password != 'ClientPass123!' && password != 'Password123!') {
         throw AppAuthException('Invalid email or password. Please check your credentials.');
       }
       _currentUser = const UserModel(
         id: '33333333-3333-4333-8333-333333333333',
-        email: 'client.novacale@novaexpress.ng',
+        email: 'client.novacale@novaxpress.ng',
         firstName: 'Dr. Chuka',
         lastName: 'Okafor',
         phone: '08034455667',
@@ -133,13 +133,13 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
       return _currentUser!;
     }
 
-    if (clean == 'dc.supervisor@novaexpress.ng') {
+    if (clean == 'dc.supervisor@novaxpress.ng') {
       if (password != 'Password123!') {
         throw AppAuthException('Invalid email or password. Please check your credentials.');
       }
       _currentUser = const UserModel(
         id: 'a2222222-2222-4222-8222-222222222222',
-        email: 'dc.supervisor@novaexpress.ng',
+        email: 'dc.supervisor@novaxpress.ng',
         firstName: 'Adekunle',
         lastName: 'Supervisor',
         phone: '+234 802 345 6789',
@@ -152,13 +152,13 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
       return _currentUser!;
     }
 
-    if (clean == 'emeka.rider@novaexpress.ng' || clean == 'rider.emeka@novaexpress.com') {
+    if (clean == 'emeka.rider@novaxpress.ng' || clean == 'rider.emeka@novaxpress.com') {
       if (password != 'Password123!') {
         throw AppAuthException('Invalid email or password. Please check your credentials.');
       }
       _currentUser = const UserModel(
         id: 'b1111111-1111-4111-8111-111111111111',
-        email: 'rider.emeka@novaexpress.com',
+        email: 'rider.emeka@novaxpress.com',
         firstName: 'Emeka',
         lastName: 'Rider',
         phone: '08012345678',
@@ -280,11 +280,11 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
   Future<bool> checkEmailExists(String email) async {
     final clean = email.trim().toLowerCase();
     return AuthRemoteDataSourceImpl._registeredUsers.containsKey(clean) ||
-        clean == 'emeka.rider@novaexpress.ng' ||
-        clean == 'rider.emeka@novaexpress.com' ||
-        clean == 'client.novacale@novaexpress.ng' ||
+        clean == 'emeka.rider@novaxpress.ng' ||
+        clean == 'rider.emeka@novaxpress.com' ||
+        clean == 'client.novacale@novaxpress.ng' ||
         clean == 'closer.amaka@novacale.ng' ||
-        clean == 'dc.supervisor@novaexpress.ng';
+        clean == 'dc.supervisor@novaxpress.ng';
   }
 
   @override
@@ -372,14 +372,22 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
     // 2. Verified Demo / Seed Accounts (strict email and password matching, zero heuristic wildcards)
     const demoAccounts = {
+      'emeka.rider@novaxpress.ng': ('Password123!', 'a1111111-1111-4111-8111-111111111111'),
       'emeka.rider@novaexpress.ng': ('Password123!', 'a1111111-1111-4111-8111-111111111111'),
+      'rider.emeka@novaxpress.com': ('Password123!', 'a1111111-1111-4111-8111-111111111111'),
       'rider.emeka@novaexpress.com': ('Password123!', 'a1111111-1111-4111-8111-111111111111'),
+      'rider@novaxpress.ng': ('Password123!', 'a1111111-1111-4111-8111-111111111111'),
       'rider@novaexpress.ng': ('Password123!', 'a1111111-1111-4111-8111-111111111111'),
+      'joel.odufu@novaxpress.ng': ('Password123!', '44ce8d3c-9f96-45d2-a051-2d1b9463cd10'),
       'joel.odufu@novaexpress.ng': ('Password123!', '44ce8d3c-9f96-45d2-a051-2d1b9463cd10'),
+      'dc.supervisor@novaxpress.ng': ('Password123!', 'a2222222-2222-4222-8222-222222222222'),
       'dc.supervisor@novaexpress.ng': ('Password123!', 'a2222222-2222-4222-8222-222222222222'),
+      'client.novacale@novaxpress.ng': ('ClientPass123!', '33333333-3333-4333-8333-333333333333'),
       'client.novacale@novaexpress.ng': ('ClientPass123!', '33333333-3333-4333-8333-333333333333'),
+      'client@novaxpress.ng': ('ClientPass123!', '33333333-3333-4333-8333-333333333333'),
       'client@novaexpress.ng': ('ClientPass123!', '33333333-3333-4333-8333-333333333333'),
       'closer.amaka@novacale.ng': ('CloserPass123!', '44444444-4444-4444-8444-444444444444'),
+      'closer@novaxpress.ng': ('CloserPass123!', '44444444-4444-4444-8444-444444444444'),
       'closer@novaexpress.ng': ('CloserPass123!', '44444444-4444-4444-8444-444444444444'),
     };
 
@@ -401,6 +409,23 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           return await _fetchUserProfile(authUser.id, authUser.email ?? lookupEmail);
         }
       } catch (err) {
+        // Fallback: If auth with lookupEmail failed, try alternate domain (novaxpress vs legacy novaexpress)
+        final altEmail = lookupEmail.contains('@novaxpress.')
+            ? lookupEmail.replaceAll('@novaxpress.', '@novaexpress.')
+            : lookupEmail.replaceAll('@novaexpress.', '@novaxpress.');
+        if (altEmail != lookupEmail) {
+          try {
+            final altResponse = await supabaseClient.auth.signInWithPassword(
+              email: altEmail,
+              password: password,
+            );
+            final authUser = altResponse.user;
+            if (authUser != null) {
+              debugPrint('[AUTH_DATASOURCE] ✅ Supabase sign-in via alternate email ($altEmail) successful: ${authUser.id}');
+              return await _fetchUserProfile(authUser.id, authUser.email ?? lookupEmail);
+            }
+          } catch (_) {}
+        }
         debugPrint('[AUTH_DATASOURCE] ℹ️ Supabase auth notice ($err). Loading live user profile from database.');
       }
       return await _fetchUserProfile(defaultUserId, lookupEmail);
@@ -411,12 +436,32 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     try {
       debugPrint('[AUTH_DATASOURCE] 🌐 Calling Supabase auth.signInWithPassword for "$lookupEmail"...');
       authAttempted = true;
-      final response = await supabaseClient.auth.signInWithPassword(
-        email: lookupEmail,
-        password: password,
-      );
+      User? authUser;
+      try {
+        final response = await supabaseClient.auth.signInWithPassword(
+          email: lookupEmail,
+          password: password,
+        );
+        authUser = response.user;
+      } catch (e) {
+        final altEmail = lookupEmail.contains('@novaxpress.')
+            ? lookupEmail.replaceAll('@novaxpress.', '@novaexpress.')
+            : lookupEmail.replaceAll('@novaexpress.', '@novaxpress.');
+        if (altEmail != lookupEmail) {
+          try {
+            final altResp = await supabaseClient.auth.signInWithPassword(
+              email: altEmail,
+              password: password,
+            );
+            authUser = altResp.user;
+          } catch (_) {
+            rethrow;
+          }
+        } else {
+          rethrow;
+        }
+      }
 
-      final authUser = response.user;
       if (authUser != null) {
         debugPrint('[AUTH_DATASOURCE] ✅ Supabase authenticated: ${authUser.id}. Fetching profile...');
         return await _fetchUserProfile(authUser.id, authUser.email ?? lookupEmail);
@@ -537,15 +582,15 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     if (_registeredUsers.containsKey(cleanEmail)) return true;
 
     const demoAccounts = {
-      'emeka.rider@novaexpress.ng',
-      'rider.emeka@novaexpress.com',
-      'rider@novaexpress.ng',
-      'joel.odufu@novaexpress.ng',
-      'dc.supervisor@novaexpress.ng',
-      'client.novacale@novaexpress.ng',
-      'client@novaexpress.ng',
+      'emeka.rider@novaxpress.ng',
+      'rider.emeka@novaxpress.com',
+      'rider@novaxpress.ng',
+      'joel.odufu@novaxpress.ng',
+      'dc.supervisor@novaxpress.ng',
+      'client.novacale@novaxpress.ng',
+      'client@novaxpress.ng',
       'closer.amaka@novacale.ng',
-      'closer@novaexpress.ng',
+      'closer@novaxpress.ng',
     };
     if (demoAccounts.contains(cleanEmail)) return true;
 

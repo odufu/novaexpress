@@ -1293,7 +1293,7 @@ class _ClientFinancePageState extends ConsumerState<ClientFinancePage> {
                     style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A)),
                   ),
                   Text(
-                    'Liquid funds in NovaExpress custody + In-kind warehouse inventory valuation',
+                    'Liquid funds in NovaXpress custody + In-kind warehouse inventory valuation',
                     style: GoogleFonts.inter(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                   ),
                 ],

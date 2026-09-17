@@ -6,7 +6,7 @@ void main() {
     test('1. DC Manager strictly resolves to /dc console route', () {
       const dcUser = UserEntity(
         id: 'u-dc-01',
-        email: 'dc.supervisor@novaexpress.ng',
+        email: 'dc.supervisor@novaxpress.ng',
         firstName: 'Adekunle',
         lastName: 'Supervisor',
         phone: '08012345678',
@@ -25,7 +25,7 @@ void main() {
     test('2. Client Merchant strictly resolves to /client console route', () {
       const clientUser = UserEntity(
         id: 'u-cli-01',
-        email: 'client.novacale@novaexpress.ng',
+        email: 'client.novacale@novaxpress.ng',
         firstName: 'Novacale',
         lastName: 'Admin',
         phone: '08023456789',
@@ -64,7 +64,7 @@ void main() {
     test('4. Field Delivery Agent (Rider) strictly resolves to / root dashboard', () {
       const riderUser = UserEntity(
         id: 'u-rdr-01',
-        email: 'emeka.rider@novaexpress.ng',
+        email: 'emeka.rider@novaxpress.ng',
         firstName: 'Emeka',
         lastName: 'Rider',
         phone: '08045678901',

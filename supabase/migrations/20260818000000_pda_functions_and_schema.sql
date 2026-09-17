@@ -1,5 +1,5 @@
 -- ============================================================================
--- NovaExpress Logistics Management System
+-- NovaXpress Logistics Management System
 -- Schema Enhancements, Ledger Triggers, and Stored Procedures for PDA App
 -- ============================================================================
 

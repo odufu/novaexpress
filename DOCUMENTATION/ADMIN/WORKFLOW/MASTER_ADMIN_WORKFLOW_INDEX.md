@@ -1,6 +1,6 @@
 # 👑 NoveXPS Overall Administration (Super Admin) Master Operational Workflow Guide & Sitemap
 
-Welcome to the **NovaExpress Logistics Management System (NoveXPS) Overall Administration (Super Admin) Operational Workflow Guide**. This master document details platform-wide governance, multi-company tenancy, system integrations, database and Edge Function maintenance, cryptographic security, global rate governance, and disaster recovery.
+Welcome to the **NovaXpress Logistics Management System (NoveXPS) Overall Administration (Super Admin) Operational Workflow Guide**. This master document details platform-wide governance, multi-company tenancy, system integrations, database and Edge Function maintenance, cryptographic security, global rate governance, and disaster recovery.
 
 ---
 

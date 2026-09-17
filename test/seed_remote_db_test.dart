@@ -18,9 +18,9 @@ void main() {
     try {
       await client.from('companies').upsert({
         'id': '11111111-1111-4111-8111-111111111111',
-        'name': 'NovaExpress Logistics Limited',
+        'name': 'NovaXpress Logistics Limited',
         'code': 'NOVEXPS',
-        'email': 'operations@novaexpress.ng',
+        'email': 'operations@novaxpress.ng',
         'phone': '+2348000000000',
         'address': 'Plot 102 Central Business District, Abuja, Nigeria',
         'currency': 'NGN',
@@ -65,7 +65,7 @@ void main() {
         {
           'id': 'a1111111-1111-4111-8111-111111111111',
           'company_id': '11111111-1111-4111-8111-111111111111',
-          'email': 'emeka.rider@novaexpress.ng',
+          'email': 'emeka.rider@novaxpress.ng',
           'phone_number': '08031234567',
           'first_name': 'Emeka',
           'last_name': 'Rider',
@@ -74,7 +74,7 @@ void main() {
         {
           'id': 'a3333333-3333-4333-8333-333333333333',
           'company_id': '11111111-1111-4111-8111-111111111111',
-          'email': 'babatunde.lawal@novaexpress.ng',
+          'email': 'babatunde.lawal@novaxpress.ng',
           'phone_number': '08022223344',
           'first_name': 'Babatunde',
           'last_name': 'Lawal',
@@ -83,7 +83,7 @@ void main() {
         {
           'id': 'a2222222-2222-4222-8222-222222222222',
           'company_id': '11111111-1111-4111-8111-111111111111',
-          'email': 'dc.supervisor@novaexpress.ng',
+          'email': 'dc.supervisor@novaxpress.ng',
           'phone_number': '08091112233',
           'first_name': 'Adekunle',
           'last_name': 'Supervisor',

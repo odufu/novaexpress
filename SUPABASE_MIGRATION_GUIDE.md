@@ -1,12 +1,12 @@
-# 🚀 NovaExpress Supabase Migration Runbook
+# 🚀 NovaXpress Supabase Migration Runbook
 
-> **Target**: Transitioning the entire NovaExpress platform (Database, Storage Buckets, RLS, Stored Procedures, Edge Functions, Live Data, and Flutter Client) to a brand new Supabase project/account in **under 5 minutes**.
+> **Target**: Transitioning the entire NovaXpress platform (Database, Storage Buckets, RLS, Stored Procedures, Edge Functions, Live Data, and Flutter Client) to a brand new Supabase project/account in **under 5 minutes**.
 
 ---
 
 ## 📋 Overview of the Migration Toolkit
 
-NovaExpress is equipped with a turnkey, production-tested migration suite located in the repository:
+NovaXpress is equipped with a turnkey, production-tested migration suite located in the repository:
 
 | Tool / File | Purpose | Location |
 | :--- | :--- | :--- |
@@ -35,7 +35,7 @@ flowchart LR
 ### Step 1: Create Your New Supabase Project
 
 1. Log into your new or existing Supabase account at [supabase.com/dashboard](https://supabase.com/dashboard).
-2. Click **New Project**, select your organization, name it (e.g. `NovaExpress-Prod`), choose your region (e.g. `London (eu-west-2)` or closest), and set a secure database password.
+2. Click **New Project**, select your organization, name it (e.g. `NovaXpress-Prod`), choose your region (e.g. `London (eu-west-2)` or closest), and set a secure database password.
 3. Once initialized, navigate to **Project Settings** ➡️ **API** and copy:
    - **Project URL** (e.g. `https://yournewproject.supabase.co`)
    - **Project Ref** (e.g. `yournewproject`)
@@ -174,7 +174,7 @@ After migrating, run these quick verification checks:
 
 We conducted a forensic audit of the live database, Edge Functions, and client codebase to eliminate the top failure modes in Supabase migrations:
 
-| Potential Complication | What Goes Wrong | How NovaExpress Prevents It |
+| Potential Complication | What Goes Wrong | How NovaXpress Prevents It |
 | :--- | :--- | :--- |
 | **PostgREST Schema Cache Delay** | Calling a newly created RPC stored procedure returns HTTP 404 for up to 5 minutes after migration until PostgREST reloads. | [`schema_master_complete.sql`](file:///c:/PROJECT/NoveXPS/supabase/schema_master_complete.sql) ends with `NOTIFY pgrst, 'reload schema';` forcing PostgREST to recognize all 12+ RPCs instantly. |
 | **Silent Realtime Stream Failure** | Orders, chat messages, and notifications stop updating live in the UI on a new account. | Configured `REPLICA IDENTITY FULL` on all streaming tables and automatically registered them in `supabase_realtime` in the master migration. |

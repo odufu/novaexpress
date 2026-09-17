@@ -21,19 +21,19 @@ void main() {
       final dcNotifier = container.read(dcConsoleProvider.notifier);
 
       // Existing client account email must return true
-      final existsClient = await dcNotifier.checkClientEmailExists('client.novacale@novaexpress.ng');
+      final existsClient = await dcNotifier.checkClientEmailExists('client.novacale@novaxpress.ng');
       expect(existsClient, isTrue, reason: 'Seed client account should be recognized as existing');
 
       // Existing rider account email must return true
-      final existsRider = await dcNotifier.checkClientEmailExists('emeka.rider@novaexpress.ng');
+      final existsRider = await dcNotifier.checkClientEmailExists('emeka.rider@novaxpress.ng');
       expect(existsRider, isTrue, reason: 'Rider account email should not be re-usable by clients');
 
       // Existing DC supervisor account email must return true
-      final existsDcSupervisor = await dcNotifier.checkClientEmailExists('dc.supervisor@novaexpress.ng');
+      final existsDcSupervisor = await dcNotifier.checkClientEmailExists('dc.supervisor@novaxpress.ng');
       expect(existsDcSupervisor, isTrue, reason: 'DC supervisor email should not be re-usable by clients');
 
       // Brand new unique email must return false
-      final existsNew = await dcNotifier.checkClientEmailExists('brand.new.merchant.2026@novaexpress.ng');
+      final existsNew = await dcNotifier.checkClientEmailExists('brand.new.merchant.2026@novaxpress.ng');
       expect(existsNew, isFalse, reason: 'Unique unused email should be available for onboarding');
     });
 
@@ -44,7 +44,7 @@ void main() {
         () async => await dcNotifier.createClient(
           companyName: 'Duplicate Attempt Brand',
           contactPerson: 'Kalu Okonkwo',
-          email: 'client.novacale@novaexpress.ng', // Existing email
+          email: 'client.novacale@novaxpress.ng', // Existing email
           phone: '08099887766',
           address: 'Plot 55 Garki 2, Abuja',
           city: 'Abuja',
@@ -55,7 +55,7 @@ void main() {
         ),
         throwsA(predicate((e) =>
             e.toString().contains('already exists') &&
-            e.toString().contains('client.novacale@novaexpress.ng'))),
+            e.toString().contains('client.novacale@novaxpress.ng'))),
       );
     });
 

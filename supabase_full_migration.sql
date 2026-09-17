@@ -1,6 +1,6 @@
 -- === FILE: 20260818000000_pda_functions_and_schema.sql ===
 -- ============================================================================
--- NovaExpress Logistics Management System
+-- NovaXpress Logistics Management System
 -- Schema Enhancements, Ledger Triggers, and Stored Procedures for PDA App
 -- ============================================================================
 
@@ -197,7 +197,7 @@ $$;
 
 -- === FILE: 20260819180000_full_schema_pda_system.sql ===
 -- ============================================================================
--- NovaExpress Logistics Management System (NoveXPS)
+-- NovaXpress Logistics Management System (NoveXPS)
 -- Complete PostgreSQL / Supabase Schema Definition for PDA Operations
 -- ============================================================================
 
@@ -521,7 +521,7 @@ CREATE TABLE IF NOT EXISTS monnify_virtual_accounts (
     order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
     account_reference VARCHAR(100) UNIQUE NOT NULL, -- e.g. 'MNFY-TRK-8924'
     account_number VARCHAR(20) NOT NULL, -- e.g. '7890892401'
-    account_name VARCHAR(255) NOT NULL DEFAULT 'NovaExpress / Novacare',
+    account_name VARCHAR(255) NOT NULL DEFAULT 'NovaXpress / Novacare',
     bank_name VARCHAR(100) NOT NULL DEFAULT 'Wema Bank / Monnify',
     expected_amount NUMERIC(14, 2) NOT NULL,
     amount_paid NUMERIC(14, 2) DEFAULT 0.00,
@@ -561,7 +561,7 @@ CREATE TABLE IF NOT EXISTS cash_remittances (
     payment_method VARCHAR(50) NOT NULL DEFAULT 'bank_transfer', -- 'bank_transfer', 'cash_to_dc', 'pos'
     destination_bank_name VARCHAR(100) DEFAULT 'GTBank',
     destination_account_number VARCHAR(50) DEFAULT '0123456789',
-    destination_account_name VARCHAR(255) DEFAULT 'NovaExpress Logistics Limited',
+    destination_account_name VARCHAR(255) DEFAULT 'NovaXpress Logistics Limited',
     status VARCHAR(50) NOT NULL DEFAULT 'submitted', -- 'pending', 'submitted', 'verified', 'approved', 'rejected'
     deposit_receipt_url TEXT,
     verified_by_user_id UUID REFERENCES users(id),
@@ -668,7 +668,7 @@ CREATE POLICY "Agents can view rider transactions" ON rider_transactions
 
 -- === FILE: 20260819183000_seed_data_all_modules.sql ===
 -- ============================================================================
--- NovaExpress Logistics Management System (NoveXPS)
+-- NovaXpress Logistics Management System (NoveXPS)
 -- Complete Database Seed Data for PDA App & Operational Workflows
 -- ============================================================================
 
@@ -826,9 +826,9 @@ ALTER TABLE IF EXISTS rider_transactions ADD COLUMN IF NOT EXISTS description TE
 INSERT INTO companies (id, name, code, email, phone, address, currency)
 VALUES (
     '11111111-1111-4111-8111-111111111111',
-    'NovaExpress Logistics Limited',
+    'NovaXpress Logistics Limited',
     'NOVEXPS',
-    'operations@novaexpress.ng',
+    'operations@novaxpress.ng',
     '+2348000000000',
     'Plot 102 Central Business District, Abuja, Nigeria',
     'NGN'
@@ -867,7 +867,7 @@ VALUES
 (
     'a1111111-1111-4111-8111-111111111111',
     '11111111-1111-4111-8111-111111111111',
-    'emeka.rider@novaexpress.ng',
+    'emeka.rider@novaxpress.ng',
     '08031234567',
     'Emeka',
     'Rider',
@@ -876,7 +876,7 @@ VALUES
 (
     'a2222222-2222-4222-8222-222222222222',
     '11111111-1111-4111-8111-111111111111',
-    'dc.supervisor@novaexpress.ng',
+    'dc.supervisor@novaxpress.ng',
     '08091112233',
     'Adekunle',
     'Supervisor',
@@ -1196,7 +1196,7 @@ INSERT INTO monnify_virtual_accounts (
     '20202020-2020-4020-8020-202020202020',
     'MNFY-TRK-8924',
     '7890892401',
-    'NovaExpress / Novacare Limited',
+    'NovaXpress / Novacare Limited',
     'Wema Bank / Monnify',
     55000.00,
     'active'
@@ -1444,7 +1444,7 @@ SELECT pg_notify('pgrst', 'reload schema');
 
 -- === FILE: 20260819233000_dynamic_notifications_and_triggers.sql ===
 -- ============================================================================
--- NovaExpress Logistics Management System
+-- NovaXpress Logistics Management System
 -- Dynamic Notifications Engine & Automated Ledger Triggers
 -- ============================================================================
 
@@ -1564,7 +1564,7 @@ NOTIFY pgrst, 'reload schema';
 
 -- === FILE: 20260822120000_automated_geocoding_and_proximity_dispatch.sql ===
 -- ============================================================================
--- NovaExpress Logistics Management System (NoveXPS)
+-- NovaXpress Logistics Management System (NoveXPS)
 -- Database Migration: Automated Geocoding, Proximity Dispatch & Spatial Indexing
 -- ============================================================================
 
@@ -1864,7 +1864,7 @@ SET
   current_latitude = 9.0765,
   current_longitude = 7.4832,
   last_location_update = NOW()
-WHERE email = 'emeka.rider@novaexpress.ng';
+WHERE email = 'emeka.rider@novaxpress.ng';
 
 -- Update Sample Orders with Geocoded Locations & Verification
 UPDATE orders
@@ -1912,7 +1912,7 @@ NOTIFY pgrst, 'reload schema';
 
 -- === FILE: 20260823150000_storage_buckets_and_upload_restrictions.sql ===
 -- ==============================================================================
--- NOVAEXPRESS LOGISTICS: SUPABASE STORAGE BUCKETS & UPLOAD SECURITY RESTRICTIONS
+-- NOVAXPRESS LOGISTICS: SUPABASE STORAGE BUCKETS & UPLOAD SECURITY RESTRICTIONS
 -- ==============================================================================
 
 -- 1. Create and configure 'avatars' bucket with 5MB limit and image restrictions
@@ -1990,7 +1990,7 @@ END $$;
 
 -- === FILE: 20260824000000_paystack_gateway_tables.sql ===
 -- ============================================================================
--- NOVAEXPRESS LOGISTICS PLATFORM - PAYSTACK GATEWAY SCHEMA
+-- NOVAXPRESS LOGISTICS PLATFORM - PAYSTACK GATEWAY SCHEMA
 -- Table Definitions & Indexing for Paystack Remittances & Direct Transfers
 -- ============================================================================
 
@@ -2001,7 +2001,7 @@ CREATE TABLE IF NOT EXISTS paystack_virtual_accounts (
     account_reference VARCHAR(100) UNIQUE NOT NULL,
     account_number VARCHAR(50) NOT NULL,
     bank_name VARCHAR(100) NOT NULL DEFAULT 'Titan Trust Bank / Paystack',
-    account_name VARCHAR(255) NOT NULL DEFAULT 'NovaExpress Logistics / Settlement',
+    account_name VARCHAR(255) NOT NULL DEFAULT 'NovaXpress Logistics / Settlement',
     expected_amount NUMERIC(14, 2) NOT NULL,
     amount_paid NUMERIC(14, 2) DEFAULT 0.00,
     status VARCHAR(50) NOT NULL DEFAULT 'active', -- 'active', 'paid', 'expired'
@@ -2074,7 +2074,7 @@ ON paystack_transactions FOR ALL USING (true);
 
 -- === FILE: 20260825000000_standardize_payment_methods_cash_and_paystack.sql ===
 -- ============================================================================
--- NOVAEXPRESS LOGISTICS PLATFORM - STANDARDIZE PAYMENT METHODS MIGRATION
+-- NOVAXPRESS LOGISTICS PLATFORM - STANDARDIZE PAYMENT METHODS MIGRATION
 -- Standardize operational payment options strictly to:
 --   1. 'cash' (Pay On Delivery with physical cash custody for later remittance)
 --   2. 'bank_transfer' (Direct Transfer via Paystack with instant company settlement)
@@ -2118,7 +2118,7 @@ NOTIFY pgrst, 'reload schema';
 
 -- === FILE: 20260902100000_rider_compensation_and_dc_finance_settings.sql ===
 -- ============================================================================
--- NOVAEXPRESS LOGISTICS PLATFORM - RIDER COMPENSATION & DC FINANCE SETTINGS
+-- NOVAXPRESS LOGISTICS PLATFORM - RIDER COMPENSATION & DC FINANCE SETTINGS
 -- Production-grade schema for multi-device sync of:
 --   1. Rider compensation terms (commission, transport, failed delivery, salary, personnel type)
 --   2. DC hub finance & POS rules (charge mode, tier fee, flat rate, caps, defaults)
@@ -2297,7 +2297,7 @@ NOTIFY pgrst, 'reload schema';
 
 -- === FILE: 20260902110000_hierarchical_dc_dispatch_and_lga_routing.sql ===
 -- ============================================================================
--- NOVAEXPRESS LOGISTICS PLATFORM - HIERARCHICAL DC & LGA DISPATCH ENGINE
+-- NOVAXPRESS LOGISTICS PLATFORM - HIERARCHICAL DC & LGA DISPATCH ENGINE
 -- Production-grade schema & triggers for:
 --   1. Grand DC vs Regional Station DC designation
 --   2. Order state & LGA multi-zone dispatching
@@ -2485,7 +2485,7 @@ NOTIFY pgrst, 'reload schema';
 
 -- === FILE: 20260902120000_client_portal_and_merchant_management.sql ===
 -- ============================================================================
--- NOVAEXPRESS LOGISTICS PLATFORM - CLIENT & MERCHANT PORTAL SCHEMA
+-- NOVAXPRESS LOGISTICS PLATFORM - CLIENT & MERCHANT PORTAL SCHEMA
 -- Migration for:
 --   1. Clients / Merchants Table
 --   2. Commercial Product Packages Table
@@ -2531,7 +2531,7 @@ VALUES (
   'Novacale Limited',
   'Novacale Limited',
   'Dr. Chuka Okafor',
-  'client.novacale@novaexpress.ng',
+  'client.novacale@novaxpress.ng',
   '08034455667',
   'Plot 12, Commercial Avenue, Central Business District, Abuja',
   'Abuja',
@@ -2551,7 +2551,7 @@ INSERT INTO users (id, company_id, email, phone_number, first_name, last_name, r
 VALUES (
   '33333333-3333-4333-8333-333333333333'::uuid,
   '11111111-1111-4111-8111-111111111111',
-  'client.novacale@novaexpress.ng',
+  'client.novacale@novaxpress.ng',
   '08034455667',
   'Chuka',
   'Okafor (Novacale)',
@@ -2606,7 +2606,7 @@ NOTIFY pgrst, 'reload schema';
 
 -- === FILE: 20260902140000_enterprise_clients_and_closer_hierarchy.sql ===
 -- ============================================================================
--- NOVAEXPRESS LOGISTICS PLATFORM - ENTERPRISE CLIENTS & CLOSER HIERARCHY
+-- NOVAXPRESS LOGISTICS PLATFORM - ENTERPRISE CLIENTS & CLOSER HIERARCHY
 -- Migration for:
 --   1. Enterprise Client Tiering & Closer Capacity Limits
 --   2. Client Closers / Telesales Agents Directory

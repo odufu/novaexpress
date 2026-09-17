@@ -27,7 +27,7 @@ final List<DistributionCenter> defaultDistributionCenters = [
     city: 'Wuse 2',
     address: 'Plot 402 Aminu Kano Crescent, Wuse 2, Abuja',
     contactPhone: '+234 802 345 6789',
-    contactEmail: 'dc.supervisor@novaexpress.ng',
+    contactEmail: 'dc.supervisor@novaxpress.ng',
     managerName: 'Adekunle Supervisor',
     isGrandDc: true,
     isHub: true,
@@ -1034,7 +1034,7 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     // 1. Resolve supervisor login email
     final supEmail = (supervisorEmail != null && supervisorEmail.trim().isNotEmpty)
         ? supervisorEmail.trim().toLowerCase()
-        : (contactEmail?.trim().isNotEmpty == true ? contactEmail!.trim().toLowerCase() : 'supervisor.${cleanCode.toLowerCase()}@novaexpress.ng');
+        : (contactEmail?.trim().isNotEmpty == true ? contactEmail!.trim().toLowerCase() : 'supervisor.${cleanCode.toLowerCase()}@novaxpress.ng');
     final supPass = (supervisorPassword != null && supervisorPassword.trim().length >= 6)
         ? supervisorPassword.trim()
         : 'Password123!';

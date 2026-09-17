@@ -128,7 +128,7 @@ serve(async (req: Request) => {
       const encoded = encodeURIComponent(synthesizedQuery);
       const url = `https://nominatim.openstreetmap.org/search?q=${encoded}&format=json&countrycodes=ng&limit=1`;
       const geoResp = await fetch(url, {
-        headers: { "User-Agent": "NoveXPS-Logistics/1.0 (contact@novaexpress.ng)" },
+        headers: { "User-Agent": "NoveXPS-Logistics/1.0 (contact@novaxpress.ng)" },
       });
 
       if (geoResp.ok) {

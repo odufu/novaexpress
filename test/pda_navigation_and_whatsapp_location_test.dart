@@ -222,7 +222,7 @@ void main() {
               notifier.state = const AuthState(
                 user: UserEntity(
                   id: 'b1111111-1111-4111-8111-111111111111',
-                  email: 'emeka.rider@novaexpress.ng',
+                  email: 'emeka.rider@novaxpress.ng',
                   firstName: 'Emeka',
                   lastName: 'Rider',
                   phone: '08031234567',
@@ -356,7 +356,7 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
   @override
   Future<UserModel> login(String email, String password) async => const UserModel(
         id: 'b1111111-1111-4111-8111-111111111111',
-        email: 'emeka.rider@novaexpress.ng',
+        email: 'emeka.rider@novaxpress.ng',
         firstName: 'Emeka',
         lastName: 'Rider',
         phone: '08031234567',
@@ -370,7 +370,7 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
   @override
   Future<UserModel?> getCurrentUser() async => const UserModel(
         id: 'b1111111-1111-4111-8111-111111111111',
-        email: 'emeka.rider@novaexpress.ng',
+        email: 'emeka.rider@novaxpress.ng',
         firstName: 'Emeka',
         lastName: 'Rider',
         phone: '08031234567',

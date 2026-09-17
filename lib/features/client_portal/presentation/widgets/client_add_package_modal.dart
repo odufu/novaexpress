@@ -577,7 +577,7 @@ class _ClientAddPackageModalState extends ConsumerState<ClientAddPackageModal> {
                             Text(
                               _selectedProduct != null && _selectedProduct!.coveringStates.isNotEmpty
                                   ? 'This package will be visible and operational in all DCs covering: ${_selectedProduct!.coveringStates.join(", ")}.'
-                                  : 'This package is available across all nationwide Distribution Centers in the NovaExpress network.',
+                                  : 'This package is available across all nationwide Distribution Centers in the NovaXpress network.',
                               style: GoogleFonts.inter(
                                 fontSize: 11,
                                 color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),

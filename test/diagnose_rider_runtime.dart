@@ -35,7 +35,7 @@ void main() {
     print('Agents matching joel: $agentRes');
 
     // Simulate login for joel
-    final loggedInUser = await authDatasource.login('joel.odufu@novaexpress.ng', 'Password123!');
+    final loggedInUser = await authDatasource.login('joel.odufu@novaxpress.ng', 'Password123!');
     print('\nLogged in UserModel:');
     print('  id: ${loggedInUser.id}');
     print('  email: ${loggedInUser.email}');

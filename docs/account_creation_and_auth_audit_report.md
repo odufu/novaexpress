@@ -1,6 +1,6 @@
-# NovaExpress Account Creation & Authentication System Audit Report
+# NovaXpress Account Creation & Authentication System Audit Report
 
-**System Version:** NovaExpress Logistics Platform (NoveXPS)  
+**System Version:** NovaXpress Logistics Platform (NoveXPS)  
 **Audit Date:** September 13, 2026  
 **Auditor:** Antigravity Advanced Agentic AI Engine  
 **Remote Environment:** Supabase Cloud Project `qpcafevjsrbauweuiiyq`
@@ -9,7 +9,7 @@
 
 ## 1. Executive Summary
 
-A comprehensive, end-to-end audit was conducted on NovaExpress's **Account Creation and Authentication System**, examining all database tables, stored procedures, remote Supabase instances, authentication providers, and Flutter client applications. 
+A comprehensive, end-to-end audit was conducted on NovaXpress's **Account Creation and Authentication System**, examining all database tables, stored procedures, remote Supabase instances, authentication providers, and Flutter client applications. 
 
 Prior to this audit:
 1. The login screen had an artificial multi-tab/role selector card that forced users to choose a persona prior to authentication. If a user entered their valid credentials under a different tab, the system blocked them with a client-side role mismatch error.

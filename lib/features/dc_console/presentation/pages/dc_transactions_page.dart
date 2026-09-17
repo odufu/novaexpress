@@ -826,7 +826,7 @@ class _DCTransactionsPageState extends ConsumerState<DCTransactionsPage> {
                               overflow: TextOverflow.ellipsis,
                             ),
                             Text(
-                              'NovaExpress Distribution Center Financial Ledger',
+                              'NovaXpress Distribution Center Financial Ledger',
                               style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -1084,7 +1084,7 @@ class _DCTransactionsPageState extends ConsumerState<DCTransactionsPage> {
                         onPressed: () {
                           final receiptText = '''
 ========================================
-NOVAEXPRESS DC TRANSACTION RECEIPT
+NOVAXPRESS DC TRANSACTION RECEIPT
 ========================================
 Transaction Code: ${txn.transactionCode}
 Order: #${txn.orderNumber ?? "N/A"}
@@ -1097,7 +1097,7 @@ Customer: ${txn.customerName ?? "N/A"}
 Timestamp: $timestampFormatted
 Status: ${isPartial ? "PARTIAL REMITTANCE" : (txn.isRemittance ? "COMPLETE REMITTANCE" : "APPROVED / SUCCESSFUL (200 OK)")}
 ========================================
-NovaExpress Distribution Center Audit
+NovaXpress Distribution Center Audit
 ''';
                           Clipboard.setData(ClipboardData(text: receiptText));
                           ScaffoldMessenger.of(context).showSnackBar(

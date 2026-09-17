@@ -230,7 +230,7 @@ void main() {
 
       const clientAdmin = UserEntity(
         id: 'user-admin-01',
-        email: 'client.novacale@novaexpress.ng',
+        email: 'client.novacale@novaxpress.ng',
         firstName: 'Chuka',
         lastName: 'Okafor',
         phone: '08034455667',

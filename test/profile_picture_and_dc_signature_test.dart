@@ -33,7 +33,7 @@ class _MockAuthNotifier extends StateNotifier<AuthState> implements AuthNotifier
           const AuthState(
             user: UserEntity(
               id: 'user-001',
-              email: 'dc.supervisor@novaexpress.ng',
+              email: 'dc.supervisor@novaxpress.ng',
               firstName: 'Adekunle',
               lastName: 'Supervisor',
               phone: '08099887766',
@@ -105,7 +105,7 @@ void main() {
     test('2b. UserModel.fromJson parses avatarUrl across Supabase column variants and aliases', () {
       final json1 = {
         'id': 'u-1',
-        'email': 'joel.odufu@novaexpress.ng',
+        'email': 'joel.odufu@novaxpress.ng',
         'first_name': 'Joel',
         'last_name': 'Odufu',
         'avatar_url': 'https://supabase.co/avatars/joel.jpg',
@@ -115,7 +115,7 @@ void main() {
 
       final json2 = {
         'id': 'u-2',
-        'email': 'emeka.rider@novaexpress.ng',
+        'email': 'emeka.rider@novaxpress.ng',
         'first_name': 'Emeka',
         'last_name': 'Rider',
         'photo_url': 'https://supabase.co/avatars/emeka.png',
@@ -128,7 +128,7 @@ void main() {
       final storage = LocalStorageServiceImpl();
       const testUser = UserModel(
         id: 'u-101',
-        email: 'joel.odufu@novaexpress.ng',
+        email: 'joel.odufu@novaxpress.ng',
         firstName: 'Joel',
         lastName: 'Odufu',
         phone: '08031234567',
@@ -142,7 +142,7 @@ void main() {
 
       final restoredUser = UserModel.fromJson(restoredJson!);
       expect(restoredUser.id, equals('u-101'));
-      expect(restoredUser.email, equals('joel.odufu@novaexpress.ng'));
+      expect(restoredUser.email, equals('joel.odufu@novaxpress.ng'));
       expect(restoredUser.avatarUrl, equals('https://oygtaeriljuelhshfvkv.supabase.co/storage/v1/object/public/avatars/avatar_joel.jpg'));
     });
   });

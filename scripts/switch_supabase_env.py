@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-NovaExpress Supabase Environment Switcher
+NovaXpress Supabase Environment Switcher
 Allows instantaneous switching between Supabase accounts/projects, or registering new accounts.
 """
 
@@ -81,7 +81,7 @@ def switch_to_environment(target_url, target_anon, target_service, env_name="Cus
     print(f"   Flutter app will now connect to this Supabase backend.")
 
 def main():
-    parser = argparse.ArgumentParser(description="NovaExpress Supabase Environment Switcher")
+    parser = argparse.ArgumentParser(description="NovaXpress Supabase Environment Switcher")
     parser.add_argument("--list", action="store_true", help="List all saved Supabase environments")
     parser.add_argument("--switch", type=str, help="Switch to a known environment by key or name")
     parser.add_argument("--set", action="store_true", help="Set active Supabase environment using explicit credentials")

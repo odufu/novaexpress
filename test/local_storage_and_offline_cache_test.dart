@@ -26,7 +26,7 @@ void main() {
           driverCode: 'PDA-7000',
           name: 'Emeka Rider',
           phone: '08012345678',
-          email: 'emeka.rider@novaexpress.ng',
+          email: 'emeka.rider@novaxpress.ng',
           avatarUrl: 'https://example.com/avatar.jpg',
           vehicleModel: 'Bajaj Boxer 100',
           vehiclePlate: 'ABJ-204-XY',
@@ -47,7 +47,7 @@ void main() {
           driverCode: 'PDA-7588',
           name: 'Sanni Abacha',
           phone: '08098765432',
-          email: 'sanni.abacha@novaexpress.ng',
+          email: 'sanni.abacha@novaxpress.ng',
           avatarUrl: 'https://example.com/avatar2.jpg',
           vehicleModel: 'TVS HLX Plus',
           vehiclePlate: 'ABJ-892-KT',
@@ -175,7 +175,7 @@ void main() {
     test('4. Dynamic Rider Remittance & Earnings: Increases cash in custody and calculates earnings with base commission + transport + failed allowance', () {
       const pdaUser = UserEntity(
         id: 'usr-pda-01',
-        email: 'emeka@novaexpress.ng',
+        email: 'emeka@novaxpress.ng',
         firstName: 'Emeka',
         lastName: 'Rider',
         phone: '08012345678',

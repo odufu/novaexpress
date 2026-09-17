@@ -52,7 +52,7 @@ export default function TopHeader({
         }}>
           <img
             src="./square_logo.png"
-            alt="NovaExpress Logo"
+            alt="NovaXpress Logo"
             style={{ width: '100%', height: '100%', objectFit: 'contain' }}
             onError={(e) => {
               // Fallback if image path differs
@@ -72,7 +72,7 @@ export default function TopHeader({
               letterSpacing: '-0.02em',
               lineHeight: 1.1,
             }}>
-              NovaExpress
+              NovaXpress
             </h1>
             <span style={{
               background: 'var(--brand-orange-subtle)',

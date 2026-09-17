@@ -50,7 +50,7 @@ sequenceDiagram
 3. Inputs rider credentials and vehicle parameters:
    * **Name**: Emeka Rider
    * **Phone**: `08031234567`
-   * **Email**: `emeka.rider@novaexpress.ng`
+   * **Email**: `emeka.rider@novaxpress.ng`
    * **Assigned DC**: `Wuse Distribution Center`
    * **Operating State**: `Abuja (FCT)`
    * **Operating City / Zone**: `Wuse 2`

@@ -25,7 +25,7 @@ void main() {
       );
 
       expect(
-        () => authDs.login('unregistered.random@novaexpress.ng', 'Password123!'),
+        () => authDs.login('unregistered.random@novaxpress.ng', 'Password123!'),
         throwsA(isA<AppAuthException>()),
       );
     });
@@ -43,7 +43,7 @@ void main() {
       AuthRemoteDataSourceImpl.registerUserInMemory(
         const UserModel(
           id: 'u-kaduna-01',
-          email: 'supervisor.kaduna@novaexpress.ng',
+          email: 'supervisor.kaduna@novaxpress.ng',
           firstName: 'Ibrahim',
           lastName: 'Kaduna',
           phone: '08031112233',
@@ -54,18 +54,18 @@ void main() {
         'Password123!',
       );
 
-      final loggedSupervisor = await authDs.login('supervisor.kaduna@novaexpress.ng', 'Password123!');
+      final loggedSupervisor = await authDs.login('supervisor.kaduna@novaxpress.ng', 'Password123!');
       expect(loggedSupervisor.role, equals('dc_manager'));
       expect(loggedSupervisor.isDcManager, isTrue);
       expect(loggedSupervisor.deliveryAgentId, isNull);
 
       // Verified seed supervisor
-      final seedSupervisor = await authDs.login('dc.supervisor@novaexpress.ng', 'Password123!');
+      final seedSupervisor = await authDs.login('dc.supervisor@novaxpress.ng', 'Password123!');
       expect(seedSupervisor.role, equals('dc_manager'));
       expect(seedSupervisor.isDcManager, isTrue);
 
       // Verified seed rider
-      final seedRider = await authDs.login('emeka.rider@novaexpress.ng', 'Password123!');
+      final seedRider = await authDs.login('emeka.rider@novaxpress.ng', 'Password123!');
       expect(seedRider.role, equals('delivery_agent'));
       expect(seedRider.isDcManager, isFalse);
       expect(seedRider.isRider, isTrue);
@@ -74,7 +74,7 @@ void main() {
     test('3. Supervisor entity accurately exposes role permissions for DC Console', () {
       const supervisorUser = UserEntity(
         id: 'usr-sup-002',
-        email: 'supervisor.002@novaexpress.ng',
+        email: 'supervisor.002@novaxpress.ng',
         firstName: 'Station',
         lastName: 'Supervisor',
         phone: '08000000002',

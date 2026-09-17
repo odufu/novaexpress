@@ -70,7 +70,7 @@ class LoginPage extends StatelessWidget {
                         ),
                         const SizedBox(height: 14),
                         Text(
-                          'NovaExpress',
+                          'NovaXpress',
                           style: TextStyle(
                             fontSize: isCompact ? 22 : 24,
                             fontWeight: FontWeight.bold,

@@ -165,7 +165,7 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
     final cleanName = name.trim();
     final supEmail = (supervisorEmail != null && supervisorEmail.trim().isNotEmpty)
         ? supervisorEmail.trim().toLowerCase()
-        : (contactEmail?.trim().isNotEmpty == true ? contactEmail!.trim().toLowerCase() : 'supervisor.${cleanCode.toLowerCase()}@novaexpress.ng');
+        : (contactEmail?.trim().isNotEmpty == true ? contactEmail!.trim().toLowerCase() : 'supervisor.${cleanCode.toLowerCase()}@novaxpress.ng');
     final supPass = (supervisorPassword != null && supervisorPassword.trim().length >= 6)
         ? supervisorPassword.trim()
         : 'Password123!';
@@ -560,10 +560,10 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
     if (cleanEmail.isEmpty) return false;
 
     const demoAccounts = {
-      'emeka.rider@novaexpress.ng',
-      'rider.emeka@novaexpress.com',
-      'joel.odufu@novaexpress.ng',
-      'dc.supervisor@novaexpress.ng',
+      'emeka.rider@novaxpress.ng',
+      'rider.emeka@novaxpress.com',
+      'joel.odufu@novaxpress.ng',
+      'dc.supervisor@novaxpress.ng',
     };
     if (demoAccounts.contains(cleanEmail)) return true;
 

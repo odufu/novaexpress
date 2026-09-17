@@ -24,13 +24,13 @@ sequenceDiagram
     Admin->>Portal: Opens "Hub Provisioning & Regional Expansion"
     Admin->>Portal: Enters New DC Parameters:
     Admin->>Portal: • Name: Kano Central Distribution Center<br>• Code: DC-KANO-01<br>• State: Kano State | City: Kano Municipal<br>• Address: Plot 18 Bompai Industrial Estate, Kano<br>• Hub Type: Regional Hub (is_hub = true)
-    Admin->>Portal: Assigns Initial DC Manager (musa.manager@novaexpress.ng)
+    Admin->>Portal: Assigns Initial DC Manager (musa.manager@novaxpress.ng)
     Admin->>Portal: Submits DC Provisioning Request
     
     Portal->>DB: INSERT INTO distribution_centers (company_id, name, code, state, city, address, is_hub)
     DB-->>Portal: DC Provisioned (ID: 33333333-3333-4333-8333-333333333333)
     
-    Portal->>DB: UPDATE users SET distribution_center_id = '33333333' WHERE email = 'musa.manager@novaexpress.ng'
+    Portal->>DB: UPDATE users SET distribution_center_id = '33333333' WHERE email = 'musa.manager@novaxpress.ng'
     DB-->>Portal: Manager Assigned to Kano DC
     
     Portal-->>Admin: Displays Hub Active Confirmation & Generates DC QR Activation Code
@@ -42,7 +42,7 @@ sequenceDiagram
 
 ### Step 1: Company / Tenant Management
 1. Super Admin manages corporate tenant entities in the `companies` table:
-   * **Company Name**: `NovaExpress Logistics Limited`
+   * **Company Name**: `NovaXpress Logistics Limited`
    * **Company Code**: `NOVEXPS`
    * **Base Currency**: `NGN` (Nigerian Naira)
    * **Tax Identification Number (TIN)**: Corporate tax compliance code.
@@ -57,7 +57,7 @@ sequenceDiagram
    * **Operating City**: `Kano Municipal`
    * **Facility Address**: `Plot 18 Bompai Industrial Estate, Kano`
    * **Contact Phone**: `+2348061112233`
-   * **Contact Email**: `kano.dc@novaexpress.ng`
+   * **Contact Email**: `kano.dc@novaxpress.ng`
    * **Is Regional Hub**: `true`
 
 ### Step 3: Database Insertion & Geographic Scope
@@ -86,7 +86,7 @@ sequenceDiagram
        'Kano Municipal',
        'Plot 18 Bompai Industrial Estate, Kano',
        '+2348061112233',
-       'kano.dc@novaexpress.ng',
+       'kano.dc@novaxpress.ng',
        true,
        true,
        NOW(),

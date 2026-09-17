@@ -781,7 +781,7 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
         'weight_kg': weightKg ?? 0.5,
         'low_stock_threshold': lowStockThreshold ?? 10,
         'category': category,
-        'client_name': clientName.isNotEmpty ? clientName : 'NovaExpress Merchant',
+        'client_name': clientName.isNotEmpty ? clientName : 'NovaXpress Merchant',
         if (cleanClientId != null) 'client_id': cleanClientId,
         'description': description,
         'image_url': imageUrl,

@@ -1,5 +1,5 @@
 -- ============================================================================
--- NovaExpress Logistics Management System (NoveXPS)
+-- NovaXpress Logistics Management System (NoveXPS)
 -- Complete PostgreSQL / Supabase Schema Definition for PDA Operations
 -- ============================================================================
 
@@ -323,7 +323,7 @@ CREATE TABLE IF NOT EXISTS monnify_virtual_accounts (
     order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
     account_reference VARCHAR(100) UNIQUE NOT NULL, -- e.g. 'MNFY-TRK-8924'
     account_number VARCHAR(20) NOT NULL, -- e.g. '7890892401'
-    account_name VARCHAR(255) NOT NULL DEFAULT 'NovaExpress / Novacare',
+    account_name VARCHAR(255) NOT NULL DEFAULT 'NovaXpress / Novacare',
     bank_name VARCHAR(100) NOT NULL DEFAULT 'Wema Bank / Monnify',
     expected_amount NUMERIC(14, 2) NOT NULL,
     amount_paid NUMERIC(14, 2) DEFAULT 0.00,
@@ -363,7 +363,7 @@ CREATE TABLE IF NOT EXISTS cash_remittances (
     payment_method VARCHAR(50) NOT NULL DEFAULT 'bank_transfer', -- 'bank_transfer', 'cash_to_dc', 'pos'
     destination_bank_name VARCHAR(100) DEFAULT 'GTBank',
     destination_account_number VARCHAR(50) DEFAULT '0123456789',
-    destination_account_name VARCHAR(255) DEFAULT 'NovaExpress Logistics Limited',
+    destination_account_name VARCHAR(255) DEFAULT 'NovaXpress Logistics Limited',
     status VARCHAR(50) NOT NULL DEFAULT 'submitted', -- 'pending', 'submitted', 'verified', 'approved', 'rejected'
     deposit_receipt_url TEXT,
     verified_by_user_id UUID REFERENCES users(id),

@@ -76,7 +76,7 @@ void main() {
 
     const subDcSupervisor = UserEntity(
       id: 'usr-sup-002',
-      email: 'supervisor.002@novaexpress.ng',
+      email: 'supervisor.002@novaxpress.ng',
       firstName: 'Station',
       lastName: 'Supervisor',
       phone: '08000000002',
@@ -109,7 +109,7 @@ void main() {
           driverCode: 'RDR-002-1',
           name: 'Chidi Nnewi',
           phone: '08099887766',
-          email: 'chidi@novaexpress.com',
+          email: 'chidi@novaxpress.com',
           avatarUrl: 'https://images.unsplash.com/photo-1534528741775?w=150',
           vehicleModel: 'Bajaj Boxer 150',
           vehiclePlate: 'ANM-002-XX',

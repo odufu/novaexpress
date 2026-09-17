@@ -1,5 +1,5 @@
 -- ============================================================================
--- NOVAEXPRESS LOGISTICS PLATFORM - CLIENT FINANCIAL SETTLEMENTS & ORDER SCHEMA
+-- NOVAXPRESS LOGISTICS PLATFORM - CLIENT FINANCIAL SETTLEMENTS & ORDER SCHEMA
 -- Migration for:
 --   1. First-class financial, remittance, and product columns on `orders` table
 --   2. Client Payout Bank Account details on `clients` table
