@@ -4,11 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../../core/constants/paystack_constants.dart';
 import '../../../../core/constants/supabase_constants.dart';
 import '../../../../core/helpers/formatters.dart';
 import '../../../../core/providers/navigation_provider.dart';
-import '../../../../core/services/paystack_web_interop.dart';
 import '../../../../core/services/rider_location_service.dart';
 import '../../../../core/services/signature_storage_service.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -21,7 +19,7 @@ import '../../../notifications/presentation/providers/notifications_provider.dar
 import '../../../stock/presentation/providers/stock_provider.dart';
 import '../../domain/entities/order.dart';
 import '../providers/orders_provider.dart';
-import '../widgets/paystack_transfer_modal.dart';
+import '../../../../core/services/paystack_gateway_launcher.dart';
 
 class ConfirmDeliveryPodState {
   final String selectedPaymentMethod;
@@ -139,6 +137,7 @@ class ConfirmDeliveryPodPage extends ConsumerStatefulWidget {
 class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage> {
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _referenceController = TextEditingController();
+  bool _isPaystackLaunching = false;
 
   @override
   void initState() {
@@ -168,67 +167,49 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
   }
 
   void _launchPaystackCheckout(OrderEntity order, UserEntity? user) {
+    if (!mounted) return;
+    setState(() => _isPaystackLaunching = true);
+
     final timestamp = DateTime.now().millisecondsSinceEpoch.toString().substring(7);
     final orderNumClean = order.orderNumber.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '');
     final refCode = 'PSTK-POD-$orderNumClean-$timestamp';
     final customerEmail = (order.customerPhone.isNotEmpty)
         ? '${order.customerPhone.replaceAll(RegExp(r'[^0-9]'), '')}@customer.novaexpress.ng'
         : 'customer@novaexpress.ng';
-    final amountKobo = (order.totalAmount * 100).toInt();
 
     void onPaymentSuccess(String confirmedRef) {
       if (mounted) {
+        setState(() => _isPaystackLaunching = false);
         ref.read(confirmDeliveryPodProvider.notifier).setPaystackVerified(true);
         _referenceController.text = confirmedRef;
-        ref.read(confirmDeliveryPodProvider.notifier).setLoading(true);
         // Automatically submit & clear order upon successful Paystack payment
         _submitDelivery();
       }
     }
 
-    void showFallbackModal() {
-      if (!mounted) return;
-      PaystackTransferModal.show(
+    try {
+      PaystackGatewayLauncher.openPayment(
         context: context,
-        orderNumber: order.orderNumber,
         amount: order.totalAmount,
-        customerPhone: order.customerPhone,
-        customerEmail: customerEmail,
-        orderId: order.id,
+        email: customerEmail,
+        reference: refCode,
+        title: 'Paystack Direct Payment',
+        payerName: order.customerName.isNotEmpty ? order.customerName : 'Customer',
+        payerCode: orderNumClean,
         agentId: user?.deliveryAgentId ?? user?.id,
-        onPaymentConfirmed: () {
+        transactionType: 'direct_transfer',
+        onSuccess: onPaymentSuccess,
+        onCancel: () {
           if (mounted) {
-            ref.read(confirmDeliveryPodProvider.notifier).setPaystackVerified(true);
-            _referenceController.text = refCode;
-            ref.read(confirmDeliveryPodProvider.notifier).setLoading(true);
-            // Automatically submit & clear order upon successful payment
-            _submitDelivery();
+            setState(() => _isPaystackLaunching = false);
           }
         },
       );
-    }
-
-    if (kIsWeb) {
-      launchPaystackInlineJs(
-        publicKey: PaystackConstants.publicKey,
-        email: customerEmail,
-        amountKobo: amountKobo,
-        reference: refCode,
-        metadata: {
-          'type': 'direct_transfer',
-          'order_id': order.id,
-          'order_number': order.orderNumber,
-          'customer_name': order.customerName,
-          'customer_phone': order.customerPhone,
-          'agent_id': user?.deliveryAgentId ?? user?.id,
-          'agent_name': '${user?.firstName ?? "Joel"} ${user?.lastName ?? "Rider"}'.trim(),
-        },
-        onSuccess: onPaymentSuccess,
-        onClose: () {},
-        onFallback: showFallbackModal,
-      );
-    } else {
-      showFallbackModal();
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isPaystackLaunching = false);
+        ref.read(confirmDeliveryPodProvider.notifier).setError('Could not open Paystack checkout: $e');
+      }
     }
   }
 
@@ -1706,44 +1687,63 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
             const SizedBox(height: 20),
 
             // Single Main Action Button (Pay via Paystack / Confirm Delivery)
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: isDirectTransfer
-                      ? (podState.paystackTransferVerified ? const Color(0xFF16A34A) : const Color(0xFF00A2D3))
-                      : const Color(0xFF00522A),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+            (() {
+              final isButtonDisabled = _isPaystackLaunching || podState.isLoading || !podState.hasConfirmedReceipt;
+              return SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isDirectTransfer
+                        ? (podState.paystackTransferVerified ? const Color(0xFF16A34A) : const Color(0xFF00A2D3))
+                        : const Color(0xFF00522A),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
+                  onPressed: isButtonDisabled ? null : _submitDelivery,
+                  icon: (_isPaystackLaunching || podState.isLoading)
+                      ? const SizedBox.shrink()
+                      : Icon(
+                          isDirectTransfer
+                              ? (podState.paystackTransferVerified ? Icons.check_circle_rounded : Icons.bolt_rounded)
+                              : Icons.task_alt_rounded,
+                          size: 20,
+                        ),
+                  label: _isPaystackLaunching
+                      ? Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const SizedBox(
+                              height: 18,
+                              width: 18,
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              'Initializing Paystack Gateway...',
+                              style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14),
+                            ),
+                          ],
+                        )
+                      : (podState.isLoading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                            )
+                          : Text(
+                              isDirectTransfer
+                                  ? (podState.paystackTransferVerified
+                                      ? 'Confirm & Complete Delivery (Verified ✓)'
+                                      : 'Pay via Paystack / Confirm Delivery')
+                                  : 'Confirm Cash Collection & POD',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                            )),
                 ),
-                onPressed: podState.isLoading || !podState.hasConfirmedReceipt ? null : _submitDelivery,
-                icon: podState.isLoading
-                    ? const SizedBox.shrink()
-                    : Icon(
-                        isDirectTransfer
-                            ? (podState.paystackTransferVerified ? Icons.check_circle_rounded : Icons.bolt_rounded)
-                            : Icons.task_alt_rounded,
-                        size: 20,
-                      ),
-                label: podState.isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                      )
-                    : Text(
-                        isDirectTransfer
-                            ? (podState.paystackTransferVerified
-                                ? 'Confirm & Complete Delivery (Verified ✓)'
-                                : 'Pay via Paystack / Confirm Delivery')
-                            : 'Confirm Cash Collection & POD',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                      ),
-              ),
-            ),
+              );
+            }()),
           ],
         ),
       ),

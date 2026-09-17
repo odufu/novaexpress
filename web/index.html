@@ -113,50 +113,142 @@
     <p class="system-status">Initializing Operational System...</p>
   </div>
 
-  <!-- Paystack Inline SDK (Lazy-loaded on demand to prevent unused CSS 403 warnings) -->
+  <!-- Paystack Inline SDK (Modern V2 with automatic fallback watchdog) -->
   <script>
     window.payWithPaystack = function(options, onSuccess, onClose) {
+      var watchdogTimer = null;
+
+      function cleanupPaystackBackdrop() {
+        if (watchdogTimer) clearTimeout(watchdogTimer);
+        // Remove any trapped or stuck paystack overlays if iframe failed to mount
+        try {
+          var stuckOverlays = document.querySelectorAll('div[id*="paystack"], .paystack-iframe-wrapper, iframe[name*="paystack"]');
+          stuckOverlays.forEach(function(el) {
+            if (el && el.parentNode) el.parentNode.removeChild(el);
+          });
+        } catch (_) {}
+      }
+
       function executePaystack() {
         try {
           if (typeof PaystackPop === 'undefined') {
-            console.error('[PAYSTACK] PaystackPop not available on window');
-            if (onClose) onClose();
+            console.warn('[PAYSTACK] PaystackPop not found, triggering in-app fallback');
+            if (window.__paystack_on_fallback) window.__paystack_on_fallback();
+            else if (onClose) onClose();
             return;
           }
+
           var meta = options.metadata || {};
           if (typeof meta === 'string') {
             try { meta = JSON.parse(meta); } catch(e) { meta = {}; }
           }
-          var handler = PaystackPop.setup({
-            key: options.key,
-            email: options.email,
-            amount: options.amount,
-            currency: options.currency || 'NGN',
-            ref: options.ref,
-            metadata: meta,
-            callback: function(response) {
-              console.log('[PAYSTACK] Payment successful callback:', response);
-              if (onSuccess) onSuccess(response && response.reference ? response.reference : options.ref);
-            },
-            onClose: function() {
-              console.log('[PAYSTACK] Popup dismissed by user');
-              if (onClose) onClose();
+
+          var hasHandled = false;
+
+          // 1. Try Modern Paystack Inline V2 API
+          try {
+            var paystack = new PaystackPop();
+            if (paystack && typeof paystack.newTransaction === 'function') {
+              console.log('[PAYSTACK] Initializing via Paystack Inline V2 newTransaction');
+              paystack.newTransaction({
+                key: options.key,
+                email: options.email,
+                amount: options.amount,
+                currency: options.currency || 'NGN',
+                ref: options.ref,
+                metadata: meta,
+                onSuccess: function(transaction) {
+                  if (hasHandled) return;
+                  hasHandled = true;
+                  cleanupPaystackBackdrop();
+                  console.log('[PAYSTACK] V2 Payment successful:', transaction);
+                  var resolvedRef = (transaction && transaction.reference) ? transaction.reference : options.ref;
+                  if (onSuccess) onSuccess(resolvedRef);
+                },
+                onCancel: function() {
+                  if (hasHandled) return;
+                  hasHandled = true;
+                  cleanupPaystackBackdrop();
+                  console.log('[PAYSTACK] V2 Checkout closed by user');
+                  if (onClose) onClose();
+                },
+                onError: function(err) {
+                  console.warn('[PAYSTACK] V2 Checkout error:', err);
+                  if (hasHandled) return;
+                  hasHandled = true;
+                  cleanupPaystackBackdrop();
+                  if (window.__paystack_on_fallback) window.__paystack_on_fallback();
+                  else if (onClose) onClose();
+                }
+              });
+
+              // Watchdog: If user gets trapped on infinite black screen/spinner for > 6 seconds without an iframe
+              watchdogTimer = setTimeout(function() {
+                var iframe = document.querySelector('iframe[src*="paystack"], iframe[name*="paystack"], iframe[id*="paystack"]');
+                if (!iframe && !hasHandled) {
+                  console.warn('[PAYSTACK] Watchdog: Paystack iframe blocked or not mounted. Activating in-app overlay.');
+                  hasHandled = true;
+                  cleanupPaystackBackdrop();
+                  if (window.__paystack_on_fallback) window.__paystack_on_fallback();
+                }
+              }, 6000);
+
+              return;
             }
-          });
-          handler.openIframe();
+          } catch (v2Err) {
+            console.warn('[PAYSTACK] V2 newTransaction not available, attempting V1 setup fallback:', v2Err);
+          }
+
+          // 2. Fallback to Paystack Inline V1 API
+          if (typeof PaystackPop.setup === 'function') {
+            console.log('[PAYSTACK] Initializing via Paystack Inline V1 setup');
+            var handler = PaystackPop.setup({
+              key: options.key,
+              email: options.email,
+              amount: options.amount,
+              currency: options.currency || 'NGN',
+              ref: options.ref,
+              metadata: meta,
+              callback: function(response) {
+                if (hasHandled) return;
+                hasHandled = true;
+                cleanupPaystackBackdrop();
+                console.log('[PAYSTACK] V1 Payment successful callback:', response);
+                var resolvedRef = (response && response.reference) ? response.reference : options.ref;
+                if (onSuccess) onSuccess(resolvedRef);
+              },
+              onClose: function() {
+                if (hasHandled) return;
+                hasHandled = true;
+                cleanupPaystackBackdrop();
+                console.log('[PAYSTACK] V1 Popup dismissed by user');
+                if (onClose) onClose();
+              }
+            });
+            handler.openIframe();
+            return;
+          }
+
+          // Neither V2 nor V1 succeeded
+          if (window.__paystack_on_fallback) window.__paystack_on_fallback();
+          else if (onClose) onClose();
         } catch (err) {
-          console.error('[PAYSTACK] Paystack launch error:', err);
-          if (onClose) onClose();
+          console.error('[PAYSTACK] Paystack launch exception:', err);
+          cleanupPaystackBackdrop();
+          if (window.__paystack_on_fallback) window.__paystack_on_fallback();
+          else if (onClose) onClose();
         }
       }
 
       if (typeof PaystackPop === 'undefined') {
         var s = document.createElement('script');
-        s.src = 'https://js.paystack.co/v1/inline.js';
+        s.src = 'https://js.paystack.co/v2/inline.js';
+        s.async = true;
         s.onload = executePaystack;
         s.onerror = function() {
-          console.error('[PAYSTACK] Failed to fetch inline.js from CDN');
-          if (onClose) onClose();
+          console.error('[PAYSTACK] Failed to fetch v2/inline.js from CDN, falling back to in-app overlay');
+          if (window.__paystack_on_fallback) window.__paystack_on_fallback();
+          else if (onClose) onClose();
         };
         document.head.appendChild(s);
       } else {

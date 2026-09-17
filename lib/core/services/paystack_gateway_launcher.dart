@@ -26,6 +26,11 @@ class PaystackGatewayLauncher {
     required Function(String reference) onSuccess,
     VoidCallback? onCancel,
   }) async {
+    if (!context.mounted) {
+      onCancel?.call();
+      return;
+    }
+
     // 1. Show connecting dialog
     BuildContext? dialogContext;
     showDialog(

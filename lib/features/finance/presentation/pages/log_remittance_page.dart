@@ -26,6 +26,7 @@ class LogRemittancePage extends ConsumerStatefulWidget {
 class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
+  bool _isPaystackLaunching = false;
 
   final List<String> _discrepancyReasons = [
     'Cash shortage',
@@ -477,44 +478,63 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
               const SizedBox(height: 24),
 
               // 5. MAIN REMIT CTA BUTTON (TRIGGER PAYSTACK POPUP DIRECTLY)
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton.icon(
-                  onPressed: financeState.isLoading
-                      ? null
-                      : () => _handlePaystackRemit(
-                          enteredAmount,
-                          user,
-                          grossCollections,
-                          commissionDeduction,
-                          transportDeduction,
-                          failedStipendsDeduction,
-                          transferFeeDeduction,
-                          expectedAmount,
-                          associatedOrderItems,
-                        ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00A2D3),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    elevation: 2,
+              (() {
+                final isButtonDisabled = financeState.isLoading || _isPaystackLaunching;
+                return SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton.icon(
+                    onPressed: isButtonDisabled
+                        ? null
+                        : () => _handlePaystackRemit(
+                            enteredAmount,
+                            user,
+                            grossCollections,
+                            commissionDeduction,
+                            transportDeduction,
+                            failedStipendsDeduction,
+                            transferFeeDeduction,
+                            expectedAmount,
+                            associatedOrderItems,
+                          ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF00A2D3),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      elevation: 2,
+                    ),
+                    icon: isButtonDisabled
+                        ? const SizedBox.shrink()
+                        : const Icon(Icons.bolt_rounded, size: 20, color: Colors.white),
+                    label: _isPaystackLaunching
+                        ? Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const SizedBox(
+                                height: 18,
+                                width: 18,
+                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                              ),
+                              const SizedBox(width: 10),
+                              Text(
+                                'Initializing Paystack Gateway...',
+                                style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700),
+                              ),
+                            ],
+                          )
+                        : (financeState.isLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                              )
+                            : Text(
+                                'Remit ${CurrencyFormatter.formatNaira(enteredAmount > 0 ? enteredAmount : expectedAmount)} via Paystack ⚡',
+                                style: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.w800),
+                              )),
                   ),
-                  icon: financeState.isLoading
-                      ? const SizedBox.shrink()
-                      : const Icon(Icons.bolt_rounded, size: 20, color: Colors.white),
-                  label: financeState.isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                        )
-                      : Text(
-                          'Remit ${CurrencyFormatter.formatNaira(enteredAmount > 0 ? enteredAmount : expectedAmount)} via Paystack ⚡',
-                          style: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.w800),
-                        ),
-                ),
-              ),
+                );
+              }()),
               const SizedBox(height: 16),
             ],
           ),
@@ -615,18 +635,31 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
     final paymentRef = 'PSTK-RMT-${cleanCode.isNotEmpty ? cleanCode : 'RDR'}-$timestamp';
 
     if (!mounted) return;
-    PaystackGatewayLauncher.openPayment(
-      context: context,
-      amount: finalAmount,
-      email: riderEmail,
-      reference: paymentRef,
-      title: 'Paystack Remittance Portal',
-      payerName: user != null ? '${user.firstName} ${user.lastName}'.trim() : 'Field Agent',
-      payerCode: cleanCode.isNotEmpty ? cleanCode : 'RDR',
-      agentId: user?.deliveryAgentId ?? user?.id,
-      transactionType: 'remittance',
-      onSuccess: onPaymentConfirmed,
-    );
+    setState(() => _isPaystackLaunching = true);
+
+    try {
+      PaystackGatewayLauncher.openPayment(
+        context: context,
+        amount: finalAmount,
+        email: riderEmail,
+        reference: paymentRef,
+        title: 'Paystack Remittance Portal',
+        payerName: user != null ? '${user.firstName} ${user.lastName}'.trim() : 'Field Agent',
+        payerCode: cleanCode.isNotEmpty ? cleanCode : 'RDR',
+        agentId: user?.deliveryAgentId ?? user?.id,
+        transactionType: 'remittance',
+        onSuccess: (confirmedRef) {
+          if (mounted) setState(() => _isPaystackLaunching = false);
+          onPaymentConfirmed(confirmedRef);
+        },
+        onCancel: () {
+          if (mounted) setState(() => _isPaystackLaunching = false);
+        },
+      );
+    } catch (e) {
+      if (mounted) setState(() => _isPaystackLaunching = false);
+      _onPaymentFailure('Could not open Paystack payment gateway: $e');
+    }
   }
 
   void _onPaymentFailure(String message) {

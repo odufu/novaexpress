@@ -9,5 +9,10 @@ void launchPaystackInlineJs({
   required void Function() onClose,
   void Function()? onFallback,
 }) {
-  // Stub for non-web environments
+  // If invoked in stub/non-JS environment, immediately route to in-app fallback
+  if (onFallback != null) {
+    onFallback();
+  } else {
+    onClose();
+  }
 }

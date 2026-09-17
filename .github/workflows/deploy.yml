@@ -39,7 +39,7 @@ jobs:
       - name: Install Project Dependencies
         run: flutter pub get
 
-      - name: Build Flutter Web (WebAssembly / WASM)
+      - name: Build Flutter Web Release
         run: |
           REPO_NAME="${{ github.event.repository.name }}"
           if [ -f "CNAME" ] || [ -f "web/CNAME" ]; then
@@ -47,8 +47,8 @@ jobs:
           else
             BASE_HREF="/${REPO_NAME}/"
           fi
-          echo "Building WebAssembly (WASM) for repository: $REPO_NAME with base-href: $BASE_HREF"
-          flutter build web --wasm --release --base-href "$BASE_HREF"
+          echo "Building Flutter Web Release for repository: $REPO_NAME with base-href: $BASE_HREF"
+          flutter build web --release --base-href "$BASE_HREF"
 
       - name: Configure SPA Routing Fallback (404.html) & Jekyll Override
         run: |
@@ -62,11 +62,12 @@ jobs:
 
       - name: Add Static Hosting Headers
         run: |
-          # Write headers config for static hosts (Cloudflare / Netlify / Vercel bridges)
+          # Safe hosting headers without COEP require-corp which blocks third-party payment iframes (Paystack)
           cat << 'EOF' > build/web/_headers
           /*
-            Cross-Origin-Opener-Policy: same-origin
-            Cross-Origin-Embedder-Policy: require-corp
+            X-Frame-Options: SAMEORIGIN
+            X-Content-Type-Options: nosniff
+            Referrer-Policy: strict-origin-when-cross-origin
           EOF
 
       - name: Setup GitHub Pages

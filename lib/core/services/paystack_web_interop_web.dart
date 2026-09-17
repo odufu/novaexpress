@@ -63,30 +63,70 @@ void launchPaystackInlineJs({
               return;
             }
 
-            var meta = $metaJson;
-            var handler = PaystackPop.setup({
-              key: '$publicKey',
-              email: '$email',
-              amount: $amountKobo,
-              currency: 'NGN',
-              ref: '$reference',
-              metadata: meta,
-              callback: function(response) {
-                console.log('[PAYSTACK_INTEROP] Success:', response);
-                var resolvedRef = (response && response.reference) ? response.reference : '$reference';
-                if (window.__paystack_on_success) {
-                  window.__paystack_on_success(resolvedRef);
-                }
-              },
-              onClose: function() {
-                console.log('[PAYSTACK_INTEROP] Modal closed by user');
-                if (window.__paystack_on_close) {
-                  window.__paystack_on_close();
-                }
+            // 1. Try V2 newTransaction
+            try {
+              var paystack = new PaystackPop();
+              if (paystack && typeof paystack.newTransaction === 'function') {
+                paystack.newTransaction({
+                  key: '$publicKey',
+                  email: '$email',
+                  amount: $amountKobo,
+                  currency: 'NGN',
+                  ref: '$reference',
+                  metadata: $metaJson,
+                  onSuccess: function(transaction) {
+                    var resolvedRef = (transaction && transaction.reference) ? transaction.reference : '$reference';
+                    if (window.__paystack_on_success) window.__paystack_on_success(resolvedRef);
+                  },
+                  onCancel: function() {
+                    if (window.__paystack_on_close) window.__paystack_on_close();
+                  },
+                  onError: function(err) {
+                    console.warn('[PAYSTACK_INTEROP] V2 error:', err);
+                    if (window.__paystack_on_fallback) window.__paystack_on_fallback();
+                    else if (window.__paystack_on_close) window.__paystack_on_close();
+                  }
+                });
+                return;
               }
-            });
+            } catch(e) {
+              console.warn('[PAYSTACK_INTEROP] V2 attempt failed, trying V1:', e);
+            }
 
-            handler.openIframe();
+            // 2. Fallback to V1 setup
+            if (typeof PaystackPop.setup === 'function') {
+              var meta = $metaJson;
+              var handler = PaystackPop.setup({
+                key: '$publicKey',
+                email: '$email',
+                amount: $amountKobo,
+                currency: 'NGN',
+                ref: '$reference',
+                metadata: meta,
+                callback: function(response) {
+                  console.log('[PAYSTACK_INTEROP] Success:', response);
+                  var resolvedRef = (response && response.reference) ? response.reference : '$reference';
+                  if (window.__paystack_on_success) {
+                    window.__paystack_on_success(resolvedRef);
+                  }
+                },
+                onClose: function() {
+                  console.log('[PAYSTACK_INTEROP] Modal closed by user');
+                  if (window.__paystack_on_close) {
+                    window.__paystack_on_close();
+                  }
+                }
+              });
+
+              handler.openIframe();
+              return;
+            }
+
+            if (window.__paystack_on_fallback) {
+              window.__paystack_on_fallback();
+            } else if (window.__paystack_on_close) {
+              window.__paystack_on_close();
+            }
           } catch(err) {
             console.error('[PAYSTACK_INTEROP] Error opening iframe:', err);
             if (window.__paystack_on_fallback) {
@@ -99,7 +139,7 @@ void launchPaystackInlineJs({
 
         if (typeof PaystackPop === 'undefined' && typeof window.payWithPaystack === 'undefined') {
           var script = document.createElement('script');
-          script.src = 'https://js.paystack.co/v1/inline.js';
+          script.src = 'https://js.paystack.co/v2/inline.js';
           script.async = true;
           script.onload = triggerCheckout;
           script.onerror = function() {
