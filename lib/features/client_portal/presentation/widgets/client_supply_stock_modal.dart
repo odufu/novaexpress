@@ -35,6 +35,11 @@ class _ClientSupplyStockModalState extends ConsumerState<ClientSupplyStockModal>
   final _waybillCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
 
+  bool _isSingleDcMode = true;
+  String? _selectedSingleDcId;
+  final _dcSearchCtrl = TextEditingController();
+  String _dcSearchQuery = '';
+
   bool _isEqualSplit = true;
   final Map<String, TextEditingController> _dcControllers = {};
   bool _isSubmitting = false;
@@ -51,6 +56,7 @@ class _ClientSupplyStockModalState extends ConsumerState<ClientSupplyStockModal>
     _totalUnitsCtrl.dispose();
     _waybillCtrl.dispose();
     _notesCtrl.dispose();
+    _dcSearchCtrl.dispose();
     for (final c in _dcControllers.values) {
       c.dispose();
     }
@@ -119,7 +125,33 @@ class _ClientSupplyStockModalState extends ConsumerState<ClientSupplyStockModal>
   Future<void> _handleSubmit(List<DistributionCenter> dcs) async {
     if (!_formKey.currentState!.validate()) return;
 
-    final allocations = _getAllocations(dcs);
+    final totalConsignmentUnits = int.tryParse(_totalUnitsCtrl.text.trim()) ?? 0;
+    if (totalConsignmentUnits <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Color(0xFFEF4444),
+          content: Text('Please enter a valid quantity of physical units to supply.'),
+        ),
+      );
+      return;
+    }
+
+    Map<String, int> allocations;
+    if (_isSingleDcMode) {
+      if (_selectedSingleDcId == null || _selectedSingleDcId!.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: Color(0xFFEF4444),
+            content: Text('Please search and select a destination distribution hub.'),
+          ),
+        );
+        return;
+      }
+      allocations = {_selectedSingleDcId!: totalConsignmentUnits};
+    } else {
+      allocations = _getAllocations(dcs);
+    }
+
     final totalAllocated = allocations.values.fold(0, (a, b) => a + b);
 
     if (totalAllocated <= 0) {
@@ -155,6 +187,10 @@ class _ClientSupplyStockModalState extends ConsumerState<ClientSupplyStockModal>
 
       Navigator.of(context).pop();
 
+      final targetDcName = _isSingleDcMode
+          ? (dcs.where((d) => d.id == _selectedSingleDcId).firstOrNull?.name ?? 'Distribution Hub')
+          : '${allocations.length} Hubs';
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: const Color(0xFF10B981),
@@ -166,7 +202,9 @@ class _ClientSupplyStockModalState extends ConsumerState<ClientSupplyStockModal>
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Consignment of $totalAllocated units dispatched! Awaiting DC physical count and intake approval.',
+                  _isSingleDcMode
+                      ? 'Consignment of $totalAllocated units dispatched to $targetDcName! Awaiting physical count and intake approval.'
+                      : 'Consignment of $totalAllocated units dispatched across $targetDcName! Awaiting physical count and intake approval.',
                   style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600),
                 ),
               ),
@@ -198,16 +236,32 @@ class _ClientSupplyStockModalState extends ConsumerState<ClientSupplyStockModal>
         : defaultDistributionCenters;
     final coveredDcs = _getCoveredDcs(allDcs);
 
+    // Default select the first DC if not yet selected
+    if (_selectedSingleDcId == null && coveredDcs.isNotEmpty) {
+      _selectedSingleDcId = coveredDcs.first.id;
+    }
+
     // Initialize controllers
     for (final dc in coveredDcs) {
       _dcControllers.putIfAbsent(dc.id, () => TextEditingController(text: '0'));
     }
 
-    if (_isEqualSplit) {
+    if (!_isSingleDcMode && _isEqualSplit) {
       _recalculateEqualSplit(coveredDcs);
     }
 
-    final sumAllocated = _computeSumAllocated(coveredDcs);
+    final sumAllocated = _isSingleDcMode
+        ? (int.tryParse(_totalUnitsCtrl.text.trim()) ?? 0)
+        : _computeSumAllocated(coveredDcs);
+
+    final cleanQuery = _dcSearchQuery.trim().toLowerCase();
+    final filteredDcs = cleanQuery.isEmpty
+        ? coveredDcs
+        : coveredDcs.where((dc) {
+            return dc.name.toLowerCase().contains(cleanQuery) ||
+                dc.city.toLowerCase().contains(cleanQuery) ||
+                dc.state.toLowerCase().contains(cleanQuery);
+          }).toList();
 
     final mediaQuery = MediaQuery.of(context);
     final isCompactScreen = mediaQuery.size.width < 500;
@@ -511,141 +565,538 @@ class _ClientSupplyStockModalState extends ConsumerState<ClientSupplyStockModal>
                       ),
                       const SizedBox(height: 16),
 
-                      // Distribution Mode Selector
-                      Wrap(
-                        alignment: WrapAlignment.spaceBetween,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          Text(
-                            'Distribution Allocation Mode:',
-                            style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF334155)),
-                          ),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 6,
-                            children: [
-                              ChoiceChip(
-                                label: Text('Equal Split', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600)),
-                                selected: _isEqualSplit,
-                                selectedColor: const Color(0xFF10B981).withValues(alpha: 0.2),
-                                onSelected: (val) {
-                                  setState(() {
-                                    _isEqualSplit = true;
-                                  });
-                                },
+                      // Supply Mode Selector (Single Hub Destination vs Multi-Hub Split)
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: InkWell(
+                                onTap: () => setState(() => _isSingleDcMode = true),
+                                borderRadius: BorderRadius.circular(8),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 150),
+                                  padding: const EdgeInsets.symmetric(vertical: 9),
+                                  decoration: BoxDecoration(
+                                    color: _isSingleDcMode ? const Color(0xFF10B981) : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(8),
+                                    boxShadow: _isSingleDcMode
+                                        ? [
+                                            BoxShadow(
+                                              color: const Color(0xFF10B981).withValues(alpha: 0.25),
+                                              blurRadius: 6,
+                                              offset: const Offset(0, 2),
+                                            )
+                                          ]
+                                        : null,
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.storefront_rounded,
+                                        size: 16,
+                                        color: _isSingleDcMode ? Colors.white : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Flexible(
+                                        child: Text(
+                                          'Single Hub Destination',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: GoogleFonts.inter(
+                                            fontSize: 12,
+                                            fontWeight: _isSingleDcMode ? FontWeight.w700 : FontWeight.w500,
+                                            color: _isSingleDcMode ? Colors.white : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
-                              ChoiceChip(
-                                label: Text('Custom Allocation', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600)),
-                                selected: !_isEqualSplit,
-                                selectedColor: const Color(0xFFF37021).withValues(alpha: 0.2),
-                                onSelected: (val) {
-                                  setState(() {
-                                    _isEqualSplit = false;
-                                  });
-                                },
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: InkWell(
+                                onTap: () => setState(() => _isSingleDcMode = false),
+                                borderRadius: BorderRadius.circular(8),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 150),
+                                  padding: const EdgeInsets.symmetric(vertical: 9),
+                                  decoration: BoxDecoration(
+                                    color: !_isSingleDcMode ? const Color(0xFFF37021) : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(8),
+                                    boxShadow: !_isSingleDcMode
+                                        ? [
+                                            BoxShadow(
+                                              color: const Color(0xFFF37021).withValues(alpha: 0.25),
+                                              blurRadius: 6,
+                                              offset: const Offset(0, 2),
+                                            )
+                                          ]
+                                        : null,
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.alt_route_rounded,
+                                        size: 16,
+                                        color: !_isSingleDcMode ? Colors.white : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Flexible(
+                                        child: Text(
+                                          'Multi-Hub Split',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: GoogleFonts.inter(
+                                            fontSize: 12,
+                                            fontWeight: !_isSingleDcMode ? FontWeight.w700 : FontWeight.w500,
+                                            color: !_isSingleDcMode ? Colors.white : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
-                            ],
-                          ),
-                        ],
+                            ),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 14),
 
-                      // Hub Allocation List
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: isDark ? const Color(0xFF1E293B) : const Color(0xFFCBD5E1)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Wrap(
-                              alignment: WrapAlignment.spaceBetween,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              spacing: 8,
-                              runSpacing: 6,
-                              children: [
-                                Text(
-                                  'Covering Distribution Hubs (${coveredDcs.length})',
-                                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A)),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF10B981).withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    'Total to Dispatch: $sumAllocated Units',
-                                    style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF10B981)),
-                                  ),
-                                ),
-                              ],
+                      // Single Hub Destination Mode
+                      if (_isSingleDcMode) ...[
+                        // Search Distribution Center Input
+                        TextFormField(
+                          controller: _dcSearchCtrl,
+                          onChanged: (val) => setState(() => _dcSearchQuery = val),
+                          style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : Colors.black87),
+                          decoration: InputDecoration(
+                            hintText: 'Search covering distribution hubs by name, city, or state...',
+                            hintStyle: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)),
+                            prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Color(0xFF94A3B8)),
+                            suffixIcon: _dcSearchQuery.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.close_rounded, size: 16),
+                                    onPressed: () {
+                                      _dcSearchCtrl.clear();
+                                      setState(() => _dcSearchQuery = '');
+                                    },
+                                  )
+                                : null,
+                            filled: true,
+                            fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
                             ),
-                            const SizedBox(height: 10),
-                            ...coveredDcs.map((dc) {
-                              final ctrl = _dcControllers[dc.id];
-                              // Find existing units in this DC from stock state
-                              final existingItem = stockState.stockItems.where((i) => i.sku.toUpperCase() == widget.product.sku.toUpperCase()).firstOrNull;
-                              final existingUnits = existingItem?.availableCount ?? 0;
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(color: Color(0xFF10B981), width: 1.5),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                            isDense: true,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
 
+                        // Selected Destination Hub Callout Banner
+                        Builder(
+                          builder: (context) {
+                            final targetDc = coveredDcs.where((d) => d.id == _selectedSingleDcId).firstOrNull;
+                            final totalUnits = _totalUnitsCtrl.text.trim().isEmpty ? '0' : _totalUnitsCtrl.text.trim();
+
+                            if (targetDc == null) {
                               return Container(
-                                margin: const EdgeInsets.only(bottom: 8),
-                                padding: const EdgeInsets.all(10),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                                 decoration: BoxDecoration(
-                                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                                  color: const Color(0xFFF37021).withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                                  border: Border.all(color: const Color(0xFFF37021).withValues(alpha: 0.3)),
                                 ),
                                 child: Row(
                                   children: [
+                                    const Icon(Icons.touch_app_rounded, color: Color(0xFFF37021), size: 18),
+                                    const SizedBox(width: 8),
                                     Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            dc.name,
-                                            style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF0F172A)),
-                                          ),
-                                          Text(
-                                            '${dc.city}, ${dc.state} • Current shelf stock: $existingUnits units',
-                                            style: GoogleFonts.inter(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    SizedBox(
-                                      width: 100,
-                                      child: TextFormField(
-                                        controller: ctrl,
-                                        enabled: !_isEqualSplit,
-                                        keyboardType: TextInputType.number,
-                                        textAlign: TextAlign.center,
-                                        onChanged: (_) => setState(() {}),
-                                        style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87),
-                                        decoration: InputDecoration(
-                                          suffixText: 'pcs',
-                                          suffixStyle: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
-                                          filled: true,
-                                          fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-                                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                                          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                          isDense: true,
-                                        ),
+                                      child: Text(
+                                        'Please tap a distribution hub below to select the consignment destination.',
+                                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFFF37021)),
                                       ),
                                     ),
                                   ],
                                 ),
                               );
-                            }),
+                            }
+
+                            return Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.35)),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 18),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: RichText(
+                                      text: TextSpan(
+                                        style: GoogleFonts.inter(fontSize: 12, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                                        children: [
+                                          const TextSpan(text: 'Supplying all '),
+                                          TextSpan(
+                                            text: '$totalUnits units ',
+                                            style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF10B981)),
+                                          ),
+                                          const TextSpan(text: 'directly to '),
+                                          TextSpan(
+                                            text: targetDc.name,
+                                            style: const TextStyle(fontWeight: FontWeight.w800),
+                                          ),
+                                          TextSpan(
+                                            text: ' (${targetDc.city}, ${targetDc.state})',
+                                            style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 10),
+
+                        // List of Selectable Covering DCs (Searchable)
+                        Container(
+                          constraints: const BoxConstraints(maxHeight: 280),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: isDark ? const Color(0xFF1E293B) : const Color(0xFFCBD5E1)),
+                          ),
+                          child: filteredDcs.isEmpty
+                              ? Padding(
+                                  padding: const EdgeInsets.all(24),
+                                  child: Center(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.search_off_rounded, size: 36, color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'No distribution hubs match "$_dcSearchQuery"',
+                                          style: GoogleFonts.inter(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                )
+                              : ListView.separated(
+                                  shrinkWrap: true,
+                                  padding: const EdgeInsets.all(10),
+                                  itemCount: filteredDcs.length,
+                                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                                  itemBuilder: (context, index) {
+                                    final dc = filteredDcs[index];
+                                    final isSelected = dc.id == _selectedSingleDcId;
+                                    final existingItem = stockState.stockItems
+                                        .where((i) => i.sku.toUpperCase() == widget.product.sku.toUpperCase())
+                                        .firstOrNull;
+                                    final existingUnits = existingItem?.availableCount ?? 0;
+
+                                    return InkWell(
+                                      onTap: () {
+                                        setState(() {
+                                          _selectedSingleDcId = dc.id;
+                                        });
+                                      },
+                                      borderRadius: BorderRadius.circular(10),
+                                      child: AnimatedContainer(
+                                        duration: const Duration(milliseconds: 150),
+                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                        decoration: BoxDecoration(
+                                          color: isSelected
+                                              ? const Color(0xFF10B981).withValues(alpha: isDark ? 0.18 : 0.08)
+                                              : (isDark ? const Color(0xFF1E293B) : Colors.white),
+                                          borderRadius: BorderRadius.circular(10),
+                                          border: Border.all(
+                                            color: isSelected
+                                                ? const Color(0xFF10B981)
+                                                : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                                            width: isSelected ? 1.8 : 1.0,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Container(
+                                              width: 38,
+                                              height: 38,
+                                              decoration: BoxDecoration(
+                                                color: isSelected
+                                                    ? const Color(0xFF10B981).withValues(alpha: 0.18)
+                                                    : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9)),
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              child: Icon(
+                                                isSelected ? Icons.warehouse_rounded : Icons.storefront_outlined,
+                                                color: isSelected
+                                                    ? const Color(0xFF10B981)
+                                                    : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                                                size: 20,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Row(
+                                                    children: [
+                                                      Expanded(
+                                                        child: Text(
+                                                          dc.name,
+                                                          style: GoogleFonts.inter(
+                                                            fontSize: 13,
+                                                            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                                                            color: isSelected
+                                                                ? (isDark ? Colors.white : const Color(0xFF065F46))
+                                                                : (isDark ? Colors.white : const Color(0xFF0F172A)),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      if (isSelected)
+                                                        Container(
+                                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                                          decoration: BoxDecoration(
+                                                            color: const Color(0xFF10B981),
+                                                            borderRadius: BorderRadius.circular(12),
+                                                          ),
+                                                          child: Text(
+                                                            'SELECTED',
+                                                            style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white),
+                                                          ),
+                                                        ),
+                                                    ],
+                                                  ),
+                                                  const SizedBox(height: 2),
+                                                  Text(
+                                                    '${dc.city}, ${dc.state} • Current shelf stock: $existingUnits units',
+                                                    style: GoogleFonts.inter(
+                                                      fontSize: 11,
+                                                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            const SizedBox(width: 10),
+                                            Icon(
+                                              isSelected ? Icons.check_circle_rounded : Icons.radio_button_unchecked,
+                                              color: isSelected ? const Color(0xFF10B981) : (isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
+                                              size: 22,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                        ),
+                      ] else ...[
+                        // Multi-Hub Distribution Mode
+                        Wrap(
+                          alignment: WrapAlignment.spaceBetween,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            Text(
+                              'Multi-Hub Allocation Mode:',
+                              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF334155)),
+                            ),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 6,
+                              children: [
+                                ChoiceChip(
+                                  label: Text('Equal Split', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600)),
+                                  selected: _isEqualSplit,
+                                  selectedColor: const Color(0xFF10B981).withValues(alpha: 0.2),
+                                  onSelected: (val) {
+                                    setState(() {
+                                      _isEqualSplit = true;
+                                    });
+                                  },
+                                ),
+                                ChoiceChip(
+                                  label: Text('Custom Allocation', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600)),
+                                  selected: !_isEqualSplit,
+                                  selectedColor: const Color(0xFFF37021).withValues(alpha: 0.2),
+                                  onSelected: (val) {
+                                    setState(() {
+                                      _isEqualSplit = false;
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
                           ],
                         ),
-                      ),
+                        const SizedBox(height: 10),
+
+                        // Search Bar for Multi-Hub as well
+                        TextFormField(
+                          controller: _dcSearchCtrl,
+                          onChanged: (val) => setState(() => _dcSearchQuery = val),
+                          style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : Colors.black87),
+                          decoration: InputDecoration(
+                            hintText: 'Filter hubs by name, city, or state...',
+                            hintStyle: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)),
+                            prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Color(0xFF94A3B8)),
+                            suffixIcon: _dcSearchQuery.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.close_rounded, size: 16),
+                                    onPressed: () {
+                                      _dcSearchCtrl.clear();
+                                      setState(() => _dcSearchQuery = '');
+                                    },
+                                  )
+                                : null,
+                            filled: true,
+                            fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            isDense: true,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+
+                        // Hub Allocation List
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: isDark ? const Color(0xFF1E293B) : const Color(0xFFCBD5E1)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Wrap(
+                                alignment: WrapAlignment.spaceBetween,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                spacing: 8,
+                                runSpacing: 6,
+                                children: [
+                                  Text(
+                                    'Covering Distribution Hubs (${filteredDcs.length} of ${coveredDcs.length})',
+                                    style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      'Total to Dispatch: $sumAllocated Units',
+                                      style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF10B981)),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              ConstrainedBox(
+                                constraints: const BoxConstraints(maxHeight: 280),
+                                child: ListView.separated(
+                                  shrinkWrap: true,
+                                  itemCount: filteredDcs.length,
+                                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                                  itemBuilder: (context, index) {
+                                    final dc = filteredDcs[index];
+                                    final ctrl = _dcControllers[dc.id];
+                                    final existingItem = stockState.stockItems.where((i) => i.sku.toUpperCase() == widget.product.sku.toUpperCase()).firstOrNull;
+                                    final existingUnits = existingItem?.availableCount ?? 0;
+
+                                    return Container(
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  dc.name,
+                                                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                                                ),
+                                                Text(
+                                                  '${dc.city}, ${dc.state} • Current shelf stock: $existingUnits units',
+                                                  style: GoogleFonts.inter(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          SizedBox(
+                                            width: 100,
+                                            child: TextFormField(
+                                              controller: ctrl,
+                                              enabled: !_isEqualSplit,
+                                              keyboardType: TextInputType.number,
+                                              textAlign: TextAlign.center,
+                                              onChanged: (_) => setState(() {}),
+                                              style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87),
+                                              decoration: InputDecoration(
+                                                suffixText: 'pcs',
+                                                suffixStyle: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
+                                                filled: true,
+                                                fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                                                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                                isDense: true,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 16),
 
                       // Notes
@@ -718,7 +1169,11 @@ class _ClientSupplyStockModalState extends ConsumerState<ClientSupplyStockModal>
                         ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                         : const Icon(Icons.check_rounded, size: 16),
                     label: Text(
-                      _isSubmitting ? 'Supplying to Hubs...' : 'Confirm & Supply to NovaExpress',
+                      _isSubmitting
+                          ? 'Supplying Consignment...'
+                          : _isSingleDcMode
+                              ? 'Confirm & Supply to Hub'
+                              : 'Confirm & Supply to NovaExpress',
                       style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700),
                     ),
                   ),

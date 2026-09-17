@@ -9,6 +9,7 @@ import '../../../dc_console/presentation/providers/dc_console_provider.dart';
 import '../../../notifications/presentation/providers/notifications_provider.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
 import '../../../../core/services/paystack_gateway_launcher.dart';
+import '../../../../core/providers/navigation_provider.dart';
 import '../../domain/entities/remittance.dart';
 import '../providers/finance_provider.dart';
 
@@ -163,7 +164,14 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
         elevation: 0.5,
         leading: IconButton(
           icon: Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: theme.colorScheme.onSurface),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            ref.read(bottomNavIndexProvider.notifier).state = 3;
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/');
+            }
+          },
         ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -686,6 +694,8 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
     bool isPartial,
   ) {
     if (!mounted) return;
+    bool navigatedToReceipt = false;
+
     showModalBottomSheet(
       context: context,
       useRootNavigator: true,
@@ -767,9 +777,11 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
               height: 48,
               child: ElevatedButton(
                 onPressed: () {
+                  navigatedToReceipt = true;
                   Navigator.of(ctx, rootNavigator: true).pop();
                   if (mounted) {
-                    context.push('/remittance/receipt/$reference');
+                    ref.read(bottomNavIndexProvider.notifier).state = 3;
+                    context.pushReplacement('/remittance/receipt/$reference');
                   }
                 },
                 style: ElevatedButton.styleFrom(
@@ -780,19 +792,45 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
               ),
             ),
             const SizedBox(height: 8),
-            TextButton(
-              onPressed: () {
-                Navigator.of(ctx, rootNavigator: true).pop();
-                if (mounted) {
-                  context.pop();
-                }
-              },
-              child: Text('Done & Return to Finance', style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B))),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: OutlinedButton(
+                onPressed: () {
+                  Navigator.of(ctx, rootNavigator: true).pop();
+                  if (mounted) {
+                    ref.read(bottomNavIndexProvider.notifier).state = 3;
+                    final user = ref.read(authProvider).user;
+                    final agentId = user?.deliveryAgentId ?? user?.id;
+                    if (agentId != null) {
+                      ref.read(financeProvider.notifier).loadRemittances(agentId);
+                      ref.read(ordersProvider.notifier).loadOrders(agentId);
+                    }
+                    context.go('/');
+                  }
+                },
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0xFF00A2D3)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: Text('Done & Return to Remittance Tab', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold, color: const Color(0xFF00A2D3))),
+              ),
             ),
           ],
         ),
       ),
-    );
+    ).whenComplete(() {
+      if (!navigatedToReceipt && mounted) {
+        ref.read(bottomNavIndexProvider.notifier).state = 3;
+        final user = ref.read(authProvider).user;
+        final agentId = user?.deliveryAgentId ?? user?.id;
+        if (agentId != null) {
+          ref.read(financeProvider.notifier).loadRemittances(agentId);
+          ref.read(ordersProvider.notifier).loadOrders(agentId);
+        }
+        context.go('/');
+      }
+    });
   }
 
   Widget _buildAuditRow(String label, String value, bool isDark, {Color? valueColor}) {

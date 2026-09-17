@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:novexps/core/helpers/formatters.dart';
+import 'package:novexps/core/providers/navigation_provider.dart';
 import 'package:novexps/core/services/file_downloader.dart';
 import 'package:novexps/features/auth/presentation/providers/auth_provider.dart';
 import 'package:novexps/features/finance/domain/entities/remittance.dart';
@@ -553,7 +554,14 @@ Thank you for your timely settlement!
         elevation: 0,
         leading: IconButton(
           icon: Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: theme.colorScheme.onSurface),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            ref.read(bottomNavIndexProvider.notifier).state = 3;
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/');
+            }
+          },
         ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1019,15 +1027,29 @@ Thank you for your timely settlement!
             const SizedBox(height: 10),
             SizedBox(
               width: double.infinity,
-              height: 44,
-              child: OutlinedButton(
-                onPressed: () => context.pop(),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: theme.colorScheme.onSurface,
-                  side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  ref.read(bottomNavIndexProvider.notifier).state = 3;
+                  final user = ref.read(authProvider).user;
+                  final agentId = user?.deliveryAgentId ?? user?.id;
+                  if (agentId != null) {
+                    ref.read(financeProvider.notifier).loadRemittances(agentId);
+                    ref.read(ordersProvider.notifier).loadOrders(agentId);
+                  }
+                  context.go('/');
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF16A34A),
+                  foregroundColor: Colors.white,
+                  elevation: 1,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                child: const Text('Back to Remittances'),
+                icon: const Icon(Icons.payments_rounded, size: 18),
+                label: Text(
+                  'Return to Remittance & Finance Tab',
+                  style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold),
+                ),
               ),
             ),
             const SizedBox(height: 24),
