@@ -18,6 +18,7 @@ class OrderConversationEntity {
   final String? deliveryAgentName;
   final String? closerId;
   final String? closerName;
+  final String? closerAvatarUrl;
 
   // Order state snapshot
   final String orderStatus;
@@ -52,6 +53,7 @@ class OrderConversationEntity {
     this.deliveryAgentName,
     this.closerId,
     this.closerName,
+    this.closerAvatarUrl,
     this.orderStatus = 'pending',
     this.currentProductName,
     this.currentPackageName,
@@ -80,6 +82,7 @@ class OrderConversationEntity {
     String? deliveryAgentName,
     String? closerId,
     String? closerName,
+    String? closerAvatarUrl,
     String? orderStatus,
     String? currentProductName,
     String? currentPackageName,
@@ -107,6 +110,7 @@ class OrderConversationEntity {
       deliveryAgentName: deliveryAgentName ?? this.deliveryAgentName,
       closerId: closerId ?? this.closerId,
       closerName: closerName ?? this.closerName,
+      closerAvatarUrl: closerAvatarUrl ?? this.closerAvatarUrl,
       orderStatus: orderStatus ?? this.orderStatus,
       currentProductName: currentProductName ?? this.currentProductName,
       currentPackageName: currentPackageName ?? this.currentPackageName,
@@ -132,3 +136,5 @@ class OrderConversationEntity {
   @override
   int get hashCode => id.hashCode;
 }
+
+typedef OrderConversation = OrderConversationEntity;

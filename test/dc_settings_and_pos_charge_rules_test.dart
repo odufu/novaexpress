@@ -58,7 +58,7 @@ void main() {
       // Verify Dynamic Tiered vs Flat Cards
       expect(find.text('Dynamic Tiered Scaling'), findsOneWidget);
       expect(find.text('Flat Rate Fee'), findsOneWidget);
-      expect(find.text('Live Financial Reconciliation Simulator'), findsOneWidget);
+      expect(find.text('LIVE FINANCIAL RECONCILIATION SIMULATOR'), findsOneWidget);
 
       // Switch to Flat Rate Fee
       await tester.tap(find.text('Flat Rate Fee'));

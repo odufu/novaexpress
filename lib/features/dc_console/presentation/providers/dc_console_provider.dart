@@ -41,7 +41,29 @@ final List<DistributionCenter> defaultDistributionCenters = [
   ),
 ];
 
-const List<DCFleetDriver> defaultFleetDrivers = [];
+final List<DCFleetDriver> defaultFleetDrivers = [
+  DCFleetDriver(
+    id: 'b1111111-1111-4111-8111-111111111111',
+    driverCode: 'PDA-7000',
+    name: 'Emeka Rider',
+    phone: '08012345678',
+    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+    vehicleModel: 'Honda Ace 125',
+    vehiclePlate: 'ABJ-789-XY',
+    vehicleType: 'Motorcycle',
+    status: 'active',
+    assignedZone: 'Abuja Municipal (AMAC)',
+    distributionCenterId: '22222222-2222-4222-8222-222222222222',
+    coveredLgas: const ['Abuja Municipal (AMAC)', 'Bwari', 'Gwagwalada', 'Kuje', 'Kwali'],
+    totalAssignedOrders: 0,
+    completedOrders: 0,
+    routeProgressPercent: 0.0,
+    efficiencyRating: 98.4,
+    cashInCustody: 0.0,
+    itemsInCustody: 0,
+    personnelType: 'pda',
+  ),
+];
 
 const List<ClientProfile> defaultRegisteredClients = [];
 
@@ -491,7 +513,7 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
             ),
         super(DCConsoleState(
           distributionCenters: defaultDistributionCenters,
-          drivers: const [],
+          drivers: defaultFleetDrivers,
         )) {
     if (!isTestEnvironment) {
       _initDrivers();
@@ -1464,7 +1486,7 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     // 1. Optimistically update local state & cache
     final updated = state.payoutClaims.map((c) {
       if (c.id == claimId) {
-        return c.copyWith(status: 'approved', disbursementRef: ref);
+        return c.copyWith(status: 'disbursed', disbursementRef: ref);
       }
       return c;
     }).toList();
@@ -1479,6 +1501,7 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
         claimId: claimId,
         amount: claim.requestedAmount,
         driverId: claim.riderId,
+        disbursementRef: ref,
       );
       debugPrint('[DC_CONSOLE_PROVIDER] ✅ Payout claim $claimId approved via repository (Ref: $ref).');
     } catch (e) {

@@ -131,6 +131,7 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
     required double commissionRate,
     required double transportAllowance,
     required double fuelAllowance,
+    double failedDeliveryAllowance = 500.0,
     required double baseSalary,
     required String vehicleType,
     required String vehiclePlateNumber,
@@ -161,6 +162,9 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
 
   @override
   Future<bool> checkPhoneExists(String phone) async => false;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class MockOrdersRemoteDataSource implements OrdersRemoteDataSource {

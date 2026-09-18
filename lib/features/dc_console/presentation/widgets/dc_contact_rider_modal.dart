@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/helpers/formatters.dart';
 import '../../../../core/widgets/user_avatar_widget.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../notifications/presentation/providers/notifications_provider.dart';
 import '../../../orders/domain/entities/order.dart';
 
@@ -105,9 +106,10 @@ class _DCContactRiderModalState extends ConsumerState<DCContactRiderModal> {
 
   void _sendWhatsAppReminder() async {
     final customNote = _customNoteController.text.trim();
+    final senderName = ref.read(authProvider).user?.fullName ?? 'DC Logistics Operations';
     final message = '''Hello ${widget.riderName.trim()} (${widget.riderCode.trim()}),
 
-This is DC Supervisor Adekunle from NovaXpress Logistics Command regarding Order #${widget.order.orderNumber}.
+This is $senderName from NovaXpress Logistics Command regarding Order #${widget.order.orderNumber}.
 
 • Customer: ${widget.order.customerName}
 • Delivery Address: ${widget.order.deliveryAddress}

@@ -166,9 +166,20 @@ class _ConversationListModalState extends ConsumerState<ConversationListModal> {
     final chatState = ref.watch(pipelineChatProvider);
     final authUser = ref.watch(authProvider).user;
     final userRole = authUser?.role ?? 'client';
+    final isCloser = authUser?.isCloser == true;
+    final closerId = authUser?.closerId ?? authUser?.id;
+    final closerName = authUser?.fullName.trim().toLowerCase();
+
+    // Defense-in-depth: Closers only have access to conversations that concern their orders
+    final allConversations = isCloser
+        ? chatState.recentConversations.where((conv) {
+            final matchId = conv.closerId != null && (conv.closerId == closerId || conv.closerId == authUser?.id);
+            final matchName = closerName != null && closerName.isNotEmpty && conv.closerName != null && conv.closerName!.trim().toLowerCase() == closerName;
+            return matchId || matchName;
+          }).toList()
+        : chatState.recentConversations;
 
     // Filter conversations chronologically top to bottom and by search query
-    final allConversations = chatState.recentConversations;
     final filteredConversations = allConversations.where((conv) {
       if (_searchQuery.isEmpty) return true;
       final q = _searchQuery.toLowerCase();
@@ -269,7 +280,7 @@ class _ConversationListModalState extends ConsumerState<ConversationListModal> {
                       ),
                       const SizedBox(height: 1),
                       Text(
-                        'Live coordination between Merchant, DC & Rider',
+                        isCloser ? 'Live coordination for your booked & assigned orders' : 'Live coordination between Merchant, DC & Rider',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.inter(
@@ -423,16 +434,17 @@ class _ConversationListModalState extends ConsumerState<ConversationListModal> {
     required bool isDark,
     required String userRole,
   }) {
-    // Unread conversations have distinct border and soft vibrant accent background
-    final cardBg = isUnread
-        ? (isDark
-            ? const Color(0xFF0D9488).withValues(alpha: 0.15)
-            : const Color(0xFF0D9488).withValues(alpha: 0.08))
-        : (isDark ? const Color(0xFF1E293B) : Colors.white);
+    // Clean uniform background and border for all cards (highlight removed as requested)
+    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
 
-    final borderColor = isUnread
-        ? const Color(0xFF0D9488).withValues(alpha: 0.5)
-        : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0));
+    // Creator of the order / Closer that owns the order
+    final creatorName = (conv.closerName != null && conv.closerName!.trim().isNotEmpty)
+        ? conv.closerName!.trim()
+        : (conv.clientName.trim().isNotEmpty ? conv.clientName.trim() : conv.customerName);
+    final creatorAvatar = (conv.closerAvatarUrl != null && conv.closerAvatarUrl!.trim().isNotEmpty)
+        ? conv.closerAvatarUrl!.trim()
+        : null;
 
     return InkWell(
       onTap: () {
@@ -449,49 +461,23 @@ class _ConversationListModalState extends ConsumerState<ConversationListModal> {
         });
       },
       borderRadius: BorderRadius.circular(14),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
+      child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
           color: cardBg,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: borderColor, width: isUnread ? 1.5 : 1.0),
-          boxShadow: [
-            if (isUnread)
-              BoxShadow(
-                color: const Color(0xFF0D9488).withValues(alpha: 0.12),
-                blurRadius: 10,
-                offset: const Offset(0, 2),
-              ),
-          ],
+          border: Border.all(color: borderColor, width: 1.0),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Profile Picture / DP of the receiver
-            Stack(
-              children: [
-                UserAvatarWidget(
-                  fullName: conv.customerName,
-                  radius: 24,
-                  backgroundColor: isUnread ? const Color(0xFF0D9488) : const Color(0xFF2563EB),
-                  textColor: Colors.white,
-                ),
-                if (isUnread)
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF10B981), // Active green indicator
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                      ),
-                    ),
-                  ),
-              ],
+            // Profile Picture / DP of the creator of the order / closer that owns the order
+            UserAvatarWidget(
+              fullName: creatorName,
+              avatarUrl: creatorAvatar,
+              radius: 24,
+              backgroundColor: const Color(0xFF4F46E5), // Closer/Creator Indigo
+              textColor: Colors.white,
             ),
             const SizedBox(width: 12),
 
@@ -521,9 +507,7 @@ class _ConversationListModalState extends ConsumerState<ConversationListModal> {
                         style: GoogleFonts.inter(
                           fontSize: 11,
                           fontWeight: isUnread ? FontWeight.w700 : FontWeight.w500,
-                          color: isUnread
-                              ? const Color(0xFF0D9488)
-                              : const Color(0xFF94A3B8),
+                          color: const Color(0xFF94A3B8),
                         ),
                       ),
                     ],
@@ -566,6 +550,40 @@ class _ConversationListModalState extends ConsumerState<ConversationListModal> {
                           ),
                         ),
                       ),
+                      if (conv.closerName != null && conv.closerName!.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF7C3AED).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (conv.closerAvatarUrl != null && conv.closerAvatarUrl!.isNotEmpty) ...[
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: Image.network(
+                                    conv.closerAvatarUrl!,
+                                    width: 12,
+                                    height: 12,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                                  ),
+                                ),
+                                const SizedBox(width: 3),
+                              ],
+                              Text(
+                                'Closer: ${conv.closerName!.split(' ').first}',
+                                style: GoogleFonts.inter(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF7C3AED),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       if (conv.currentProductName != null && conv.currentProductName!.isNotEmpty)
                         Text(
                           '• ${conv.currentProductName}',

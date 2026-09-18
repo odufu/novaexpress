@@ -23,6 +23,8 @@ class OrderConversationMessageModel extends OrderConversationMessageEntity {
     final rStr = json['sender_role']?.toString().toLowerCase();
     if (rStr == 'client') {
       role = ChatSenderRole.client;
+    } else if (rStr == 'closer' || rStr == 'client_closer') {
+      role = ChatSenderRole.closer;
     } else if (rStr == 'dc_manager' || rStr == 'dc') {
       role = ChatSenderRole.dcManager;
     } else if (rStr == 'delivery_agent' || rStr == 'rider') {
@@ -84,11 +86,33 @@ class OrderConversationMessageModel extends OrderConversationMessageEntity {
     );
   }
 
+  factory OrderConversationMessageModel.fromEntity(OrderConversationMessage entity) {
+    return OrderConversationMessageModel(
+      id: entity.id,
+      conversationId: entity.conversationId,
+      orderId: entity.orderId,
+      senderId: entity.senderId,
+      senderName: entity.senderName,
+      senderAvatarUrl: entity.senderAvatarUrl,
+      senderRole: entity.senderRole,
+      messageType: entity.messageType,
+      messageBody: entity.messageBody,
+      metadata: entity.metadata,
+      readByClient: entity.readByClient,
+      readByDc: entity.readByDc,
+      readByRider: entity.readByRider,
+      createdAt: entity.createdAt,
+    );
+  }
+
   Map<String, dynamic> toJson() {
     String rStr = 'system';
     switch (senderRole) {
       case ChatSenderRole.client:
         rStr = 'client';
+        break;
+      case ChatSenderRole.closer:
+        rStr = 'closer';
         break;
       case ChatSenderRole.dcManager:
         rStr = 'dc_manager';

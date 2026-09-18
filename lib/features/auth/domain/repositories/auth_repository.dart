@@ -15,6 +15,7 @@ abstract class AuthRepository {
     required double commissionRate,
     required double transportAllowance,
     required double fuelAllowance,
+    double failedDeliveryAllowance = 500.0,
     required double baseSalary,
     required String vehicleType,
     required String vehiclePlateNumber,

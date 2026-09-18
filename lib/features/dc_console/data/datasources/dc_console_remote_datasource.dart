@@ -43,6 +43,7 @@ abstract class DCConsoleRemoteDataSource {
     required String claimId,
     required double amount,
     required String driverId,
+    String? disbursementRef,
   });
   Future<void> rejectPayoutClaim({
     required String claimId,
@@ -449,20 +450,25 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
     required String claimId,
     required double amount,
     required String driverId,
+    String? disbursementRef,
   }) async {
     final adminDb = _getAdminClient();
-      await adminDb.from('payout_requests').update({
-        'status': 'approved',
-        'reviewed_at': DateTime.now().toIso8601String(),
-      }).eq('id', claimId);
+    final nowIso = DateTime.now().toIso8601String();
+    await adminDb.from('payout_requests').update({
+      'status': 'disbursed',
+      if (disbursementRef != null && disbursementRef.isNotEmpty) 'disbursement_ref': disbursementRef,
+      'approved_at': nowIso,
+      'reviewed_at': nowIso,
+      'updated_at': nowIso,
+    }).eq('id', claimId);
 
-      // Decrement driver entitlement
-      try {
-        await adminDb.rpc('decrement_driver_entitlement', params: {
-          'p_driver_id': driverId,
-          'p_amount': amount,
-        });
-      } catch (_) {}
+    // Decrement driver entitlement
+    try {
+      await adminDb.rpc('decrement_driver_entitlement', params: {
+        'p_driver_id': driverId,
+        'p_amount': amount,
+      });
+    } catch (_) {}
   }
 
   @override

@@ -19,6 +19,7 @@ class ClientPortalRepositoryImpl implements ClientPortalRepository {
     required String phone,
     String? password,
     String? avatarUrl,
+    String? closerCode,
     int dailyCallTarget = 50,
     double commissionRate = 500.0,
   }) async {
@@ -29,6 +30,7 @@ class ClientPortalRepositoryImpl implements ClientPortalRepository {
       phone: phone,
       password: password,
       avatarUrl: avatarUrl,
+      closerCode: closerCode,
       dailyCallTarget: dailyCallTarget,
       commissionRate: commissionRate,
     );

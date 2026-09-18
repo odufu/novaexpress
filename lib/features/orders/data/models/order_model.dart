@@ -63,6 +63,7 @@ class OrderModel extends OrderEntity {
     super.closerId,
     super.closerName,
     super.closerCode,
+    super.closerAvatarUrl,
     super.leadId,
     required super.createdAt,
   });
@@ -269,6 +270,8 @@ class OrderModel extends OrderEntity {
       closerId: json['closer_id']?.toString(),
       closerName: json['closer_name']?.toString(),
       closerCode: json['closer_code']?.toString(),
+      closerAvatarUrl: json['closer_avatar_url']?.toString() ??
+          (json['client_closers'] is Map ? json['client_closers']['avatar_url']?.toString() : null),
       leadId: json['lead_id']?.toString(),
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])
@@ -338,6 +341,7 @@ class OrderModel extends OrderEntity {
       closerId: entity.closerId,
       closerName: entity.closerName,
       closerCode: entity.closerCode,
+      closerAvatarUrl: entity.closerAvatarUrl,
       leadId: entity.leadId,
       createdAt: entity.createdAt,
     );
@@ -404,6 +408,7 @@ class OrderModel extends OrderEntity {
       'closer_id': closerId,
       'closer_name': closerName,
       'closer_code': closerCode,
+      'closer_avatar_url': closerAvatarUrl,
       'lead_id': leadId,
     };
   }

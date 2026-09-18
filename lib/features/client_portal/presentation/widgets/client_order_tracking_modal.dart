@@ -242,7 +242,7 @@ class ClientOrderTrackingModal extends ConsumerWidget {
                   _buildTimelineStep(
                     icon: Icons.store_mall_directory_rounded,
                     title: '2. Routed to Regional Distribution Center',
-                    subtitle: 'Hub: ${matchedHub?.name ?? currentOrder.distributionCenterName ?? "Wuse Central Hub (DC-WUSE-01)"}\nDestination Zone: ${currentOrder.deliveryState} / ${currentOrder.deliveryLga ?? currentOrder.deliveryCity}',
+                    subtitle: 'Hub: ${matchedHub?.name ?? currentOrder.distributionCenterName ?? "Regional Distribution Center"}\nDestination Zone: ${currentOrder.deliveryState} / ${currentOrder.deliveryLga ?? currentOrder.deliveryCity}',
                     timestamp: 'Matched via Automated State/LGA Dispatch',
                     isDone: currentOrder.distributionCenterId != null || matchedHub != null,
                     isCurrent: statusStr == 'pending_dispatch' || statusStr == 'pending_rider_assignment',
@@ -732,9 +732,9 @@ class ClientOrderTrackingModal extends ConsumerWidget {
       );
     } else {
       // Unassigned / Hub Dispatch Queue View
-      final hubName = matchedHub?.name ?? currentOrder.distributionCenterName ?? 'Wuse Central Distribution Hub';
-      final hubPhone = matchedHub?.contactPhone ?? '+234 802 345 6789';
-      final hubManager = matchedHub?.managerName ?? 'Adekunle Supervisor';
+      final hubName = matchedHub?.name ?? currentOrder.distributionCenterName ?? 'Regional Distribution Center';
+      final hubPhone = matchedHub?.contactPhone ?? 'DC Dispatch Operations';
+      final hubManager = matchedHub?.managerName ?? 'Station DC Operations Supervisor';
 
       return Container(
         decoration: BoxDecoration(

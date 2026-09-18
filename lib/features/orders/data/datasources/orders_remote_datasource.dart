@@ -328,6 +328,7 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
         'closer_id': insertPayload['closer_id']?.toString(),
         'closer_name': insertPayload['closer_name']?.toString(),
         'closer_code': insertPayload['closer_code']?.toString(),
+        'closer_avatar_url': insertPayload['closer_avatar_url']?.toString(),
         'lead_id': insertPayload['lead_id']?.toString(),
         'assignment_status': insertPayload['assignment_status']?.toString() ?? (validRiderId != null ? 'auto_assigned' : 'pending_rider_assignment'),
         'routing_notes': insertPayload['routing_notes']?.toString(),
@@ -348,19 +349,38 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
               .insert(payloadWithPkg)
               .select('*, products(name, sku, base_price)')
               .single();
-        } catch (_) {
-          // Fallback if schema doesn't have package_deal_id column
-          response = await dbClient
-              .from(SupabaseConstants.ordersTable)
-              .insert(sanitizedDbPayload)
-              .select('*, products(name, sku, base_price)')
-              .single();
+        } catch (e1) {
+          debugPrint('[ORDERS_DATASOURCE] Insert attempt 1 notice: $e1');
+          try {
+            response = await dbClient
+                .from(SupabaseConstants.ordersTable)
+                .insert(payloadWithPkg)
+                .select('*')
+                .single();
+          } catch (e2) {
+            debugPrint('[ORDERS_DATASOURCE] Insert attempt 2 notice: $e2');
+            try {
+              response = await dbClient
+                  .from(SupabaseConstants.ordersTable)
+                  .insert(sanitizedDbPayload)
+                  .select('*')
+                  .single();
+            } catch (e3) {
+              debugPrint('[ORDERS_DATASOURCE] Insert attempt 3 notice: $e3');
+              final noProdPayload = Map<String, dynamic>.from(sanitizedDbPayload)..remove('product_id');
+              response = await dbClient
+                  .from(SupabaseConstants.ordersTable)
+                  .insert(noProdPayload)
+                  .select('*')
+                  .single();
+            }
+          }
         }
 
         createdModel = OrderModel.fromJson(response);
         debugPrint('[ORDERS_DATASOURCE] ✅ Successfully created order ${createdModel.orderNumber} (ID: ${createdModel.id}) in live Supabase DB.');
       } catch (dbErr) {
-        debugPrint('[ORDERS_DATASOURCE] ℹ️ Supabase remote insert notice ($dbErr). Creating standard operational model.');
+        debugPrint('[ORDERS_DATASOURCE] ⚠️ Supabase remote insert notice ($dbErr). Creating standard operational model.');
         createdModel = OrderModel.fromJson({
           ...sanitizedDbPayload,
           'id': validOrderUuid,

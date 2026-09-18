@@ -15,11 +15,15 @@ import '../widgets/client_convert_lead_modal.dart';
 import '../widgets/client_create_order_modal.dart';
 import '../widgets/client_order_tracking_modal.dart';
 import '../widgets/closer_create_package_modal.dart';
+import '../../../dc_console/domain/entities/product_package.dart';
+import '../../../dc_console/presentation/providers/product_catalog_provider.dart';
+import '../../../pipeline_chat/presentation/widgets/order_pipeline_chat_sheet.dart';
 import '../../../pipeline_chat/presentation/widgets/pipeline_chat_floating_action_button.dart';
 
 final closerActiveTabProvider = StateProvider.autoDispose<int>((ref) => 0);
 final closerOrderStatusFilterProvider = StateProvider.autoDispose<String>((ref) => 'all');
 final closerOrderSearchProvider = StateProvider.autoDispose<String>((ref) => '');
+final closerOrderScopeFilterProvider = StateProvider.autoDispose<String>((ref) => 'my_orders');
 
 class CloserMobilePortalPage extends ConsumerStatefulWidget {
   const CloserMobilePortalPage({super.key});
@@ -261,6 +265,13 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
     dynamic user,
     bool isDark,
   ) {
+    final effectiveAvatarUrl = user != null
+        ? ((user.avatarUrl != null && user.avatarUrl.toString().trim().isNotEmpty) ? user.avatarUrl.toString().trim() : null)
+        : (closer.avatarUrl?.trim().isNotEmpty == true ? closer.avatarUrl : null);
+    final effectiveFullName = (user != null && user.fullName.toString().trim().isNotEmpty)
+        ? user.fullName.toString().trim()
+        : closer.fullName;
+
     return AppBar(
       backgroundColor: isDark ? const Color(0xFF151D36) : Colors.white,
       elevation: 0.5,
@@ -276,8 +287,8 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
             child: Stack(
               children: [
                 UserAvatarWidget(
-                  fullName: closer.fullName,
-                  avatarUrl: closer.avatarUrl ?? user?.avatarUrl,
+                  fullName: effectiveFullName,
+                  avatarUrl: effectiveAvatarUrl,
                   radius: 20,
                   backgroundColor: const Color(0xFFF37021),
                   textColor: Colors.white,
@@ -304,7 +315,7 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  closer.fullName,
+                  effectiveFullName,
                   style: GoogleFonts.inter(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
@@ -330,7 +341,7 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                       const SizedBox(width: 6),
                       Flexible(
                         child: Text(
-                          user.clientCompanyName,
+                          user.clientCompanyName.toString(),
                           style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8)),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -357,7 +368,10 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
         IconButton(
           tooltip: 'Refresh',
           icon: const Icon(Icons.refresh_rounded, size: 20, color: Color(0xFF94A3B8)),
-          onPressed: () => ref.read(clientPortalProvider.notifier).loadClientData(),
+          onPressed: () async {
+            await ref.read(authProvider.notifier).checkCurrentUser();
+            await ref.read(clientPortalProvider.notifier).loadClientData();
+          },
         ),
       ],
     );
@@ -370,7 +384,7 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
     bool isDark,
   ) {
     final currencyFormatter = NumberFormat.currency(symbol: '₦', decimalDigits: 0);
-    final metrics = state.getCloserPerformanceMetrics(closer.id, closer.email);
+    final metrics = state.getCloserPerformanceMetrics(closer.id, closer.email, closer.fullName);
 
     final totalBooked = (metrics['totalBooked'] as int?) ?? closer.totalOrdersBooked;
     final deliveredCount = (metrics['deliveredCount'] as int?) ?? closer.totalOrdersDelivered;
@@ -379,7 +393,7 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
     final grossSales = (metrics['grossSales'] as double?) ?? 0.0;
     final earnedCommission = (metrics['earnedCommission'] as double?) ?? closer.totalEarnedCommission;
 
-    final closerOrders = state.getOrdersForCloser(closer.id, closer.email);
+    final closerOrders = state.getOrdersForCloser(closer.id, closer.email, closer.fullName);
     final inTransitOrders = closerOrders.where((o) => o.isAssignedInTransit).toList();
 
     return RefreshIndicator(
@@ -569,11 +583,14 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
   ) {
     final currencyFormatter = NumberFormat.currency(symbol: '₦', decimalDigits: 0);
     final statusFilter = ref.watch(closerOrderStatusFilterProvider);
+    final scopeFilter = ref.watch(closerOrderScopeFilterProvider);
     final searchQuery = ref.watch(closerOrderSearchProvider).trim().toLowerCase();
 
-    final allCloserOrders = state.getOrdersForCloser(closer.id, closer.email);
+    final baseOrders = scopeFilter == 'all_novacare'
+        ? state.orders
+        : state.getOrdersForCloser(closer.id, closer.email, closer.fullName);
 
-    final filtered = allCloserOrders.where((o) {
+    final filtered = baseOrders.where((o) {
       if (statusFilter != 'all') {
         if (statusFilter == 'in_transit' && !o.isAssignedInTransit) return false;
         if (statusFilter == 'delivered' && !o.isDelivered) return false;
@@ -592,9 +609,48 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
 
     return Column(
       children: [
+        // Top Action Bar: Scope Selector + Book Order Button
+        Container(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          color: isDark ? const Color(0xFF151D36) : Colors.white,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0B1021) : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildScopeButton('my_orders', 'My Orders', scopeFilter, isDark),
+                    _buildScopeButton('all_novacare', 'Novacare All', scopeFilter, isDark),
+                  ],
+                ),
+              ),
+              ElevatedButton.icon(
+                onPressed: () => ClientCreateOrderModal.show(context),
+                icon: const Icon(Icons.add_circle_outline_rounded, size: 15, color: Colors.white),
+                label: Text(
+                  '+ Book Order',
+                  style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w700, color: Colors.white),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFF37021),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  elevation: 0,
+                ),
+              ),
+            ],
+          ),
+        ),
+
         // Filter & Search Header
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
           color: isDark ? const Color(0xFF151D36) : Colors.white,
           child: Column(
             children: [
@@ -616,11 +672,11 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
-                    _buildFilterChip('all', 'All (${allCloserOrders.length})', statusFilter, isDark),
+                    _buildFilterChip('all', 'All (${baseOrders.length})', statusFilter, isDark),
                     const SizedBox(width: 8),
-                    _buildFilterChip('in_transit', 'In Transit (${allCloserOrders.where((o) => o.isAssignedInTransit).length})', statusFilter, isDark),
+                    _buildFilterChip('in_transit', 'In Transit (${baseOrders.where((o) => o.isAssignedInTransit).length})', statusFilter, isDark),
                     const SizedBox(width: 8),
-                    _buildFilterChip('delivered', 'Delivered (${allCloserOrders.where((o) => o.isDelivered).length})', statusFilter, isDark),
+                    _buildFilterChip('delivered', 'Delivered (${baseOrders.where((o) => o.isDelivered).length})', statusFilter, isDark),
                     const SizedBox(width: 8),
                     _buildFilterChip('pending', 'Pending Dispatch', statusFilter, isDark),
                     const SizedBox(width: 8),
@@ -819,6 +875,43 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                   ],
                 ),
 
+                if (order.closerName != null && order.closerName!.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF7C3AED).withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFF7C3AED).withValues(alpha: 0.2)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (order.closerAvatarUrl != null && order.closerAvatarUrl!.isNotEmpty) ...[
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              order.closerAvatarUrl!,
+                              width: 16,
+                              height: 16,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Icon(Icons.headset_mic_rounded, size: 14, color: Color(0xFF7C3AED)),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                        ] else ...[
+                          const Icon(Icons.headset_mic_rounded, size: 14, color: Color(0xFF7C3AED)),
+                          const SizedBox(width: 6),
+                        ],
+                        Text(
+                          'Created by: ${order.closerName}',
+                          style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF7C3AED)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
                 if (hasRider) ...[
                   const SizedBox(height: 10),
                   Container(
@@ -845,7 +938,7 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
             ),
           ),
 
-          // Action Strip with One-Tap Calling Buttons
+          // Action Strip with One-Tap Calling & Chat Followup Buttons
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
@@ -871,34 +964,72 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
 
-                // 2. One-Tap Call Rider
-                if (hasRider) ...[
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () => _makePhoneCall(
-                        context,
-                        riderPhone.isNotEmpty ? riderPhone : order.customerPhone,
-                        'Rider (${order.deliveryAgentName})',
-                      ),
-                      icon: const Icon(Icons.two_wheeler_rounded, size: 14, color: Colors.white),
+                // 2. Order Chat & Live Followup (Strict Closer Scoping)
+                Builder(
+                  builder: (ctx) {
+                    final authUser = ref.read(authProvider).user;
+                    final closerId = authUser?.closerId ?? authUser?.id;
+                    final closerName = authUser?.fullName.trim().toLowerCase() ?? '';
+                    final isMyOrder = (order.closerId != null && (order.closerId == closerId || order.closerId == authUser?.id)) ||
+                        (order.closerName != null && order.closerName!.trim().toLowerCase() == closerName);
+
+                    return ElevatedButton.icon(
+                      onPressed: isMyOrder
+                          ? () {
+                              OrderPipelineChatSheet.show(
+                                context,
+                                orderId: order.id,
+                                orderNumber: order.orderNumber,
+                                customerName: order.customerName,
+                                customerPhone: order.customerPhone,
+                              );
+                            }
+                          : () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  backgroundColor: Color(0xFFEF4444),
+                                  behavior: SnackBarBehavior.floating,
+                                  content: Text('⛔ Access Restricted: Closers can only access chats for their own assigned orders.'),
+                                ),
+                              );
+                            },
+                      icon: Icon(isMyOrder ? Icons.forum_rounded : Icons.lock_outline_rounded, size: 13, color: Colors.white),
                       label: Text(
-                        'Call Rider',
+                        isMyOrder ? 'Chat' : 'Locked',
                         style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
                       ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFF37021),
-                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        backgroundColor: isMyOrder ? const Color(0xFF7C3AED) : const Color(0xFF64748B),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         elevation: 0,
                       ),
+                    );
+                  },
+                ),
+                const SizedBox(width: 6),
+
+                // 3. One-Tap Call Rider
+                if (hasRider) ...[
+                  IconButton(
+                    tooltip: 'Call Rider (${order.deliveryAgentName})',
+                    onPressed: () => _makePhoneCall(
+                      context,
+                      riderPhone.isNotEmpty ? riderPhone : order.customerPhone,
+                      'Rider (${order.deliveryAgentName})',
+                    ),
+                    icon: const Icon(Icons.two_wheeler_rounded, size: 18, color: Colors.white),
+                    style: IconButton.styleFrom(
+                      backgroundColor: const Color(0xFFF37021),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                 ],
 
-                // 3. Track Stages
+                // 4. Track Stages
                 IconButton(
                   tooltip: 'Track Stages',
                   onPressed: () => ClientOrderTrackingModal.show(context, order),
@@ -925,6 +1056,33 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
     bool isDark,
   ) {
     final currencyFormatter = NumberFormat.currency(symbol: '₦', decimalDigits: 0);
+    final catalogState = ref.watch(productCatalogProvider);
+    final authState = ref.watch(authProvider);
+
+    final effectiveClientId = state.clientProfile.id.isNotEmpty
+        ? state.clientProfile.id
+        : (authState.user?.clientId ?? '00000000-0000-4000-8000-789382731303');
+    final effectiveCompanyName = state.clientProfile.companyName.isNotEmpty
+        ? state.clientProfile.companyName
+        : (authState.user?.clientCompanyName ?? 'Novacare Health & Wellness Ltd');
+
+    final catalogMerchantProducts = catalogState.products.where((p) {
+      return ClientPortalNotifier.isProductForClient(
+        product: p,
+        clientId: effectiveClientId,
+        companyName: effectiveCompanyName,
+      );
+    }).toList();
+
+    // Deduplicate merged products by SKU & ID
+    final Set<String> seenKeys = {};
+    final List<CatalogProduct> allProducts = [];
+    for (final p in [...state.products, ...catalogMerchantProducts]) {
+      final key = p.sku.trim().isNotEmpty ? p.sku.trim().toUpperCase() : p.id.trim();
+      if (key.isNotEmpty && seenKeys.add(key)) {
+        allProducts.add(p);
+      }
+    }
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -935,8 +1093,13 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
         label: Text('New Package Deal', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: Colors.white)),
       ),
       body: RefreshIndicator(
-        onRefresh: () => ref.read(clientPortalProvider.notifier).loadClientData(),
-        child: state.products.isEmpty
+        onRefresh: () async {
+          await Future.wait([
+            ref.read(productCatalogProvider.notifier).reloadCatalog(),
+            ref.read(clientPortalProvider.notifier).loadClientData(),
+          ]);
+        },
+        child: allProducts.isEmpty
             ? Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -949,10 +1112,10 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
               )
             : ListView.separated(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-                itemCount: state.products.length,
+                itemCount: allProducts.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 14),
                 itemBuilder: (context, index) {
-                  final prod = state.products[index];
+                  final prod = allProducts[index];
                   return Container(
                     decoration: BoxDecoration(
                       color: isDark ? const Color(0xFF151D36) : Colors.white,
@@ -1157,6 +1320,16 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
     dynamic user,
     bool isDark,
   ) {
+    final effectiveAvatarUrl = user != null
+        ? ((user.avatarUrl != null && user.avatarUrl.toString().trim().isNotEmpty) ? user.avatarUrl.toString().trim() : null)
+        : (closer.avatarUrl?.trim().isNotEmpty == true ? closer.avatarUrl : null);
+    final effectiveFullName = (user != null && user.fullName.toString().trim().isNotEmpty)
+        ? user.fullName.toString().trim()
+        : closer.fullName;
+    final effectiveEmail = (user != null && user.email.toString().trim().isNotEmpty)
+        ? user.email.toString().trim()
+        : closer.email;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -1175,8 +1348,8 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                 Stack(
                   children: [
                     UserAvatarWidget(
-                      fullName: closer.fullName,
-                      avatarUrl: closer.avatarUrl ?? user?.avatarUrl,
+                      fullName: effectiveFullName,
+                      avatarUrl: effectiveAvatarUrl,
                       radius: 40,
                       backgroundColor: const Color(0xFFF37021),
                       textColor: Colors.white,
@@ -1204,11 +1377,11 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  closer.fullName,
+                  effectiveFullName,
                   style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A)),
                 ),
                 Text(
-                  closer.email,
+                  effectiveEmail,
                   style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF94A3B8)),
                 ),
                 const SizedBox(height: 6),
@@ -1375,6 +1548,42 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
         const SizedBox(height: 2),
         Text(value, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: color)),
       ],
+    );
+  }
+
+  Widget _buildScopeButton(String key, String label, String currentScope, bool isDark) {
+    final isSelected = key == currentScope;
+    return InkWell(
+      onTap: () => ref.read(closerOrderScopeFilterProvider.notifier).state = key,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? (isDark ? const Color(0xFF1E293B) : Colors.white)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ]
+              : null,
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            color: isSelected
+                ? (isDark ? Colors.white : const Color(0xFF0F172A))
+                : const Color(0xFF94A3B8),
+          ),
+        ),
+      ),
     );
   }
 }

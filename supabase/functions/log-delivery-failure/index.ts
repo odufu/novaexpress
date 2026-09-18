@@ -58,7 +58,14 @@ serve(async (req: Request) => {
       );
     }
 
-    // 2. Fetch failed attempt stipend from DC settings
+    // 2. Fetch rider's configured failed delivery allowance and current balance
+    const { data: agent } = await supabaseClient
+      .from("delivery_agents")
+      .select("failed_delivery_allowance, direct_transfer_balance")
+      .eq("id", payload.agentId)
+      .maybeSingle();
+
+    // Fetch DC fallback settings
     const { data: dcSettings } = await supabaseClient
       .from("dc_finance_settings")
       .select("default_failed_stipend, default_failed_delivery_allowance")
@@ -67,17 +74,14 @@ serve(async (req: Request) => {
       .maybeSingle();
 
     const failedStipend = Number(
-      dcSettings?.default_failed_stipend ?? dcSettings?.default_failed_delivery_allowance ?? 500.00
+      agent?.failed_delivery_allowance ??
+      dcSettings?.default_failed_stipend ??
+      dcSettings?.default_failed_delivery_allowance ??
+      500.00
     );
 
     // 3. Credit rider's direct_transfer_balance with transport allowance for attempt
     if (!isCallback && failedStipend > 0) {
-      const { data: agent } = await supabaseClient
-        .from("delivery_agents")
-        .select("direct_transfer_balance")
-        .eq("id", payload.agentId)
-        .single();
-
       const newBalance = Number(agent?.direct_transfer_balance || 0) + failedStipend;
 
       await supabaseClient

@@ -86,6 +86,7 @@ class _MockAuthRemoteDS implements AuthRemoteDataSource {
     required double commissionRate,
     required double transportAllowance,
     required double fuelAllowance,
+    double failedDeliveryAllowance = 500.0,
     required double baseSalary,
     required String vehicleType,
     required String vehiclePlateNumber,
@@ -116,6 +117,9 @@ class _MockAuthRemoteDS implements AuthRemoteDataSource {
 
   @override
   Future<bool> checkPhoneExists(String phone) async => false;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class _MockOrdersRemoteDS implements OrdersRemoteDataSource {
@@ -218,12 +222,10 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      expect(find.text('TEST LOGIN SELECTOR'), findsOneWidget);
-      expect(find.text('Field Delivery Agent (PDA)'), findsOneWidget);
-      expect(find.text('Parent DC: Wuse Distribution Center (DC-WUSE-01)'), findsOneWidget);
-      expect(find.text('DC Operations Supervisor'), findsOneWidget);
-      expect(find.text('Managing DC: Wuse Distribution Center (DC-WUSE-01)'), findsOneWidget);
-      expect(find.text('Sign In to PDA App'), findsOneWidget);
+      expect(find.text('QUICK OPERATIONS SELECTOR'), findsOneWidget);
+      expect(find.text('Field Rider (PDA)'), findsOneWidget);
+      expect(find.text('DC Supervisor'), findsOneWidget);
+      expect(find.text('Sign In as DC Supervisor'), findsOneWidget);
     });
 
     testWidgets('2. Tapping DC Manager card automatically fills DC supervisor credentials and changes button', (tester) async {
@@ -242,19 +244,19 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // Tap the DC Supervisor card
-      await tester.tap(find.text('DC Operations Supervisor'));
+      // Tap Rider card
+      await tester.tap(find.text('Field Rider (PDA)'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('rider.emeka@novaxpress.com'), findsOneWidget);
+      expect(find.text('Sign In as Field Rider (PDA)'), findsOneWidget);
+
+      // Tap DC Supervisor card
+      await tester.tap(find.text('DC Supervisor'));
       await tester.pumpAndSettle();
 
       expect(find.text('dc.supervisor@novaxpress.ng'), findsOneWidget);
-      expect(find.text('Sign In to DC Console'), findsOneWidget);
-
-      // Tap back to Rider
-      await tester.tap(find.text('Field Delivery Agent (PDA)'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('emeka.rider@novaxpress.ng'), findsOneWidget);
-      expect(find.text('Sign In to PDA App'), findsOneWidget);
+      expect(find.text('Sign In as DC Supervisor'), findsOneWidget);
     });
 
     test('3. Verifies that Wuse Distribution Center is the common parent entity for both PDA and DC', () {
@@ -325,7 +327,7 @@ void main() {
 
       // Verify Confirm Logout Dialog appears
       expect(find.text('Confirm Logout'), findsOneWidget);
-      expect(find.text('Are you sure you want to log out of the NovaXpress Rider Terminal?'), findsOneWidget);
+      expect(find.text('Are you sure you want to log out of your NovaXpress operations account?'), findsOneWidget);
       expect(find.text('Cancel'), findsOneWidget);
       expect(find.text('Logout'), findsOneWidget);
 
@@ -400,11 +402,11 @@ void main() {
       await tester.enterText(textFields.last, 'Password123!');
       await tester.pumpAndSettle();
 
-      // Verify submit button says Sign In to PDA App
-      expect(find.text('Sign In to PDA App'), findsOneWidget);
+      // Verify submit button says Sign In to Assigned Workspace
+      expect(find.text('Sign In to Assigned Workspace'), findsOneWidget);
 
       // Tap Sign In
-      await tester.tap(find.text('Sign In to PDA App'));
+      await tester.tap(find.text('Sign In to Assigned Workspace'));
       await tester.pumpAndSettle();
 
       // Should complete login without throwing invalid credential error

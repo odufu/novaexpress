@@ -9,6 +9,7 @@ import '../../domain/entities/order_conversation_message.dart';
 import '../../data/datasources/pipeline_chat_remote_datasource.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../../core/services/audio_service.dart';
+import '../../../../core/services/local_storage_service.dart';
 
 final pipelineChatDataSourceProvider = Provider<PipelineChatRemoteDataSource>((ref) {
   return PipelineChatRemoteDataSourceImpl();
@@ -155,7 +156,20 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
       return;
     }
 
-    if (!silent) {
+    final localStorage = _ref.read(localStorageServiceProvider);
+    final scopeKey = authUser.isCloser
+        ? 'closer_${authUser.closerId ?? authUser.id}'
+        : (authUser.clientId ?? authUser.distributionCenterId ?? authUser.id);
+
+    // Fast-path: Load cached conversations instantly
+    try {
+      final cached = await localStorage.getCachedConversations(scopeKey);
+      if (cached != null && cached.isNotEmpty && mounted) {
+        state = state.copyWith(recentConversations: cached);
+      }
+    } catch (_) {}
+
+    if (!silent && state.recentConversations.isEmpty) {
       state = state.copyWith(isLoading: true, errorMessage: null);
     }
 
@@ -166,14 +180,26 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
         clientId: authUser.clientId,
         distributionCenterId: authUser.distributionCenterId,
         deliveryAgentId: authUser.deliveryAgentId,
-        closerId: authUser.closerId,
+        closerId: authUser.closerId ?? (authUser.isCloser ? authUser.id : null),
       );
+
+      // Defense-in-depth: If user is a closer, strictly filter to their conversations
+      final filteredConvs = authUser.isCloser
+          ? convs.where((c) {
+              final closerId = authUser.closerId ?? authUser.id;
+              final closerName = authUser.fullName.trim().toLowerCase();
+              final matchId = c.closerId != null && (c.closerId == closerId || c.closerId == authUser.id);
+              final matchName = closerName.isNotEmpty && c.closerName != null && c.closerName!.trim().toLowerCase() == closerName;
+              return matchId || matchName;
+            }).toList()
+          : convs;
 
       if (mounted) {
         state = state.copyWith(
-          recentConversations: convs,
+          recentConversations: filteredConvs,
           isLoading: false,
         );
+        unawaited(localStorage.cacheConversations(filteredConvs, scopeKey));
       }
     } catch (e) {
       if (mounted && !silent) {
@@ -185,7 +211,28 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
   /// Open or load an order conversation by its Order ID
   Future<void> openOrderConversation(String orderId) async {
     _streamSub?.cancel();
-    state = state.copyWith(isLoading: true, errorMessage: null);
+    final localStorage = _ref.read(localStorageServiceProvider);
+
+    // If an existing conversation is already in recentConversations, load cached messages first
+    final existingConv = state.recentConversations.cast<OrderConversationEntity?>().firstWhere(
+          (c) => c?.orderId == orderId,
+          orElse: () => null,
+        );
+
+    if (existingConv != null) {
+      final cachedMsgs = await localStorage.getCachedConversationMessages(existingConv.id);
+      if (cachedMsgs != null && cachedMsgs.isNotEmpty) {
+        state = state.copyWith(
+          activeConversation: existingConv,
+          messages: cachedMsgs,
+          isLoading: false,
+        );
+      } else {
+        state = state.copyWith(activeConversation: existingConv, isLoading: true, errorMessage: null);
+      }
+    } else {
+      state = state.copyWith(isLoading: true, errorMessage: null);
+    }
 
     try {
       final conv = await _dataSource.getConversationByOrderId(orderId);
@@ -197,6 +244,26 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
         return;
       }
 
+      // STRICT CLOSER ACCESS CONTROL: Closers can ONLY access conversations that concern them
+      final authUser = _ref.read(authProvider).user;
+      if (authUser?.isCloser == true) {
+        final closerId = authUser?.closerId ?? authUser?.id;
+        final closerName = authUser?.fullName.trim().toLowerCase();
+        final matchId = conv.closerId != null && (conv.closerId == closerId || conv.closerId == authUser?.id);
+        final matchName = closerName != null && closerName.isNotEmpty && conv.closerName != null && conv.closerName!.trim().toLowerCase() == closerName;
+
+        if (!matchId && !matchName) {
+          debugPrint('[PIPELINE_CHAT] ⛔ Access Denied: Closer ${authUser?.email} attempted to open conversation for order ${conv.orderNumber} belonging to "${conv.closerName ?? "Unassigned"}"');
+          state = state.copyWith(
+            isLoading: false,
+            activeConversation: null,
+            messages: const [],
+            errorMessage: 'Access Restricted: Closers only have access to chat pipelines for their own assigned orders.',
+          );
+          return;
+        }
+      }
+
       final initialMsgs = await _dataSource.fetchMessages(conv.id);
 
       state = state.copyWith(
@@ -204,11 +271,11 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
         messages: initialMsgs,
         isLoading: false,
       );
+      unawaited(localStorage.cacheConversationMessages(conv.id, initialMsgs));
 
       // Auto-mark as read for current user role
-      final authUser = _ref.read(authProvider).user;
       if (authUser != null) {
-        markConversationAsRead(conv.id, authUser.role);
+        markConversationAsRead(conv.id, authUser.isCloser ? 'closer' : authUser.role);
       }
 
       // Start realtime stream
@@ -224,6 +291,7 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
             }
           }
           state = state.copyWith(messages: updatedMsgs);
+          unawaited(localStorage.cacheConversationMessages(conv.id, updatedMsgs));
         },
         onError: (err) {
           // Keep current messages if stream drops
@@ -274,6 +342,17 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
       final authState = _ref.read(authProvider);
       final user = authState.user;
 
+      if (user?.isCloser == true) {
+        final closerId = user?.closerId ?? user?.id;
+        final closerName = user?.fullName.trim().toLowerCase();
+        final matchId = conv.closerId != null && (conv.closerId == closerId || conv.closerId == user?.id);
+        final matchName = closerName != null && closerName.isNotEmpty && conv.closerName != null && conv.closerName!.trim().toLowerCase() == closerName;
+        if (!matchId && !matchName) {
+          state = state.copyWith(isSending: false, errorMessage: 'Access Restricted: You cannot post in conversations for other orders.');
+          return false;
+        }
+      }
+
       String senderName = 'User';
       String? senderId = user?.id;
       String? senderAvatar = user?.avatarUrl;
@@ -285,7 +364,9 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
             : (user.email.split('@').first);
 
         final rStr = user.role.toLowerCase();
-        if (rStr.contains('client')) {
+        if (user.isCloser || rStr.contains('closer')) {
+          role = ChatSenderRole.closer;
+        } else if (rStr.contains('client')) {
           role = ChatSenderRole.client;
         } else if (rStr.contains('dc') || rStr.contains('admin') || rStr.contains('manager')) {
           role = ChatSenderRole.dcManager;

@@ -31,7 +31,69 @@ class PaystackGatewayLauncher {
       return;
     }
 
-    // 1. Show connecting dialog
+    bool hasHandledSuccess = false;
+
+    if (kIsWeb) {
+      // WEB: Popup the authentic Paystack Checkout modal directly on the current screen without network delay!
+      // Paystack Inline JS handles initialization instantly using the public key and pre-cached client SDK.
+      launchPaystackInlineJs(
+        publicKey: PaystackConstants.publicKey,
+        email: email.isNotEmpty ? email : 'customer@novaxpress.ng',
+        amountKobo: (amount * 100).round(),
+        reference: reference,
+        metadata: {
+          'payer_name': payerName,
+          'payer_code': payerCode ?? 'RDR',
+          'transaction_type': transactionType,
+          'agent_id': agentId,
+        },
+        onSuccess: (ref) {
+          if (hasHandledSuccess) return;
+          hasHandledSuccess = true;
+          onSuccess(ref);
+        },
+        onClose: () async {
+          if (hasHandledSuccess) return;
+          // Verify on close in case payment completed externally but webhook/callback lagged
+          try {
+            final result = await _paystackService.verifyTransaction(reference);
+            if (result.isSuccessful) {
+              if (hasHandledSuccess) return;
+              hasHandledSuccess = true;
+              onSuccess(reference);
+              return;
+            }
+          } catch (_) {}
+
+          // If not genuinely verified as successful, strictly treat as cancelled
+          onCancel?.call();
+        },
+        onFallback: () {
+          if (hasHandledSuccess) return;
+          // Fallback if browser extensions or blockers block inline JS
+          PaystackCheckoutOverlay.show(
+            context: context,
+            amount: amount,
+            email: email,
+            reference: reference,
+            payerName: payerName,
+            payerCode: payerCode,
+            agentId: agentId,
+            transactionType: transactionType,
+            title: title,
+            onSuccess: (ref) {
+              if (hasHandledSuccess) return;
+              hasHandledSuccess = true;
+              onSuccess(ref);
+            },
+            onCancel: onCancel,
+          );
+        },
+      );
+      return;
+    }
+
+    // MOBILE (Android / iOS): Open real Paystack in-app screen with native WebView
     BuildContext? dialogContext;
     showDialog(
       context: context,
@@ -73,7 +135,7 @@ class PaystackGatewayLauncher {
     try {
       final res = await _paystackService.initializeTransaction(
         amount: amount,
-        email: email.isNotEmpty ? email : 'rider.${(payerCode ?? 'rdr').toLowerCase()}@novaxpress.ng',
+        email: email.isNotEmpty ? email : 'customer@novaxpress.ng',
         reference: reference,
         metadata: {
           'payer_name': payerName,
@@ -94,113 +156,62 @@ class PaystackGatewayLauncher {
       Navigator.of(context, rootNavigator: true).maybePop();
     }
 
-    bool hasHandledSuccess = false;
+    if (!context.mounted) return;
 
-    if (kIsWeb) {
-      // WEB: Popup the authentic Paystack Checkout modal directly on the current screen!
-      launchPaystackInlineJs(
-        publicKey: PaystackConstants.publicKey,
-        email: email.isNotEmpty ? email : 'rider.${(payerCode ?? 'rdr').toLowerCase()}@novaxpress.ng',
-        amountKobo: (amount * 100).round(),
+    if (authUrl == null || authUrl.isEmpty) {
+      PaystackCheckoutOverlay.show(
+        context: context,
+        amount: amount,
+        email: email,
         reference: reference,
-        authorizationUrl: authUrl,
-        metadata: {
-          'payer_name': payerName,
-          'payer_code': payerCode ?? 'RDR',
-          'transaction_type': transactionType,
-          'agent_id': agentId,
-        },
+        payerName: payerName,
+        payerCode: payerCode,
+        agentId: agentId,
+        transactionType: transactionType,
+        title: title,
         onSuccess: (ref) {
           if (hasHandledSuccess) return;
           hasHandledSuccess = true;
           onSuccess(ref);
         },
-        onClose: () async {
-          if (hasHandledSuccess) return;
-          // Verify on close in case payment completed but webhook/callback lagged
-          try {
-            final result = await _paystackService.verifyTransaction(reference);
-            if (result.isSuccessful) {
-              if (hasHandledSuccess) return;
-              hasHandledSuccess = true;
-              onSuccess(reference);
-            } else {
-              onCancel?.call();
-            }
-          } catch (_) {
-            onCancel?.call();
-          }
-        },
-        onFallback: () {
-          if (hasHandledSuccess) return;
-          // Fallback if browser extensions or blockers block inline JS
-          PaystackCheckoutOverlay.show(
-            context: context,
-            amount: amount,
-            email: email,
-            reference: reference,
-            payerName: payerName,
-            payerCode: payerCode,
-            agentId: agentId,
-            transactionType: transactionType,
-            title: title,
-            onSuccess: (ref) {
-              if (hasHandledSuccess) return;
-              hasHandledSuccess = true;
-              onSuccess(ref);
-            },
-            onCancel: onCancel,
-          );
-        },
+        onCancel: onCancel,
       );
-    } else {
-      if (!context.mounted) return;
-      // MOBILE (Android / iOS): Open real Paystack in-app screen with native WebView
-      if (authUrl == null || authUrl.isEmpty) {
-        PaystackCheckoutOverlay.show(
-          context: context,
-          amount: amount,
-          email: email,
+      return;
+    }
+
+    final bool? success = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (ctx) => PaystackWebViewPage(
+          initialUrl: authUrl!,
           reference: reference,
-          payerName: payerName,
-          payerCode: payerCode,
-          agentId: agentId,
-          transactionType: transactionType,
+          amount: amount,
           title: title,
-          onSuccess: onSuccess,
-          onCancel: onCancel,
-        );
-        return;
-      }
-
-      if (!context.mounted) return;
-      final bool? success = await Navigator.push<bool>(
-        context,
-        MaterialPageRoute(
-          builder: (ctx) => PaystackWebViewPage(
-            initialUrl: authUrl!,
-            reference: reference,
-            amount: amount,
-            title: title,
-            onPaymentSuccess: onSuccess,
-          ),
+          onPaymentSuccess: (ref) {
+            if (hasHandledSuccess) return;
+            hasHandledSuccess = true;
+            onSuccess(ref);
+          },
         ),
-      );
+      ),
+    );
 
-      if (success == true) {
-        onSuccess(reference);
-      } else {
-        try {
-          final result = await _paystackService.verifyTransaction(reference);
-          if (result.isSuccessful) {
-            onSuccess(reference);
-          } else {
-            onCancel?.call();
-          }
-        } catch (_) {
-          onCancel?.call();
+    if (success == true) {
+      if (hasHandledSuccess) return;
+      hasHandledSuccess = true;
+      onSuccess(reference);
+    } else {
+      try {
+        final result = await _paystackService.verifyTransaction(reference);
+        if (result.isSuccessful) {
+          if (hasHandledSuccess) return;
+          hasHandledSuccess = true;
+          onSuccess(reference);
+          return;
         }
-      }
+      } catch (_) {}
+
+      onCancel?.call();
     }
   }
 }

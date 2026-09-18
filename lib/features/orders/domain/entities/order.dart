@@ -60,6 +60,7 @@ class OrderEntity {
   final String? closerId;
   final String? closerName;
   final String? closerCode;
+  final String? closerAvatarUrl;
   final String? leadId;
   final DateTime createdAt;
 
@@ -125,6 +126,7 @@ class OrderEntity {
     this.closerId,
     this.closerName,
     this.closerCode,
+    this.closerAvatarUrl,
     this.leadId,
     required this.createdAt,
   });
@@ -461,6 +463,7 @@ Kindly tap the "📎" attach button below and share your *Current Location / Liv
     String? closerId,
     String? closerName,
     String? closerCode,
+    String? closerAvatarUrl,
     String? leadId,
     DateTime? createdAt,
   }) {
@@ -526,6 +529,7 @@ Kindly tap the "📎" attach button below and share your *Current Location / Liv
       closerId: closerId ?? this.closerId,
       closerName: closerName ?? this.closerName,
       closerCode: closerCode ?? this.closerCode,
+      closerAvatarUrl: closerAvatarUrl ?? this.closerAvatarUrl,
       leadId: leadId ?? this.leadId,
       createdAt: createdAt ?? this.createdAt,
     );

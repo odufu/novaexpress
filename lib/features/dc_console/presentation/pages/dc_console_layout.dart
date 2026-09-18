@@ -247,7 +247,7 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
                 if (isPrimaryDc)
                   _buildNavItem(9, 'Distribution Centers', Icons.apartment_rounded, state.activeTabIndex == 9, isCollapsed, isDrawer),
                 _buildNavItem(11, 'Clients & Merchants', Icons.storefront_rounded, state.activeTabIndex == 11, isCollapsed, isDrawer),
-                _buildNavItem(10, 'Policy & Settings', Icons.tune_rounded, state.activeTabIndex == 10, isCollapsed, isDrawer),
+                _buildNavItem(10, 'Policy & Settings', Icons.settings_outlined, state.activeTabIndex == 10, isCollapsed, isDrawer),
               ],
             ),
           ),
@@ -283,7 +283,7 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
                       children: [
                         UserAvatarWidget(
                           avatarUrl: user?.avatarUrl,
-                          fullName: user != null && user.fullName.isNotEmpty ? user.fullName : 'Adekunle Supervisor',
+                          fullName: user != null && user.fullName.isNotEmpty ? user.fullName : 'DC Operations Supervisor',
                           radius: 18,
                           showBorder: true,
                           borderColor: const Color(0xFFF37021),
@@ -295,7 +295,7 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                user != null && user.fullName.isNotEmpty ? user.fullName : 'Adekunle Supervisor',
+                                user != null && user.fullName.isNotEmpty ? user.fullName : 'DC Operations Supervisor',
                                 style: GoogleFonts.inter(
                                   fontSize: 13,
                                   fontWeight: FontWeight.bold,
@@ -334,14 +334,15 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
     IconData icon,
     bool isSelected,
     bool isCollapsed,
-    bool isDrawer,
-  ) {
+    bool isDrawer, {
+    bool hasDot = false,
+  }) {
     final notifier = ref.read(dcConsoleProvider.notifier);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 4),
       child: Material(
-        color: isSelected ? const Color(0xFF1A2B48) : Colors.transparent,
+        color: isSelected ? const Color(0xFF1E254E) : Colors.transparent,
         borderRadius: BorderRadius.circular(10),
         child: InkWell(
           onTap: () {
@@ -352,44 +353,77 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
           },
           borderRadius: BorderRadius.circular(10),
           hoverColor: Colors.white.withValues(alpha: 0.08),
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: isCollapsed ? 12 : 14,
-              vertical: 11,
-            ),
-            child: Row(
-              mainAxisAlignment: isCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
-              children: [
-                Icon(
-                  icon,
-                  size: 20,
-                  color: isSelected ? const Color(0xFFF37021) : const Color(0xFF8293B5),
-                ),
-                if (!isCollapsed) ...[
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                        color: isSelected ? Colors.white : const Color(0xFFCBD5E1),
-                      ),
-                      overflow: TextOverflow.ellipsis,
+          child: Stack(
+            alignment: Alignment.centerLeft,
+            children: [
+              if (isSelected)
+                Positioned(
+                  left: 0,
+                  top: 6,
+                  bottom: 6,
+                  child: Container(
+                    width: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF6366F1),
+                      borderRadius: BorderRadius.circular(4),
                     ),
                   ),
-                  if (isSelected)
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFF37021),
-                        shape: BoxShape.circle,
-                      ),
+                ),
+              Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isCollapsed ? 12 : 14,
+                  vertical: 11,
+                ),
+                child: Row(
+                  mainAxisAlignment: isCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
+                  children: [
+                    if (!isCollapsed && isSelected) const SizedBox(width: 4),
+                    Icon(
+                      icon,
+                      size: 20,
+                      color: isSelected ? const Color(0xFF818CF8) : const Color(0xFF8293B5),
                     ),
-                ],
-              ],
-            ),
+                    if (!isCollapsed) ...[
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                            color: isSelected ? Colors.white : const Color(0xFFCBD5E1),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (isSelected || hasDot)
+                        Container(
+                          width: 22,
+                          height: 22,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2E2938),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: const Color(0xFFF59E0B).withValues(alpha: 0.25),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Center(
+                            child: Container(
+                              width: 9,
+                              height: 9,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFF59E0B),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),

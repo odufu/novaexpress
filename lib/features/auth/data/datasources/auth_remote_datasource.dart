@@ -21,6 +21,7 @@ abstract class AuthRemoteDataSource {
     required double commissionRate,
     required double transportAllowance,
     required double fuelAllowance,
+    double failedDeliveryAllowance = 500.0,
     required double baseSalary,
     required String vehicleType,
     required String vehiclePlateNumber,
@@ -66,16 +67,9 @@ abstract class AuthRemoteDataSource {
 }
 
 class MockAuthRemoteDataSource implements AuthRemoteDataSource {
-  UserModel? _currentUser = const UserModel(
-    id: 'b1111111-1111-4111-8111-111111111111',
-    email: 'rider.emeka@novaxpress.com',
-    firstName: 'Emeka',
-    lastName: 'Rider',
-    phone: '08012345678',
-    role: 'delivery_agent',
-    deliveryAgentId: 'b1111111-1111-4111-8111-111111111111',
-    deliveryAgentCode: 'PDA-7000',
-  );
+  UserModel? _currentUser;
+
+  MockAuthRemoteDataSource([this._currentUser]);
 
   @override
   Future<UserModel> login(String email, String password) async {
@@ -92,43 +86,66 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
     }
 
     // 2. Verified Demo / Seed Accounts
-    if (clean == 'client.novacale@novaxpress.ng') {
+    if (clean == 'client.novacale@novaxpress.ng' || clean == 'merchant@novacare.com') {
       if (password != 'ClientPass123!' && password != 'Password123!') {
         throw AppAuthException('Invalid email or password. Please check your credentials.');
       }
       _currentUser = const UserModel(
-        id: '33333333-3333-4333-8333-333333333333',
-        email: 'client.novacale@novaxpress.ng',
+        id: '00000000-0000-4000-8000-789382731303',
+        email: 'merchant@novacare.com',
         firstName: 'Dr. Chuka',
         lastName: 'Okafor',
         phone: '08034455667',
         role: 'client',
-        clientId: '33333333-3333-4333-8333-333333333333',
-        clientCompanyName: 'Novacale Limited',
-        deliveryAgentCode: 'CLI-NOVACALE-01',
+        clientId: '00000000-0000-4000-8000-789382731303',
+        clientCompanyName: 'Novacare Health & Wellness Ltd',
+        deliveryAgentCode: 'CLI-NOVACARE-01',
         operatingState: 'Federal Capital Territory',
         operatingCity: 'Abuja',
       );
       return _currentUser!;
     }
 
-    if (clean == 'closer.amaka@novacale.ng') {
+    if (clean == 'closer.amaka@novacale.ng' || clean == 'closer@novacare.com') {
       if (password != 'CloserPass123!' && password != 'Password123!') {
         throw AppAuthException('Invalid email or password. Please check your credentials.');
       }
       _currentUser = const UserModel(
         id: '44444444-4444-4444-8444-444444444444',
-        email: 'closer.amaka@novacale.ng',
+        email: 'closer@novacare.com',
         firstName: 'Amaka',
         lastName: 'Chioma',
         phone: '08021122334',
         role: 'closer',
         closerId: '44444444-4444-4444-8444-444444444444',
         closerCode: 'CLS-NOVA-001',
-        clientId: '33333333-3333-4333-8333-333333333333',
-        clientCompanyName: 'Novacale Limited',
+        clientId: '00000000-0000-4000-8000-789382731303',
+        clientCompanyName: 'Novacare Health & Wellness Ltd',
         operatingState: 'Federal Capital Territory',
         operatingCity: 'Abuja',
+        avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
+      );
+      return _currentUser!;
+    }
+
+    if (clean == 'chidinma.closer@novacare.com') {
+      if (password != 'CloserPass123!' && password != 'Password123!') {
+        throw AppAuthException('Invalid email or password. Please check your credentials.');
+      }
+      _currentUser = const UserModel(
+        id: '55555555-5555-4555-8555-555555555555',
+        email: 'chidinma.closer@novacare.com',
+        firstName: 'Chidinma',
+        lastName: 'Eze',
+        phone: '08034567890',
+        role: 'closer',
+        closerId: '55555555-5555-4555-8555-555555555555',
+        closerCode: 'CLS-NOVA-002',
+        clientId: '00000000-0000-4000-8000-789382731303',
+        clientCompanyName: 'Novacare Health & Wellness Ltd',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Abuja',
+        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
       );
       return _currentUser!;
     }
@@ -192,6 +209,7 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
     required double commissionRate,
     required double transportAllowance,
     required double fuelAllowance,
+    double failedDeliveryAllowance = 500.0,
     required double baseSalary,
     required String vehicleType,
     required String vehiclePlateNumber,
@@ -334,16 +352,71 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     final cleanInput = rawInput.toLowerCase();
     debugPrint('[AUTH_DATASOURCE] 🔐 Attempting login for identifier: "$rawInput"...');
 
-    // 0. Resolve Agent Code to Email if user typed an Agent Code (e.g., PDA-7588, PDA-7000, or RDR-102)
+    // 0. Dynamic Code Resolution: Resolve Agent Code / Closer Code / Client Code to registered email
     String lookupEmail = cleanInput;
     String? resolvedAgentCode;
-    if (!cleanInput.contains('@') || cleanInput.startsWith('pda-') || cleanInput.startsWith('rdr-')) {
+    if (!cleanInput.contains('@') ||
+        cleanInput.startsWith('pda-') ||
+        cleanInput.startsWith('rdr-') ||
+        cleanInput.startsWith('cls-') ||
+        cleanInput.startsWith('cli-')) {
       resolvedAgentCode = rawInput.toUpperCase();
-      // Check in-memory registered accounts by agent code
+      // Check in-memory registered accounts by agent code or closer code
       for (final user in _registeredUsers.values) {
-        if (user.deliveryAgentCode?.toUpperCase() == resolvedAgentCode) {
+        if (user.deliveryAgentCode?.toUpperCase() == resolvedAgentCode ||
+            user.closerCode?.toUpperCase() == resolvedAgentCode) {
           lookupEmail = user.email.toLowerCase();
           break;
+        }
+      }
+
+      // If still not resolved, query the database dynamically
+      if (!lookupEmail.contains('@')) {
+        try {
+          final dbClient = SupabaseClient(
+            SupabaseConstants.supabaseUrl,
+            SupabaseConstants.supabaseServiceRoleKey,
+          );
+          // Check delivery_agents
+          final daRes = await dbClient
+              .from(SupabaseConstants.deliveryAgentsTable)
+              .select('user_id')
+              .ilike('agent_code', resolvedAgentCode)
+              .maybeSingle();
+          if (daRes != null && daRes['user_id'] != null) {
+            final uRes = await dbClient
+                .from(SupabaseConstants.usersTable)
+                .select('email')
+                .eq('id', daRes['user_id'])
+                .maybeSingle();
+            if (uRes != null && uRes['email'] != null) {
+              lookupEmail = uRes['email'].toString().toLowerCase();
+            }
+          }
+          // Check client_closers
+          if (!lookupEmail.contains('@')) {
+            final closerRes = await dbClient
+                .from('client_closers')
+                .select('email')
+                .ilike('closer_code', resolvedAgentCode)
+                .maybeSingle();
+            if (closerRes != null && closerRes['email'] != null) {
+              lookupEmail = closerRes['email'].toString().toLowerCase();
+            }
+          }
+          // Check clients
+          if (!lookupEmail.contains('@')) {
+            final clientRes = await dbClient
+                .from('clients')
+                .select('email')
+                .ilike('code', resolvedAgentCode)
+                .maybeSingle();
+            if (clientRes != null && clientRes['email'] != null) {
+              lookupEmail = clientRes['email'].toString().toLowerCase();
+            }
+          }
+        } catch (e) {
+          debugPrint('[AUTH_DATASOURCE] ℹ️ Code lookup notice ($e)');
         }
       }
     }
@@ -370,65 +443,37 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       return _registeredUsers[lookupEmail]!;
     }
 
-    // 2. Verified Demo / Seed Accounts (strict email and password matching, zero heuristic wildcards)
-    const demoAccounts = {
-      'emeka.rider@novaxpress.ng': ('Password123!', 'a1111111-1111-4111-8111-111111111111'),
-      'emeka.rider@novaexpress.ng': ('Password123!', 'a1111111-1111-4111-8111-111111111111'),
-      'rider.emeka@novaxpress.com': ('Password123!', 'a1111111-1111-4111-8111-111111111111'),
-      'rider.emeka@novaexpress.com': ('Password123!', 'a1111111-1111-4111-8111-111111111111'),
-      'rider@novaxpress.ng': ('Password123!', 'a1111111-1111-4111-8111-111111111111'),
-      'rider@novaexpress.ng': ('Password123!', 'a1111111-1111-4111-8111-111111111111'),
-      'joel.odufu@novaxpress.ng': ('Password123!', '44ce8d3c-9f96-45d2-a051-2d1b9463cd10'),
-      'joel.odufu@novaexpress.ng': ('Password123!', '44ce8d3c-9f96-45d2-a051-2d1b9463cd10'),
-      'dc.supervisor@novaxpress.ng': ('Password123!', 'a2222222-2222-4222-8222-222222222222'),
-      'dc.supervisor@novaexpress.ng': ('Password123!', 'a2222222-2222-4222-8222-222222222222'),
-      'client.novacale@novaxpress.ng': ('ClientPass123!', '33333333-3333-4333-8333-333333333333'),
-      'client.novacale@novaexpress.ng': ('ClientPass123!', '33333333-3333-4333-8333-333333333333'),
-      'client@novaxpress.ng': ('ClientPass123!', '33333333-3333-4333-8333-333333333333'),
-      'client@novaexpress.ng': ('ClientPass123!', '33333333-3333-4333-8333-333333333333'),
-      'closer.amaka@novacale.ng': ('CloserPass123!', '44444444-4444-4444-8444-444444444444'),
-      'closer@novaxpress.ng': ('CloserPass123!', '44444444-4444-4444-8444-444444444444'),
-      'closer@novaexpress.ng': ('CloserPass123!', '44444444-4444-4444-8444-444444444444'),
-    };
-
-    if (demoAccounts.containsKey(lookupEmail)) {
-      final (expectedPassword, defaultUserId) = demoAccounts[lookupEmail]!;
-      if (password != expectedPassword && password != 'Password123!') {
-        throw AppAuthException('Invalid email or password. Please check your credentials.');
+    // 2. Production Standard Supabase Authentication
+    debugPrint('[AUTH_DATASOURCE] 🌐 Calling Supabase auth.signInWithPassword for "$lookupEmail"...');
+    User? authUser;
+    try {
+      final response = await supabaseClient.auth.signInWithPassword(
+        email: lookupEmail,
+        password: password,
+      );
+      authUser = response.user;
+    } catch (e) {
+      // Fallback: If auth with lookupEmail failed, try alternate domain (novaxpress vs legacy novaexpress)
+      final altEmail = lookupEmail.contains('@novaxpress.')
+          ? lookupEmail.replaceAll('@novaxpress.', '@novaexpress.')
+          : lookupEmail.replaceAll('@novaexpress.', '@novaxpress.');
+      if (altEmail != lookupEmail) {
+        try {
+          final altResponse = await supabaseClient.auth.signInWithPassword(
+            email: altEmail,
+            password: password,
+          );
+          authUser = altResponse.user;
+        } catch (_) {}
       }
-
-      debugPrint('[AUTH_DATASOURCE] ⚡ Matched verified seed account for "$lookupEmail". Authenticating with Supabase...');
-      try {
-        final response = await supabaseClient.auth.signInWithPassword(
-          email: lookupEmail,
-          password: password,
-        );
-        final authUser = response.user;
-        if (authUser != null) {
-          debugPrint('[AUTH_DATASOURCE] ✅ Supabase remote sign-in successful: ${authUser.id}');
-          return await _fetchUserProfile(authUser.id, authUser.email ?? lookupEmail);
-        }
-      } catch (err) {
-        // Fallback: If auth with lookupEmail failed, try alternate domain (novaxpress vs legacy novaexpress)
-        final altEmail = lookupEmail.contains('@novaxpress.')
-            ? lookupEmail.replaceAll('@novaxpress.', '@novaexpress.')
-            : lookupEmail.replaceAll('@novaexpress.', '@novaxpress.');
-        if (altEmail != lookupEmail) {
-          try {
-            final altResponse = await supabaseClient.auth.signInWithPassword(
-              email: altEmail,
-              password: password,
-            );
-            final authUser = altResponse.user;
-            if (authUser != null) {
-              debugPrint('[AUTH_DATASOURCE] ✅ Supabase sign-in via alternate email ($altEmail) successful: ${authUser.id}');
-              return await _fetchUserProfile(authUser.id, authUser.email ?? lookupEmail);
-            }
-          } catch (_) {}
-        }
-        debugPrint('[AUTH_DATASOURCE] ℹ️ Supabase auth notice ($err). Loading live user profile from database.');
+      if (authUser == null) {
+        debugPrint('[AUTH_DATASOURCE] ℹ️ Remote sign-in notice ($e). Checking database records...');
       }
-      return await _fetchUserProfile(defaultUserId, lookupEmail);
+    }
+
+    if (authUser != null) {
+      debugPrint('[AUTH_DATASOURCE] ✅ Supabase authenticated: ${authUser.id}. Fetching live profile...');
+      return await _fetchUserProfile(authUser.id, authUser.email ?? lookupEmail);
     }
 
     // 3. Authenticate with Supabase Auth for live registered users
@@ -590,7 +635,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       'client.novacale@novaxpress.ng',
       'client@novaxpress.ng',
       'closer.amaka@novacale.ng',
+      'closer@novacare.com',
+      'chidinma.closer@novacare.com',
       'closer@novaxpress.ng',
+      'merchant@novacare.com',
     };
     if (demoAccounts.contains(cleanEmail)) return true;
 
@@ -662,6 +710,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     required double commissionRate,
     required double transportAllowance,
     required double fuelAllowance,
+    double failedDeliveryAllowance = 500.0,
     required double baseSalary,
     required String vehicleType,
     required String vehiclePlateNumber,
@@ -797,6 +846,13 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           'user_id': userId,
           'agent_code': agentCode,
           'distribution_center_id': effectiveDcId,
+          'personnel_type': personnelType,
+          'compensation_type': compensationType,
+          'commission_rate': commissionRate,
+          'transport_allowance': transportAllowance,
+          'fuel_allowance': fuelAllowance,
+          'failed_delivery_allowance': failedDeliveryAllowance,
+          'base_salary': baseSalary,
           'vehicle_type': vehicleType,
           'vehicle_plate_number': vehiclePlateNumber,
           'operating_state': 'Abuja (FCT)',
@@ -824,6 +880,20 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         throw Exception("Failed to create delivery agent record: $agentErr");
       }
 
+    String? dcName;
+    if (effectiveDcId.isNotEmpty) {
+      try {
+        final dcRes = await dbClient
+            .from('distribution_centers')
+            .select('name')
+            .eq('id', effectiveDcId)
+            .maybeSingle();
+        if (dcRes != null) {
+          dcName = dcRes['name']?.toString();
+        }
+      } catch (_) {}
+    }
+
     final userModel = UserModel(
       id: userId,
       authUserId: authUserId,
@@ -834,13 +904,14 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       role: 'delivery_agent',
       deliveryAgentId: agentId,
       deliveryAgentCode: agentCode,
-      distributionCenterId: distributionCenterId,
-      distributionCenterName: 'Wuse Distribution Center',
+      distributionCenterId: effectiveDcId,
+      distributionCenterName: dcName ?? 'Distribution Hub',
       personnelType: personnelType,
       compensationType: compensationType,
       commissionRate: commissionRate,
       transportAllowance: transportAllowance,
       fuelAllowance: fuelAllowance,
+      failedDeliveryAllowance: failedDeliveryAllowance,
       baseSalary: baseSalary,
       vehicleType: vehicleType,
       vehiclePlateNumber: vehiclePlateNumber,
@@ -1415,8 +1486,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       } else if (isDcStaff) {
         merged['role'] = 'dc_manager';
         merged['delivery_agent_id'] = null;
-        merged['first_name'] ??= 'Adekunle';
-        merged['last_name'] ??= 'Supervisor';
         
         String? assignedDcId = userRes?['distribution_center_id'] ?? merged['distribution_center_id'];
         String? assignedDcName = userRes?['distribution_center_name'] ?? merged['distribution_center_name'];
@@ -1428,6 +1497,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
             dcRow = await dbClient.from('distribution_centers').select().eq('id', assignedDcId).maybeSingle();
           }
           dcRow ??= await dbClient.from('distribution_centers').select().ilike('contact_email', cleanEmail).maybeSingle();
+          dcRow ??= await dbClient.from('distribution_centers').select().eq('is_active', true).order('is_hub', ascending: false).limit(1).maybeSingle();
 
           if (dcRow != null) {
             assignedDcId = dcRow['id'];
@@ -1435,25 +1505,22 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
             assignedDcCode = dcRow['code'];
             if (dcRow['manager_name'] != null && (userRes?['first_name'] == null || userRes!['first_name'].toString().isEmpty)) {
               final parts = dcRow['manager_name'].toString().trim().split(' ');
-              merged['first_name'] = parts.first;
-              merged['last_name'] = parts.length > 1 ? parts.sublist(1).join(' ') : '';
+              merged['first_name'] ??= parts.first;
+              merged['last_name'] ??= parts.length > 1 ? parts.sublist(1).join(' ') : '';
             }
           }
         } catch (e) {
           debugPrint('[AUTH_DATASOURCE] ℹ️ DC Supervisor hub query notice ($e)');
         }
 
-        merged['distribution_center_id'] = assignedDcId ?? '22222222-2222-4222-8222-222222222222';
-        merged['distribution_center_name'] = assignedDcName ?? 'Wuse Central Distribution Hub';
-        merged['delivery_agent_code'] = assignedDcCode ?? 'DC-WUSE-01';
+        merged['first_name'] ??= userRes?['first_name'] ?? 'DC';
+        merged['last_name'] ??= userRes?['last_name'] ?? 'Supervisor';
+        merged['distribution_center_id'] = assignedDcId;
+        merged['distribution_center_name'] = assignedDcName ?? 'Central Distribution Hub';
+        merged['delivery_agent_code'] = assignedDcCode ?? 'DC-01';
       } else {
         // Field Delivery Agent (Rider)
         merged['role'] = 'delivery_agent';
-        merged['distribution_center_id'] ??= '22222222-2222-4222-8222-222222222222';
-        merged['distribution_center_name'] ??= 'Wuse Central Distribution Hub';
-        merged['delivery_agent_code'] ??= (cleanEmail.contains('joel') ? 'PDA-7182' : 'PDA-7000');
-        merged['first_name'] ??= (cleanEmail.contains('joel') ? 'Joel' : 'Emeka');
-        merged['last_name'] ??= (cleanEmail.contains('joel') ? 'Odufu' : 'Rider');
         try {
           agentRes = await dbClient
               .from(SupabaseConstants.deliveryAgentsTable)
@@ -1465,6 +1532,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
               .from(SupabaseConstants.deliveryAgentsTable)
               .select()
               .eq('id', userId)
+              .maybeSingle();
+
+          agentRes ??= await dbClient
+              .from(SupabaseConstants.deliveryAgentsTable)
+              .select()
+              .ilike('email', cleanEmail)
               .maybeSingle();
         } catch (e) {
           debugPrint('[AUTH_DATASOURCE] ℹ️ Delivery agents query notice ($e)');
@@ -1520,6 +1593,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         } else {
           deliveryAgentId = 'agt-${cleanEmail.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')}';
         }
+
+        merged['first_name'] ??= userRes?['first_name'] ?? 'Field';
+        merged['last_name'] ??= userRes?['last_name'] ?? 'Rider';
+        merged['delivery_agent_code'] ??= agentRes?['agent_code'] ?? userRes?['delivery_agent_code'] ?? 'PDA-01';
       }
 
       if (email.isNotEmpty) {

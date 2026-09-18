@@ -90,4 +90,17 @@ class FinanceRepositoryImpl implements FinanceRepository {
   Future<Map<String, dynamic>?> getPaystackTransactionDetails(String reference) async {
     return await remoteDataSource.getPaystackTransactionDetails(reference);
   }
+
+  @override
+  Future<Map<String, dynamic>> confirmPayoutReceipt({
+    required String payoutId,
+    required String agentId,
+    String? notes,
+  }) async {
+    return await remoteDataSource.confirmPayoutReceipt(
+      payoutId: payoutId,
+      agentId: agentId,
+      notes: notes,
+    );
+  }
 }

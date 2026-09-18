@@ -49,6 +49,19 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
 
   void _initAppAndNavigate() async {
     if (_hasNavigated) return;
+
+    // Fast-track if user is already pre-warmed from local cache
+    final preloadedAuth = ref.read(authProvider);
+    if (preloadedAuth.isAuthenticated && preloadedAuth.user != null) {
+      await Future.delayed(const Duration(milliseconds: 600));
+      if (!mounted || _hasNavigated) return;
+      _hasNavigated = true;
+      final target = preloadedAuth.user!.homeConsoleRoute;
+      debugPrint('[SPLASH] ⚡ Pre-warmed ${preloadedAuth.user!.roleDescription} -> Routing directly to $target');
+      context.go(target);
+      return;
+    }
+
     await Future.delayed(const Duration(milliseconds: 1400));
 
     if (!mounted || _hasNavigated) return;

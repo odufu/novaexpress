@@ -168,11 +168,13 @@ class DCConsoleRepositoryImpl implements DCConsoleRepository {
     required String claimId,
     required double amount,
     required String driverId,
+    String? disbursementRef,
   }) async {
     await _remoteDataSource.approvePayoutClaim(
       claimId: claimId,
       amount: amount,
       driverId: driverId,
+      disbursementRef: disbursementRef,
     );
   }
 

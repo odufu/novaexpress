@@ -12,6 +12,7 @@ abstract class ClientPortalRepository {
     required String phone,
     String? password,
     String? avatarUrl,
+    String? closerCode,
     int dailyCallTarget = 50,
     double commissionRate = 500.0,
   });

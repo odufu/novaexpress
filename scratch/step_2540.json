@@ -1,0 +1,12 @@
+{
+  "AllowMultiple": false,
+  "Description": "Use ClientPortalNotifier.isProductForClient in client_products_page.dart",
+  "EndLine": 86,
+  "Instruction": "Use ClientPortalNotifier.isProductForClient",
+  "ReplacementContent": "    // Scoped products from master catalog for this merchant\n    final catalogMerchantProducts = catalogState.products.where((p) {\n      return ClientPortalNotifier.isProductForClient(\n        product: p,\n        clientId: effectiveClientId,\n        companyName: effectiveCompanyName,\n      );\n    }).toList();",
+  "StartLine": 80,
+  "TargetContent": "    // Scoped products from master catalog for this merchant\n    final catalogMerchantProducts = catalogState.products.where((p) {\n      if (effectiveClientId.isNotEmpty && p.clientId != null && p.clientId == effectiveClientId) return true;\n      if (effectiveCompanyName.isNotEmpty && p.clientName.trim().isNotEmpty && p.clientName.trim().toLowerCase() == effectiveCompanyName.trim().toLowerCase()) return true;\n      return false;\n    }).toList();",
+  "TargetFile": "c:\\PROJECT\\NoveXPS\\lib\\features\\client_portal\\presentation\\pages\\client_products_page.dart",
+  "toolAction": "Editing file",
+  "toolSummary": "Update product filtering in client_products_page.dart"
+}

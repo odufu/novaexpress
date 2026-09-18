@@ -339,6 +339,7 @@ CREATE TABLE IF NOT EXISTS orders (
     closer_id UUID REFERENCES client_closers(id) ON DELETE SET NULL,
     closer_name VARCHAR(255),
     closer_code VARCHAR(50),
+    closer_avatar_url TEXT,
     lead_id UUID REFERENCES customer_leads(id) ON DELETE SET NULL,
     customer_name VARCHAR(255) NOT NULL,
     customer_phone VARCHAR(50) NOT NULL,
@@ -417,6 +418,7 @@ CREATE TABLE IF NOT EXISTS order_conversations (
     delivery_agent_name VARCHAR(255),
     closer_id UUID REFERENCES client_closers(id) ON DELETE SET NULL,
     closer_name VARCHAR(255),
+    closer_avatar_url TEXT,
     order_status VARCHAR(50),
     current_product_name VARCHAR(255),
     current_package_name VARCHAR(255),
@@ -663,6 +665,8 @@ CREATE TABLE IF NOT EXISTS payout_requests (
     dc_notes TEXT,
     notes TEXT,
     rejection_reason TEXT,
+    rider_confirmed_at TIMESTAMPTZ,
+    rider_confirmation_notes TEXT,
     approved_by UUID REFERENCES users(id) ON DELETE SET NULL,
     approved_at TIMESTAMPTZ,
     reviewed_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
@@ -2160,7 +2164,14 @@ SECURITY DEFINER
 AS $$
 DECLARE
     v_new_status VARCHAR;
+    v_agent RECORD;
+    v_order RECORD;
+    v_failed_allowance NUMERIC(14,2) := 0.00;
+    v_new_balance NUMERIC(14,2) := 0.00;
 BEGIN
+    SELECT * INTO v_agent FROM public.delivery_agents WHERE id = p_agent_id;
+    SELECT * INTO v_order FROM public.orders WHERE id = p_order_id;
+
     IF p_reason_code = 'rescheduled' OR p_reason_code = 'customer_callback' OR p_reschedule_time IS NOT NULL THEN
         v_new_status := 'call_back';
     ELSE
@@ -2184,17 +2195,56 @@ BEGIN
         created_at
     ) VALUES (
         p_order_id,
-        (SELECT user_id FROM public.delivery_agents WHERE id = p_agent_id),
+        v_agent.user_id,
         'delivery_failed',
         CONCAT('Delivery attempt failed: [', p_reason_code, '] ', COALESCE(p_notes, '')),
         NOW()
     );
 
+    -- Credit Rider's direct_transfer_balance with failed delivery allowance (as configured on the rider's profile)
+    v_failed_allowance := COALESCE(v_agent.failed_delivery_allowance, 500.00);
+    IF v_failed_allowance > 0.00 THEN
+        UPDATE public.delivery_agents
+        SET 
+            direct_transfer_balance = COALESCE(direct_transfer_balance, 0.00) + v_failed_allowance,
+            updated_at = NOW()
+        WHERE id = p_agent_id
+        RETURNING direct_transfer_balance INTO v_new_balance;
+
+        INSERT INTO public.rider_transactions (
+            delivery_agent_id,
+            transaction_code,
+            title,
+            category,
+            amount,
+            is_credit,
+            reference,
+            status,
+            description,
+            created_at
+        ) VALUES (
+            p_agent_id,
+            CONCAT('TXN-FAIL-', TO_CHAR(NOW(), 'YYYYMMDD'), '-', SUBSTRING(p_order_id::TEXT FROM 1 FOR 4)),
+            'Failed Delivery Stipend',
+            'failed_delivery_stipend',
+            v_failed_allowance,
+            TRUE,
+            COALESCE(v_order.order_number, SUBSTRING(p_order_id::TEXT FROM 1 FOR 8)),
+            'completed',
+            CONCAT('Transport stipend for failed attempt [', p_reason_code, '] on order ', COALESCE(v_order.order_number, '')),
+            NOW()
+        );
+    ELSE
+        v_new_balance := COALESCE(v_agent.direct_transfer_balance, 0.00);
+    END IF;
+
     RETURN jsonb_build_object(
         'success', true,
         'order_id', p_order_id,
         'status', v_new_status,
-        'message', 'Delivery failure recorded and logged.'
+        'failed_delivery_stipend', v_failed_allowance,
+        'direct_transfer_balance', v_new_balance,
+        'message', 'Delivery failure recorded, attempt stipend credited to My Balance.'
     );
 END;
 $$;
@@ -2302,7 +2352,61 @@ BEGIN
 END;
 $$;
 
--- 4.23 Merchant Asset Custody & Dual Valuation: fn_calculate_merchant_asset_custody
+-- 4.23 Rider Confirm Payout Receipt: fn_rider_confirm_payout_receipt
+CREATE OR REPLACE FUNCTION public.fn_rider_confirm_payout_receipt(
+    p_payout_id UUID,
+    p_agent_id UUID,
+    p_notes TEXT DEFAULT NULL
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_payout RECORD;
+BEGIN
+    SELECT * INTO v_payout
+    FROM public.payout_requests
+    WHERE id = p_payout_id AND (delivery_agent_id = p_agent_id OR p_agent_id IS NULL);
+
+    IF v_payout.id IS NULL THEN
+        SELECT * INTO v_payout FROM public.payout_requests WHERE id = p_payout_id;
+        IF v_payout.id IS NULL THEN
+            RETURN jsonb_build_object(
+                'success', false,
+                'error', 'Payout request not found.'
+            );
+        END IF;
+    END IF;
+
+    UPDATE public.payout_requests
+    SET 
+        status = 'completed',
+        rider_confirmed_at = NOW(),
+        rider_confirmation_notes = COALESCE(p_notes, 'Confirmed received by rider in PDA app'),
+        updated_at = NOW()
+    WHERE id = p_payout_id;
+
+    -- Update any corresponding rider_transactions audit log to settled
+    UPDATE public.rider_transactions
+    SET 
+        status = 'settled',
+        description = CONCAT(description, ' [Rider Confirmed Receipt at ', TO_CHAR(NOW(), 'YYYY-MM-DD HH24:MI'), ']')
+    WHERE delivery_agent_id = v_payout.delivery_agent_id
+      AND (reference = v_payout.payout_number OR reference = v_payout.disbursement_ref);
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'payout_id', p_payout_id,
+        'payout_number', v_payout.payout_number,
+        'status', 'completed',
+        'confirmed_at', NOW(),
+        'message', 'Payout receipt successfully confirmed by rider.'
+    );
+END;
+$$;
+
+-- 4.24 Merchant Asset Custody & Dual Valuation: fn_calculate_merchant_asset_custody
 CREATE OR REPLACE FUNCTION public.fn_calculate_merchant_asset_custody(
     p_client_id UUID,
     p_dc_id UUID DEFAULT NULL
@@ -2842,6 +2946,7 @@ DECLARE
     v_dc_name TEXT;
     v_rider_name TEXT;
     v_closer_name TEXT;
+    v_closer_avatar_url TEXT;
 BEGIN
     IF NEW.client_id IS NOT NULL THEN
         SELECT company_name INTO v_client_name FROM public.clients WHERE id = NEW.client_id;
@@ -2856,7 +2961,14 @@ BEGIN
     END IF;
 
     IF NEW.closer_id IS NOT NULL THEN
-        SELECT full_name INTO v_closer_name FROM public.client_closers WHERE id = NEW.closer_id;
+        SELECT full_name, avatar_url INTO v_closer_name, v_closer_avatar_url FROM public.client_closers WHERE id = NEW.closer_id;
+    END IF;
+
+    IF v_closer_name IS NULL THEN
+        v_closer_name := NEW.closer_name;
+    END IF;
+    IF v_closer_avatar_url IS NULL THEN
+        v_closer_avatar_url := NEW.closer_avatar_url;
     END IF;
 
     INSERT INTO public.order_conversations (
@@ -2872,6 +2984,7 @@ BEGIN
         delivery_agent_name,
         closer_id,
         closer_name,
+        closer_avatar_url,
         order_status,
         current_product_name,
         current_package_name,
@@ -2893,6 +3006,7 @@ BEGIN
         v_rider_name,
         NEW.closer_id,
         v_closer_name,
+        v_closer_avatar_url,
         NEW.status,
         NEW.product_name,
         NEW.package_deal_name,
@@ -2914,6 +3028,7 @@ BEGIN
         delivery_agent_name = EXCLUDED.delivery_agent_name,
         closer_id = EXCLUDED.closer_id,
         closer_name = EXCLUDED.closer_name,
+        closer_avatar_url = EXCLUDED.closer_avatar_url,
         order_status = EXCLUDED.order_status,
         current_product_name = EXCLUDED.current_product_name,
         current_package_name = EXCLUDED.current_package_name,
@@ -2926,7 +3041,7 @@ $$;
 
 DROP TRIGGER IF EXISTS trg_orders_sync_conversation ON public.orders;
 CREATE TRIGGER trg_orders_sync_conversation
-    AFTER INSERT OR UPDATE OF customer_name, customer_phone, client_id, distribution_center_id, delivery_agent_id, closer_id, status, product_name, package_deal_name, total_amount
+    AFTER INSERT OR UPDATE OF customer_name, customer_phone, client_id, distribution_center_id, delivery_agent_id, closer_id, closer_avatar_url, status, product_name, package_deal_name, total_amount
     ON public.orders
     FOR EACH ROW
     EXECUTE FUNCTION public.fn_sync_order_conversation();
@@ -2940,13 +3055,13 @@ AS $$
 BEGIN
     UPDATE public.order_conversations
     SET 
-        last_message_text = NEW.message,
+        last_message_text = NEW.message_body,
         last_message_sender_id = NEW.sender_id,
         last_message_sender_name = NEW.sender_name,
         last_message_at = NEW.created_at,
-        unread_client_count = CASE WHEN NEW.sender_role <> 'client' THEN unread_client_count + 1 ELSE unread_client_count END,
-        unread_dc_count = CASE WHEN NEW.sender_role <> 'dc' THEN unread_dc_count + 1 ELSE unread_dc_count END,
-        unread_rider_count = CASE WHEN NEW.sender_role <> 'rider' THEN unread_rider_count + 1 ELSE unread_rider_count END,
+        unread_client_count = CASE WHEN NEW.sender_role NOT IN ('client', 'closer') THEN unread_client_count + 1 ELSE unread_client_count END,
+        unread_dc_count = CASE WHEN NEW.sender_role NOT IN ('dc', 'dc_manager', 'dc_supervisor') THEN unread_dc_count + 1 ELSE unread_dc_count END,
+        unread_rider_count = CASE WHEN NEW.sender_role NOT IN ('rider', 'delivery_agent') THEN unread_rider_count + 1 ELSE unread_rider_count END,
         updated_at = NOW()
     WHERE id = NEW.conversation_id;
 
@@ -3208,19 +3323,72 @@ INSERT INTO public.clients (
     custom_failed_attempt_fee = 1000.00,
     custom_platform_fee = 500.00;
 
--- 6.8 Default Client Telesales Closer
+-- 6.8 Default Client Telesales Closers (Novacare Telesales Team)
+INSERT INTO public.users (
+    id, company_id, email, phone_number, first_name, last_name, role, is_active, avatar_url
+) VALUES 
+(
+    '44444444-4444-4444-8444-444444444444',
+    '11111111-1111-4111-8111-111111111111',
+    'closer@novacare.com',
+    '+2348021122334',
+    'Amaka',
+    'Chioma',
+    'closer',
+    true,
+    'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80'
+),
+(
+    '55555555-5555-4555-8555-555555555555',
+    '11111111-1111-4111-8111-111111111111',
+    'chidinma.closer@novacare.com',
+    '+2348034567890',
+    'Chidinma',
+    'Eze',
+    'closer',
+    true,
+    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
+)
+ON CONFLICT (email) DO UPDATE SET
+    role = 'closer',
+    first_name = EXCLUDED.first_name,
+    last_name = EXCLUDED.last_name,
+    avatar_url = EXCLUDED.avatar_url,
+    is_active = true;
+
 INSERT INTO public.client_closers (
-    id, client_id, closer_code, full_name, email, phone, commission_rate, is_active
-) VALUES (
-    'cc111111-1111-4111-8111-111111111111',
+    id, client_id, user_id, closer_code, full_name, email, phone, commission_rate, is_active, avatar_url
+) VALUES 
+(
+    '44444444-4444-4444-8444-444444444444',
     '00000000-0000-4000-8000-789382731303',
-    'CLOSER-01',
-    'Chioma Adebayo',
-    'chioma@novacare.ng',
-    '+2348099887766',
+    '44444444-4444-4444-8444-444444444444',
+    'CLS-NOVA-001',
+    'Amaka Chioma',
+    'closer@novacare.com',
+    '+2348021122334',
     500.00,
-    true
-) ON CONFLICT (closer_code) DO NOTHING;
+    true,
+    'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80'
+),
+(
+    '55555555-5555-4555-8555-555555555555',
+    '00000000-0000-4000-8000-789382731303',
+    '55555555-5555-4555-8555-555555555555',
+    'CLS-NOVA-002',
+    'Chidinma Eze',
+    'chidinma.closer@novacare.com',
+    '+2348034567890',
+    500.00,
+    true,
+    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
+)
+ON CONFLICT (closer_code) DO UPDATE SET
+    full_name = EXCLUDED.full_name,
+    email = EXCLUDED.email,
+    phone = EXCLUDED.phone,
+    avatar_url = EXCLUDED.avatar_url,
+    is_active = true;
 
 -- 6.9 Products & Packages Catalog
 INSERT INTO public.products (
@@ -3306,6 +3474,8 @@ BEGIN
     ALTER TABLE IF EXISTS public.stock_requests REPLICA IDENTITY FULL;
     ALTER TABLE IF EXISTS public.agent_inventory REPLICA IDENTITY FULL;
     ALTER TABLE IF EXISTS public.product_packages REPLICA IDENTITY FULL;
+    ALTER TABLE IF EXISTS public.client_closers REPLICA IDENTITY FULL;
+    ALTER TABLE IF EXISTS public.customer_leads REPLICA IDENTITY FULL;
 
     -- Add tables to supabase_realtime publication
     IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
@@ -3318,7 +3488,9 @@ BEGIN
                 public.stock_transfers,
                 public.stock_requests,
                 public.agent_inventory,
-                public.product_packages;
+                public.product_packages,
+                public.client_closers,
+                public.customer_leads;
         EXCEPTION WHEN duplicate_object THEN
             NULL;
         END;

@@ -12,13 +12,15 @@ import '../providers/finance_provider.dart';
 class PayoutRequestItem {
   final String id;
   final double amount;
-  final String status; // 'pending', 'approved', 'rejected'
+  final String status; // 'pending', 'disbursed', 'approved', 'completed', 'confirmed', 'rejected'
   final DateTime date;
   final String bankName;
   final String accountNumber;
   final String accountName;
   final String? disbursementRef;
   final String? dcNotes;
+  final DateTime? riderConfirmedAt;
+  final String? riderConfirmationNotes;
 
   PayoutRequestItem({
     required this.id,
@@ -30,11 +32,43 @@ class PayoutRequestItem {
     required this.accountName,
     this.disbursementRef,
     this.dcNotes,
+    this.riderConfirmedAt,
+    this.riderConfirmationNotes,
   });
 
   bool get isPending => status == 'pending';
-  bool get isApproved => status == 'approved';
+  bool get isConfirmed => status == 'completed' || status == 'confirmed' || riderConfirmedAt != null;
+  bool get isDisbursed => (status == 'disbursed' || status == 'approved') && !isConfirmed;
+  bool get isApproved => status == 'approved' || status == 'disbursed' || isConfirmed;
   bool get isRejected => status == 'rejected';
+
+  PayoutRequestItem copyWith({
+    String? id,
+    double? amount,
+    String? status,
+    DateTime? date,
+    String? bankName,
+    String? accountNumber,
+    String? accountName,
+    String? disbursementRef,
+    String? dcNotes,
+    DateTime? riderConfirmedAt,
+    String? riderConfirmationNotes,
+  }) {
+    return PayoutRequestItem(
+      id: id ?? this.id,
+      amount: amount ?? this.amount,
+      status: status ?? this.status,
+      date: date ?? this.date,
+      bankName: bankName ?? this.bankName,
+      accountNumber: accountNumber ?? this.accountNumber,
+      accountName: accountName ?? this.accountName,
+      disbursementRef: disbursementRef ?? this.disbursementRef,
+      dcNotes: dcNotes ?? this.dcNotes,
+      riderConfirmedAt: riderConfirmedAt ?? this.riderConfirmedAt,
+      riderConfirmationNotes: riderConfirmationNotes ?? this.riderConfirmationNotes,
+    );
+  }
 }
 
 final payoutsFilterProvider = StateProvider.autoDispose<String>((ref) => 'all');
@@ -49,6 +83,15 @@ class PayoutsListNotifier extends StateNotifier<List<PayoutRequestItem>> {
 
   void addPayout(PayoutRequestItem item) {
     state = [item, ...state];
+  }
+
+  void updatePayoutStatus(String id, String status, {DateTime? confirmedAt}) {
+    state = state.map((p) {
+      if (p.id == id) {
+        return p.copyWith(status: status, riderConfirmedAt: confirmedAt ?? DateTime.now());
+      }
+      return p;
+    }).toList();
   }
 }
 
@@ -86,9 +129,11 @@ class _PayoutsPageState extends ConsumerState<PayoutsPage> {
           date: map['created_at'] != null ? DateTime.tryParse(map['created_at'].toString()) ?? DateTime.now() : DateTime.now(),
           bankName: map['bank_name']?.toString() ?? 'Bank',
           accountNumber: map['account_number']?.toString() ?? '0000000000',
-          accountName: map['account_name']?.toString() ?? 'Rider',
-          disbursementRef: map['disbursement_reference']?.toString(),
-          dcNotes: map['notes']?.toString(),
+          accountName: map['account_name']?.toString() ?? 'Rider Account',
+          disbursementRef: map['disbursement_ref']?.toString() ?? map['disbursement_reference']?.toString(),
+          dcNotes: map['dc_notes']?.toString() ?? map['notes']?.toString(),
+          riderConfirmedAt: map['rider_confirmed_at'] != null ? DateTime.tryParse(map['rider_confirmed_at'].toString()) : null,
+          riderConfirmationNotes: map['rider_confirmation_notes']?.toString(),
         );
       }).toList();
       ref.read(payoutsListProvider.notifier).setPayouts(items);
@@ -320,13 +365,17 @@ class _PayoutsPageState extends ConsumerState<PayoutsPage> {
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    item.status.toUpperCase(),
+                    item.isConfirmed
+                        ? 'CONFIRMED'
+                        : (item.isDisbursed ? 'DISBURSED' : item.status.toUpperCase()),
                     style: GoogleFonts.jetBrainsMono(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
-                      color: item.isApproved
+                      color: item.isConfirmed
                           ? const Color(0xFF16A34A)
-                          : (item.isPending ? const Color(0xFFEA580C) : const Color(0xFFE11D48)),
+                          : (item.isDisbursed
+                              ? const Color(0xFF2563EB)
+                              : (item.isPending ? const Color(0xFFEA580C) : const Color(0xFFE11D48))),
                     ),
                   ),
                 ),
@@ -340,13 +389,32 @@ class _PayoutsPageState extends ConsumerState<PayoutsPage> {
             _buildModalRow('Date', '${item.date.day}/${item.date.month}/${item.date.year} ${item.date.hour}:${item.date.minute.toString().padLeft(2, '0')}'),
             if (item.disbursementRef != null) _buildModalRow('Disbursement Ref', item.disbursementRef!),
             if (item.dcNotes != null) _buildModalRow('DC Notes', item.dcNotes!),
-            const SizedBox(height: 20),
+            if (item.riderConfirmedAt != null)
+              _buildModalRow('Confirmed At', '${item.riderConfirmedAt!.day}/${item.riderConfirmedAt!.month}/${item.riderConfirmedAt!.year} ${item.riderConfirmedAt!.hour}:${item.riderConfirmedAt!.minute.toString().padLeft(2, '0')}'),
+            if (item.riderConfirmationNotes != null && item.riderConfirmationNotes!.isNotEmpty)
+              _buildModalRow('Rider Notes', item.riderConfirmationNotes!),
+            const SizedBox(height: 16),
+            if (item.isDisbursed) ...[
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _showConfirmReceiptModal(context, item);
+                  },
+                  icon: const Icon(Icons.check_circle_rounded, size: 18, color: Colors.white),
+                  label: const Text('Confirm Receipt of Funds', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton(
+              child: OutlinedButton(
                 onPressed: () => Navigator.pop(ctx),
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
-                child: const Text('Close', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                child: const Text('Close'),
               ),
             ),
           ],
@@ -577,6 +645,7 @@ class _PayoutsPageState extends ConsumerState<PayoutsPage> {
           border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
         ),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -585,19 +654,25 @@ class _PayoutsPageState extends ConsumerState<PayoutsPage> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: p.isApproved
+                    color: p.isConfirmed
                         ? const Color(0xFFDCFCE7)
-                        : (p.isPending ? const Color(0xFFFFF7ED) : const Color(0xFFFFE4E6)),
+                        : (p.isDisbursed
+                            ? const Color(0xFFDBEAFE)
+                            : (p.isPending ? const Color(0xFFFFF7ED) : const Color(0xFFFFE4E6))),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    p.status.toUpperCase(),
+                    p.isConfirmed
+                        ? 'CONFIRMED'
+                        : (p.isDisbursed ? 'DISBURSED' : p.status.toUpperCase()),
                     style: GoogleFonts.jetBrainsMono(
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
-                      color: p.isApproved
+                      color: p.isConfirmed
                           ? const Color(0xFF16A34A)
-                          : (p.isPending ? const Color(0xFFEA580C) : const Color(0xFFE11D48)),
+                          : (p.isDisbursed
+                              ? const Color(0xFF2563EB)
+                              : (p.isPending ? const Color(0xFFEA580C) : const Color(0xFFE11D48))),
                     ),
                   ),
                 ),
@@ -621,8 +696,153 @@ class _PayoutsPageState extends ConsumerState<PayoutsPage> {
                 ),
               ],
             ),
+            if (p.isDisbursed) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.25)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.account_balance_rounded, size: 14, color: Color(0xFF10B981)),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Disbursed by DC • Ref: ${p.disbursementRef ?? 'DISB-PAID'}',
+                            style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF059669)),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 34,
+                      child: ElevatedButton.icon(
+                        onPressed: () => _showConfirmReceiptModal(context, p),
+                        icon: const Icon(Icons.check_circle_rounded, size: 15, color: Colors.white),
+                        label: const Text('Confirm Receipt of Funds', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ] else if (p.isConfirmed) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(Icons.verified_rounded, size: 14, color: Color(0xFF16A34A)),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Receipt Confirmed by You',
+                    style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF16A34A)),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
+      ),
+    );
+  }
+
+  void _showConfirmReceiptModal(BuildContext context, PayoutRequestItem item) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final notesController = TextEditingController(text: 'Received in bank account. All balanced.');
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF151D36) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 22),
+            const SizedBox(width: 8),
+            Text('Confirm Receipt of Funds', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Payout: ${item.id}', style: GoogleFonts.jetBrainsMono(fontSize: 12, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 6),
+              Text(
+                CurrencyFormatter.formatNaira(item.amount),
+                style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w900, color: const Color(0xFF059669)),
+              ),
+              const SizedBox(height: 6),
+              Text('Bank: ${item.bankName} • ${item.accountNumber}', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+              if (item.disbursementRef != null) ...[
+                const SizedBox(height: 4),
+                Text('Bank Ref: ${item.disbursementRef}', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB))),
+              ],
+              const SizedBox(height: 14),
+              TextField(
+                controller: notesController,
+                style: GoogleFonts.inter(fontSize: 12),
+                decoration: InputDecoration(
+                  labelText: 'Acknowledgment Note',
+                  labelStyle: GoogleFonts.inter(fontSize: 11),
+                  hintText: 'e.g. Bank alert verified, received in full.',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  isDense: true,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Confirming acknowledges that the Parent DC transferred these funds to your bank account, settling the balance.',
+                style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final notes = notesController.text.trim();
+              Navigator.pop(ctx);
+              final success = await ref.read(financeProvider.notifier).confirmPayoutReceipt(item.id, notes: notes);
+              if (success) {
+                ref.read(payoutsListProvider.notifier).updatePayoutStatus(item.id, 'completed', confirmedAt: DateTime.now());
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('✅ Payout receipt confirmed for ${CurrencyFormatter.formatNaira(item.amount)}! Payout settled.'),
+                      backgroundColor: const Color(0xFF10B981),
+                    ),
+                  );
+                }
+                _fetchPayouts();
+              } else {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('⚠️ Could not confirm receipt. Please check connection and try again.'),
+                      backgroundColor: Color(0xFFEF4444),
+                    ),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
+            child: const Text('Confirm Receipt', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
   }

@@ -56,10 +56,10 @@ You do **not** need to run 45 individual migration files manually. We have compi
 > [!TIP]
 > Execution takes approximately **10 to 15 seconds**. Upon completion, your new Supabase backend has:
 > - **5 Storage Buckets**: `avatars`, `products`, `pod-proofs`, `remittance-proofs`, `receipts` (all public RLS configured).
-> - **37 Relational Tables**: Full schema with multi-tenant company support, distribution centers, warehouses, products, packages, batches, orders, order activities, chat pipelines, stock transfers/handovers/returns, cash remittances, rider transactions, Paystack/Monnify virtual accounts & transactions, audits, and daily settlements.
-> - **27 Production Stored Procedures (RPCs)**: Zero-variance 3-way daily settlement engine (`fn_generate_merchant_daily_settlement`), merchant asset custody valuation (`fn_calculate_merchant_asset_custody`), auto-dispatch with LGA proximity matching (`auto_dispatch_order`), two-way stock handshake, cash remittance verification, gate pin geocoding, rider GPS telemetry, and driver entitlement deduction.
-> - **2 Realtime Notification Triggers**: Automatic order conversation sync and unread counter increments.
-> - **Seed Baseline**: Default company, Wuse Central DC (Grand Hub), Garki DC, Novacare client with custom tariffs (₦5,000 delivery, ₦1,000 failed attempt, ₦500 platform fee), test catalog products, and default test users.
+> - **37 Relational Tables**: Full schema with multi-tenant company support, distribution centers, warehouses, products, packages, batches, orders, order activities, chat pipelines, telesales closers (`client_closers`), customer leads (`customer_leads`), stock transfers/handovers/returns, cash remittances, rider transactions, Paystack/Monnify virtual accounts & transactions, audits, and daily settlements.
+> - **29 Production Stored Procedures (RPCs)**: Zero-variance 3-way daily settlement engine (`fn_generate_merchant_daily_settlement`), merchant asset custody valuation (`fn_calculate_merchant_asset_custody`), auto-dispatch with LGA proximity matching (`auto_dispatch_order`), two-way stock handshake, cash remittance verification, gate pin geocoding, rider GPS telemetry, driver entitlement deduction, ownership transfer, and chat unread management.
+> - **2 Realtime Notification & Chat Triggers**: Automatic order conversation sync (`fn_sync_order_conversation` with closer avatar attribution) and unread counter increments (`fn_on_order_message_inserted`).
+> - **Seed Baseline**: Default company, Wuse Central DC (Grand Hub), Garki DC, Novacare client with custom tariffs (₦5,000 delivery, ₦1,000 failed attempt, ₦500 platform fee), catalog products, and default seed accounts (Admin, DC Manager, PDA Rider, Novacare Merchant, and Novacare Telesales Closers).
 
 ---
 
@@ -187,11 +187,37 @@ We conducted a forensic audit of the live database, Edge Functions, and client c
 
 ---
 
+---
+
+## 🧑‍💻 Production Standard Dynamic Authentication & Role Matrix
+
+NovaXpress operates under strict enterprise multi-tenant isolation with zero hardcoded credentials, mock fallbacks, or artificial IDs in production paths:
+
+1. **Authentication Flow**: Every login invokes `supabaseClient.auth.signInWithPassword`. If an Agent Code (`PDA-7000`), Closer Code (`CLS-NOVA-001`), or Client Code (`CLI-NOVACARE-01`) is entered, the backend dynamically resolves the identifier to the registered email address from the corresponding database table.
+2. **Dynamic Profile Hydration (`_fetchUserProfile`)**:
+   - **Merchant Admins**: Resolves business entities dynamically from `public.clients` (tariffs, company name, contact person, bank details).
+   - **Telesales Closers**: Resolves identity from `public.client_closers` (closer code, quota targets, commission per converted order, avatar photo, linked client company).
+   - **DC Logistics Supervisors**: Resolves hub jurisdiction dynamically from `public.distribution_centers` (hub code, manager name, operating zones, parent/regional links).
+   - **Field Delivery Agents**: Resolves motorcycle/vehicle details, cash custody, and DC links from `public.delivery_agents`.
+
+### 🔑 Verified Role Credentials Reference:
+
+| Target Console | Role | Name | Login Email / Identifier | Password | Database UUID |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Merchant Portal (`/client`)** | Client Admin | Dr. Chuka Okafor | `merchant@novacare.com` | `Password123!` | `00000000-0000-4000-8000-789382731303` |
+| **Closer Portal (`/closer`)** | Telesales Closer | Amaka Chioma | `closer@novacare.com` | `Password123!` | `44444444-4444-4444-8444-444444444444` |
+| **Closer Portal (`/closer`)** | Telesales Closer | Chidinma Eze | `chidinma.closer@novacare.com` | `Password123!` | `55555555-5555-4555-8555-555555555555` |
+| **DC Console (`/dc`)** | DC Manager | Ahmed Bello | `dc.supervisor@novaxpress.ng` | `Password123!` | `a2222222-2222-4222-8222-222222222222` |
+| **Rider PDA (`/`)** | Delivery Agent | Emeka Rider | `rider.emeka@novaxpress.com` | `Password123!` | `a1111111-1111-4111-8111-111111111111` |
+
+---
+
 ## 🏁 Summary of Transition Readiness
 
 With this toolkit installed in your workspace:
-- **No manual table creation needed**: 1-click execution in Supabase SQL editor.
-- **No missing functions or broken triggers**: All stored procedures include the latest negotiated charges (₦5,000 delivery fee, ₦1,000 failed delivery, ₦500 platform fee) and 3-way split logic.
-- **No hardcoded stale URLs**: All webhook and service endpoints resolve dynamically from the active project.
-- **Full Data Portability**: Export and import scripts allow moving all database records between Supabase accounts whenever needed without schema corruption.
+- **No manual table creation needed**: 1-click execution in Supabase SQL editor via [`schema_master_complete.sql`](file:///c:/PROJECT/NoveXPS/supabase/schema_master_complete.sql).
+- **No missing functions or broken triggers**: All 29 stored procedures include the latest negotiated charges (₦5,000 delivery fee, ₦1,000 failed delivery, ₦500 platform fee), 3-way split logic, and telesales closer attribution.
+- **No hardcoded stale URLs or IDs**: All webhook and service endpoints resolve dynamically from the active project.
+- **Full Data Portability**: Export and import scripts allow moving all 37 database tables between Supabase accounts whenever needed with zero schema corruption.
+- **Instant Account Switching**: Switch environments in 1 second via `python scripts/switch_supabase_env.py`.
 

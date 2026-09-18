@@ -1,0 +1,12 @@
+{
+  "AllowMultiple": false,
+  "Description": "Update loadClientData to fetch catalog products and use isProductForClient",
+  "EndLine": 905,
+  "Instruction": "Update product fetching in loadClientData",
+  "ReplacementContent": "      // 1. Fetch live products and packages strictly scoped for this client\n      var catalogState = _ref.read(productCatalogProvider);\n      if (catalogState.products.isEmpty) {\n        await _ref.read(productCatalogProvider.notifier).reloadCatalog();\n        catalogState = _ref.read(productCatalogProvider);\n      }\n\n      final clientProducts = catalogState.products.where((p) {\n        return isProductForClient(\n          product: p,\n          clientId: clientId,\n          companyName: companyName,\n        );\n      }).toList();\n\n      List<ProductPackage> allPackages = [];\n      for (final p in clientProducts) {\n        allPackages.addAll(catalogState.getPackagesForProduct(p.name));\n      }",
+  "StartLine": 880,
+  "TargetContent": "      // 1. Fetch live products and packages strictly scoped for this client\n      final catalogState = _ref.read(productCatalogProvider);\n      final clientProducts = catalogState.products.where((p) {\n        if (clientId.isNotEmpty && p.clientId != null && p.clientId == clientId) return true;\n        if (companyName.isNotEmpty && p.clientName.trim().isNotEmpty && p.clientName.trim().toLowerCase() == companyName.trim().toLowerCase()) return true;\n        return false;\n      }).toList();\n\n      List<ProductPackage> allPackages = [];\n      for (final p in clientProducts) {\n        allPackages.addAll(catalogState.getPackagesForProduct(p.name));\n      }",
+  "TargetFile": "c:\\PROJECT\\NoveXPS\\lib\\features\\client_portal\\presentation\\providers\\client_portal_provider.dart",
+  "toolAction": "Editing file",
+  "toolSummary": "Update loadClientData in client_portal_provider.dart"
+}

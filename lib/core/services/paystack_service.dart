@@ -62,6 +62,7 @@ class PaystackService {
         headers: {
           'Authorization': 'Bearer $secretKey',
           'Content-Type': 'application/json',
+          'User-Agent': 'NovaXpress-Logistics/1.0',
         },
         body: jsonEncode({
           'email': email.isNotEmpty ? email : 'customer@novaxpress.ng',
@@ -71,7 +72,7 @@ class PaystackService {
           'metadata': metadata,
           'channels': ['bank_transfer', 'card', 'ussd', 'qr'],
         }),
-      );
+      ).timeout(const Duration(seconds: 6));
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final data = jsonDecode(response.body);
@@ -80,7 +81,6 @@ class PaystackService {
         debugPrint('[PAYSTACK_SERVICE] ⚠️ Paystack Init warning (${response.statusCode}): ${response.body}');
         return {
           'reference': reference,
-          'authorization_url': 'https://checkout.paystack.com/$reference',
           'fallback': true,
         };
       }
@@ -88,7 +88,6 @@ class PaystackService {
       debugPrint('[PAYSTACK_SERVICE] ⚠️ Paystack Init network error: $e');
       return {
         'reference': reference,
-        'authorization_url': 'https://checkout.paystack.com/$reference',
         'fallback': true,
       };
     }
@@ -104,8 +103,9 @@ class PaystackService {
         headers: {
           'Authorization': 'Bearer $secretKey',
           'Content-Type': 'application/json',
+          'User-Agent': 'NovaXpress-Logistics/1.0',
         },
-      );
+      ).timeout(const Duration(seconds: 6));
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final body = jsonDecode(response.body);
@@ -120,17 +120,17 @@ class PaystackService {
           reference: reference,
           amount: amountNaira,
           status: status,
-          gatewayResponse: data['gateway_response']?.toString(),
+          gatewayResponse: data['gateway_response']?.toString() ?? (isSuccess ? 'Approved' : 'Failed'),
           channel: data['channel']?.toString(),
           paidAt: data['paid_at'] != null ? DateTime.tryParse(data['paid_at'].toString()) : DateTime.now(),
           rawData: data,
         );
       } else {
-        // Check local Supabase transactions table as resilient fallback
+        // Check local Supabase transactions table as resilient fallback (e.g. webhook already arrived)
         return await _verifyViaSupabaseFallback(reference);
       }
     } catch (e) {
-      debugPrint('[PAYSTACK_SERVICE] ℹ️ Verifying via Supabase ledger fallback: $e');
+      debugPrint('[PAYSTACK_SERVICE] ℹ️ Verifying via Supabase ledger fallback due to network/CORS error: $e');
       return await _verifyViaSupabaseFallback(reference);
     }
   }
@@ -145,23 +145,28 @@ class PaystackService {
           .maybeSingle();
 
       if (res != null) {
+        final isVerified = res['verification_status'] == 'verified' || res['status'] == 'success';
         return PaystackVerificationResult(
-          isSuccessful: res['verification_status'] == 'verified' || res['status'] == 'success',
+          isSuccessful: isVerified,
           reference: reference,
           amount: (res['amount'] as num?)?.toDouble() ?? 0.0,
-          status: 'success',
+          status: isVerified ? 'success' : (res['status']?.toString() ?? 'pending'),
+          gatewayResponse: isVerified ? 'Approved via Webhook' : 'Pending Confirmation',
+          channel: res['channel']?.toString(),
           rawData: res,
         );
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[PAYSTACK_SERVICE] Supabase verification query failed: $e');
+    }
 
-    // Simulated test verification for offline or test mode execution
+    // Never return isSuccessful: true on unverified or missing transactions!
     return PaystackVerificationResult(
-      isSuccessful: true,
+      isSuccessful: false,
       reference: reference,
       amount: 0.0,
-      status: 'success',
-      gatewayResponse: 'Approved (Test Mode Verified)',
+      status: 'unverified',
+      gatewayResponse: 'Payment not yet detected or verified',
     );
   }
 

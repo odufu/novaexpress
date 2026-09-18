@@ -125,7 +125,30 @@ serve(async (req: Request) => {
         // Credit Rider's Direct Transfer Balance
         const deliveryAgentId = targetOrder.delivery_agent_id || agentId;
         if (deliveryAgentId) {
-          const entitlement = targetOrder.agent_entitlement || 2500.0;
+          // Fetch rider's configured compensation terms from delivery_agents
+          const { data: agentData } = await supabaseClient
+            .from("delivery_agents")
+            .select("commission_rate, transport_allowance, fuel_allowance, personnel_type, direct_transfer_balance")
+            .eq("id", deliveryAgentId)
+            .maybeSingle();
+
+          const commission = Number(agentData?.commission_rate ?? (agentData?.personnel_type === "in_house_rider" ? 500.0 : 1000.0));
+          const transport = Number(agentData?.transport_allowance ?? (agentData?.personnel_type === "in_house_rider" ? (agentData?.fuel_allowance ?? 800.0) : 1500.0));
+          const configuredEntitlement = commission + transport;
+          const entitlement = (targetOrder.agent_entitlement && targetOrder.agent_entitlement > 0)
+            ? targetOrder.agent_entitlement
+            : configuredEntitlement;
+
+          // Update Delivery Agent's Direct Transfer Balance (MY BALANCE)
+          const currentBal = Number(agentData?.direct_transfer_balance || 0.0);
+          const newBal = currentBal + entitlement;
+          await supabaseClient
+            .from("delivery_agents")
+            .update({ 
+              direct_transfer_balance: newBal,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", deliveryAgentId);
 
           // Record Rider Transaction Ledger Credit
           const txnCode = `TXN-PSTK-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -138,7 +161,7 @@ serve(async (req: Request) => {
             is_credit: true,
             reference: reference,
             status: "settled",
-            description: `Commission & allowance credited from Paystack customer direct transfer on order ${targetOrder.order_number}.`,
+            description: `Commission (₦${commission}) & allowance (₦${transport}) credited from Paystack customer direct transfer on order ${targetOrder.order_number}.`,
             created_at: new Date().toISOString(),
           });
 

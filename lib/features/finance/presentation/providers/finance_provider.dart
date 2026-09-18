@@ -17,10 +17,10 @@ import '../../../dc_console/presentation/providers/dc_console_provider.dart';
 
 final financeRemoteDataSourceProvider = Provider<FinanceRemoteDataSource>((ref) {
   try {
-    return FinanceRemoteDataSourceImpl(Supabase.instance.client);
+    return FinanceRemoteDataSourceImpl(supabaseClient: Supabase.instance.client);
   } catch (_) {
     return FinanceRemoteDataSourceImpl(
-      SupabaseClient(
+      supabaseClient: SupabaseClient(
         SupabaseConstants.supabaseUrl,
         SupabaseConstants.supabaseAnonKey,
       ),
@@ -463,6 +463,28 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
       return await _repository.getPayoutRequests(agentId);
     } catch (_) {
       return [];
+    }
+  }
+
+  Future<bool> confirmPayoutReceipt(String payoutId, {String? notes}) async {
+    try {
+      final user = _ref?.read(authProvider).user;
+      final agentId = user?.deliveryAgentId ?? user?.id ?? _lastAgentId ?? SupabaseConstants.defaultDeliveryAgentId;
+
+      final res = await _repository.confirmPayoutReceipt(
+        payoutId: payoutId,
+        agentId: agentId,
+        notes: notes,
+      );
+
+      // Refresh transactions and balances
+      if (agentId.isNotEmpty) {
+        await loadTransactions(agentId);
+      }
+      return res['success'] == true || res['status'] == 'completed' || res['id'] != null;
+    } catch (e) {
+      debugPrint('[FINANCE_PROVIDER] ❌ confirmPayoutReceipt error: $e');
+      return false;
     }
   }
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../providers/client_portal_provider.dart';
+import 'client_closer_credentials_modal.dart';
 
 final onboardCloserSubmittingProvider = StateProvider.autoDispose<bool>((ref) => false);
 
@@ -56,24 +57,11 @@ class _ClientOnboardCloserModalState extends ConsumerState<ClientOnboardCloserMo
 
       if (mounted) {
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: const Color(0xFF10B981),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Closer ${closer.fullName} (${closer.closerCode}) onboarded successfully!',
-                    style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: Colors.white),
-                  ),
-                ),
-              ],
-            ),
-          ),
+        ClientCloserCredentialsModal.show(
+          context,
+          closer: closer,
+          initialPassword: password,
+          clientName: ref.read(clientPortalProvider).clientProfile.name,
         );
       }
     } catch (e) {
@@ -154,6 +142,17 @@ class _ClientOnboardCloserModalState extends ConsumerState<ClientOnboardCloserMo
                                   style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 2),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.verified_rounded, size: 12, color: Color(0xFF10B981)),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Enterprise Tier • Limit auto-expands on demand',
+                                      style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF10B981)),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),

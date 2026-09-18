@@ -19,6 +19,11 @@
   <title>NovaXpress Logistics | Operational System</title>
   <link rel="manifest" href="manifest.json">
 
+  <!-- Preconnect & Preload Official Paystack Inline SDK -->
+  <link rel="preconnect" href="https://js.paystack.co">
+  <link rel="dns-prefetch" href="https://js.paystack.co">
+  <script src="https://js.paystack.co/v2/inline.js" defer></script>
+
   <!-- Branded Web Splash Styling -->
   <style>
     body {
@@ -182,16 +187,16 @@
                 }
               });
 
-              // Watchdog: If user gets trapped on infinite black screen/spinner for > 6 seconds without an iframe
+              // Watchdog: If user gets trapped on infinite black screen/spinner for > 15 seconds without mounting
               watchdogTimer = setTimeout(function() {
-                var iframe = document.querySelector('iframe[src*="paystack"], iframe[name*="paystack"], iframe[id*="paystack"]');
-                if (!iframe && !hasHandled) {
+                var mountedElement = document.querySelector('iframe[src*="paystack"], iframe[name*="paystack"], iframe[id*="paystack"], div[id*="paystack"], .paystack-iframe-wrapper');
+                if (!mountedElement && !hasHandled) {
                   console.warn('[PAYSTACK] Watchdog: Paystack iframe blocked or not mounted. Activating in-app overlay.');
                   hasHandled = true;
                   cleanupPaystackBackdrop();
                   if (window.__paystack_on_fallback) window.__paystack_on_fallback();
                 }
-              }, 6000);
+              }, 15000);
 
               return;
             }

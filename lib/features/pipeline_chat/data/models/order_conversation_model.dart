@@ -15,6 +15,7 @@ class OrderConversationModel extends OrderConversationEntity {
     super.deliveryAgentName,
     super.closerId,
     super.closerName,
+    super.closerAvatarUrl,
     super.orderStatus,
     super.currentProductName,
     super.currentPackageName,
@@ -43,7 +44,10 @@ class OrderConversationModel extends OrderConversationEntity {
       deliveryAgentId: json['delivery_agent_id']?.toString(),
       deliveryAgentName: json['delivery_agent_name']?.toString(),
       closerId: json['closer_id']?.toString(),
-      closerName: json['closer_name']?.toString(),
+      closerName: json['closer_name']?.toString() ??
+          (json['client_closers'] is Map ? json['client_closers']['full_name']?.toString() : null),
+      closerAvatarUrl: json['closer_avatar_url']?.toString() ??
+          (json['client_closers'] is Map ? json['client_closers']['avatar_url']?.toString() : null),
       orderStatus: json['order_status']?.toString() ?? 'pending',
       currentProductName: json['current_product_name']?.toString(),
       currentPackageName: json['current_package_name']?.toString(),
@@ -65,6 +69,37 @@ class OrderConversationModel extends OrderConversationEntity {
     );
   }
 
+  factory OrderConversationModel.fromEntity(OrderConversation entity) {
+    return OrderConversationModel(
+      id: entity.id,
+      orderId: entity.orderId,
+      orderNumber: entity.orderNumber,
+      customerName: entity.customerName,
+      customerPhone: entity.customerPhone,
+      clientId: entity.clientId,
+      clientName: entity.clientName,
+      distributionCenterId: entity.distributionCenterId,
+      distributionCenterName: entity.distributionCenterName,
+      deliveryAgentId: entity.deliveryAgentId,
+      deliveryAgentName: entity.deliveryAgentName,
+      closerId: entity.closerId,
+      closerName: entity.closerName,
+      closerAvatarUrl: entity.closerAvatarUrl,
+      orderStatus: entity.orderStatus,
+      currentProductName: entity.currentProductName,
+      currentPackageName: entity.currentPackageName,
+      currentTotalAmount: entity.currentTotalAmount,
+      lastMessageText: entity.lastMessageText,
+      lastMessageSenderName: entity.lastMessageSenderName,
+      lastMessageAt: entity.lastMessageAt,
+      unreadClientCount: entity.unreadClientCount,
+      unreadDcCount: entity.unreadDcCount,
+      unreadRiderCount: entity.unreadRiderCount,
+      createdAt: entity.createdAt,
+      updatedAt: entity.updatedAt,
+    );
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -80,6 +115,7 @@ class OrderConversationModel extends OrderConversationEntity {
       'delivery_agent_name': deliveryAgentName,
       'closer_id': closerId,
       'closer_name': closerName,
+      'closer_avatar_url': closerAvatarUrl,
       'order_status': orderStatus,
       'current_product_name': currentProductName,
       'current_package_name': currentPackageName,

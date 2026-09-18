@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/providers/navigation_provider.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../finance/presentation/pages/cash_page.dart';
 import '../../../orders/presentation/pages/orders_list_page.dart';
 import '../../../stock/presentation/pages/stock_page.dart';
@@ -29,6 +31,24 @@ class _MainBottomNavShellState extends ConsumerState<MainBottomNavShell>
 
   @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authProvider);
+    final user = authState.user;
+
+    // Defense-in-depth safety guard: If user is non-rider, never mount Rider UI
+    if (user != null && !user.isRider) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          context.go(user.homeConsoleRoute);
+        }
+      });
+      return const Scaffold(
+        backgroundColor: Color(0xFF0B1021),
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.orange),
+        ),
+      );
+    }
+
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final currentIndex = ref.watch(bottomNavIndexProvider);

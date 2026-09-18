@@ -69,6 +69,13 @@ class MockPaystackTestFinanceRepository implements FinanceRepository {
 
   @override
   Future<Map<String, dynamic>?> getPaystackTransactionDetails(String reference) async => null;
+
+  @override
+  Future<Map<String, dynamic>> confirmPayoutReceipt({
+    required String payoutId,
+    required String agentId,
+    String? notes,
+  }) async => {'status': 'confirmed'};
 }
 
 void main() {

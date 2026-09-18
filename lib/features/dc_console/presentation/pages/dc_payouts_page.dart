@@ -373,21 +373,7 @@ class _DCPayoutsPageState extends ConsumerState<DCPayoutsPage> {
                                           ],
                                         )
                                       else
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                          decoration: BoxDecoration(
-                                            color: claim.isApproved ? const Color(0xFFECFDF5) : const Color(0xFFFEF2F2),
-                                            borderRadius: BorderRadius.circular(12),
-                                          ),
-                                          child: Text(
-                                            claim.isApproved ? 'DISBURSED' : 'REJECTED',
-                                            style: GoogleFonts.inter(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.bold,
-                                              color: claim.isApproved ? const Color(0xFF059669) : const Color(0xFFDC2626),
-                                            ),
-                                          ),
-                                        ),
+                                        _buildClaimStatusBadge(claim),
                                     ],
                                   ),
                                 ],
@@ -486,21 +472,7 @@ class _DCPayoutsPageState extends ConsumerState<DCPayoutsPage> {
                                         ],
                                       )
                                     else
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: claim.isApproved ? const Color(0xFFECFDF5) : const Color(0xFFFEF2F2),
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
-                                        child: Text(
-                                          claim.isApproved ? 'DISBURSED' : 'REJECTED',
-                                          style: GoogleFonts.inter(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
-                                            color: claim.isApproved ? const Color(0xFF059669) : const Color(0xFFDC2626),
-                                          ),
-                                        ),
-                                      ),
+                                      _buildClaimStatusBadge(claim),
                                   ],
                                 ),
                               ],
@@ -514,6 +486,46 @@ class _DCPayoutsPageState extends ConsumerState<DCPayoutsPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildClaimStatusBadge(DCPayoutClaim claim) {
+    String label;
+    Color bgColor;
+    Color textColor;
+
+    if (claim.isConfirmed) {
+      label = 'CONFIRMED & SETTLED';
+      bgColor = const Color(0xFFECFDF5);
+      textColor = const Color(0xFF059669);
+    } else if (claim.isApproved || claim.isDisbursed) {
+      label = 'DISBURSED (AWAITING CONFIRMATION)';
+      bgColor = const Color(0xFFEFF6FF);
+      textColor = const Color(0xFF2563EB);
+    } else if (claim.isRejected) {
+      label = 'REJECTED';
+      bgColor = const Color(0xFFFEF2F2);
+      textColor = const Color(0xFFDC2626);
+    } else {
+      label = 'PENDING REVIEW';
+      bgColor = const Color(0xFFFFFBEB);
+      textColor = const Color(0xFFD97706);
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.inter(
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          color: textColor,
+        ),
       ),
     );
   }
@@ -611,7 +623,7 @@ class _DCPayoutsPageState extends ConsumerState<DCPayoutsPage> {
               ),
               const SizedBox(height: 12),
               Text(
-                'Confirming this will approve the withdrawal of ₦${claim.requestedAmount.toStringAsFixed(0)}, update the Supabase financial ledger, and alert the rider.',
+                'Confirming will record disbursement of ₦${claim.requestedAmount.toStringAsFixed(0)} to the rider, decrement My Balance in the ledger, and dispatch the bank reference to the rider for confirmation of receipt in the PDA app.',
                 style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
               ),
             ],

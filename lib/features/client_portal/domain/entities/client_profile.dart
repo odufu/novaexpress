@@ -27,6 +27,7 @@ class ClientProfile {
   final double? customFailedAttemptFee;
 
   double? get customPlatformFee => customPlatformFeeValue;
+  String get name => companyName;
 
   const ClientProfile({
     required this.id,

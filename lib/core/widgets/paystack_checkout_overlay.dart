@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../constants/paystack_constants.dart';
 import '../helpers/formatters.dart';
 import '../services/paystack_service.dart';
+import '../services/paystack_web_interop.dart';
 
 class PaystackCheckoutOverlay extends ConsumerStatefulWidget {
   final double amount;
@@ -152,7 +153,7 @@ class _PaystackCheckoutOverlayState extends ConsumerState<PaystackCheckoutOverla
     try {
       final res = await _paystackService.initializeTransaction(
         amount: widget.amount,
-        email: widget.email.isNotEmpty ? widget.email : 'rider.${(widget.payerCode ?? 'rdr').toLowerCase()}@novaxpress.ng',
+        email: widget.email.isNotEmpty ? widget.email : 'customer@novaxpress.ng',
         reference: widget.reference,
         metadata: {
           'payer_name': widget.payerName,
@@ -164,39 +165,51 @@ class _PaystackCheckoutOverlayState extends ConsumerState<PaystackCheckoutOverla
 
       if (!mounted) return;
       setState(() {
-        _authorizationUrl = res['authorization_url']?.toString() ?? 'https://checkout.paystack.com/${widget.reference}';
+        _authorizationUrl = res['authorization_url']?.toString();
         _isLoadingAuthUrl = false;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _authorizationUrl = 'https://checkout.paystack.com/${widget.reference}';
+        _authorizationUrl = null;
         _isLoadingAuthUrl = false;
       });
     }
   }
 
   Future<void> _openRealPaystackCheckout() async {
-    final urlStr = _authorizationUrl ?? 'https://checkout.paystack.com/${widget.reference}';
-    final uri = Uri.parse(urlStr);
+    if (kIsWeb) {
+      launchPaystackInlineJs(
+        publicKey: PaystackConstants.publicKey,
+        email: widget.email.isNotEmpty ? widget.email : 'customer@novaxpress.ng',
+        amountKobo: (widget.amount * 100).round(),
+        reference: widget.reference,
+        metadata: {
+          'payer_name': widget.payerName,
+          'payer_code': widget.payerCode ?? 'RDR',
+          'transaction_type': widget.transactionType,
+          'agent_id': widget.agentId,
+        },
+        onSuccess: (ref) {
+          _completePayment(channel: 'paystack_inline');
+        },
+        onClose: () {},
+      );
+      _startAutoPolling();
+      return;
+    }
 
-    try {
-      if (kIsWeb) {
-        await launchUrl(uri, webOnlyWindowName: '_blank');
-      } else {
+    if (_authorizationUrl != null && _authorizationUrl!.isNotEmpty) {
+      final uri = Uri.parse(_authorizationUrl!);
+      try {
         final launched = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
         if (!launched) {
           await launchUrl(uri, mode: LaunchMode.externalApplication);
         }
-      }
-    } catch (_) {
-      try {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
       } catch (e) {
         debugPrint('[PAYSTACK_OVERLAY] Could not launch URL: $e');
       }
     }
-
     _startAutoPolling();
   }
 
@@ -225,7 +238,7 @@ class _PaystackCheckoutOverlayState extends ConsumerState<PaystackCheckoutOverla
   Future<void> _verifyPaymentManually() async {
     setState(() {
       _isProcessing = true;
-      _statusMessage = 'Checking transaction status with Paystack REST API...';
+      _statusMessage = 'Checking transaction status with Paystack...';
     });
 
     try {
@@ -233,12 +246,32 @@ class _PaystackCheckoutOverlayState extends ConsumerState<PaystackCheckoutOverla
       if (res.isSuccessful) {
         _completePayment(channel: res.channel ?? 'paystack_official');
       } else {
-        await Future.delayed(const Duration(milliseconds: 700));
-        _completePayment(channel: 'paystack_verified');
+        if (!mounted) return;
+        setState(() {
+          _isProcessing = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFFEF4444),
+            behavior: SnackBarBehavior.floating,
+            content: Text(res.gatewayResponse ?? 'Payment not yet confirmed by Paystack. Please ensure payment was completed.'),
+            duration: const Duration(seconds: 3),
+          ),
+        );
       }
     } catch (e) {
-      await Future.delayed(const Duration(milliseconds: 700));
-      _completePayment(channel: 'paystack_verified');
+      if (!mounted) return;
+      setState(() {
+        _isProcessing = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+          content: Text('Verification check failed: $e'),
+          duration: const Duration(seconds: 3),
+        ),
+      );
     }
   }
 
@@ -284,13 +317,13 @@ class _PaystackCheckoutOverlayState extends ConsumerState<PaystackCheckoutOverla
     });
 
     try {
-      await Future.delayed(const Duration(milliseconds: 600));
+      await Future.delayed(const Duration(milliseconds: 400));
       if (!mounted) return;
       setState(() {
         _statusMessage = 'Authorizing transaction with bank...';
       });
 
-      await Future.delayed(const Duration(milliseconds: 600));
+      await Future.delayed(const Duration(milliseconds: 400));
       if (!mounted) return;
       setState(() {
         _statusMessage = 'Payment verified! Updating ledger...';
@@ -313,23 +346,25 @@ class _PaystackCheckoutOverlayState extends ConsumerState<PaystackCheckoutOverla
         _isSuccess = true;
       });
 
-      await Future.delayed(const Duration(milliseconds: 900));
+      await Future.delayed(const Duration(milliseconds: 600));
       if (!mounted) return;
 
       Navigator.of(context).pop();
       widget.onSuccess(widget.reference);
     } catch (e) {
+      debugPrint('[PAYSTACK_OVERLAY] Error completing payment: $e');
       if (!mounted) return;
       setState(() {
         _isProcessing = false;
-        _isSuccess = true;
       });
-
-      await Future.delayed(const Duration(milliseconds: 800));
-      if (!mounted) return;
-
-      Navigator.of(context).pop();
-      widget.onSuccess(widget.reference);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+          content: Text('Failed to complete payment record: $e'),
+          duration: const Duration(seconds: 3),
+        ),
+      );
     }
   }
 

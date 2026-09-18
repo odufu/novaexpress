@@ -1,0 +1,12 @@
+{
+  "AllowMultiple": false,
+  "Description": "Change Policy & Settings sidebar icon to Icons.settings_outlined",
+  "EndLine": 252,
+  "Instruction": "Change Icons.tune_rounded to Icons.settings_outlined for Policy & Settings",
+  "ReplacementContent": "                _buildNavItem(10, 'Policy & Settings', Icons.settings_outlined, state.activeTabIndex == 10, isCollapsed, isDrawer),",
+  "StartLine": 249,
+  "TargetContent": "                _buildNavItem(10, 'Policy & Settings', Icons.tune_rounded, state.activeTabIndex == 10, isCollapsed, isDrawer),",
+  "TargetFile": "c:\\PROJECT\\NoveXPS\\lib\\features\\dc_console\\presentation\\pages\\dc_console_layout.dart",
+  "toolAction": "Editing file",
+  "toolSummary": "Update Policy & Settings icon"
+}

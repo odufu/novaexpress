@@ -34,4 +34,9 @@ abstract class FinanceRepository {
   Future<List<Map<String, dynamic>>> getPayoutRequests(String agentId);
   Future<List<TransactionItem>> getRiderTransactions(String agentId);
   Future<Map<String, dynamic>?> getPaystackTransactionDetails(String reference);
+  Future<Map<String, dynamic>> confirmPayoutReceipt({
+    required String payoutId,
+    required String agentId,
+    String? notes,
+  });
 }

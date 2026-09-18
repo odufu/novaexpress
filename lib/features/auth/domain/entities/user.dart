@@ -85,7 +85,8 @@ class UserEntity {
     if (isDcManager) return 'DC Operations Supervisor';
     if (isCloser) return 'Telesales Closer';
     if (isClientAdmin) return 'E-Commerce Merchant Admin';
-    return 'Field Delivery Agent (PDA)';
+    if (isRider) return 'Field Delivery Agent (PDA)';
+    return 'User';
   }
 
   /// Canonical console route strictly governed by the user's operational role
@@ -93,6 +94,7 @@ class UserEntity {
     if (isDcManager) return '/dc';
     if (isCloser) return '/closer';
     if (isClientAdmin) return '/client';
-    return '/';
+    if (isRider) return '/';
+    return '/login';
   }
 }

@@ -61,6 +61,7 @@ abstract class DCConsoleRepository {
     required String claimId,
     required double amount,
     required String driverId,
+    String? disbursementRef,
   });
 
   /// Rejects a rider's payout claim with an explanatory reason

@@ -9,6 +9,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/user_avatar_widget.dart';
 import '../../../auth/domain/entities/user.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../client_portal/presentation/providers/client_portal_provider.dart';
 
 final editProfileAvatarUrlProvider = StateProvider.autoDispose<String?>((ref) => null);
 final editProfileSavingProvider = StateProvider.autoDispose<bool>((ref) => false);
@@ -86,20 +87,20 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> with Single
 
   final List<Map<String, String>> _avatarPresets = [
     {
-      'label': 'Rider Standard',
-      'url': 'https://api.dicebear.com/7.x/bottts/svg?seed=RiderStd',
-    },
-    {
-      'label': 'Rider Pro',
-      'url': 'https://api.dicebear.com/7.x/avataaars/png?seed=RiderPro',
-    },
-    {
-      'label': 'Captain',
-      'url': 'https://api.dicebear.com/7.x/personas/png?seed=RiderCaptain',
+      'label': 'Professional',
+      'url': 'https://api.dicebear.com/7.x/avataaars/png?seed=AmakaChioma',
     },
     {
       'label': 'Executive',
-      'url': 'https://api.dicebear.com/7.x/micah/png?seed=RiderExec',
+      'url': 'https://api.dicebear.com/7.x/personas/png?seed=NovaExecutive',
+    },
+    {
+      'label': 'Agent Pro',
+      'url': 'https://api.dicebear.com/7.x/micah/png?seed=AgentPro',
+    },
+    {
+      'label': 'Rider Fast',
+      'url': 'https://api.dicebear.com/7.x/bottts/png?seed=RiderStd',
     },
   ];
 
@@ -260,6 +261,22 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> with Single
     if (mounted) {
       ref.read(editProfileSavingProvider.notifier).state = false;
       if (success) {
+        // Sync across Client Portal state immediately (closer avatar, full name, merchant bank details)
+        try {
+          ref.read(clientPortalProvider.notifier).syncUserProfile(
+                fullName: '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}'.trim(),
+                avatarUrl: selectedAvatarUrl,
+                phone: _phoneController.text.trim(),
+                bankName: _bankNameController.text.trim(),
+                accountNumber: _bankAccountNoController.text.trim(),
+                accountName: _bankAccountNameController.text.trim(),
+                email: widget.user.email,
+                closerId: widget.user.closerId,
+              );
+        } catch (e) {
+          debugPrint('[EDIT_PROFILE] Notice on clientPortalProvider sync: $e');
+        }
+
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -379,10 +396,7 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> with Single
                         child: CircleAvatar(
                           radius: 26,
                           backgroundColor: AppColors.primary,
-                          child: Text(
-                            preset['label']!.isNotEmpty ? preset['label']!.substring(0, 1) : 'U',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
-                          ),
+                          backgroundImage: NetworkImage(preset['url']!),
                         ),
                       ),
                       const SizedBox(height: 4),

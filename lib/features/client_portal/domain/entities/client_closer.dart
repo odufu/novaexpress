@@ -125,7 +125,7 @@ class ClientCloser {
       totalOrdersBooked: totalOrdersBooked ?? this.totalOrdersBooked,
       totalOrdersDelivered: totalOrdersDelivered ?? this.totalOrdersDelivered,
       commissionRate: commissionRate ?? this.commissionRate,
-      avatarUrl: avatarUrl ?? this.avatarUrl,
+      avatarUrl: avatarUrl != null ? (avatarUrl.isEmpty ? null : avatarUrl) : this.avatarUrl,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

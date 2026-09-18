@@ -166,6 +166,36 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
           Expanded(
             child: chatState.isLoading
                 ? const Center(child: CircularProgressIndicator())
+                : chatState.errorMessage != null && chatState.activeConversation == null
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24.0),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEF4444).withValues(alpha: 0.1),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.lock_person_rounded, size: 48, color: Color(0xFFEF4444)),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Access Restricted',
+                                style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFFEF4444)),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                chatState.errorMessage!,
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.inter(fontSize: 13, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
                 : chatState.messages.isEmpty
                     ? _buildEmptyState(isDark)
                     : ListView.builder(
@@ -179,8 +209,9 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                       ),
           ),
 
-          // Input Footer
-          _buildInputFooter(context, isDark, chatState.isSending),
+          // Input Footer (only rendered if user is authorized and conversation is loaded)
+          if (conv != null)
+            _buildInputFooter(context, isDark, chatState.isSending),
         ],
       ),
     );
@@ -225,11 +256,16 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
             const SizedBox(width: 8),
           ],
 
-          // Order / Customer Avatar
+          // Creator of the order / Closer that owns the order avatar
           UserAvatarWidget(
-            fullName: widget.customerName,
+            fullName: (conv?.closerName != null && conv!.closerName!.trim().isNotEmpty)
+                ? conv.closerName!.trim()
+                : (conv?.clientName != null && conv!.clientName.trim().isNotEmpty
+                    ? conv.clientName.trim()
+                    : widget.customerName),
+            avatarUrl: conv?.closerAvatarUrl,
             radius: 18,
-            backgroundColor: const Color(0xFF0D9488),
+            backgroundColor: const Color(0xFF4F46E5),
             textColor: Colors.white,
           ),
           const SizedBox(width: 10),
@@ -361,6 +397,15 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
             Container(width: 1, height: 12, color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
             const SizedBox(width: 10),
             _buildParticipantPill('Client', conv.clientName, const Color(0xFF0D9488)),
+            if (conv.closerName != null && conv.closerName!.trim().isNotEmpty) ...[
+              const SizedBox(width: 5),
+              _buildParticipantPill(
+                'Creator (Closer)',
+                conv.closerName!,
+                const Color(0xFF7C3AED),
+                avatarUrl: conv.closerAvatarUrl,
+              ),
+            ],
             const SizedBox(width: 5),
             _buildParticipantPill('DC', conv.distributionCenterName ?? 'DC', const Color(0xFF6366F1)),
             const SizedBox(width: 5),
@@ -371,7 +416,7 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
     );
   }
 
-  Widget _buildParticipantPill(String role, String name, Color color) {
+  Widget _buildParticipantPill(String role, String name, Color color, {String? avatarUrl}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
@@ -379,9 +424,27 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
         borderRadius: BorderRadius.circular(4),
         border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
-      child: Text(
-        '$role: ${name.split(' ').first}',
-        style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: color),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (avatarUrl != null && avatarUrl.isNotEmpty) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.network(
+                avatarUrl,
+                width: 14,
+                height: 14,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+              ),
+            ),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            '$role: ${name.split(' ').first}',
+            style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: color),
+          ),
+        ],
       ),
     );
   }
@@ -395,13 +458,17 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
     final currentUserId = authUser?.id;
     final isMyMessage = (currentUserId != null && msg.senderId == currentUserId);
 
+    final isCloser = msg.senderRole == ChatSenderRole.closer;
     final isClient = msg.senderRole == ChatSenderRole.client;
     final isDc = msg.senderRole == ChatSenderRole.dcManager;
     final isRider = msg.senderRole == ChatSenderRole.deliveryAgent;
 
     Color roleColor = const Color(0xFF64748B);
     String roleLabel = 'Member';
-    if (isClient) {
+    if (isCloser) {
+      roleColor = const Color(0xFF7C3AED); // Vibrant Purple
+      roleLabel = 'Closer';
+    } else if (isClient) {
       roleColor = const Color(0xFFD97706); // Warm Amber
       roleLabel = 'Merchant';
     } else if (isDc) {
@@ -506,7 +573,10 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
     // 2. Left-aligned with role-based color differentiation for other accounts
     Color otherBg;
     Color otherBorder;
-    if (isDc) {
+    if (isCloser) {
+      otherBg = isDark ? const Color(0xFF3B0764).withValues(alpha: 0.3) : const Color(0xFFF5F3FF);
+      otherBorder = const Color(0xFF7C3AED).withValues(alpha: 0.25);
+    } else if (isDc) {
       otherBg = isDark ? const Color(0xFF1E1B4B).withValues(alpha: 0.5) : const Color(0xFFEEF2FF);
       otherBorder = const Color(0xFF6366F1).withValues(alpha: 0.25);
     } else if (isRider) {

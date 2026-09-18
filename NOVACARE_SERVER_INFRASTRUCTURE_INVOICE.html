@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Invoice - Novacare Server Infrastructure (INV-NX-2026-09-NC01)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #F8FAFC;
+      color: #1E293B;
+      padding: 40px 20px;
+      line-height: 1.5;
+    }
+
+    .invoice-card {
+      max-width: 860px;
+      margin: 0 auto;
+      background: #FFFFFF;
+      border-radius: 16px;
+      border: 1px solid #E2E8F0;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+      padding: 48px;
+    }
+
+    .header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 2px solid #F1F5F9;
+      padding-bottom: 28px;
+      margin-bottom: 28px;
+    }
+
+    .brand-title {
+      font-size: 26px;
+      font-weight: 900;
+      color: #0F172A;
+      letter-spacing: -0.5px;
+    }
+
+    .brand-subtitle {
+      font-size: 13px;
+      color: #64748B;
+      margin-top: 4px;
+      font-weight: 500;
+    }
+
+    .invoice-badge {
+      display: inline-block;
+      padding: 6px 14px;
+      background: #EEF2FF;
+      color: #4F46E5;
+      font-size: 12px;
+      font-weight: 800;
+      border-radius: 8px;
+      letter-spacing: 0.5px;
+      text-align: right;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-bottom: 32px;
+    }
+
+    .meta-box h4 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #94A3B8;
+      margin-bottom: 8px;
+      font-weight: 800;
+    }
+
+    .meta-box p {
+      font-size: 13.5px;
+      color: #334155;
+      margin-bottom: 4px;
+    }
+
+    .meta-box p strong {
+      color: #0F172A;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 28px;
+    }
+
+    th {
+      background: #F8FAFC;
+      color: #475569;
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      padding: 12px 16px;
+      border-top: 1px solid #E2E8F0;
+      border-bottom: 1px solid #E2E8F0;
+      text-align: left;
+    }
+
+    td {
+      padding: 16px;
+      border-bottom: 1px solid #F1F5F9;
+      font-size: 13px;
+      color: #334155;
+      vertical-align: top;
+    }
+
+    td strong {
+      color: #0F172A;
+      display: block;
+      font-size: 13.5px;
+      margin-bottom: 4px;
+    }
+
+    .text-right {
+      text-align: right;
+    }
+
+    .summary-section {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 36px;
+    }
+
+    .summary-table {
+      width: 360px;
+    }
+
+    .summary-table tr td {
+      padding: 8px 12px;
+      font-size: 13.5px;
+      border: none;
+    }
+
+    .summary-table tr.total-row td {
+      border-top: 2px solid #E2E8F0;
+      font-size: 16px;
+      font-weight: 900;
+      color: #0F172A;
+      padding-top: 14px;
+    }
+
+    .total-amount {
+      color: #4F46E5;
+      font-size: 19px;
+    }
+
+    .benefit-box {
+      background: #F8FAFC;
+      border: 1px solid #E2E8F0;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 32px;
+    }
+
+    .benefit-box h3 {
+      font-size: 15px;
+      font-weight: 800;
+      color: #0F172A;
+      margin-bottom: 14px;
+    }
+
+    .benefit-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .benefit-item {
+      font-size: 12.5px;
+      color: #475569;
+    }
+
+    .benefit-item strong {
+      color: #1E293B;
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    .bank-box {
+      background: #EFF6FF;
+      border: 1px solid #BFDBFE;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 32px;
+    }
+
+    .bank-box h4 {
+      font-size: 13px;
+      font-weight: 800;
+      color: #1E40AF;
+      margin-bottom: 8px;
+    }
+
+    .bank-box p {
+      font-size: 13px;
+      color: #1E3A8A;
+      margin-bottom: 4px;
+    }
+
+    .signature-row {
+      display: flex;
+      justify-content: space-between;
+      border-top: 1px solid #E2E8F0;
+      padding-top: 28px;
+      margin-top: 28px;
+    }
+
+    .sign-col {
+      width: 45%;
+    }
+
+    .sign-line {
+      margin-top: 40px;
+      border-top: 1px solid #94A3B8;
+      padding-top: 6px;
+      font-size: 11.5px;
+      color: #64748B;
+    }
+
+    @media print {
+      body {
+        background: white;
+        padding: 0;
+      }
+      .invoice-card {
+        box-shadow: none;
+        border: none;
+        padding: 0;
+      }
+      .no-print {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="invoice-card">
+    <!-- Header -->
+    <div class="header-row">
+      <div>
+        <div class="brand-title">NovaXpress Logistics</div>
+        <div class="brand-subtitle">Enterprise Distribution & High-Availability Logistics Infrastructure</div>
+        <div style="font-size: 11.5px; color: #64748B; margin-top: 6px;">
+          CBD, Abuja, FCT, Nigeria &bull; billing@novaxpress.ng &bull; +234 (0) 800-NOVX-LOGISTICS
+        </div>
+      </div>
+      <div class="text-right">
+        <div class="invoice-badge">PRODUCTION INVOICE</div>
+        <div style="font-size: 15px; font-weight: 800; color: #0F172A; margin-top: 8px;">INV-NX-2026-09-NC01</div>
+        <div style="font-size: 12px; color: #64748B;">Date: Sept 18, 2026</div>
+      </div>
+    </div>
+
+    <!-- Metadata Grid -->
+    <div class="meta-grid">
+      <div class="meta-box">
+        <h4>BILLED TO (CLIENT)</h4>
+        <p><strong>Novacare Health & E-Commerce Limited</strong></p>
+        <p>Client ID: <code>00000000-0000-4000-8000-789382731303</code></p>
+        <p>Abuja Regional Center, FCT, Nigeria</p>
+        <p>Attn: Operations & Management Directorate</p>
+      </div>
+      <div class="meta-box">
+        <h4>BILLING & TERMS</h4>
+        <p><strong>Term:</strong> Annual Production Provisioning (2026 &ndash; 2027)</p>
+        <p><strong>Due Date:</strong> September 25, 2026</p>
+        <p><strong>Payment Mode:</strong> Bank Transfer / Corporate NUBAN Settlement</p>
+        <p><strong>Status:</strong> <span style="color: #D97706; font-weight: 700;">Pending Payment</span></p>
+      </div>
+    </div>
+
+    <!-- Line Items Table -->
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Infrastructure Component & Scope</th>
+          <th>Term</th>
+          <th class="text-right">Amount (NGN)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>01</td>
+          <td>
+            <strong>Dedicated High-Availability Database & API Cluster</strong>
+            PostgreSQL production instance with zero inactivity sleep, sub-150ms latency, and connection pooling.
+          </td>
+          <td>12 Months</td>
+          <td class="text-right">&#8358;450,000.00</td>
+        </tr>
+        <tr>
+          <td>02</td>
+          <td>
+            <strong>100 GB Encrypted Storage for Proof of Delivery (POD)</strong>
+            Dedicated storage for high-res doorstep photos, touchscreen signatures, and dispatch waybill receipts.
+          </td>
+          <td>12 Months</td>
+          <td class="text-right" style="color: #10B981; font-weight: 700;">Included</td>
+        </tr>
+        <tr>
+          <td>03</td>
+          <td>
+            <strong>Automated FinTech & Paystack Webhook Gateway</strong>
+            Real-time doorstep transfer auto-reconciliation, split-settlement routing, and automated rider custody deduction.
+          </td>
+          <td>12 Months</td>
+          <td class="text-right">&#8358;150,000.00</td>
+        </tr>
+        <tr>
+          <td>04</td>
+          <td>
+            <strong>Disaster Recovery & Automated Daily Backups</strong>
+            24-hour snapshot recovery with 7-day retention, Row Level Security (RLS), and 256-bit AES encryption.
+          </td>
+          <td>12 Months</td>
+          <td class="text-right" style="color: #10B981; font-weight: 700;">Included</td>
+        </tr>
+        <tr>
+          <td>05</td>
+          <td>
+            <strong>Telesales Closer Portal & Multi-Hub Routing Setup</strong>
+            Dedicated portal for Novacare closers with instant order injection into Wuse, Gwarinpa, Kubwa, and Lugbe hubs.
+          </td>
+          <td>One-time</td>
+          <td class="text-right">&#8358;100,000.00</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Financial Summary -->
+    <div class="summary-section">
+      <table class="summary-table">
+        <tr>
+          <td>Subtotal:</td>
+          <td class="text-right">&#8358;700,000.00</td>
+        </tr>
+        <tr>
+          <td style="color: #4F46E5;">Enterprise Partner Subsidy:</td>
+          <td class="text-right" style="color: #4F46E5;">-&#8358;150,000.00</td>
+        </tr>
+        <tr>
+          <td>Value Added Tax (7.5%):</td>
+          <td class="text-right">Included</td>
+        </tr>
+        <tr class="total-row">
+          <td>Total Due:</td>
+          <td class="text-right total-amount">&#8358;550,000.00</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- What Novacare Can Expect -->
+    <div class="benefit-box">
+      <h3>What Novacare Can Expect from This New Server Upgrade</h3>
+      <div class="benefit-grid">
+        <div class="benefit-item">
+          <strong>⚡ 24/7 Always-On (Zero Inactivity Sleep)</strong>
+          Eliminates sandbox cold starts. Orders and inventory load instantaneously 24/7.
+        </div>
+        <div class="benefit-item">
+          <strong>📸 100 GB Proof-of-Delivery Vault</strong>
+          Photos and signatures captured by riders are safely stored and accessible anytime for audit.
+        </div>
+        <div class="benefit-item">
+          <strong>🔒 Automated Daily Backups</strong>
+          Full database snapshots every 24 hours protect Novacare’s sales ledger from loss.
+        </div>
+        <div class="benefit-item">
+          <strong>💳 Instant Paystack Reconciliation</strong>
+          Doorstep card, USSD, and bank transfers settle in seconds with zero rider cash-leakage risk.
+        </div>
+      </div>
+    </div>
+
+    <!-- Bank Details -->
+    <div class="bank-box">
+      <h4>OFFICIAL SETTLEMENT ACCOUNT DETAILS</h4>
+      <p><strong>Bank Name:</strong> Titan Trust Bank / Designated Settlement Gateway</p>
+      <p><strong>Account Name:</strong> NovaXpress Logistics Limited &ndash; Enterprise Infrastructure</p>
+      <p><strong>Account Number (NUBAN):</strong> 0098234123</p>
+      <p><strong>Payment Reference:</strong> <code>INV-NX-NOVACARE-2026</code></p>
+    </div>
+
+    <!-- Signature Row -->
+    <div class="signature-row">
+      <div class="sign-col">
+        <div class="sign-line">
+          <strong>NovaXpress Logistics Limited</strong><br>
+          Authorized Engineering & Financial Operations
+        </div>
+      </div>
+      <div class="sign-col text-right">
+        <div class="sign-line">
+          <strong>Novacare Health & E-Commerce Limited</strong><br>
+          Authorized Client Signatory & Date
+        </div>
+      </div>
+    </div>
+
+    <div class="no-print" style="margin-top: 32px; text-align: center;">
+      <button onclick="window.print()" style="padding: 12px 28px; background: #4F46E5; color: white; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 14px;">
+        🖨️ Print / Save as PDF
+      </button>
+    </div>
+  </div>
+
+</body>
+</html>

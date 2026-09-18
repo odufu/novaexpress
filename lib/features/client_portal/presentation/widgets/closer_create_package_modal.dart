@@ -152,9 +152,10 @@ class _CloserCreatePackageModalState extends ConsumerState<CloserCreatePackageMo
     return Dialog(
       backgroundColor: isDark ? const Color(0xFF151D36) : Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       child: Container(
         constraints: const BoxConstraints(maxWidth: 520, maxHeight: 720),
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(20),
         child: Form(
           key: _formKey,
           child: Column(
@@ -165,38 +166,46 @@ class _CloserCreatePackageModalState extends ConsumerState<CloserCreatePackageMo
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF37021).withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(12),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF37021).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.card_giftcard_rounded, color: Color(0xFFF37021), size: 22),
                         ),
-                        child: const Icon(Icons.card_giftcard_rounded, color: Color(0xFFF37021), size: 22),
-                      ),
-                      const SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Create Package Deal',
-                            style: GoogleFonts.inter(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              color: isDark ? Colors.white : const Color(0xFF0F172A),
-                            ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Create Package Deal',
+                                style: GoogleFonts.inter(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                              Text(
+                                'Add commercial bundle to client catalog',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            ],
                           ),
-                          Text(
-                            'Add commercial bundle to client catalog',
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                        ),
+                      ],
+                    ),
                   ),
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
@@ -252,6 +261,7 @@ class _CloserCreatePackageModalState extends ConsumerState<CloserCreatePackageMo
 
                           return DropdownButtonFormField<CatalogProduct>(
                             value: effectiveProduct,
+                            isExpanded: true,
                             dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
                             style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : const Color(0xFF0F172A)),
                             decoration: InputDecoration(
@@ -264,7 +274,11 @@ class _CloserCreatePackageModalState extends ConsumerState<CloserCreatePackageMo
                             items: distinctProducts.map((p) {
                               return DropdownMenuItem<CatalogProduct>(
                                 value: p,
-                                child: Text('${p.name} (${currencyFormatter.format(p.defaultUnitPrice)})'),
+                                child: Text(
+                                  '${p.name} (${currencyFormatter.format(p.defaultUnitPrice)})',
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
                               );
                             }).toList(),
                             onChanged: _onProductChanged,

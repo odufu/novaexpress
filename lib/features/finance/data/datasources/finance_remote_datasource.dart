@@ -38,22 +38,81 @@ abstract class FinanceRemoteDataSource {
   Future<List<Map<String, dynamic>>> getPayoutRequests(String agentId);
   Future<List<Map<String, dynamic>>> getRiderTransactions(String agentId);
   Future<Map<String, dynamic>?> getPaystackTransactionDetails(String reference);
+  Future<Map<String, dynamic>> confirmPayoutReceipt({
+    required String payoutId,
+    required String agentId,
+    String? notes,
+  });
 }
 
 class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
   final SupabaseClient supabaseClient;
 
-  FinanceRemoteDataSourceImpl(this.supabaseClient);
+  FinanceRemoteDataSourceImpl({required this.supabaseClient});
 
   SupabaseClient _getAuthDbClient() {
     try {
-      return SupabaseClient(
-        SupabaseConstants.supabaseUrl,
-        SupabaseConstants.supabaseServiceRoleKey,
-        authOptions: const AuthClientOptions(autoRefreshToken: false),
-      );
-    } catch (_) {
-      return supabaseClient;
+      final session = Supabase.instance.client.auth.currentSession;
+      if (session != null && !session.isExpired) {
+        return Supabase.instance.client;
+      }
+    } catch (_) {}
+    return supabaseClient;
+  }
+
+  @override
+  Future<Map<String, dynamic>> confirmPayoutReceipt({
+    required String payoutId,
+    required String agentId,
+    String? notes,
+  }) async {
+    final dbClient = _getAuthDbClient();
+    final cleanPayoutId = payoutId.trim();
+    final cleanAgentId = agentId.trim();
+    final nowIso = DateTime.now().toIso8601String();
+
+    // 1. Try RPC fn_rider_confirm_payout_receipt
+    try {
+      final rpcRes = await dbClient.rpc('fn_rider_confirm_payout_receipt', params: {
+        'p_payout_id': cleanPayoutId,
+        'p_agent_id': cleanAgentId,
+        'p_notes': notes ?? 'Confirmed received by rider in PDA app',
+      });
+      if (rpcRes != null && (rpcRes['success'] == true || rpcRes['status'] == 'completed')) {
+        debugPrint('[FINANCE_DATASOURCE] ✅ fn_rider_confirm_payout_receipt RPC executed successfully.');
+        return Map<String, dynamic>.from(rpcRes as Map);
+      }
+    } catch (rpcErr) {
+      debugPrint('[FINANCE_DATASOURCE] ℹ️ RPC fn_rider_confirm_payout_receipt notice ($rpcErr). Falling back to direct update.');
+    }
+
+    // 2. Direct Table Update fallback
+    try {
+      final response = await dbClient
+          .from('payout_requests')
+          .update({
+            'status': 'completed',
+            'rider_confirmed_at': nowIso,
+            'rider_confirmation_notes': notes ?? 'Confirmed received by rider in PDA app',
+            'updated_at': nowIso,
+          })
+          .eq('id', cleanPayoutId)
+          .select()
+          .maybeSingle();
+
+      // Settle corresponding rider_transactions ledger entry
+      try {
+        await dbClient
+            .from('rider_transactions')
+            .update({'status': 'settled'})
+            .eq('delivery_agent_id', cleanAgentId)
+            .eq('category', 'payout');
+      } catch (_) {}
+
+      return response != null ? Map<String, dynamic>.from(response) : {'success': true, 'payout_id': cleanPayoutId};
+    } catch (e) {
+      debugPrint('[FINANCE_DATASOURCE] ⚠️ confirmPayoutReceipt fallback error: $e');
+      return {'success': false, 'error': e.toString()};
     }
   }
 

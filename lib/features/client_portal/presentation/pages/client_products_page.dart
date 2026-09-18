@@ -79,9 +79,11 @@ class _ClientProductsPageState extends ConsumerState<ClientProductsPage> {
 
     // Scoped products from master catalog for this merchant
     final catalogMerchantProducts = catalogState.products.where((p) {
-      if (effectiveClientId.isNotEmpty && p.clientId != null && p.clientId == effectiveClientId) return true;
-      if (effectiveCompanyName.isNotEmpty && p.clientName.trim().isNotEmpty && p.clientName.trim().toLowerCase() == effectiveCompanyName.trim().toLowerCase()) return true;
-      return false;
+      return ClientPortalNotifier.isProductForClient(
+        product: p,
+        clientId: effectiveClientId,
+        companyName: effectiveCompanyName,
+      );
     }).toList();
 
     // Deduplicate merged products by SKU & ID

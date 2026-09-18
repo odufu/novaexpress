@@ -38,7 +38,9 @@ class RouterRefreshNotifier extends ChangeNotifier {
     _ref.listen<AuthState>(
       authProvider,
       (previous, next) {
-        if (previous?.isAuthenticated != next.isAuthenticated ||
+        if (previous?.user != next.user ||
+            previous?.isAuthenticated != next.isAuthenticated ||
+            previous?.isInitialized != next.isInitialized ||
             previous?.user?.role != next.user?.role ||
             previous?.user?.isClient != next.user?.isClient ||
             previous?.user?.isDcManager != next.user?.isDcManager ||
@@ -55,6 +57,95 @@ final routerRefreshNotifierProvider = Provider<RouterRefreshNotifier>((ref) {
   return RouterRefreshNotifier(ref);
 });
 
+/// Pure, deterministic route redirection & isolation logic for all 4 operational consoles
+String? appRouteRedirect({
+  required AuthState authState,
+  required String matchedLocation,
+  bool hasSupabaseSession = false,
+}) {
+  final isAuthFromState = authState.isAuthenticated;
+  final isAuthenticated = isAuthFromState || hasSupabaseSession;
+  final isSplash = matchedLocation == '/splash';
+  final isPresentation = matchedLocation == '/presentation';
+  final isLoggingIn = matchedLocation == '/login' || matchedLocation == '/forgot-password';
+
+  debugPrint('[AUTH_ROUTER] 🚦 Route check: location="$matchedLocation", isAuthenticated=$isAuthenticated (riverpod=$isAuthFromState, supabase=$hasSupabaseSession)');
+
+  if (isSplash || isPresentation) {
+    return null;
+  }
+  if (!isAuthenticated && !isLoggingIn) {
+    debugPrint('[AUTH_ROUTER] 🛑 Access denied for unauthenticated state -> Redirecting to /login');
+    return '/login';
+  }
+  if (isAuthenticated) {
+    final user = authState.user;
+
+    // 🚨 CRITICAL ROLE GATE: If authenticated session exists but user profile/role is still resolving,
+    // DO NOT guess, DO NOT default to Rider, and NEVER render the Rider console ('/').
+    // Hold user on /splash until the UserEntity is fully resolved.
+    if (user == null) {
+      debugPrint('[AUTH_ROUTER] ⏳ Session detected but UserEntity still resolving -> holding on /splash');
+      return '/splash';
+    }
+
+    final isDc = user.isDcManager;
+    final isCloser = user.isCloser;
+    final isClientAdmin = user.isClientAdmin;
+    final isRider = user.isRider;
+
+    // Canonical home console path based strictly on the user's role
+    final String homePath = user.homeConsoleRoute;
+
+    // 1. If currently on login or forgot-password, redirect immediately to assigned console
+    if (isLoggingIn) {
+      debugPrint('[AUTH_ROUTER] 🎯 Authenticated ${user.roleDescription} -> Directing to designated console: $homePath');
+      return homePath;
+    }
+
+    // 2. Strict Console Isolation: Distribution Center Console (/dc/**)
+    if (matchedLocation.startsWith('/dc')) {
+      if (!isDc) {
+        debugPrint('[AUTH_ROUTER] 🛑 Access Denied: User role "${user.role}" cannot access DC Console -> Redirecting to $homePath');
+        return homePath;
+      }
+    }
+
+    // 3. Strict Console Isolation: Client Merchant Portal (/client/**)
+    if (matchedLocation.startsWith('/client')) {
+      if (!isClientAdmin) {
+        debugPrint('[AUTH_ROUTER] 🛑 Access Denied: User role "${user.role}" cannot access Client Merchant Portal -> Redirecting to $homePath');
+        return homePath;
+      }
+    }
+
+    // 4. Strict Console Isolation: Telesales Closer Portal (/closer/**)
+    if (matchedLocation.startsWith('/closer')) {
+      if (!isCloser) {
+        debugPrint('[AUTH_ROUTER] 🛑 Access Denied: User role "${user.role}" cannot access Closer Portal -> Redirecting to $homePath');
+        return homePath;
+      }
+    }
+
+    // 5. Strict Console Isolation: Field Delivery Agent (Rider) Routes
+    // Only confirmed Riders can access root ('/'), rider orders list ('/orders'), scanner, POD confirmation, failure reporting, stock, and remittance
+    final isRiderOnlyPath = matchedLocation == '/' ||
+        matchedLocation == '/orders' ||
+        matchedLocation.startsWith('/orders/scan') ||
+        matchedLocation.endsWith('/deliver-pod') ||
+        matchedLocation.endsWith('/log-failure') ||
+        matchedLocation.startsWith('/stock') ||
+        matchedLocation.startsWith('/cash') ||
+        matchedLocation.startsWith('/finance');
+
+    if (isRiderOnlyPath && !isRider) {
+      debugPrint('[AUTH_ROUTER] 🛑 Access Denied: Role "${user.role}" cannot access Rider route "$matchedLocation" -> Redirecting to $homePath');
+      return homePath;
+    }
+  }
+  return null;
+}
+
 final routerProvider = Provider<GoRouter>((ref) {
   final refreshNotifier = ref.watch(routerRefreshNotifierProvider);
 
@@ -63,86 +154,15 @@ final routerProvider = Provider<GoRouter>((ref) {
     refreshListenable: refreshNotifier,
     redirect: (BuildContext context, GoRouterState state) {
       final authState = ref.read(authProvider);
-      final isAuthFromState = authState.isAuthenticated;
       Session? session;
       try {
         session = Supabase.instance.client.auth.currentSession;
       } catch (_) {}
-      final isAuthenticated = isAuthFromState || session != null;
-      final isSplash = state.matchedLocation == '/splash';
-      final isPresentation = state.matchedLocation == '/presentation';
-      final isLoggingIn = state.matchedLocation == '/login' || state.matchedLocation == '/forgot-password';
-
-      debugPrint('[AUTH_ROUTER] 🚦 Route check: location="${state.matchedLocation}", isAuthenticated=$isAuthenticated (riverpod=$isAuthFromState, supabase=${session != null})');
-
-      if (isSplash || isPresentation) {
-        return null;
-      }
-      if (!isAuthenticated && !isLoggingIn) {
-        debugPrint('[AUTH_ROUTER] 🛑 Access denied for unauthenticated state -> Redirecting to /login');
-        return '/login';
-      }
-      if (isAuthenticated) {
-        final user = authState.user;
-        final isDc = user?.isDcManager == true;
-        final isCloser = user?.isCloser == true;
-        final isClientAdmin = user?.isClientAdmin == true;
-        final isRider = user?.isRider == true || (!isDc && !isCloser && !isClientAdmin);
-
-        // Canonical home console path based strictly on the user's role
-        final String homePath = user?.homeConsoleRoute ?? (isDc
-            ? '/dc'
-            : (isCloser
-                ? '/closer'
-                : (isClientAdmin ? '/client' : '/')));
-
-        // 1. If currently on login or forgot-password, redirect immediately to assigned console
-        if (isLoggingIn) {
-          debugPrint('[AUTH_ROUTER] 🎯 Authenticated ${user?.roleDescription ?? user?.role} -> Directing to designated console: $homePath');
-          return homePath;
-        }
-
-        // 2. Strict Console Isolation: Distribution Center Console (/dc/**)
-        if (state.matchedLocation.startsWith('/dc')) {
-          if (!isDc) {
-            debugPrint('[AUTH_ROUTER] 🛑 Access Denied: User role "${user?.role}" cannot access DC Console -> Redirecting to $homePath');
-            return homePath;
-          }
-        }
-
-        // 3. Strict Console Isolation: Client Merchant Portal (/client/**)
-        if (state.matchedLocation.startsWith('/client')) {
-          if (!isClientAdmin) {
-            debugPrint('[AUTH_ROUTER] 🛑 Access Denied: User role "${user?.role}" cannot access Client Merchant Portal -> Redirecting to $homePath');
-            return homePath;
-          }
-        }
-
-        // 4. Strict Console Isolation: Telesales Closer Portal (/closer/**)
-        if (state.matchedLocation.startsWith('/closer')) {
-          if (!isCloser) {
-            debugPrint('[AUTH_ROUTER] 🛑 Access Denied: User role "${user?.role}" cannot access Closer Portal -> Redirecting to $homePath');
-            return homePath;
-          }
-        }
-
-        // 5. Strict Console Isolation: Field Delivery Agent (Rider) Routes
-        // Only Riders can access root ('/'), rider orders list ('/orders'), scanner, POD confirmation, failure reporting, stock, and remittance
-        final isRiderOnlyPath = state.matchedLocation == '/' ||
-            state.matchedLocation == '/orders' ||
-            state.matchedLocation.startsWith('/orders/scan') ||
-            state.matchedLocation.endsWith('/deliver-pod') ||
-            state.matchedLocation.endsWith('/log-failure') ||
-            state.matchedLocation.startsWith('/stock') ||
-            state.matchedLocation.startsWith('/cash') ||
-            state.matchedLocation.startsWith('/finance');
-
-        if (isRiderOnlyPath && !isRider) {
-          debugPrint('[AUTH_ROUTER] 🛑 Access Denied: Role "${user?.role}" cannot access Rider route "${state.matchedLocation}" -> Redirecting to $homePath');
-          return homePath;
-        }
-      }
-      return null;
+      return appRouteRedirect(
+        authState: authState,
+        matchedLocation: state.matchedLocation,
+        hasSupabaseSession: session != null,
+      );
     },
     routes: [
       GoRoute(

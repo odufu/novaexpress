@@ -18,6 +18,10 @@ import '../../features/orders/domain/entities/order.dart';
 import '../../features/stock/data/models/stock_item_model.dart';
 import '../../features/stock/domain/entities/rider_stock_allocation.dart';
 import '../../features/stock/domain/entities/stock_item.dart';
+import '../../features/pipeline_chat/data/models/order_conversation_message_model.dart';
+import '../../features/pipeline_chat/data/models/order_conversation_model.dart';
+import '../../features/pipeline_chat/domain/entities/order_conversation.dart';
+import '../../features/pipeline_chat/domain/entities/order_conversation_message.dart';
 
 abstract class LocalStorageService {
   Future<void> saveJsonList(String key, List<Map<String, dynamic>> items);
@@ -74,6 +78,12 @@ abstract class LocalStorageService {
   Future<void> cacheProductCatalog(List<CatalogProduct> products);
   Future<List<CatalogProduct>?> getCachedProductCatalog();
 
+  Future<void> cacheConversations(List<OrderConversation> conversations, [String? scopeKey]);
+  Future<List<OrderConversation>?> getCachedConversations([String? scopeKey]);
+
+  Future<void> cacheConversationMessages(String conversationId, List<OrderConversationMessage> messages);
+  Future<List<OrderConversationMessage>?> getCachedConversationMessages(String conversationId);
+
   Future<void> cacheUserProfile(Map<String, dynamic> userJson);
   Future<Map<String, dynamic>?> getCachedUserProfile();
   Future<void> clearUserProfile();
@@ -98,6 +108,8 @@ class LocalStorageServiceImpl implements LocalStorageService {
   static const String _riderAllocationsKey = 'novexps_cache_rider_stock_allocations';
   static const String _productCatalogKey = 'novexps_cache_product_catalog';
   static const String _userProfileKey = 'novexps_cache_user_profile';
+  static const String _conversationsKey = 'novexps_cache_conversations';
+  static const String _chatMessagesPrefix = 'novexps_cache_chat_msgs_';
   static const String _notificationsPrefix = 'novexps_cache_notifications_';
   static const String _syncTimePrefix = 'novexps_sync_time_';
 
@@ -634,6 +646,66 @@ class LocalStorageServiceImpl implements LocalStorageService {
       }
     }
     return items.isNotEmpty ? items : null;
+  }
+
+  // --- Pipeline Chat Caching ---
+
+  @override
+  Future<void> cacheConversations(List<OrderConversation> conversations, [String? scopeKey]) async {
+    final list = conversations.map<Map<String, dynamic>>((c) {
+      if (c is OrderConversationModel) return c.toJson();
+      return OrderConversationModel.fromEntity(c).toJson();
+    }).toList();
+    final key = scopeKey != null && scopeKey.isNotEmpty ? '${_conversationsKey}_$scopeKey' : _conversationsKey;
+    await saveJsonList(key, list);
+    await setLastSyncTime('conversations_${scopeKey ?? 'global'}');
+    debugPrint('[LOCAL_STORAGE] 💾 Cached ${conversations.length} conversations to local storage (key: $key).');
+  }
+
+  @override
+  Future<List<OrderConversation>?> getCachedConversations([String? scopeKey]) async {
+    final key = scopeKey != null && scopeKey.isNotEmpty ? '${_conversationsKey}_$scopeKey' : _conversationsKey;
+    final rawList = await getJsonList(key);
+    if (rawList == null || rawList.isEmpty) return null;
+
+    final conversations = <OrderConversation>[];
+    for (final map in rawList) {
+      try {
+        conversations.add(OrderConversationModel.fromJson(map));
+      } catch (e) {
+        debugPrint('[LOCAL_STORAGE] ⚠️ Error parsing cached conversation: $e');
+      }
+    }
+    return conversations.isNotEmpty ? conversations : null;
+  }
+
+  @override
+  Future<void> cacheConversationMessages(String conversationId, List<OrderConversationMessage> messages) async {
+    final list = messages.map<Map<String, dynamic>>((m) {
+      if (m is OrderConversationMessageModel) return m.toJson();
+      return OrderConversationMessageModel.fromEntity(m).toJson();
+    }).toList();
+    final key = '$_chatMessagesPrefix$conversationId';
+    await saveJsonList(key, list);
+    await setLastSyncTime('chat_msgs_$conversationId');
+    debugPrint('[LOCAL_STORAGE] 💾 Cached ${messages.length} messages for conversation $conversationId.');
+  }
+
+  @override
+  Future<List<OrderConversationMessage>?> getCachedConversationMessages(String conversationId) async {
+    final key = '$_chatMessagesPrefix$conversationId';
+    final rawList = await getJsonList(key);
+    if (rawList == null || rawList.isEmpty) return null;
+
+    final messages = <OrderConversationMessage>[];
+    for (final map in rawList) {
+      try {
+        messages.add(OrderConversationMessageModel.fromJson(map));
+      } catch (e) {
+        debugPrint('[LOCAL_STORAGE] ⚠️ Error parsing cached chat message: $e');
+      }
+    }
+    return messages.isNotEmpty ? messages : null;
   }
 
   // --- User Profile ---

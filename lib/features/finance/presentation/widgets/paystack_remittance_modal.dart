@@ -197,27 +197,30 @@ class _PaystackRemittanceModalState extends ConsumerState<PaystackRemittanceModa
             widget.onRemittanceConfirmed(_paymentReference);
           }
         } else {
-          // In test/demo mode when manual confirmation is performed
-          ref.read(paystackRemittanceReceivedProvider.notifier).state = true;
           ref.read(paystackRemittanceVerifyingProvider.notifier).state = false;
-
-          await Future.delayed(const Duration(milliseconds: 600));
-          if (mounted) {
-            Navigator.pop(context);
-            widget.onRemittanceConfirmed(_paymentReference);
-          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: const Color(0xFFEF4444),
+              behavior: SnackBarBehavior.floating,
+              content: Text(
+                verifyRes.gatewayResponse ?? 'Remittance payment not yet confirmed by Paystack. Please complete the transfer.',
+              ),
+              duration: const Duration(seconds: 3),
+            ),
+          );
         }
       }
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
-        ref.read(paystackRemittanceReceivedProvider.notifier).state = true;
         ref.read(paystackRemittanceVerifyingProvider.notifier).state = false;
-
-        await Future.delayed(const Duration(milliseconds: 600));
-        if (mounted) {
-          Navigator.pop(context);
-          widget.onRemittanceConfirmed(_paymentReference);
-        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFFEF4444),
+            behavior: SnackBarBehavior.floating,
+            content: Text('Payment verification check failed: $e'),
+            duration: const Duration(seconds: 3),
+          ),
+        );
       }
     }
   }

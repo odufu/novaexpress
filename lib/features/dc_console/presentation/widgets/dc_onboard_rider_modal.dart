@@ -486,6 +486,7 @@ class _DCOnboardRiderModalState extends ConsumerState<DCOnboardRiderModal> {
         commissionRate: commission,
         transportAllowance: transport,
         fuelAllowance: isPda ? 0.0 : 800.0,
+        failedDeliveryAllowance: failed,
         baseSalary: salary,
         vehicleType: draftState.vehicleType,
         vehiclePlateNumber: _vehiclePlateController.text.trim(),

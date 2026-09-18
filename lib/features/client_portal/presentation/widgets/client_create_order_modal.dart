@@ -199,6 +199,7 @@ class _ClientCreateOrderModalState extends ConsumerState<ClientCreateOrderModal>
       final closerId = isCloser ? (authUser?.closerId ?? authUser?.id) : null;
       final closerName = isCloser ? authUser?.fullName : null;
       final closerCode = isCloser ? authUser?.closerCode : null;
+      final closerAvatarUrl = isCloser ? authUser?.avatarUrl : null;
 
       final order = await ref.read(clientPortalProvider.notifier).createOrder(
         customerName: _customerNameController.text.trim(),
@@ -220,6 +221,7 @@ class _ClientCreateOrderModalState extends ConsumerState<ClientCreateOrderModal>
         closerId: closerId,
         closerName: closerName,
         closerCode: closerCode,
+        closerAvatarUrl: closerAvatarUrl,
         notes: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
       );
 
@@ -414,11 +416,16 @@ class _ClientCreateOrderModalState extends ConsumerState<ClientCreateOrderModal>
 
                         return DropdownButtonFormField<CatalogProduct>(
                           value: effectiveProduct,
+                          isExpanded: true,
                           decoration: _inputDecoration('Product Name', prefixIcon: Icons.shopping_bag_outlined),
                           items: distinctProducts.map((p) {
                             return DropdownMenuItem<CatalogProduct>(
                               value: p,
-                              child: Text('${p.name} (₦${p.defaultUnitPrice.toStringAsFixed(0)} / unit)'),
+                              child: Text(
+                                '${p.name} (₦${p.defaultUnitPrice.toStringAsFixed(0)} / unit)',
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
                             );
                           }).toList(),
                           onChanged: (p) {

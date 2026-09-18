@@ -84,7 +84,7 @@ class PipelineChatRemoteDataSourceImpl implements PipelineChatRemoteDataSource {
       final db = _getAdminClient();
       final res = await db
           .from('order_conversations')
-          .select()
+          .select('*,client_closers(avatar_url,full_name)')
           .eq('order_id', orderId)
           .maybeSingle();
 
@@ -106,6 +106,8 @@ class PipelineChatRemoteDataSourceImpl implements PipelineChatRemoteDataSource {
           'distribution_center_name': orderRow['distribution_center_name'],
           'delivery_agent_id': orderRow['delivery_agent_id'],
           'delivery_agent_name': orderRow['delivery_agent_name'],
+          'closer_id': orderRow['closer_id'],
+          'closer_name': orderRow['closer_name'],
           'order_status': orderRow['status'] ?? 'pending',
           'current_product_name': orderRow['product_name'],
           'current_package_name': orderRow['package_deal_name'],
@@ -113,7 +115,7 @@ class PipelineChatRemoteDataSourceImpl implements PipelineChatRemoteDataSource {
           'last_message_text': 'Order chat pipeline initialized.',
           'last_message_sender_name': 'System',
           'last_message_at': DateTime.now().toIso8601String(),
-        }).select().maybeSingle();
+        }).select('*,client_closers(avatar_url,full_name)').maybeSingle();
 
         if (newConv != null) {
           return OrderConversationModel.fromJson(newConv);
@@ -167,7 +169,7 @@ class PipelineChatRemoteDataSourceImpl implements PipelineChatRemoteDataSource {
   }) async {
     try {
       final db = _getAdminClient();
-      var query = db.from('order_conversations').select();
+      var query = db.from('order_conversations').select('*,client_closers(avatar_url,full_name)');
       final r = userRole.toLowerCase().trim();
 
       if (r.contains('rider') || r.contains('delivery_agent') || r.contains('pda') || r.contains('driver')) {
@@ -183,10 +185,13 @@ class PipelineChatRemoteDataSourceImpl implements PipelineChatRemoteDataSource {
           return [];
         }
       } else if (r.contains('closer')) {
-        if (closerId != null && closerId.isNotEmpty) {
-          query = query.eq('closer_id', closerId);
-        } else if (clientId != null && clientId.isNotEmpty) {
-          query = query.eq('client_id', clientId);
+        final targetCloserId = (closerId != null && closerId.isNotEmpty) ? closerId : userId;
+        if (targetCloserId.isNotEmpty) {
+          if (closerId != null && closerId.isNotEmpty && closerId != userId) {
+            query = query.or('closer_id.eq.$closerId,closer_id.eq.$userId');
+          } else {
+            query = query.eq('closer_id', targetCloserId);
+          }
         } else {
           return [];
         }
@@ -277,6 +282,9 @@ class PipelineChatRemoteDataSourceImpl implements PipelineChatRemoteDataSource {
     switch (senderRole) {
       case ChatSenderRole.client:
         rStr = 'client';
+        break;
+      case ChatSenderRole.closer:
+        rStr = 'closer';
         break;
       case ChatSenderRole.dcManager:
         rStr = 'dc_manager';

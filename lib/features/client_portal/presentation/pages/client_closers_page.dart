@@ -6,6 +6,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../domain/entities/client_closer.dart';
 import '../providers/client_portal_provider.dart';
+import '../widgets/client_closer_credentials_modal.dart';
 import '../widgets/client_closer_detail_modal.dart';
 import '../widgets/client_onboard_closer_modal.dart';
 
@@ -313,7 +314,7 @@ class ClientClosersPage extends ConsumerWidget {
     bool isDark,
   ) {
     final isTop = rank == 1;
-    final metrics = state.getCloserPerformanceMetrics(closer.id, closer.email);
+    final metrics = state.getCloserPerformanceMetrics(closer.id, closer.email, closer.fullName);
     final bookedCount = (metrics['bookedCount'] as int) > closer.totalOrdersBooked
         ? (metrics['bookedCount'] as int)
         : closer.totalOrdersBooked;
@@ -506,7 +507,24 @@ class ClientClosersPage extends ConsumerWidget {
                 ],
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.send_rounded, size: 16, color: Color(0xFF10B981)),
+              tooltip: 'Share / Send Login Credentials',
+              constraints: const BoxConstraints(),
+              style: IconButton.styleFrom(
+                backgroundColor: const Color(0xFF10B981).withValues(alpha: 0.1),
+                padding: const EdgeInsets.all(6),
+              ),
+              onPressed: () {
+                ClientCloserCredentialsModal.show(
+                  context,
+                  closer: closer,
+                  clientName: state.clientProfile.name,
+                );
+              },
+            ),
+            const SizedBox(width: 8),
             const Icon(Icons.chevron_right_rounded, size: 18, color: Color(0xFF94A3B8)),
           ],
         ),
@@ -523,7 +541,7 @@ class ClientClosersPage extends ConsumerWidget {
     bool isDark,
   ) {
     final isTop = rank == 1;
-    final metrics = state.getCloserPerformanceMetrics(closer.id, closer.email);
+    final metrics = state.getCloserPerformanceMetrics(closer.id, closer.email, closer.fullName);
     final bookedCount = (metrics['bookedCount'] as int) > closer.totalOrdersBooked
         ? (metrics['bookedCount'] as int)
         : closer.totalOrdersBooked;
@@ -623,6 +641,52 @@ class ClientClosersPage extends ConsumerWidget {
                 Text(
                   currencyFormatter.format(earnedCommission),
                   style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFFF37021)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                InkWell(
+                  onTap: () {
+                    ClientCloserCredentialsModal.show(
+                      context,
+                      closer: closer,
+                      clientName: state.clientProfile.name,
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(6),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.send_rounded, size: 12, color: Color(0xFF10B981)),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Share / Send Login',
+                          style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF10B981)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Performance Details',
+                      style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFF37021)),
+                    ),
+                    const SizedBox(width: 2),
+                    const Icon(Icons.chevron_right_rounded, size: 14, color: Color(0xFFF37021)),
+                  ],
                 ),
               ],
             ),

@@ -10,9 +10,10 @@ class DCPayoutClaim {
   final String accountNumber;
   final String accountName;
   final DateTime requestedAt;
-  final String status; // 'pending', 'pending_review', 'approved', 'rejected'
+  final String status; // 'pending', 'pending_review', 'disbursed', 'approved', 'completed', 'confirmed', 'rejected'
   final String? disbursementRef;
   final String? dcNotes;
+  final DateTime? riderConfirmedAt;
 
   const DCPayoutClaim({
     required this.id,
@@ -29,10 +30,13 @@ class DCPayoutClaim {
     this.status = 'pending',
     this.disbursementRef,
     this.dcNotes,
+    this.riderConfirmedAt,
   });
 
   bool get isPending => status == 'pending' || status == 'pending_review';
   bool get isApproved => status == 'approved' || status == 'disbursed';
+  bool get isDisbursed => status == 'disbursed';
+  bool get isConfirmed => status == 'completed' || status == 'confirmed';
   bool get isRejected => status == 'rejected';
 
   DCPayoutClaim copyWith({
@@ -50,6 +54,7 @@ class DCPayoutClaim {
     String? status,
     String? disbursementRef,
     String? dcNotes,
+    DateTime? riderConfirmedAt,
   }) {
     return DCPayoutClaim(
       id: id ?? this.id,
@@ -66,6 +71,7 @@ class DCPayoutClaim {
       status: status ?? this.status,
       disbursementRef: disbursementRef ?? this.disbursementRef,
       dcNotes: dcNotes ?? this.dcNotes,
+      riderConfirmedAt: riderConfirmedAt ?? this.riderConfirmedAt,
     );
   }
 
@@ -107,6 +113,9 @@ class DCPayoutClaim {
       status: json['status']?.toString() ?? 'pending',
       disbursementRef: json['disbursement_ref']?.toString() ?? json['disbursementRef'],
       dcNotes: json['dc_notes']?.toString() ?? json['dcNotes'],
+      riderConfirmedAt: json['rider_confirmed_at'] != null
+          ? DateTime.tryParse(json['rider_confirmed_at'].toString())
+          : null,
     );
   }
 
@@ -135,6 +144,7 @@ class DCPayoutClaim {
       'disbursementRef': disbursementRef,
       'dc_notes': dcNotes,
       'dcNotes': dcNotes,
+      'rider_confirmed_at': riderConfirmedAt?.toIso8601String(),
     };
   }
 }

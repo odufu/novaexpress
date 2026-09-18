@@ -1,0 +1,12 @@
+{
+  "AllowMultiple": false,
+  "Description": "Use isProductForClient in reloadPackages",
+  "EndLine": 2020,
+  "Instruction": "Use isProductForClient in reloadPackages",
+  "ReplacementContent": "      // Update local client products with latest from catalog\n      final catalogState = _ref.read(productCatalogProvider);\n      final clientProducts = catalogState.products.where((p) {\n        return isProductForClient(\n          product: p,\n          clientId: clientId,\n          companyName: clientCompany,\n        );\n      }).toList();",
+  "StartLine": 2010,
+  "TargetContent": "      // Update local client products with latest from catalog\n      final catalogState = _ref.read(productCatalogProvider);\n      final clientProducts = catalogState.products.where((p) {\n        if (clientId.isNotEmpty && p.clientId != null && p.clientId == clientId) return true;\n        if (clientCompany.isNotEmpty && p.clientName.trim().isNotEmpty && p.clientName.trim().toLowerCase() == clientCompany.trim().toLowerCase()) return true;\n        return false;\n      }).toList();",
+  "TargetFile": "c:\\PROJECT\\NoveXPS\\lib\\features\\client_portal\\presentation\\providers\\client_portal_provider.dart",
+  "toolAction": "Editing file",
+  "toolSummary": "Update reloadPackages in client_portal_provider.dart"
+}

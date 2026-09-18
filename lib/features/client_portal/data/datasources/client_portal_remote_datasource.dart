@@ -16,6 +16,7 @@ abstract class ClientPortalRemoteDataSource {
     required String phone,
     String? password,
     String? avatarUrl,
+    String? closerCode,
     int dailyCallTarget = 50,
     double commissionRate = 500.0,
   });
@@ -66,10 +67,12 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
     final c = _client;
     if (c != null) return c;
     try {
-      return Supabase.instance.client;
-    } catch (_) {
-      return _getAdminClient();
-    }
+      final session = Supabase.instance.client.auth.currentSession;
+      if (session != null && !session.isExpired) {
+        return Supabase.instance.client;
+      }
+    } catch (_) {}
+    return _getAdminClient();
   }
 
   String _generateUuid() {
@@ -85,6 +88,7 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
     required String phone,
     String? password,
     String? avatarUrl,
+    String? closerCode,
     int dailyCallTarget = 50,
     double commissionRate = 500.0,
   }) async {
@@ -104,7 +108,9 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
     }
 
     final closerId = _generateUuid();
-    final closerCode = 'CLS-${DateTime.now().millisecond.toString().padLeft(3, '0')}';
+    final effectiveCloserCode = (closerCode != null && closerCode.trim().isNotEmpty)
+        ? closerCode.trim()
+        : 'CLS-${DateTime.now().millisecond.toString().padLeft(3, '0')}';
 
     // 2. Provision Supabase Auth User with confirmed status so closer can sign in directly
     String authUserId = closerId;
@@ -156,7 +162,7 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
       id: closerId,
       clientId: clientId,
       userId: authUserId,
-      closerCode: closerCode,
+      closerCode: effectiveCloserCode,
       fullName: fullName.trim(),
       email: cleanEmail,
       phone: phone.trim(),
@@ -188,6 +194,27 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
       'is_active': true,
     });
 
+    // 4b. Sync client total_closers_count and auto-expand closer_limit
+    try {
+      final clientRes = await adminDb
+          .from('clients')
+          .select('total_closers_count, closer_limit')
+          .eq('id', clientId)
+          .maybeSingle();
+      if (clientRes != null) {
+        final totalCount = (clientRes['total_closers_count'] as num?)?.toInt() ?? 0;
+        final currentLimit = (clientRes['closer_limit'] as num?)?.toInt() ?? 25;
+        final newTotal = totalCount + 1;
+        await adminDb.from('clients').update({
+          'total_closers_count': newTotal,
+          if (newTotal > currentLimit) 'closer_limit': newTotal + 15,
+        }).eq('id', clientId);
+        debugPrint('[CLIENT_PORTAL] 📈 Client closer count incremented to $newTotal (Limit: ${newTotal > currentLimit ? newTotal + 15 : currentLimit})');
+      }
+    } catch (clientErr) {
+      debugPrint('[CLIENT_PORTAL] ⚠️ Error syncing client closer stats: $clientErr');
+    }
+
     // 5. Register in-memory session for immediate local/test authentication
     final closerUser = UserModel(
       id: authUserId,
@@ -199,7 +226,7 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
       role: 'closer',
       clientId: clientId,
       closerId: closerId,
-      closerCode: closerCode,
+      closerCode: effectiveCloserCode,
       avatarUrl: avatarUrl,
     );
     AuthRemoteDataSourceImpl.registerUserInMemory(closerUser, rawPassword);
@@ -263,11 +290,23 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
     required String newPassword,
   }) async {
     final adminDb = _getAdminClient();
-    if (userId != null && userId.isNotEmpty) {
-      await adminDb.auth.admin.updateUserById(
-        userId,
-        attributes: AdminUserAttributes(password: newPassword),
-      );
+    var targetUserId = userId;
+    if (targetUserId == null || targetUserId.isEmpty) {
+      try {
+        final row = await adminDb.from('client_closers').select('user_id').eq('id', closerId).maybeSingle();
+        targetUserId = row?['user_id']?.toString();
+      } catch (_) {}
+    }
+
+    if (targetUserId != null && targetUserId.isNotEmpty) {
+      try {
+        await adminDb.auth.admin.updateUserById(
+          targetUserId,
+          attributes: AdminUserAttributes(password: newPassword),
+        );
+      } catch (authErr) {
+        debugPrint('[CLIENT_PORTAL] ⚠️ resetCloserPassword auth admin error: $authErr');
+      }
     } else {
       await adminDb.from('users').update({
         'raw_user_meta_data': {'default_password_changed': true},

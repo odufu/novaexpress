@@ -15,6 +15,7 @@ import 'client_orders_page.dart';
 import 'client_products_page.dart';
 import 'closer_mobile_portal_page.dart';
 import '../../../pipeline_chat/presentation/widgets/pipeline_chat_floating_action_button.dart';
+import '../../../users/presentation/widgets/edit_profile_modal.dart';
 
 final clientActiveTabProvider = StateProvider<String>((ref) {
   final user = ref.watch(authProvider).user;
@@ -339,37 +340,52 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
                   )
                 : Row(
                     children: [
-                      UserAvatarWidget(
-                        avatarUrl: authUser?.avatarUrl,
-                        fullName: isCloser ? (authUser?.fullName ?? 'Amaka Chioma') : state.clientProfile.companyName,
-                        radius: 18,
-                        showBorder: true,
-                        borderColor: const Color(0xFFF37021),
-                        borderWidth: 1.5,
+                      InkWell(
+                        borderRadius: BorderRadius.circular(20),
+                        onTap: () {
+                          if (authUser != null) {
+                            EditProfileModal.show(context, authUser);
+                          }
+                        },
+                        child: UserAvatarWidget(
+                          avatarUrl: authUser?.avatarUrl,
+                          fullName: isCloser ? (authUser?.fullName ?? 'Amaka Chioma') : state.clientProfile.companyName,
+                          radius: 18,
+                          showBorder: true,
+                          borderColor: const Color(0xFFF37021),
+                          borderWidth: 1.5,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              isCloser ? (authUser?.fullName ?? 'Amaka Chioma') : state.clientProfile.companyName,
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
+                        child: InkWell(
+                          onTap: () {
+                            if (authUser != null) {
+                              EditProfileModal.show(context, authUser);
+                            }
+                          },
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                isCloser ? (authUser?.fullName ?? 'Amaka Chioma') : state.clientProfile.companyName,
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            Text(
-                              isCloser ? (authUser?.closerCode ?? 'CLS-NOVA-001') : state.clientProfile.code,
-                              style: GoogleFonts.inter(
-                                fontSize: 11,
-                                color: const Color(0xFF8293B5),
+                              Text(
+                                isCloser ? (authUser?.closerCode ?? 'CLS-NOVA-001') : state.clientProfile.code,
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  color: const Color(0xFF8293B5),
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                       IconButton(
@@ -618,13 +634,24 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
           const SizedBox(width: 4),
 
           // User Profile Avatar
-          UserAvatarWidget(
-            avatarUrl: authUser?.avatarUrl,
-            fullName: isCloser ? (authUser?.fullName ?? 'Amaka Chioma') : state.clientProfile.companyName,
-            radius: 15,
-            showBorder: true,
-            borderColor: const Color(0xFFF37021),
-            borderWidth: 1.5,
+          InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: () {
+              if (authUser != null) {
+                EditProfileModal.show(context, authUser);
+              }
+            },
+            child: Tooltip(
+              message: 'Edit Profile & Settings',
+              child: UserAvatarWidget(
+                avatarUrl: authUser?.avatarUrl,
+                fullName: isCloser ? (authUser?.fullName ?? 'Amaka Chioma') : state.clientProfile.companyName,
+                radius: 15,
+                showBorder: true,
+                borderColor: const Color(0xFFF37021),
+                borderWidth: 1.5,
+              ),
+            ),
           ),
         ],
       ),

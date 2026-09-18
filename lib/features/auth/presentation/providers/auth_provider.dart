@@ -40,11 +40,13 @@ class AuthState {
   final bool isLoading;
   final UserEntity? user;
   final String? errorMessage;
+  final bool isInitialized;
 
   const AuthState({
     this.isLoading = false,
     this.user,
     this.errorMessage,
+    this.isInitialized = false,
   });
 
   bool get isAuthenticated => user != null;
@@ -53,11 +55,13 @@ class AuthState {
     bool? isLoading,
     UserEntity? user,
     String? errorMessage,
+    bool? isInitialized,
   }) {
     return AuthState(
       isLoading: isLoading ?? this.isLoading,
       user: user ?? this.user,
       errorMessage: errorMessage,
+      isInitialized: isInitialized ?? this.isInitialized,
     );
   }
 }
@@ -70,12 +74,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final LocalStorageService? localStorageService;
 
   AuthNotifier({
+    UserEntity? initialUser,
     required this.loginUseCase,
     required this.logoutUseCase,
     required this.getCurrentUserUseCase,
     this.authRepository,
     this.localStorageService,
-  }) : super(const AuthState()) {
+  }) : super(AuthState(
+          user: initialUser,
+          isInitialized: initialUser != null,
+        )) {
     checkCurrentUser();
   }
 
@@ -183,21 +191,26 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> checkCurrentUser() async {
-    // 1. Instantly restore from Local Storage cache so UI (and avatar) loads without flashing
-    try {
-      final cachedJson = await localStorageService?.getCachedUserProfile();
-      if (!mounted) return;
-      if (cachedJson != null) {
-        final cachedUser = UserModel.fromJson(cachedJson);
-        debugPrint('[AUTH_PROVIDER] 📦 Restored active user from local storage: ${cachedUser.email} (Avatar: ${cachedUser.avatarUrl})');
-        state = state.copyWith(user: cachedUser);
+    // 1. If not already populated via pre-warmed initialUser, restore from Local Storage cache
+    if (state.user == null) {
+      try {
+        final cachedJson = await localStorageService?.getCachedUserProfile();
+        if (!mounted) return;
+        if (cachedJson != null) {
+          final cachedUser = UserModel.fromJson(cachedJson);
+          debugPrint('[AUTH_PROVIDER] 📦 Restored active user from local storage: ${cachedUser.email} (Avatar: ${cachedUser.avatarUrl})');
+          state = state.copyWith(user: cachedUser, isInitialized: true);
+        }
+      } catch (cacheErr) {
+        debugPrint('[AUTH_PROVIDER] ℹ️ Cache restore notice: $cacheErr');
       }
-    } catch (cacheErr) {
-      debugPrint('[AUTH_PROVIDER] ℹ️ Cache restore notice: $cacheErr');
     }
 
     if (!mounted) return;
-    state = state.copyWith(isLoading: true);
+    // Only flag isLoading if user is not already present from cache (prevents UI flicker)
+    if (state.user == null) {
+      state = state.copyWith(isLoading: true);
+    }
     try {
       final user = await getCurrentUserUseCase.execute();
       if (!mounted) return;
@@ -210,11 +223,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
         debugPrint('[AUTH_PROVIDER] ℹ️ No active user session found from remote.');
       }
       if (!mounted) return;
-      state = state.copyWith(isLoading: false, user: user ?? state.user);
+      state = state.copyWith(isLoading: false, user: user ?? state.user, isInitialized: true);
     } catch (e) {
       debugPrint('[AUTH_PROVIDER] ⚠️ checkCurrentUser() error: $e');
       if (mounted) {
-        state = state.copyWith(isLoading: false);
+        state = state.copyWith(isLoading: false, isInitialized: true);
       }
     }
   }
@@ -267,7 +280,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final currentUser = state.user;
 
       if (currentUser != null) {
-        final cleanAvatar = (avatarUrl != null && avatarUrl.isNotEmpty) ? avatarUrl : currentUser.avatarUrl;
+        final cleanAvatar = avatarUrl != null
+            ? (avatarUrl.trim().isEmpty ? null : avatarUrl.trim())
+            : currentUser.avatarUrl;
         final opState = (operatingState != null && operatingState.isNotEmpty) ? operatingState : currentUser.operatingState;
         final opCity = (operatingCity != null && operatingCity.isNotEmpty) ? operatingCity : currentUser.operatingCity;
         final vType = (vehicleType != null && vehicleType.isNotEmpty) ? vehicleType : currentUser.vehicleType;
@@ -282,10 +297,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
           'last_name': lastName,
           'phone_number': phone,
           'updated_at': DateTime.now().toIso8601String(),
+          'avatar_url': cleanAvatar,
         };
-        if (cleanAvatar != null && cleanAvatar.isNotEmpty) {
-          userUpdateData['avatar_url'] = cleanAvatar;
-        }
 
         // 2. Prepare delivery agent update data
         final agentId = currentUser.deliveryAgentId ?? currentUser.id;
@@ -356,10 +369,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
                 'full_name': '$firstName $lastName'.trim(),
                 'phone': phone,
                 'updated_at': DateTime.now().toIso8601String(),
+                'avatar_url': cleanAvatar,
               };
-              if (cleanAvatar != null && cleanAvatar.isNotEmpty) {
-                closerUpdateData['avatar_url'] = cleanAvatar;
-              }
               if (currentUser.closerId != null && currentUser.closerId!.isNotEmpty) {
                 await serviceDb
                     .from('client_closers')
@@ -381,14 +392,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
           if (currentUser.isClientAdmin || currentUser.clientId != null) {
             try {
               final clientUpdateData = <String, dynamic>{
-                'contact_phone': phone,
+                'phone': phone,
                 'bank_name': bName,
                 'account_number': bNumber,
                 'account_name': bAccName,
                 'updated_at': DateTime.now().toIso8601String(),
               };
-              if (cleanAvatar != null && cleanAvatar.isNotEmpty) {
-                clientUpdateData['logo_url'] = cleanAvatar;
+              if (firstName.isNotEmpty || lastName.isNotEmpty) {
+                clientUpdateData['contact_person'] = '$firstName $lastName'.trim();
               }
               if (currentUser.clientId != null && currentUser.clientId!.isNotEmpty) {
                 await serviceDb
@@ -550,8 +561,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 }
 
+final initialUserProvider = Provider<UserEntity?>((ref) => null);
+
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
+  final initialUser = ref.watch(initialUserProvider);
   return AuthNotifier(
+    initialUser: initialUser,
     loginUseCase: ref.watch(loginUseCaseProvider),
     logoutUseCase: ref.watch(logoutUseCaseProvider),
     getCurrentUserUseCase: ref.watch(getCurrentUserUseCaseProvider),

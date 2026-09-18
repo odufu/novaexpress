@@ -1,6 +1,7 @@
 /// Role of sender in conversation
 enum ChatSenderRole {
   client,
+  closer,
   dcManager,
   deliveryAgent,
   system,
@@ -59,3 +60,5 @@ class OrderConversationMessageEntity {
   bool get isStatusEvent =>
       messageType != ChatMessageType.text;
 }
+
+typedef OrderConversationMessage = OrderConversationMessageEntity;

@@ -55,6 +55,16 @@ class _LoginFormState extends ConsumerState<LoginForm> {
       themeColor: Color(0xFF0D9488),
     ),
     _QuickAccount(
+      roleKey: 'closer',
+      title: 'Novacare Closer',
+      personName: 'Amaka Chioma',
+      badge: 'Telesales Closer',
+      email: 'closer@novacare.com',
+      password: 'Password123!',
+      icon: Icons.headset_mic_rounded,
+      themeColor: Color(0xFF7C3AED),
+    ),
+    _QuickAccount(
       roleKey: 'dc_manager',
       title: 'DC Supervisor',
       personName: 'Ahmed Bello',
@@ -77,7 +87,28 @@ class _LoginFormState extends ConsumerState<LoginForm> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _agentIdController.addListener(_onEmailChanged);
+  }
+
+  void _onEmailChanged() {
+    final text = _agentIdController.text.trim().toLowerCase();
+    final matchingAcc = _primaryAccounts.where((a) => a.email.toLowerCase() == text).firstOrNull;
+    if (matchingAcc != null) {
+      if (_selectedDemoRole != matchingAcc.roleKey) {
+        setState(() => _selectedDemoRole = matchingAcc.roleKey);
+      }
+    } else {
+      if (_selectedDemoRole != null) {
+        setState(() => _selectedDemoRole = null);
+      }
+    }
+  }
+
+  @override
   void dispose() {
+    _agentIdController.removeListener(_onEmailChanged);
     _agentIdController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -304,6 +335,12 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                         fontWeight: FontWeight.w600,
                         color: const Color(0xFF94A3B8),
                       ),
+                    ),
+                    _buildMiniChip(
+                      label: 'closer.amaka@novacale.ng',
+                      roleKey: 'closer_alt',
+                      color: const Color(0xFF7C3AED),
+                      onTap: () => _quickFill('closer', 'closer.amaka@novacale.ng', 'Password123!'),
                     ),
                     _buildMiniChip(
                       label: 'client@novaxpress.ng',

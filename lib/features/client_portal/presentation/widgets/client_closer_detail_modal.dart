@@ -5,12 +5,14 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/widgets/product_image_widget.dart';
+import '../../../dc_console/presentation/providers/dc_console_provider.dart';
 import '../../../dc_console/presentation/providers/product_catalog_provider.dart';
 import 'client_order_tracking_modal.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../../domain/entities/client_closer.dart';
 import '../../domain/entities/customer_lead.dart';
 import '../providers/client_portal_provider.dart';
+import 'client_closer_credentials_modal.dart';
 import 'client_convert_lead_modal.dart';
 
 class ClientCloserDetailModal extends ConsumerStatefulWidget {
@@ -157,13 +159,27 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
                     messenger.showSnackBar(
                       SnackBar(
                         backgroundColor: const Color(0xFF10B981),
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        action: SnackBarAction(
+                          label: 'Share Credentials',
+                          textColor: Colors.white,
+                          onPressed: () {
+                            ClientCloserCredentialsModal.show(
+                              context,
+                              closer: _currentCloser,
+                              initialPassword: newPass,
+                              clientName: ref.read(clientPortalProvider).clientProfile.name,
+                            );
+                          },
+                        ),
                         content: Row(
                           children: [
                             const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                'Password for ${_currentCloser.fullName} updated successfully!',
+                                'Password for ${_currentCloser.fullName} updated!',
                                 style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: Colors.white),
                               ),
                             ),
@@ -361,34 +377,27 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
             MediaQuery.of(context).platformBrightness == Brightness.dark);
     final currencyFormatter = NumberFormat.currency(symbol: '₦', decimalDigits: 0);
 
-    // Filter closer's specific orders
-    final closerOrders = state.orders.where((o) {
-      final code = _currentCloser.closerCode.toLowerCase();
-      final id = _currentCloser.id.toLowerCase();
-      final name = _currentCloser.fullName.toLowerCase();
-
-      final matchesCloser = (o.closerCode?.toLowerCase() == code) ||
-          (o.closerId?.toLowerCase() == id) ||
-          (o.closerName?.toLowerCase() == name) ||
-          (o.deliveryNotes?.toLowerCase().contains(code) == true);
-
-      if (!matchesCloser) return false;
-
-      if (_orderSearchQuery.isEmpty) return true;
-      final query = _orderSearchQuery.toLowerCase();
-      return o.orderNumber.toLowerCase().contains(query) ||
-          o.customerName.toLowerCase().contains(query) ||
-          o.productName.toLowerCase().contains(query) ||
-          o.deliveryCity.toLowerCase().contains(query);
-    }).toList();
+    // Filter closer's specific orders with robust attribution
+    final baseCloserOrders = state.getOrdersForCloser(_currentCloser.id, _currentCloser.email, _currentCloser.fullName);
+    final closerOrders = _orderSearchQuery.isEmpty
+        ? baseCloserOrders
+        : baseCloserOrders.where((o) {
+            final query = _orderSearchQuery.toLowerCase();
+            return o.orderNumber.toLowerCase().contains(query) ||
+                o.customerName.toLowerCase().contains(query) ||
+                o.productName.toLowerCase().contains(query) ||
+                o.deliveryCity.toLowerCase().contains(query);
+          }).toList();
 
     // Filter closer's specific leads
     final closerLeads = state.leads.where((l) {
       final id = _currentCloser.id.toLowerCase();
       final name = _currentCloser.fullName.toLowerCase();
+      final email = _currentCloser.email.toLowerCase();
 
       final matchesCloser = (l.assignedCloserId?.toLowerCase() == id) ||
-          (l.assignedCloserName?.toLowerCase() == name);
+          (l.assignedCloserName?.toLowerCase() == name) ||
+          (l.assignedCloserName?.toLowerCase() == email);
 
       if (!matchesCloser) return false;
 
@@ -404,9 +413,20 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
           l.productInterest.toLowerCase().contains(query);
     }).toList();
 
-    // Calculate real-time totals
-    final totalRevenue = closerOrders.where((o) => o.isDelivered).fold(0.0, (sum, o) => sum + o.totalAmount);
-    final totalCommissionEarned = closerOrders.where((o) => o.isDelivered).length * _currentCloser.commissionRate;
+    // Calculate real-time dynamic totals
+    final metrics = state.getCloserPerformanceMetrics(_currentCloser.id, _currentCloser.email, _currentCloser.fullName);
+    final bookedCount = (metrics['bookedCount'] as int) > _currentCloser.totalOrdersBooked
+        ? (metrics['bookedCount'] as int)
+        : _currentCloser.totalOrdersBooked;
+    final deliveredCount = (metrics['deliveredCount'] as int) > _currentCloser.totalOrdersDelivered
+        ? (metrics['deliveredCount'] as int)
+        : _currentCloser.totalOrdersDelivered;
+    final totalRevenue = (metrics['grossSales'] as double) > 0
+        ? (metrics['grossSales'] as double)
+        : closerOrders.where((o) => o.isDelivered).fold(0.0, (sum, o) => sum + o.totalAmount);
+    final totalCommissionEarned = (metrics['earnedCommission'] as double) > 0
+        ? (metrics['earnedCommission'] as double)
+        : deliveredCount * _currentCloser.commissionRate;
 
     final mediaQuery = MediaQuery.of(context);
     final isCompactScreen = mediaQuery.size.width < 500;
@@ -440,12 +460,13 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
 
             // 2. Performance KPI Ribbon (6 Metrics)
             _buildKpiRibbon(
-              isDark,
-              currencyFormatter,
-              totalRevenue,
-              totalCommissionEarned,
-              closerOrders.length,
-              closerLeads.length,
+              isDark: isDark,
+              currencyFormatter: currencyFormatter,
+              totalRevenue: totalRevenue,
+              totalCommission: totalCommissionEarned,
+              bookedCount: bookedCount,
+              deliveredCount: deliveredCount,
+              totalLeads: closerLeads.length,
             ),
 
             // 3. Tab Bar
@@ -691,6 +712,29 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
                 onPressed: _showEditProfileDialog,
               ),
 
+              // Share Login Credentials
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF10B981),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  elevation: 0,
+                ),
+                onPressed: () {
+                  ClientCloserCredentialsModal.show(
+                    context,
+                    closer: _currentCloser,
+                    clientName: ref.read(clientPortalProvider).clientProfile.name,
+                  );
+                },
+                icon: const Icon(Icons.send_rounded, size: 14, color: Colors.white),
+                label: Text(
+                  'Share Login',
+                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700),
+                ),
+              ),
+
               // Reset Password
               OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(
@@ -758,14 +802,22 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
     );
   }
 
-  Widget _buildKpiRibbon(
-    bool isDark,
-    NumberFormat currencyFormatter,
-    double totalRevenue,
-    double totalCommission,
-    int totalOrders,
-    int totalLeads,
-  ) {
+  Widget _buildKpiRibbon({
+    required bool isDark,
+    required NumberFormat currencyFormatter,
+    required double totalRevenue,
+    required double totalCommission,
+    required int bookedCount,
+    required int deliveredCount,
+    required int totalLeads,
+  }) {
+    final assignedCount = totalLeads > _currentCloser.totalLeadsAssigned
+        ? totalLeads
+        : _currentCloser.totalLeadsAssigned;
+    final conversionRate = bookedCount > 0 && assignedCount > 0
+        ? ((bookedCount / assignedCount) * 100).clamp(0.0, 100.0)
+        : (bookedCount > 0 ? 100.0 : _currentCloser.conversionRate);
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -793,28 +845,28 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
             children: [
               _buildKpiCard(
                 title: 'Leads Assigned',
-                value: '${_currentCloser.totalLeadsAssigned}',
+                value: '$assignedCount',
                 icon: Icons.contacts_outlined,
                 iconColor: const Color(0xFF3B82F6),
                 isDark: isDark,
               ),
               _buildKpiCard(
                 title: 'Orders Booked',
-                value: '${_currentCloser.totalOrdersBooked}',
+                value: '$bookedCount',
                 icon: Icons.shopping_bag_outlined,
                 iconColor: const Color(0xFFF37021),
                 isDark: isDark,
               ),
               _buildKpiCard(
                 title: 'Conversion Rate',
-                value: '${_currentCloser.conversionRate.toStringAsFixed(1)}%',
+                value: '${conversionRate.toStringAsFixed(1)}%',
                 icon: Icons.trending_up_rounded,
                 iconColor: const Color(0xFF10B981),
                 isDark: isDark,
               ),
               _buildKpiCard(
                 title: 'Delivered (POD)',
-                value: '${_currentCloser.totalOrdersDelivered}',
+                value: '$deliveredCount',
                 icon: Icons.verified_outlined,
                 iconColor: const Color(0xFF059669),
                 isDark: isDark,
@@ -1452,9 +1504,23 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
                     const Icon(Icons.hub_outlined, color: Color(0xFFF37021), size: 18),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text(
-                        'Primary Dispatch Hub: Wuse Central Distribution Hub (Abuja)',
-                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                      child: Builder(
+                        builder: (context) {
+                          final clientProfile = ref.watch(clientPortalProvider).clientProfile;
+                          final dcs = ref.watch(dcConsoleProvider).distributionCenters;
+                          final hubName = dcs.isNotEmpty
+                              ? dcs.first.name
+                              : (clientProfile.city.isNotEmpty
+                                  ? '${clientProfile.city} Distribution Hub'
+                                  : 'Regional Distribution Hub');
+                          final territory = clientProfile.state.isNotEmpty
+                              ? clientProfile.state
+                              : 'National Operations';
+                          return Text(
+                            'Primary Dispatch Hub: $hubName ($territory)',
+                            style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                          );
+                        },
                       ),
                     ),
                   ],
