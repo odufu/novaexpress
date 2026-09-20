@@ -47,6 +47,7 @@ $functions = @(
     "log-delivery-failure",
     "monnify-webhook",
     "paystack-webhook",
+    "process-stock-intake-invoice",
     "request-balance-payout",
     "request-stock-transfer",
     "submit-cash-remittance",

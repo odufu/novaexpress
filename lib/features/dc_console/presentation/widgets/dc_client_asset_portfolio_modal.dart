@@ -12,6 +12,7 @@ import '../../../stock/domain/entities/stock_item.dart';
 import '../../../stock/presentation/providers/stock_provider.dart';
 import '../../../pipeline_chat/presentation/widgets/order_pipeline_chat_sheet.dart';
 import 'dc_daily_merchant_settlement_modal.dart';
+import 'dc_edit_client_modal.dart';
 
 class DCClientAssetPortfolioModal extends ConsumerStatefulWidget {
   final ClientProfile client;
@@ -194,6 +195,25 @@ class _DCClientAssetPortfolioModalState
                     ],
                   ),
                 ),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final updated = await DCEditClientModal.show(context, _client);
+                    if (updated != null && mounted) {
+                      setState(() => _client = updated);
+                    }
+                  },
+                  icon: const Icon(Icons.edit_note_rounded, size: 15, color: Color(0xFF0D9488)),
+                  label: Text(
+                    'Edit Profile & Brand',
+                    style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w700, color: const Color(0xFF0D9488)),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFF0D9488)),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+                const SizedBox(width: 8),
                 IconButton(
                   onPressed: () => Navigator.of(context).pop(),
                   icon: const Icon(Icons.close_rounded),

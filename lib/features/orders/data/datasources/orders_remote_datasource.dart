@@ -333,6 +333,7 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
         'assignment_status': insertPayload['assignment_status']?.toString() ?? (validRiderId != null ? 'auto_assigned' : 'pending_rider_assignment'),
         'routing_notes': insertPayload['routing_notes']?.toString(),
         'delivery_notes': deliveryNotes,
+        'source_warehouse': insertPayload['source_warehouse']?.toString() ?? 'Stores - NL',
         'created_at': DateTime.now().toIso8601String(),
       };
 

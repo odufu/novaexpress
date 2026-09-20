@@ -195,6 +195,15 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
       if (stockItems.isNotEmpty) {
         ref.read(productCatalogProvider.notifier).syncFromStockItems(stockItems);
       }
+      if (mounted) {
+        final currentDraft = ref.read(dcCreateOrderDraftProvider);
+        if (currentDraft.selectedProductName.isEmpty) {
+          final prods = ref.read(productCatalogProvider).products;
+          if (prods.isNotEmpty) {
+            _selectProduct(prods.first);
+          }
+        }
+      }
     });
   }
 
@@ -893,20 +902,26 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Row(
-                                  children: [
-                                    const Icon(Icons.local_offer_outlined, size: 15, color: Color(0xFFF37021)),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      'Seller Packages for ${draft.selectedProductName}',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                Expanded(
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.local_offer_outlined, size: 15, color: Color(0xFFF37021)),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: Text(
+                                          'Seller Packages for ${draft.selectedProductName}',
+                                          overflow: TextOverflow.ellipsis,
+                                          style: GoogleFonts.inter(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                          ),
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
+                                const SizedBox(width: 8),
                                 InkWell(
                                   onTap: () => _showCreatePackageDialog(isDark),
                                   borderRadius: BorderRadius.circular(6),

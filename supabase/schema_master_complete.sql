@@ -815,6 +815,113 @@ CREATE TABLE IF NOT EXISTS monnify_virtual_accounts (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 2.27 Client Suppliers & Raw Manufacturers
+CREATE TABLE IF NOT EXISTS client_suppliers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+    supplier_name VARCHAR(255) NOT NULL,
+    category VARCHAR(100) DEFAULT 'General Supplies',
+    contact_person VARCHAR(255),
+    email VARCHAR(255),
+    phone VARCHAR(50),
+    address TEXT,
+    city VARCHAR(100),
+    payment_terms VARCHAR(100) DEFAULT 'Net 30',
+    supplied_products TEXT[] DEFAULT '{}',
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 2.28 Client Stock Intake Invoices (Landed Cost Ingestion)
+CREATE TABLE IF NOT EXISTS client_stock_invoices (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    invoice_number VARCHAR(100) UNIQUE NOT NULL,
+    client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+    supplier_id UUID REFERENCES client_suppliers(id) ON DELETE SET NULL,
+    supplier_name VARCHAR(255) NOT NULL,
+    destination_warehouse VARCHAR(255) NOT NULL DEFAULT 'Stores - NL',
+    entry_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    status VARCHAR(50) DEFAULT 'draft' CHECK (status IN ('draft', 'pending_approval', 'verified', 'cancelled')),
+    payment_status VARCHAR(50) DEFAULT 'unpaid' CHECK (payment_status IN ('unpaid', 'partially_paid', 'paid')),
+    total_units INT NOT NULL DEFAULT 0,
+    subtotal_raw_product_cost NUMERIC(14,2) NOT NULL DEFAULT 0.00,
+    total_packaging_cost NUMERIC(14,2) NOT NULL DEFAULT 0.00,
+    total_transportation_cost NUMERIC(14,2) NOT NULL DEFAULT 0.00,
+    grand_total_landed_cost NUMERIC(14,2) NOT NULL DEFAULT 0.00,
+    invoice_pdf_url TEXT,
+    notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 2.29 Client Stock Invoice Line Items
+CREATE TABLE IF NOT EXISTS client_stock_invoice_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    invoice_id UUID NOT NULL REFERENCES client_stock_invoices(id) ON DELETE CASCADE,
+    product_id UUID REFERENCES products(id) ON DELETE SET NULL,
+    product_name VARCHAR(255) NOT NULL,
+    product_sku VARCHAR(100),
+    quantity INT NOT NULL CHECK (quantity > 0),
+    supplier_unit_price NUMERIC(14,2) NOT NULL DEFAULT 0.00,
+    packaging_cost_per_unit NUMERIC(14,2) NOT NULL DEFAULT 0.00,
+    transportation_cost_per_unit NUMERIC(14,2) NOT NULL DEFAULT 0.00,
+    effective_landed_cost_per_unit NUMERIC(14,4) NOT NULL DEFAULT 0.0000,
+    total_landed_cost NUMERIC(14,2) NOT NULL DEFAULT 0.00,
+    target_retail_price NUMERIC(14,2) DEFAULT 0.00,
+    projected_margin_percent NUMERIC(6,2) DEFAULT 0.00,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 2.30 Client Stock Balances (Pangea Format Multi-Node Inventory)
+CREATE TABLE IF NOT EXISTS client_stock_balances (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    client_id TEXT NOT NULL,
+    product_id TEXT,
+    item_code TEXT NOT NULL,
+    item_name TEXT NOT NULL,
+    item_group TEXT DEFAULT 'Novacare',
+    warehouse TEXT NOT NULL,
+    stock_uom TEXT DEFAULT 'Nos',
+    opening_qty NUMERIC(14,2) DEFAULT 0.00,
+    opening_value NUMERIC(14,2) DEFAULT 0.00,
+    in_qty NUMERIC(14,2) DEFAULT 0.00,
+    in_value NUMERIC(14,2) DEFAULT 0.00,
+    out_qty NUMERIC(14,2) DEFAULT 0.00,
+    out_value NUMERIC(14,2) DEFAULT 0.00,
+    balance_qty NUMERIC(14,2) DEFAULT 0.00,
+    balance_value NUMERIC(14,2) DEFAULT 0.00,
+    valuation_rate NUMERIC(14,4) DEFAULT 0.0000,
+    reserved_stock NUMERIC(14,2) DEFAULT 0.00,
+    company TEXT DEFAULT 'Novacare Ltd',
+    last_entry_invoice_id UUID REFERENCES client_stock_invoices(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 2.31 Client Stock Ledger Entries (Immutable Audit Trail)
+CREATE TABLE IF NOT EXISTS client_stock_ledger_entries (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    client_id TEXT NOT NULL,
+    warehouse TEXT NOT NULL,
+    item_code TEXT NOT NULL,
+    item_name TEXT NOT NULL,
+    item_group TEXT DEFAULT 'Novacare',
+    voucher_type TEXT NOT NULL CHECK (voucher_type IN ('baseline_seed', 'purchase_receipt', 'sales_order_delivery', 'stock_transfer', 'stock_return', 'inventory_adjustment')),
+    voucher_no TEXT,
+    order_id UUID REFERENCES orders(id) ON DELETE SET NULL,
+    invoice_id UUID REFERENCES client_stock_invoices(id) ON DELETE SET NULL,
+    posting_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    posting_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    qty_change NUMERIC(14, 2) NOT NULL DEFAULT 0.00,
+    incoming_qty NUMERIC(14, 2) NOT NULL DEFAULT 0.00,
+    outgoing_qty NUMERIC(14, 2) NOT NULL DEFAULT 0.00,
+    valuation_rate NUMERIC(14, 4) NOT NULL DEFAULT 0.0000,
+    total_value NUMERIC(14, 2) NOT NULL DEFAULT 0.00,
+    notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- ============================================================================
 -- 3. INDEXES FOR HIGH-THROUGHPUT SEARCH & REALTIME
 -- ============================================================================
@@ -1642,6 +1749,8 @@ BEGIN
     IF p_product_id IS NOT NULL THEN
         UPDATE public.products
         SET delivered_count = COALESCE(delivered_count, 0) + v_qty,
+            stock_quantity = GREATEST(0, COALESCE(stock_quantity, 0) - v_qty),
+            available_count = GREATEST(0, COALESCE(available_count, 0) - v_qty),
             updated_at = NOW()
         WHERE id = p_product_id;
     END IF;
@@ -2423,10 +2532,31 @@ DECLARE
     v_base_inventory_valuation NUMERIC(14, 2) := 0.00;
     v_weighted_retail_valuation NUMERIC(14, 2) := 0.00;
     v_prod RECORD;
+    v_client RECORD;
+    v_delivery_fee NUMERIC(14, 2) := 5000.00;
+    v_failed_fee NUMERIC(14, 2) := 500.00;
+    v_failed_orders_count INT := 0;
+    v_failed_charges NUMERIC(14, 2) := 0.00;
 BEGIN
+    -- Look up client settings
+    SELECT custom_delivery_fee, custom_failed_attempt_fee
+    INTO v_client
+    FROM public.clients
+    WHERE id = p_client_id;
+
+    IF FOUND THEN
+        IF v_client.custom_delivery_fee IS NOT NULL AND v_client.custom_delivery_fee > 0 THEN
+            v_delivery_fee := v_client.custom_delivery_fee;
+        END IF;
+        IF v_client.custom_failed_attempt_fee IS NOT NULL AND v_client.custom_failed_attempt_fee > 0 THEN
+            v_failed_fee := v_client.custom_failed_attempt_fee;
+        END IF;
+    END IF;
+
+    -- 1. Liquid Cash in Custody (Delivered orders awaiting 10 PM Closeout)
     SELECT 
-        COALESCE(SUM(CASE WHEN COALESCE(payment_method, delivery_method, 'cash') = 'paystack' OR payment_type = 'prepaid' THEN (total_amount - COALESCE(client_delivery_fee, 3500.00)) ELSE 0 END), 0.00),
-        COALESCE(SUM(CASE WHEN COALESCE(payment_method, delivery_method, 'cash') = 'cash' AND payment_type = 'pay_on_delivery' THEN (total_amount - COALESCE(client_delivery_fee, 3500.00)) ELSE 0 END), 0.00)
+        COALESCE(SUM(CASE WHEN COALESCE(payment_method, delivery_method, 'cash') = 'paystack' OR payment_type = 'prepaid' THEN (total_amount - COALESCE(client_delivery_fee, v_delivery_fee)) ELSE 0 END), 0.00),
+        COALESCE(SUM(CASE WHEN COALESCE(payment_method, delivery_method, 'cash') = 'cash' AND payment_type = 'pay_on_delivery' THEN (total_amount - COALESCE(client_delivery_fee, v_delivery_fee)) ELSE 0 END), 0.00)
     INTO v_cash_in_paystack, v_cash_in_dc_vault
     FROM public.orders
     WHERE client_id = p_client_id
@@ -2434,8 +2564,18 @@ BEGIN
       AND (financial_settlement_status IS NULL OR financial_settlement_status != 'client_settled')
       AND (p_dc_id IS NULL OR distribution_center_id = p_dc_id);
 
-    v_total_liquid_cash := v_cash_in_paystack + v_cash_in_dc_vault;
+    -- Deduct pending failed delivery attempt fees from unsettled failed/cancelled orders
+    SELECT COUNT(*) INTO v_failed_orders_count
+    FROM public.orders
+    WHERE client_id = p_client_id
+      AND status IN ('failed', 'cancelled', 'rejected', 'customer_rejected')
+      AND (financial_settlement_status IS NULL OR financial_settlement_status != 'client_settled')
+      AND (p_dc_id IS NULL OR distribution_center_id = p_dc_id);
 
+    v_failed_charges := v_failed_orders_count * v_failed_fee;
+    v_total_liquid_cash := GREATEST(0.00, (v_cash_in_paystack + v_cash_in_dc_vault) - v_failed_charges);
+
+    -- 2. In-Kind Inventory Custody & Dual Valuation
     FOR v_prod IN
         SELECT id, name, sku, base_price, stock_quantity, available_count
         FROM public.products
@@ -2448,6 +2588,7 @@ BEGIN
             v_total_units_in_custody := v_total_units_in_custody + v_units;
             v_base_inventory_valuation := v_base_inventory_valuation + (v_units * COALESCE(v_prod.base_price, 25000.00));
 
+            -- Calculate historical realized unit price factoring in package deals
             SELECT COALESCE(AVG(total_amount / NULLIF(quantity, 0)), v_prod.base_price, 25000.00)
             INTO v_avg_price
             FROM public.orders
@@ -2463,6 +2604,7 @@ BEGIN
         'liquid_cash_in_custody', v_total_liquid_cash,
         'physical_cod_in_dc_vault', v_cash_in_dc_vault,
         'direct_transfer_in_paystack', v_cash_in_paystack,
+        'failed_delivery_surcharges', v_failed_charges,
         'total_inventory_units_held', v_total_units_in_custody,
         'inventory_baseline_liquidation_value', v_base_inventory_valuation,
         'inventory_estimated_retail_value', v_weighted_retail_valuation,
@@ -2906,7 +3048,247 @@ BEGIN
 END;
 $$;
 
--- 4.27 Function & Permissions Grants (Strictly No Conflicting Overloads)
+-- 4.27 Process Client Stock Intake Invoice & Update Landed Cost
+CREATE OR REPLACE FUNCTION public.fn_process_client_stock_intake_invoice(p_invoice_id UUID)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_inv RECORD;
+    v_item RECORD;
+    v_cur_bal RECORD;
+    v_new_bal_qty NUMERIC;
+    v_new_valuation NUMERIC;
+BEGIN
+    SELECT * INTO v_inv FROM public.client_stock_invoices WHERE id = p_invoice_id;
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object('success', false, 'message', 'Invoice not found');
+    END IF;
+
+    FOR v_item IN SELECT * FROM public.client_stock_invoice_items WHERE invoice_id = p_invoice_id LOOP
+        SELECT * INTO v_cur_bal 
+        FROM public.client_stock_balances
+        WHERE client_id = v_inv.client_id::TEXT
+          AND (item_code = v_item.product_sku OR item_name = v_item.product_name)
+          AND warehouse = v_inv.destination_warehouse;
+
+        IF FOUND THEN
+            v_new_bal_qty := v_cur_bal.balance_qty + v_item.quantity;
+            IF v_new_bal_qty > 0 THEN
+                v_new_valuation := ((v_cur_bal.balance_qty * v_cur_bal.valuation_rate) + (v_item.quantity * v_item.effective_landed_cost_per_unit)) / v_new_bal_qty;
+            ELSE
+                v_new_valuation := v_item.effective_landed_cost_per_unit;
+            END IF;
+
+            UPDATE public.client_stock_balances
+            SET in_qty = in_qty + v_item.quantity,
+                in_value = in_value + v_item.total_landed_cost,
+                balance_qty = balance_qty + v_item.quantity,
+                balance_value = (balance_qty + v_item.quantity) * v_new_valuation,
+                valuation_rate = v_new_valuation,
+                last_entry_invoice_id = p_invoice_id,
+                updated_at = NOW()
+            WHERE id = v_cur_bal.id;
+        ELSE
+            v_new_valuation := v_item.effective_landed_cost_per_unit;
+            INSERT INTO public.client_stock_balances (
+                client_id,
+                product_id,
+                item_code,
+                item_name,
+                warehouse,
+                stock_uom,
+                opening_qty,
+                opening_value,
+                in_qty,
+                in_value,
+                out_qty,
+                out_value,
+                balance_qty,
+                balance_value,
+                valuation_rate,
+                reserved_stock,
+                last_entry_invoice_id
+            ) VALUES (
+                v_inv.client_id::TEXT,
+                v_item.product_id::TEXT,
+                v_item.product_sku,
+                v_item.product_name,
+                v_inv.destination_warehouse,
+                'Nos',
+                0,
+                0,
+                v_item.quantity,
+                v_item.total_landed_cost,
+                0,
+                0,
+                v_item.quantity,
+                v_item.total_landed_cost,
+                v_new_valuation,
+                0,
+                p_invoice_id
+            );
+        END IF;
+
+        -- Write immutable record to client_stock_ledger_entries
+        INSERT INTO public.client_stock_ledger_entries (
+            client_id,
+            warehouse,
+            item_code,
+            item_name,
+            voucher_type,
+            voucher_no,
+            invoice_id,
+            posting_date,
+            posting_at,
+            qty_change,
+            incoming_qty,
+            outgoing_qty,
+            valuation_rate,
+            total_value,
+            notes
+        ) VALUES (
+            v_inv.client_id::TEXT,
+            v_inv.destination_warehouse,
+            v_item.product_sku,
+            v_item.product_name,
+            'purchase_receipt',
+            v_inv.invoice_number,
+            p_invoice_id,
+            v_inv.entry_date,
+            NOW(),
+            v_item.quantity,
+            v_item.quantity,
+            0,
+            v_new_valuation,
+            v_item.total_landed_cost,
+            'Verified Stock Intake from ' || v_inv.supplier_name
+        );
+
+        -- Synchronize global catalog products count & cost price
+        UPDATE public.products
+        SET stock_quantity = COALESCE(stock_quantity, 0) + v_item.quantity,
+            available_count = COALESCE(available_count, 0) + v_item.quantity,
+            cost_price = v_new_valuation,
+            base_price = CASE WHEN base_price <= 0 THEN v_item.target_retail_price ELSE base_price END,
+            updated_at = NOW()
+        WHERE name = v_item.product_name OR sku = v_item.product_sku;
+    END LOOP;
+
+    UPDATE public.client_stock_invoices
+    SET status = 'verified',
+        updated_at = NOW()
+    WHERE id = p_invoice_id;
+
+    RETURN jsonb_build_object('success', true, 'invoice_id', p_invoice_id);
+END;
+$$;
+
+-- 4.28 Dynamic Stock Balance by Period Calculation
+CREATE OR REPLACE FUNCTION public.fn_get_client_stock_balance_period(
+    p_client_id TEXT,
+    p_start_date DATE DEFAULT DATE '2026-09-01',
+    p_end_date DATE DEFAULT CURRENT_DATE,
+    p_warehouse TEXT DEFAULT 'All Warehouses',
+    p_item_group TEXT DEFAULT 'All Item Groups'
+)
+RETURNS TABLE (
+    id UUID,
+    client_id TEXT,
+    product_id TEXT,
+    item_code TEXT,
+    item_name TEXT,
+    item_group TEXT,
+    warehouse TEXT,
+    stock_uom TEXT,
+    opening_qty NUMERIC(14, 2),
+    opening_value NUMERIC(14, 2),
+    in_qty NUMERIC(14, 2),
+    in_value NUMERIC(14, 2),
+    out_qty NUMERIC(14, 2),
+    out_value NUMERIC(14, 2),
+    balance_qty NUMERIC(14, 2),
+    balance_value NUMERIC(14, 2),
+    valuation_rate NUMERIC(14, 4),
+    reserved_stock NUMERIC(14, 2),
+    company TEXT
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+    RETURN QUERY
+    WITH base_positions AS (
+        SELECT 
+            b.id AS bal_id,
+            b.client_id,
+            b.product_id,
+            b.item_code,
+            b.item_name,
+            COALESCE(b.item_group, 'Novacare') AS item_group,
+            b.warehouse,
+            COALESCE(b.stock_uom, 'Nos') AS stock_uom,
+            COALESCE(b.valuation_rate, 0.0000) AS valuation_rate,
+            COALESCE(b.reserved_stock, 0.00) AS reserved_stock,
+            COALESCE(b.company, 'Novacare Ltd') AS company,
+            b.opening_qty AS static_opening_qty,
+            b.balance_qty AS static_balance_qty
+        FROM public.client_stock_balances b
+        WHERE (b.client_id = p_client_id OR p_client_id = 'all')
+          AND (p_warehouse = 'All Warehouses' OR b.warehouse = p_warehouse)
+          AND (p_item_group = 'All Item Groups' OR b.item_group = p_item_group)
+    ),
+    ledger_agg AS (
+        SELECT 
+            l.client_id,
+            l.warehouse,
+            l.item_code,
+            COALESCE(SUM(CASE WHEN l.posting_date < p_start_date THEN l.qty_change ELSE 0 END), 0.00) AS calc_prior_delta,
+            COALESCE(SUM(CASE WHEN l.posting_date BETWEEN p_start_date AND p_end_date THEN l.incoming_qty ELSE 0 END), 0.00) AS calc_in_qty,
+            COALESCE(SUM(CASE WHEN l.posting_date BETWEEN p_start_date AND p_end_date THEN l.outgoing_qty ELSE 0 END), 0.00) AS calc_out_qty
+        FROM public.client_stock_ledger_entries l
+        WHERE (l.client_id = p_client_id OR p_client_id = 'all')
+        GROUP BY l.client_id, l.warehouse, l.item_code
+    )
+    SELECT 
+        bp.bal_id AS id,
+        bp.client_id,
+        bp.product_id,
+        bp.item_code,
+        bp.item_name,
+        bp.item_group,
+        bp.warehouse,
+        bp.stock_uom,
+        ROUND(COALESCE(NULLIF(la.calc_prior_delta, 0), bp.static_opening_qty, 0.00), 2) AS opening_qty,
+        ROUND((COALESCE(NULLIF(la.calc_prior_delta, 0), bp.static_opening_qty, 0.00) * bp.valuation_rate), 2) AS opening_value,
+        ROUND(COALESCE(la.calc_in_qty, 0.00), 2) AS in_qty,
+        ROUND((COALESCE(la.calc_in_qty, 0.00) * bp.valuation_rate), 2) AS in_value,
+        ROUND(COALESCE(la.calc_out_qty, 0.00), 2) AS out_qty,
+        ROUND((COALESCE(la.calc_out_qty, 0.00) * bp.valuation_rate), 2) AS out_value,
+        ROUND(
+            (COALESCE(NULLIF(la.calc_prior_delta, 0), bp.static_opening_qty, 0.00) + COALESCE(la.calc_in_qty, 0.00) - COALESCE(la.calc_out_qty, 0.00)), 
+            2
+        ) AS balance_qty,
+        ROUND(
+            (COALESCE(NULLIF(la.calc_prior_delta, 0), bp.static_opening_qty, 0.00) + COALESCE(la.calc_in_qty, 0.00) - COALESCE(la.calc_out_qty, 0.00)) * bp.valuation_rate, 
+            2
+        ) AS balance_value,
+        bp.valuation_rate,
+        bp.reserved_stock,
+        bp.company
+    FROM base_positions bp
+    LEFT JOIN ledger_agg la 
+      ON la.client_id = bp.client_id 
+     AND la.warehouse = bp.warehouse 
+     AND la.item_code = bp.item_code
+    ORDER BY bp.warehouse, bp.item_name;
+END;
+$$;
+
+-- 4.29 Function & Permissions Grants (Strictly No Conflicting Overloads)
+GRANT EXECUTE ON FUNCTION public.fn_process_client_stock_intake_invoice(UUID) TO authenticated, service_role, anon;
+GRANT EXECUTE ON FUNCTION public.fn_get_client_stock_balance_period(TEXT, DATE, DATE, TEXT, TEXT) TO authenticated, service_role, anon;
 GRANT EXECUTE ON FUNCTION public.fn_adjust_dc_stock(UUID, UUID, INT) TO authenticated, service_role, anon;
 GRANT EXECUTE ON FUNCTION public.fn_dispatch_client_supply(UUID, UUID, JSONB, UUID, TEXT, TEXT, TEXT) TO authenticated, service_role, anon;
 GRANT EXECUTE ON FUNCTION public.fn_receive_client_supply(UUID, UUID, TEXT, TEXT, JSONB, TEXT) TO authenticated, service_role, anon;
@@ -3451,7 +3833,59 @@ INSERT INTO public.product_packages (
     '00000000-0000-4000-8000-789382731303',
     'Novacare',
     'Special discount pack: 2 paid bottles + 1 bonus free bottle'
-) ON CONFLICT (id) DO NOTHING;
+),
+(
+    'pkg-respira-nova-1',
+    'p2222222-2222-4222-8222-222222222222',
+    'Respira Detox Tea',
+    'SKU-48678',
+    '1 Box (Standard Retail)',
+    1, 1, 0,
+    21500.00,
+    '00000000-0000-4000-8000-789382731303',
+    'Novacare',
+    '1 Box Standard Treatment'
+),
+(
+    'pkg-respira-nova-2',
+    'p2222222-2222-4222-8222-222222222222',
+    'Respira Detox Tea',
+    'SKU-48678',
+    '2 Boxes Promo Deal',
+    2, 2, 0,
+    35000.00,
+    '00000000-0000-4000-8000-789382731303',
+    'Novacare',
+    '2 Boxes Intensive Deal'
+),
+(
+    'pkg-respira-nova-3',
+    'p2222222-2222-4222-8222-222222222222',
+    'Respira Detox Tea',
+    'SKU-48678',
+    '3 Boxes Cleanse Bundle',
+    3, 3, 0,
+    45000.00,
+    '00000000-0000-4000-8000-789382731303',
+    'Novacare',
+    '3 Boxes Cleanse Treatment'
+),
+(
+    'pkg-respira-nova-5',
+    'p2222222-2222-4222-8222-222222222222',
+    'Respira Detox Tea',
+    'SKU-48678',
+    '4 Boxes + 1 Box Free Mega Deal',
+    5, 4, 1,
+    55000.00,
+    '00000000-0000-4000-8000-789382731303',
+    'Novacare',
+    '5 Boxes Mega Deal: 4 Paid + 1 Free Bonus Box'
+) ON CONFLICT (id) DO UPDATE SET
+    package_price = EXCLUDED.package_price,
+    quantity = EXCLUDED.quantity,
+    paid_quantity = EXCLUDED.paid_quantity,
+    free_quantity = EXCLUDED.free_quantity;
 
 -- Initial Agent Custody Stock for Rider-001
 INSERT INTO public.agent_inventory (delivery_agent_id, product_id, quantity)

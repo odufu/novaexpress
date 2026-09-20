@@ -1,21 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import '../../../../core/helpers/formatters.dart';
+import '../../../dc_console/domain/entities/product_package.dart';
 import '../providers/client_portal_provider.dart';
 import '../widgets/client_create_order_modal.dart';
 import '../widgets/client_order_tracking_modal.dart';
 import '../widgets/client_daily_accumulator_modal.dart';
 import '../widgets/client_add_package_modal.dart';
+import '../widgets/client_raise_stock_invoice_modal.dart';
+import '../widgets/client_supply_stock_modal.dart';
 
 class ClientDashboardPage extends ConsumerWidget {
   final VoidCallback onNavigateToOrders;
   final VoidCallback onNavigateToProducts;
+  final VoidCallback? onNavigateToInventory;
 
   const ClientDashboardPage({
     super.key,
     required this.onNavigateToOrders,
     required this.onNavigateToProducts,
+    this.onNavigateToInventory,
   });
 
   @override
@@ -35,13 +41,31 @@ class ClientDashboardPage extends ConsumerWidget {
           _buildWelcomeBanner(context, ref, state),
           const SizedBox(height: 18),
 
+          // Dynamic Low-Stock & Replenishment Alert Banner
+          if (_hasLowStock(state)) ...[
+            _buildLowStockAlertBanner(context, state, isDark),
+            const SizedBox(height: 18),
+          ],
+
           // Today's Live Cash Accumulator & 10:00 PM Closeout Card
           _buildDailyCashAccumulatorCard(context, state),
           const SizedBox(height: 24),
 
+          // Physical Inventory Custody & Landed Valuation
+          if (state.clientProfile.hasInventoryManagement || state.stockBalances.isNotEmpty) ...[
+            _buildInventoryCustodyCard(context, state, isDark),
+            const SizedBox(height: 24),
+          ],
+
           // KPI Metric Summary Grid
           _buildKpiMetricsGrid(context, state, isDark),
           const SizedBox(height: 24),
+
+          // Fast-Moving Package Deals Commercial Velocity
+          if (_getAllPackages(state).isNotEmpty) ...[
+            _buildPackageDealsSection(context, state, isDark),
+            const SizedBox(height: 24),
+          ],
 
           // Action Shortcuts & Bulk Import Bar
           _buildQuickActionsRow(context, ref, state, isDark),
@@ -139,43 +163,544 @@ class ClientDashboardPage extends ConsumerWidget {
               ),
               if (!isCompact) ...[
                 const SizedBox(width: 16),
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0D9488),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  onPressed: () => ClientCreateOrderModal.show(context),
-                  icon: const Icon(Icons.add_shopping_cart_rounded, size: 18),
-                  label: Text(
-                    'Create New Order',
-                    style: GoogleFonts.inter(fontWeight: FontWeight.bold),
-                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0D9488),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: () => ClientCreateOrderModal.show(context),
+                      icon: const Icon(Icons.add_shopping_cart_rounded, size: 18),
+                      label: Text(
+                        'Create New Order',
+                        style: GoogleFonts.inter(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: () {
+                        if (state.clientProfile.hasInventoryManagement) {
+                          ClientRaiseStockInvoiceModal.show(context);
+                        } else if (state.products.isNotEmpty) {
+                          ClientSupplyStockModal.show(context, state.products.first);
+                        }
+                      },
+                      icon: Icon(
+                        state.clientProfile.hasInventoryManagement
+                            ? Icons.receipt_long_rounded
+                            : Icons.local_shipping_rounded,
+                        size: 18,
+                      ),
+                      label: Text(
+                        state.clientProfile.hasInventoryManagement
+                            ? 'Stock Intake'
+                            : 'Supply Consignment',
+                        style: GoogleFonts.inter(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ],
           ),
           if (isCompact) ...[
             const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0D9488),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0D9488),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: () => ClientCreateOrderModal.show(context),
+                    icon: const Icon(Icons.add_shopping_cart_rounded, size: 16),
+                    label: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'Create Order',
+                        style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12.5),
+                      ),
+                    ),
+                  ),
                 ),
-                onPressed: () => ClientCreateOrderModal.show(context),
-                icon: const Icon(Icons.add_shopping_cart_rounded, size: 18),
-                label: Text(
-                  'Create New Order',
-                  style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: () {
+                      if (state.clientProfile.hasInventoryManagement) {
+                        ClientRaiseStockInvoiceModal.show(context);
+                      } else if (state.products.isNotEmpty) {
+                        ClientSupplyStockModal.show(context, state.products.first);
+                      }
+                    },
+                    icon: Icon(
+                      state.clientProfile.hasInventoryManagement
+                          ? Icons.receipt_long_rounded
+                          : Icons.local_shipping_rounded,
+                      size: 16,
+                    ),
+                    label: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        state.clientProfile.hasInventoryManagement ? 'Stock Intake' : 'Supply Stock',
+                        style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12.5),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  bool _hasLowStock(ClientPortalState state) {
+    final hasLowProduct = state.products.any((p) => p.stockQuantity <= p.lowStockThreshold);
+    final hasLowBalance = state.stockBalances.any((b) => b.balanceQty <= 15 && b.balanceQty > 0);
+    return hasLowProduct || hasLowBalance;
+  }
+
+  Widget _buildLowStockAlertBanner(BuildContext context, ClientPortalState state, bool isDark) {
+    final lowProducts = state.products.where((p) => p.stockQuantity <= p.lowStockThreshold).toList();
+    final firstProduct = lowProducts.isNotEmpty ? lowProducts.first : null;
+    final lowName = firstProduct?.name ?? 'Inventory SKU';
+    final lowQty = firstProduct?.stockQuantity ?? 0;
+    final threshold = firstProduct?.lowStockThreshold ?? 10;
+    final extraCount = lowProducts.length > 1 ? ' (+${lowProducts.length - 1} more)' : '';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF450A0A).withValues(alpha: 0.6) : const Color(0xFFFEF2F2),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? const Color(0xFF991B1B) : const Color(0xFFFCA5A5),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFDC2626).withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'CRITICAL REORDER ALERT',
+                      style: GoogleFonts.inter(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFFDC2626),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDC2626),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        '$lowQty units left',
+                        style: GoogleFonts.jetBrainsMono(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$lowName$extraCount has dropped to or below safe threshold ($threshold units). Immediate replenishment recommended to prevent regional stock-outs.',
+                  style: GoogleFonts.inter(
+                    fontSize: 11.5,
+                    color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Wrap(
+            spacing: 8,
+            children: [
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFDC2626),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: () {
+                  if (state.clientProfile.hasInventoryManagement) {
+                    ClientRaiseStockInvoiceModal.show(context, initialProduct: firstProduct);
+                  } else if (firstProduct != null) {
+                    ClientSupplyStockModal.show(context, firstProduct);
+                  }
+                },
+                icon: const Icon(Icons.receipt_long_rounded, size: 14),
+                label: Text(
+                  state.clientProfile.hasInventoryManagement ? 'Raise Stock Intake' : 'Supply Stock',
+                  style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700),
+                ),
+              ),
+              if (onNavigateToInventory != null)
+                OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: isDark ? Colors.white : const Color(0xFF334155),
+                    side: BorderSide(color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: onNavigateToInventory,
+                  child: Text(
+                    'View Ledger',
+                    style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInventoryCustodyCard(BuildContext context, ClientPortalState state, bool isDark) {
+    final totalValuation = state.stockBalances.fold(0.0, (sum, b) => sum + b.balanceValue);
+    final totalUnits = state.stockBalances.fold(0.0, (sum, b) => sum + b.balanceQty).toInt();
+    final activeHubs = state.stockBalances.map((b) => b.warehouse).where((w) => w.isNotEmpty).toSet();
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0D9488).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.warehouse_rounded, color: Color(0xFF0D9488), size: 18),
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Physical Inventory Custody & Landed Valuation',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                      ),
+                      Text(
+                        'Consolidated stock valuation and regional warehouse asset holding',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          color: const Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              if (onNavigateToInventory != null)
+                TextButton.icon(
+                  onPressed: onNavigateToInventory,
+                  icon: const Icon(Icons.arrow_forward_rounded, size: 14),
+                  label: Text('Open Ledger', style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w700)),
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFF0D9488),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 650;
+              final metrics = [
+                _buildCustodyMetricTile(
+                  label: 'Consolidated Landed Value',
+                  value: '₦${NumberFormat('#,##0.00').format(totalValuation)}',
+                  subtitle: '${state.stockBalances.length} active stock positions',
+                  valueColor: const Color(0xFF10B981),
+                  isDark: isDark,
+                ),
+                _buildCustodyMetricTile(
+                  label: 'Physical Network Units',
+                  value: '${NumberFormat('#,###').format(totalUnits)} units',
+                  subtitle: 'In DC physical custody',
+                  valueColor: isDark ? Colors.white : const Color(0xFF0F172A),
+                  isDark: isDark,
+                ),
+                _buildCustodyMetricTile(
+                  label: 'Regional Depots Holding Stock',
+                  value: '${activeHubs.length} Distribution Hubs',
+                  subtitle: activeHubs.take(2).join(', ') + (activeHubs.length > 2 ? ' +more' : ''),
+                  valueColor: const Color(0xFF2563EB),
+                  isDark: isDark,
+                ),
+              ];
+
+              if (isNarrow) {
+                return Column(
+                  children: metrics
+                      .map((m) => Padding(padding: const EdgeInsets.only(bottom: 10), child: m))
+                      .toList(),
+                );
+              }
+              return Row(
+                children: metrics.map((m) => Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: m))).toList(),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCustodyMetricTile({
+    required String label,
+    required String value,
+    required String subtitle,
+    required Color valueColor,
+    required bool isDark,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w600, color: const Color(0xFF64748B)),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: GoogleFonts.jetBrainsMono(fontSize: 14, fontWeight: FontWeight.w800, color: valueColor),
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8)),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<ProductPackage> _getAllPackages(ClientPortalState state) {
+    return state.products.expand((p) => p.packages).toList();
+  }
+
+  Widget _buildPackageDealsSection(BuildContext context, ClientPortalState state, bool isDark) {
+    final allPackages = _getAllPackages(state);
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEC4899).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.sell_rounded, color: Color(0xFFEC4899), size: 18),
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Commercial Package Deals & Bundle Velocity',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                      ),
+                      Text(
+                        'Volume bundling matrix with promotional pricing and physical unit depletion',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          color: const Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFEC4899),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  minimumSize: Size.zero,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                ),
+                onPressed: () => ClientAddPackageModal.show(context),
+                icon: const Icon(Icons.add_rounded, size: 14),
+                label: Text('+ Create Bundle', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            height: 105,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: allPackages.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 12),
+              itemBuilder: (context, index) {
+                final pkg = allPackages[index];
+                return Container(
+                  width: 220,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFFDF2F8),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isDark ? const Color(0xFF334155) : const Color(0xFFFBCFE8),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              pkg.packageName,
+                              style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w800),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (pkg.freeQuantity > 0)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF10B981),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                '+${pkg.freeQuantity} Free',
+                                style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.white),
+                              ),
+                            ),
+                        ],
+                      ),
+                      Text(
+                        pkg.productName,
+                        style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            '₦${NumberFormat('#,###').format(pkg.packagePrice)}',
+                            style: GoogleFonts.jetBrainsMono(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color: const Color(0xFFEC4899),
+                            ),
+                          ),
+                          Text(
+                            '${pkg.quantity} units (${NumberFormat('#,###').format(pkg.unitPrice)}/u)',
+                            style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B)),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
         ],
       ),
     );
@@ -460,7 +985,7 @@ class ClientDashboardPage extends ConsumerWidget {
     required bool isDark,
   }) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF151D36) : Colors.white,
         borderRadius: BorderRadius.circular(12),

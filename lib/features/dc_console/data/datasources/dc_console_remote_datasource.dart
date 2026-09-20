@@ -70,6 +70,11 @@ abstract class DCConsoleRemoteDataSource {
     double? customDeliveryFee,
     double? customPlatformFee,
     double? customFailedAttemptFee,
+    bool hasInventoryManagement = true,
+    String? logoUrl,
+    String? primaryColor,
+    String? secondaryColor,
+    String? accentColor,
     dynamic authDataSource,
   });
   Future<Map<String, dynamic>> approveCashRemittance({
@@ -618,6 +623,11 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
     double? customDeliveryFee,
     double? customPlatformFee,
     double? customFailedAttemptFee,
+    bool hasInventoryManagement = true,
+    String? logoUrl,
+    String? primaryColor,
+    String? secondaryColor,
+    String? accentColor,
     dynamic authDataSource,
   }) async {
     final cleanEmail = email.trim().toLowerCase();
@@ -710,12 +720,28 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
         'is_enterprise': isEnt,
         'is_active': true,
         'company_id': '11111111-1111-4111-8111-111111111111',
+        'has_inventory_management': hasInventoryManagement,
+        'services_enabled': [
+          'fulfillment',
+          'delivery',
+          if (hasInventoryManagement) 'inventory_management',
+          if (isEnt) 'closer_desk',
+        ],
         if (bankName != null && bankName.isNotEmpty) 'bank_name': bankName,
         if (bankAccountNumber != null && bankAccountNumber.isNotEmpty) 'account_number': bankAccountNumber,
         if (bankAccountName != null && bankAccountName.isNotEmpty) 'account_name': bankAccountName,
         if (customDeliveryFee != null && customDeliveryFee > 0) 'custom_delivery_fee': customDeliveryFee,
         if (customPlatformFee != null && customPlatformFee > 0) 'custom_platform_fee': customPlatformFee,
         if (customFailedAttemptFee != null && customFailedAttemptFee > 0) 'custom_failed_attempt_fee': customFailedAttemptFee,
+        if (logoUrl != null && logoUrl.isNotEmpty) 'logo_url': logoUrl,
+        if (primaryColor != null && primaryColor.isNotEmpty) 'brand_color_primary': primaryColor,
+        if (secondaryColor != null && secondaryColor.isNotEmpty) 'brand_color_secondary': secondaryColor,
+        if (accentColor != null && accentColor.isNotEmpty) 'brand_color_accent': accentColor,
+        'brand_theme': {
+          'primary': primaryColor ?? '#0D9488',
+          'secondary': secondaryColor ?? '#1E293B',
+          'accent': accentColor ?? '#F59E0B',
+        },
       };
 
       try {
@@ -803,6 +829,16 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
       customDeliveryFee: customDeliveryFee,
       customPlatformFeeValue: customPlatformFee,
       customFailedAttemptFee: customFailedAttemptFee,
+      hasInventoryManagement: hasInventoryManagement,
+      logoUrl: logoUrl,
+      primaryColor: primaryColor ?? '#0D9488',
+      secondaryColor: secondaryColor ?? '#1E293B',
+      accentColor: accentColor ?? '#F59E0B',
+      brandTheme: {
+        'primary': primaryColor ?? '#0D9488',
+        'secondary': secondaryColor ?? '#1E293B',
+        'accent': accentColor ?? '#F59E0B',
+      },
       createdAt: DateTime.now(),
     );
   }

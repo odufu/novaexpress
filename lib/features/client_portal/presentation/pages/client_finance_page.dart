@@ -11,6 +11,7 @@ import '../../domain/entities/client_settlement.dart';
 import '../providers/client_portal_provider.dart';
 import '../widgets/client_order_tracking_modal.dart';
 import '../widgets/client_daily_accumulator_modal.dart';
+import '../widgets/pangea_excel_data_table.dart';
 
 class ClientFinancePage extends ConsumerStatefulWidget {
   const ClientFinancePage({super.key});
@@ -717,73 +718,185 @@ class _ClientFinancePageState extends ConsumerState<ClientFinancePage> {
             ],
           ),
           const SizedBox(height: 16),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: DataTable(
-              headingRowColor: WidgetStateProperty.all(
-                isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-              ),
+          SizedBox(
+            height: 380,
+            child: PangeaExcelDataTable<ClientProductFinanceSummary>(
+              items: summaries,
+              brandPrimary: state.clientProfile.brandPrimaryColor,
+              emptyMessage: 'No product performance data available for this date filter',
               columns: [
-                DataColumn(label: Text('Product & SKU', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12))),
-                DataColumn(label: Text('Units Sold', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12))),
-                DataColumn(label: Text('Gross GMV', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12))),
-                DataColumn(label: Text('Logistics Costs', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12))),
-                DataColumn(label: Text('Net Realized', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12))),
-                DataColumn(label: Text('COGS', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12))),
-                DataColumn(label: Text('Commercial GP', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12))),
-                DataColumn(label: Text('Gross Margin', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12))),
-                DataColumn(label: Text('Awaiting Remittance', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12))),
-                DataColumn(label: Text('Money Outside', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12))),
-              ],
-              rows: summaries.map((s) {
-                final isFiltered = state.selectedFinanceProductFilter == s.productName;
-                return DataRow(
-                  selected: isFiltered,
-                  onSelectChanged: (_) {
-                    ref.read(clientPortalProvider.notifier).setFinanceProductFilter(
-                          isFiltered ? 'all' : s.productName,
-                        );
-                  },
-                  cells: [
-                    DataCell(
-                      Row(
+                ExcelColumnDef<ClientProductFinanceSummary>(
+                  key: 'productName',
+                  group: 'Product',
+                  label: 'PRODUCT & SKU',
+                  defaultWidth: 200,
+                  minWidth: 150,
+                  searchString: (s) => s.productName,
+                  sortValue: (s) => s.productName,
+                  cellBuilder: (context, s, row, isDark, brand) {
+                    final isFiltered = state.selectedFinanceProductFilter == s.productName;
+                    return InkWell(
+                      onTap: () {
+                        ref.read(clientPortalProvider.notifier).setFinanceProductFilter(
+                              isFiltered ? 'all' : s.productName,
+                            );
+                      },
+                      child: Row(
                         children: [
-                          Icon(Icons.inventory_2_rounded, size: 16, color: isFiltered ? const Color(0xFFF37021) : const Color(0xFF2563EB)),
+                          Icon(
+                            Icons.inventory_2_rounded,
+                            size: 15,
+                            color: isFiltered ? const Color(0xFFF37021) : brand,
+                          ),
                           const SizedBox(width: 8),
-                          Text(s.productName, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13)),
+                          Expanded(
+                            child: Text(
+                              s.productName,
+                              style: GoogleFonts.inter(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12.5,
+                                color: isFiltered ? const Color(0xFFF37021) : (isDark ? Colors.white : const Color(0xFF0F172A)),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
                         ],
                       ),
-                    ),
-                    DataCell(Text('${s.deliveredOrders} units', style: GoogleFonts.inter(fontSize: 12))),
-                    DataCell(Text('₦${_formatMoney(s.grossDeliveredValue)}', style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 12))),
-                    DataCell(Text('-₦${_formatMoney(s.logisticsDeliveryFees)}', style: GoogleFonts.inter(color: const Color(0xFFEF4444), fontSize: 12))),
-                    DataCell(Text('₦${_formatMoney(s.netRealizedRevenue)}', style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: const Color(0xFF10B981), fontSize: 12))),
-                    DataCell(Text('-₦${_formatMoney(s.cogs)}', style: GoogleFonts.inter(color: const Color(0xFF64748B), fontSize: 12))),
-                    DataCell(Text('₦${_formatMoney(s.commercialGrossProfit)}', style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: const Color(0xFF0D9488), fontSize: 12))),
-                    DataCell(
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: s.profitMarginPercentage >= 50
-                              ? const Color(0xFF10B981).withValues(alpha: 0.15)
-                              : const Color(0xFFF59E0B).withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          '${s.profitMarginPercentage.toStringAsFixed(1)}%',
-                          style: GoogleFonts.inter(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 11,
-                            color: s.profitMarginPercentage >= 50 ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
-                          ),
+                    );
+                  },
+                ),
+                ExcelColumnDef<ClientProductFinanceSummary>(
+                  key: 'unitsSold',
+                  group: 'Sales Volume',
+                  label: 'UNITS SOLD',
+                  defaultWidth: 110,
+                  minWidth: 85,
+                  align: TextAlign.right,
+                  sortValue: (s) => s.deliveredOrders,
+                  cellBuilder: (context, s, row, isDark, brand) => Text(
+                    '${s.deliveredOrders} units',
+                    style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                ),
+                ExcelColumnDef<ClientProductFinanceSummary>(
+                  key: 'grossGMV',
+                  group: 'Recovered Value',
+                  label: 'GROSS GMV',
+                  defaultWidth: 135,
+                  minWidth: 100,
+                  align: TextAlign.right,
+                  sortValue: (s) => s.grossDeliveredValue,
+                  cellBuilder: (context, s, row, isDark, brand) => Text(
+                    '₦${_formatMoney(s.grossDeliveredValue)}',
+                    style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700),
+                  ),
+                ),
+                ExcelColumnDef<ClientProductFinanceSummary>(
+                  key: 'logisticsCosts',
+                  group: 'Operations Cost',
+                  label: 'LOGISTICS FEES',
+                  defaultWidth: 135,
+                  minWidth: 100,
+                  align: TextAlign.right,
+                  sortValue: (s) => s.logisticsDeliveryFees,
+                  cellBuilder: (context, s, row, isDark, brand) => Text(
+                    '-₦${_formatMoney(s.logisticsDeliveryFees)}',
+                    style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFFEF4444), fontWeight: FontWeight.w600),
+                  ),
+                ),
+                ExcelColumnDef<ClientProductFinanceSummary>(
+                  key: 'netRealized',
+                  group: 'Realized Margin',
+                  label: 'NET REALIZED',
+                  defaultWidth: 140,
+                  minWidth: 105,
+                  align: TextAlign.right,
+                  sortValue: (s) => s.netRealizedRevenue,
+                  cellBuilder: (context, s, row, isDark, brand) => Text(
+                    '₦${_formatMoney(s.netRealizedRevenue)}',
+                    style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF10B981)),
+                  ),
+                ),
+                ExcelColumnDef<ClientProductFinanceSummary>(
+                  key: 'cogs',
+                  group: 'Realized Margin',
+                  label: 'COGS',
+                  defaultWidth: 120,
+                  minWidth: 90,
+                  align: TextAlign.right,
+                  sortValue: (s) => s.cogs,
+                  cellBuilder: (context, s, row, isDark, brand) => Text(
+                    '-₦${_formatMoney(s.cogs)}',
+                    style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                  ),
+                ),
+                ExcelColumnDef<ClientProductFinanceSummary>(
+                  key: 'commercialGP',
+                  group: 'Realized Margin',
+                  label: 'COMMERCIAL GP',
+                  defaultWidth: 140,
+                  minWidth: 105,
+                  align: TextAlign.right,
+                  sortValue: (s) => s.commercialGrossProfit,
+                  cellBuilder: (context, s, row, isDark, brand) => Text(
+                    '₦${_formatMoney(s.commercialGrossProfit)}',
+                    style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: brand),
+                  ),
+                ),
+                ExcelColumnDef<ClientProductFinanceSummary>(
+                  key: 'marginPercent',
+                  group: 'Realized Margin',
+                  label: 'MARGIN %',
+                  defaultWidth: 110,
+                  minWidth: 80,
+                  align: TextAlign.center,
+                  sortValue: (s) => s.profitMarginPercentage,
+                  cellBuilder: (context, s, row, isDark, brand) {
+                    final isHigh = s.profitMarginPercentage >= 50;
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: isHigh ? const Color(0xFF10B981).withValues(alpha: 0.15) : const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '${s.profitMarginPercentage.toStringAsFixed(1)}%',
+                        style: GoogleFonts.inter(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11,
+                          color: isHigh ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
                         ),
                       ),
-                    ),
-                    DataCell(Text('₦${_formatMoney(s.awaitingRemittance)}', style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: const Color(0xFF2563EB), fontSize: 12))),
-                    DataCell(Text('₦${_formatMoney(s.moneyOutside)}', style: GoogleFonts.inter(color: const Color(0xFFF59E0B), fontSize: 12))),
-                  ],
-                );
-              }).toList(),
+                    );
+                  },
+                ),
+                ExcelColumnDef<ClientProductFinanceSummary>(
+                  key: 'awaitingRemittance',
+                  group: 'Settlement Status',
+                  label: 'AWAITING PAYOUT',
+                  defaultWidth: 145,
+                  minWidth: 110,
+                  align: TextAlign.right,
+                  sortValue: (s) => s.awaitingRemittance,
+                  cellBuilder: (context, s, row, isDark, brand) => Text(
+                    '₦${_formatMoney(s.awaitingRemittance)}',
+                    style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF2563EB)),
+                  ),
+                ),
+                ExcelColumnDef<ClientProductFinanceSummary>(
+                  key: 'moneyOutside',
+                  group: 'Settlement Status',
+                  label: 'MONEY OUTSIDE',
+                  defaultWidth: 135,
+                  minWidth: 100,
+                  align: TextAlign.right,
+                  sortValue: (s) => s.moneyOutside,
+                  cellBuilder: (context, s, row, isDark, brand) => Text(
+                    '₦${_formatMoney(s.moneyOutside)}',
+                    style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFFF59E0B)),
+                  ),
+                ),
+              ],
             ),
           ),
         ],

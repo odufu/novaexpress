@@ -85,6 +85,121 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
   }) {
     final sku = productSku ?? 'SKU-${productName.hashCode.abs()}';
     final p1Price = baseUnitPrice > 0 ? baseUnitPrice : 0.0;
+    final lower = productName.toLowerCase();
+
+    if (lower.contains('respira')) {
+      return [
+        ProductPackage(
+          id: 'pkg-${sku.toLowerCase()}-1',
+          productId: productId,
+          productName: productName,
+          productSku: sku,
+          packageName: '1 Unit (Single) - 1 Box',
+          quantity: 1,
+          paidQuantity: 1,
+          freeQuantity: 0,
+          packagePrice: 21500.0,
+          clientName: clientName,
+          createdAt: DateTime.now(),
+        ),
+        ProductPackage(
+          id: 'pkg-${sku.toLowerCase()}-2',
+          productId: productId,
+          productName: productName,
+          productSku: sku,
+          packageName: '2 Boxes Promo Deal',
+          quantity: 2,
+          paidQuantity: 2,
+          freeQuantity: 0,
+          packagePrice: 35000.0,
+          clientName: clientName,
+          createdAt: DateTime.now(),
+        ),
+        ProductPackage(
+          id: 'pkg-${sku.toLowerCase()}-3',
+          productId: productId,
+          productName: productName,
+          productSku: sku,
+          packageName: '3 Boxes Cleanse Bundle',
+          quantity: 3,
+          paidQuantity: 3,
+          freeQuantity: 0,
+          packagePrice: 45000.0,
+          clientName: clientName,
+          createdAt: DateTime.now(),
+        ),
+        ProductPackage(
+          id: 'pkg-${sku.toLowerCase()}-5',
+          productId: productId,
+          productName: productName,
+          productSku: sku,
+          packageName: '4 Boxes + 1 Box Free Mega Deal (4 + 1 Free)',
+          quantity: 5,
+          paidQuantity: 4,
+          freeQuantity: 1,
+          packagePrice: 55000.0,
+          clientName: clientName,
+          createdAt: DateTime.now(),
+        ),
+      ];
+    }
+
+    if (lower.contains('grazer')) {
+      return [
+        ProductPackage(
+          id: 'pkg-${sku.toLowerCase()}-1',
+          productId: productId,
+          productName: productName,
+          productSku: sku,
+          packageName: '1 Unit (Single)',
+          quantity: 1,
+          paidQuantity: 1,
+          freeQuantity: 0,
+          packagePrice: 25000.0,
+          clientName: clientName,
+          createdAt: DateTime.now(),
+        ),
+        ProductPackage(
+          id: 'pkg-${sku.toLowerCase()}-2',
+          productId: productId,
+          productName: productName,
+          productSku: sku,
+          packageName: '2-Pack Deal',
+          quantity: 2,
+          paidQuantity: 2,
+          freeQuantity: 0,
+          packagePrice: 35000.0,
+          clientName: clientName,
+          createdAt: DateTime.now(),
+        ),
+        ProductPackage(
+          id: 'pkg-${sku.toLowerCase()}-3',
+          productId: productId,
+          productName: productName,
+          productSku: sku,
+          packageName: '3-Pack Family Deal',
+          quantity: 3,
+          paidQuantity: 3,
+          freeQuantity: 0,
+          packagePrice: 50000.0,
+          clientName: clientName,
+          createdAt: DateTime.now(),
+        ),
+        ProductPackage(
+          id: 'pkg-${sku.toLowerCase()}-5',
+          productId: productId,
+          productName: productName,
+          productSku: sku,
+          packageName: '5-Pack Mega Deal (4 + 1 Free)',
+          quantity: 5,
+          paidQuantity: 4,
+          freeQuantity: 1,
+          packagePrice: 55000.0,
+          clientName: clientName,
+          createdAt: DateTime.now(),
+        ),
+      ];
+    }
 
     return [
       ProductPackage(
@@ -97,6 +212,45 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
         paidQuantity: 1,
         freeQuantity: 0,
         packagePrice: p1Price,
+        clientName: clientName,
+        createdAt: DateTime.now(),
+      ),
+      ProductPackage(
+        id: 'pkg-${sku.toLowerCase()}-2',
+        productId: productId,
+        productName: productName,
+        productSku: sku,
+        packageName: '2-Pack Deal',
+        quantity: 2,
+        paidQuantity: 2,
+        freeQuantity: 0,
+        packagePrice: (p1Price * 1.7).roundToDouble(),
+        clientName: clientName,
+        createdAt: DateTime.now(),
+      ),
+      ProductPackage(
+        id: 'pkg-${sku.toLowerCase()}-3',
+        productId: productId,
+        productName: productName,
+        productSku: sku,
+        packageName: '3-Pack Value Deal',
+        quantity: 3,
+        paidQuantity: 3,
+        freeQuantity: 0,
+        packagePrice: (p1Price * 2.4).roundToDouble(),
+        clientName: clientName,
+        createdAt: DateTime.now(),
+      ),
+      ProductPackage(
+        id: 'pkg-${sku.toLowerCase()}-5',
+        productId: productId,
+        productName: productName,
+        productSku: sku,
+        packageName: '5-Pack Mega Saver (4 + 1 Free)',
+        quantity: 5,
+        paidQuantity: 4,
+        freeQuantity: 1,
+        packagePrice: (p1Price * 3.2).roundToDouble(),
         clientName: clientName,
         createdAt: DateTime.now(),
       ),
@@ -182,6 +336,28 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
         debugPrint('[CATALOG_PROVIDER] ℹ️ Supabase product_packages fetch notice: $pkgErr');
       }
 
+      // 1.5 Aggregate live stock balances across regional hubs
+      final Map<String, int> stockAggregates = {};
+      try {
+        final balancesRes = await dbClient
+            .from('client_stock_balances')
+            .select('item_code, item_name, balance_qty');
+        for (final b in (balancesRes as List)) {
+          final bMap = b as Map<String, dynamic>;
+          final itemCode = (bMap['item_code'] ?? '').toString().trim().toUpperCase();
+          final itemName = (bMap['item_name'] ?? '').toString().trim().toLowerCase();
+          final qty = (bMap['balance_qty'] as num?)?.toInt() ?? 0;
+          if (itemCode.isNotEmpty) {
+            stockAggregates[itemCode] = (stockAggregates[itemCode] ?? 0) + qty;
+          }
+          if (itemName.isNotEmpty) {
+            stockAggregates[itemName] = (stockAggregates[itemName] ?? 0) + qty;
+          }
+        }
+      } catch (balErr) {
+        debugPrint('[CATALOG_PROVIDER] ℹ️ Stock balances aggregate notice: $balErr');
+      }
+
       final List<CatalogProduct> fetchedProducts = [];
 
       for (final raw in (response as List)) {
@@ -199,7 +375,21 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
         final clientName = map['client_name']?.toString() ?? '';
         final clientId = map['client_id']?.toString();
         final imageUrl = map['image_url']?.toString();
-        final stockCount = (map['available_count'] ?? map['stock_quantity'] as num?)?.toInt() ?? 0;
+
+        final skuUpper = sku.trim().toUpperCase();
+        final nameLower = name.trim().toLowerCase();
+        int stockCount = (map['available_count'] ?? map['stock_quantity'] as num?)?.toInt() ?? 0;
+        if (stockCount == 0) {
+          stockCount = stockAggregates[skuUpper] ?? stockAggregates[nameLower] ?? 0;
+          if (stockCount == 0) {
+            for (final entry in stockAggregates.entries) {
+              if (nameLower.contains(entry.key) || entry.key.contains(nameLower)) {
+                stockCount = entry.value;
+                break;
+              }
+            }
+          }
+        }
 
         List<String> parsedCoveringStates = [];
         if (map['covering_states'] is List) {
@@ -725,6 +915,7 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
     String? clientId,
     String? description,
     String? imageUrl,
+    String? preferredSupplierId,
     List<String> coveringStates = const [],
     List<ProductPackage>? packages,
   }) async {
@@ -761,6 +952,7 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
       description: description,
       imageUrl: imageUrl,
       totalStockAcrossHubs: 0,
+      preferredSupplierId: preferredSupplierId,
       coveringStates: coveringStates,
       packages: initialPackages,
     );
@@ -783,6 +975,7 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
         'category': category,
         'client_name': clientName.isNotEmpty ? clientName : 'NovaXpress Merchant',
         if (cleanClientId != null) 'client_id': cleanClientId,
+        if (preferredSupplierId != null && preferredSupplierId.isNotEmpty) 'preferred_supplier_id': preferredSupplierId,
         'description': description,
         'image_url': imageUrl,
         'stock_quantity': 0,

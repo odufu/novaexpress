@@ -168,6 +168,29 @@ class SignatureStorageService {
     );
   }
 
+  /// Uploads payment receipt document or image for stock intake invoices
+  /// with automatic multi-tier fallback (service client -> standard client -> base64 data URI).
+  static Future<String> uploadReceiptDocument({
+    required Uint8List bytes,
+    required String invoiceNumber,
+    String extension = 'png',
+  }) async {
+    final ext = extension.replaceAll('.', '').toLowerCase();
+    final mimeType = ext == 'pdf'
+        ? 'application/pdf'
+        : (ext == 'png'
+            ? 'image/png'
+            : (ext == 'webp' ? 'image/webp' : 'image/jpeg'));
+    final cleanInv = invoiceNumber.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+    final fileName = 'receipt_${cleanInv}_${DateTime.now().millisecondsSinceEpoch}.$ext';
+    return await _uploadToBucket(
+      bucketName: SupabaseConstants.proofOfDeliveryBucket,
+      fileName: fileName,
+      bytes: bytes,
+      contentType: mimeType,
+    );
+  }
+
   /// Core resilient multi-tier uploader:
   /// 1. Tries Supabase.instance.client.storage
   /// 2. If RLS or unauthenticated, falls back to Supabase service client

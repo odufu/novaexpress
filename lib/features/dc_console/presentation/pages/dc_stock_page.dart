@@ -20,6 +20,7 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../client_portal/domain/entities/client_profile.dart';
 import '../widgets/dc_product_detail_modal.dart';
 import '../widgets/dc_receive_supply_modal.dart';
+import '../../../client_portal/presentation/widgets/pangea_excel_data_table.dart';
 
 class DCStockPage extends ConsumerStatefulWidget {
   const DCStockPage({super.key});
@@ -574,196 +575,305 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
             color: isDark ? const Color(0xFF1E293B) : Colors.white,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minWidth: constraints.maxWidth),
-              child: DataTable(
-                showCheckboxColumn: false,
-                columnSpacing: 18,
-                horizontalMargin: 16,
-                headingRowHeight: 44,
-                headingRowColor: WidgetStateProperty.all(
-                  isDark ? const Color(0xFF0F172A).withValues(alpha: 0.6) : const Color(0xFFF8FAFC),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: PangeaExcelDataTable<StockItemEntity>(
+              items: items,
+              rowHeight: 68.0,
+              brandPrimary: const Color(0xFF2563EB),
+              onRowTap: (item) => _showProductDetailsModal(context, isDark, item, dcState.drivers, stockState.riderAllocations),
+              columns: [
+                // 1. SKU / Code
+                ExcelColumnDef<StockItemEntity>(
+                  key: 'sku',
+                  group: 'Product Identification',
+                  label: 'SKU / CODE',
+                  defaultWidth: 150,
+                  minWidth: 110,
+                  searchString: (item) => item.sku,
+                  sortValue: (item) => item.sku,
+                  cellBuilder: (context, item, row, isDark, brand) {
+                    return Text(
+                      item.sku,
+                      style: GoogleFonts.firaCode(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    );
+                  },
                 ),
-                headingTextStyle: GoogleFonts.inter(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  color: const Color(0xFF64748B),
-                  letterSpacing: 0.5,
-                ),
-                columns: const [
-                  DataColumn(label: Text('SKU / CODE')),
-                  DataColumn(label: Text('PRODUCT & CLIENT')),
-                  DataColumn(label: Text('CATEGORY & PRICE')),
-                  DataColumn(label: Text('IN DC POSSESSION')),
-                  DataColumn(label: Text('ASSIGNED TO RIDERS')),
-                  DataColumn(label: Text('DELIVERED')),
-                  DataColumn(label: Text('COMPLAINTS')),
-                  DataColumn(label: Text('STATUS')),
-                  DataColumn(label: Text('ACTIONS')),
-                ],
-                rows: items.map((item) {
-                  final inCustody = item.inRiderCustodyCount;
 
-                  return DataRow(
-                    onSelectChanged: (_) => _showProductDetailsModal(context, isDark, item, dcState.drivers, stockState.riderAllocations),
-                    cells: [
-                      // SKU
-                      DataCell(
-                        Text(
-                          item.sku,
-                          style: GoogleFonts.firaCode(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB),
+                // 2. Product & Client
+                ExcelColumnDef<StockItemEntity>(
+                  key: 'product',
+                  group: 'Product Identification',
+                  label: 'PRODUCT & CLIENT',
+                  defaultWidth: 230,
+                  minWidth: 170,
+                  searchString: (item) => '${item.name} ${item.ownerName}',
+                  sortValue: (item) => item.name,
+                  cellBuilder: (context, item, row, isDark, brand) {
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ProductImageWidget(
+                          imageUrl: item.imageAsset,
+                          width: 36,
+                          height: 36,
+                          borderRadius: 8,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                item.name,
+                                style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Text(
+                                item.ownerName,
+                                style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
                           ),
                         ),
-                      ),
+                      ],
+                    );
+                  },
+                ),
 
-                      // Product & Client
-                      DataCell(
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            ProductImageWidget(
-                              imageUrl: item.imageAsset,
-                              width: 36,
-                              height: 36,
-                              borderRadius: 8,
-                            ),
-                            const SizedBox(width: 10),
-                            Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  item.name,
-                                  style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                Text(
-                                  item.ownerName,
-                                  style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
-                            ),
-                          ],
+                // 3. Category & Price
+                ExcelColumnDef<StockItemEntity>(
+                  key: 'category_price',
+                  group: 'Classification & Commercials',
+                  label: 'CATEGORY & PRICE',
+                  defaultWidth: 160,
+                  minWidth: 120,
+                  searchString: (item) => '${item.category} ${item.price}',
+                  sortValue: (item) => item.price,
+                  cellBuilder: (context, item, row, isDark, brand) {
+                    return Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          item.category,
+                          style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-
-                      // Category & Price
-                      DataCell(
-                        Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              item.category,
-                              style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600),
-                            ),
-                            Text(
-                              CurrencyFormatter.formatNaira(item.price),
-                              style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF10B981), fontWeight: FontWeight.bold),
-                            ),
-                          ],
+                        Text(
+                          CurrencyFormatter.formatNaira(item.price),
+                          style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF10B981), fontWeight: FontWeight.bold),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
+                      ],
+                    );
+                  },
+                ),
 
-                      // In DC Possession
-                      DataCell(
-                        Row(
-                          children: [
-                            const Icon(Icons.store_mall_directory_outlined, size: 14, color: Color(0xFF10B981)),
-                            const SizedBox(width: 5),
-                            Text(
-                              '${item.availableCount} Units',
-                              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: item.availableCount > 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444)),
-                            ),
-                          ],
+                // 4. In DC Possession
+                ExcelColumnDef<StockItemEntity>(
+                  key: 'available_warehouse',
+                  group: 'Warehouse Custody',
+                  label: 'IN DC POSSESSION',
+                  defaultWidth: 160,
+                  minWidth: 120,
+                  searchString: (item) => '${item.availableCount} Units',
+                  sortValue: (item) => item.availableCount,
+                  cellBuilder: (context, item, row, isDark, brand) {
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.store_mall_directory_outlined, size: 14, color: Color(0xFF10B981)),
+                        const SizedBox(width: 5),
+                        Text(
+                          '${item.availableCount} Units',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: item.availableCount > 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
+                      ],
+                    );
+                  },
+                ),
 
-                      // In Rider Custody
-                      DataCell(
-                        Row(
-                          children: [
-                            const Icon(Icons.two_wheeler_outlined, size: 14, color: Color(0xFF8B5CF6)),
-                            const SizedBox(width: 5),
-                            Text(
-                              '$inCustody Units',
-                              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF8B5CF6)),
-                            ),
-                          ],
+                // 5. Assigned to Riders
+                ExcelColumnDef<StockItemEntity>(
+                  key: 'rider_custody',
+                  group: 'Fleet Custody',
+                  label: 'ASSIGNED TO RIDERS',
+                  defaultWidth: 165,
+                  minWidth: 120,
+                  searchString: (item) => '${item.inRiderCustodyCount} Units',
+                  sortValue: (item) => item.inRiderCustodyCount,
+                  cellBuilder: (context, item, row, isDark, brand) {
+                    final inCustody = item.inRiderCustodyCount;
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.two_wheeler_outlined, size: 14, color: Color(0xFF8B5CF6)),
+                        const SizedBox(width: 5),
+                        Text(
+                          '$inCustody Units',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF8B5CF6),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
+                      ],
+                    );
+                  },
+                ),
 
-                      // Delivered
-                      DataCell(
-                        Row(
-                          children: [
-                            const Icon(Icons.check_circle_outline_rounded, size: 14, color: Color(0xFF2563EB)),
-                            const SizedBox(width: 5),
-                            Text(
-                              '${item.deliveredCount} Units',
-                              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
-                            ),
-                          ],
+                // 6. Delivered
+                ExcelColumnDef<StockItemEntity>(
+                  key: 'delivered',
+                  group: 'Fulfillment Metrics',
+                  label: 'DELIVERED',
+                  defaultWidth: 135,
+                  minWidth: 100,
+                  searchString: (item) => '${item.deliveredCount} Units',
+                  sortValue: (item) => item.deliveredCount,
+                  cellBuilder: (context, item, row, isDark, brand) {
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.check_circle_outline_rounded, size: 14, color: Color(0xFF2563EB)),
+                        const SizedBox(width: 5),
+                        Text(
+                          '${item.deliveredCount} Units',
+                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
+                      ],
+                    );
+                  },
+                ),
 
-                      // Complaints / Damaged
-                      DataCell(
-                        Row(
-                          children: [
-                            Icon(Icons.report_problem_outlined, size: 14, color: item.complaintCount > 0 ? const Color(0xFFEF4444) : const Color(0xFF94A3B8)),
-                            const SizedBox(width: 5),
-                            Text(
-                              '${item.complaintCount} Units',
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: item.complaintCount > 0 ? const Color(0xFFEF4444) : const Color(0xFF94A3B8),
-                              ),
-                            ),
-                          ],
+                // 7. Complaints
+                ExcelColumnDef<StockItemEntity>(
+                  key: 'complaints',
+                  group: 'Fulfillment Metrics',
+                  label: 'COMPLAINTS',
+                  defaultWidth: 135,
+                  minWidth: 100,
+                  searchString: (item) => '${item.complaintCount} Units',
+                  sortValue: (item) => item.complaintCount,
+                  cellBuilder: (context, item, row, isDark, brand) {
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.report_problem_outlined,
+                          size: 14,
+                          color: item.complaintCount > 0 ? const Color(0xFFEF4444) : const Color(0xFF94A3B8),
                         ),
-                      ),
-
-                      // Status
-                      DataCell(_buildStatusBadge(item)),
-
-                      // Actions
-                      DataCell(
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              onPressed: () => _showProductDetailsModal(context, isDark, item, dcState.drivers, stockState.riderAllocations),
-                              icon: const Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFF64748B)),
-                              tooltip: 'Product Details',
-                            ),
-                            IconButton(
-                              onPressed: () => _showReceiveStockDialog(context, isDark, ref.read(stockProvider), preselectedItem: item),
-                              icon: const Icon(Icons.arrow_downward_rounded, size: 16, color: Color(0xFF10B981)),
-                              tooltip: 'Receive More Stock',
-                            ),
-                            IconButton(
-                              onPressed: item.availableCount > 0
-                                  ? () => _showAssignToRiderDialog(context, isDark, item, dcState.drivers)
-                                  : null,
-                              icon: const Icon(Icons.person_add_alt_1_rounded, size: 16, color: Color(0xFF2563EB)),
-                              tooltip: 'Assign to Rider',
-                            ),
-                          ],
+                        const SizedBox(width: 5),
+                        Text(
+                          '${item.complaintCount} Units',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: item.complaintCount > 0 ? const Color(0xFFEF4444) : const Color(0xFF94A3B8),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                    ],
-                  );
-                }).toList(),
-              ),
+                      ],
+                    );
+                  },
+                ),
+
+                // 8. Status
+                ExcelColumnDef<StockItemEntity>(
+                  key: 'status',
+                  group: 'Status & Alerts',
+                  label: 'STATUS',
+                  defaultWidth: 160,
+                  minWidth: 130,
+                  align: TextAlign.center,
+                  searchString: (item) => item.availableCount <= 0
+                      ? 'OUT OF STOCK'
+                      : (item.isLowStock || item.availableCount <= item.lowStockThreshold ? 'LOW STOCK' : 'IN STOCK'),
+                  sortValue: (item) => item.availableCount,
+                  cellBuilder: (context, item, row, isDark, brand) {
+                    return Center(child: _buildStatusBadge(item));
+                  },
+                ),
+
+                // 9. Actions
+                ExcelColumnDef<StockItemEntity>(
+                  key: 'actions',
+                  group: 'Actions',
+                  label: 'ACTIONS',
+                  defaultWidth: 165,
+                  minWidth: 135,
+                  align: TextAlign.center,
+                  cellBuilder: (context, item, row, isDark, brand) {
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                          onPressed: () => _showProductDetailsModal(context, isDark, item, dcState.drivers, stockState.riderAllocations),
+                          icon: const Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFF64748B)),
+                          tooltip: 'Product Details',
+                        ),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                          onPressed: () => _showReceiveStockDialog(context, isDark, ref.read(stockProvider), preselectedItem: item),
+                          icon: const Icon(Icons.arrow_downward_rounded, size: 16, color: Color(0xFF10B981)),
+                          tooltip: 'Receive More Stock',
+                        ),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                          onPressed: item.availableCount > 0
+                              ? () => _showAssignToRiderDialog(context, isDark, item, dcState.drivers)
+                              : null,
+                          icon: const Icon(Icons.person_add_alt_1_rounded, size: 16, color: Color(0xFF2563EB)),
+                          tooltip: 'Assign to Rider',
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ],
             ),
           ),
         );

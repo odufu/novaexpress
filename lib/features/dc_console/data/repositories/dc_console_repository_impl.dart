@@ -230,6 +230,11 @@ class DCConsoleRepositoryImpl implements DCConsoleRepository {
     double? customDeliveryFee,
     double? customPlatformFee,
     double? customFailedAttemptFee,
+    bool hasInventoryManagement = true,
+    String? logoUrl,
+    String? primaryColor,
+    String? secondaryColor,
+    String? accentColor,
     dynamic authDataSource,
   }) async {
     return await _remoteDataSource.createClient(
@@ -250,6 +255,11 @@ class DCConsoleRepositoryImpl implements DCConsoleRepository {
       customDeliveryFee: customDeliveryFee,
       customPlatformFee: customPlatformFee,
       customFailedAttemptFee: customFailedAttemptFee,
+      hasInventoryManagement: hasInventoryManagement,
+      logoUrl: logoUrl,
+      primaryColor: primaryColor,
+      secondaryColor: secondaryColor,
+      accentColor: accentColor,
       authDataSource: authDataSource,
     );
   }

@@ -59,6 +59,7 @@ class _ClientCreateOrderModalState extends ConsumerState<ClientCreateOrderModal>
   double _price = 22000.0;
   String _paymentType = 'Pay on Delivery (Cash/POS)';
   String _dispatchMode = 'auto_assign'; // 'auto_assign' or 'dc_pool'
+  String _selectedWarehouse = 'Stores - NL';
 
   bool _isSubmitting = false;
 
@@ -213,6 +214,9 @@ class _ClientCreateOrderModalState extends ConsumerState<ClientCreateOrderModal>
         productId: _selectedProduct?.id ?? 'prod-${DateTime.now().millisecondsSinceEpoch}',
         productName: _selectedProduct?.name ?? 'Standard Product',
         quantity: _quantity,
+        paidQuantity: _selectedPackage?.paidQuantity ?? _quantity,
+        freeQuantity: _selectedPackage?.freeQuantity ?? 0,
+        sourceWarehouse: _selectedWarehouse,
         totalAmount: _price,
         packageId: _selectedPackage?.id,
         packageName: _selectedPackage?.packageName,
@@ -583,6 +587,48 @@ class _ClientCreateOrderModalState extends ConsumerState<ClientCreateOrderModal>
                                   priceField,
                                 ],
                               );
+                      },
+                    ),
+                    const SizedBox(height: 14),
+                    // Source Warehouse for Inventory Deduction
+                    Builder(
+                      builder: (context) {
+                        final stockBalances = ref.watch(clientPortalProvider).stockBalances;
+                        final warehouses = stockBalances
+                            .map((b) => b.warehouse)
+                            .where((w) => w.isNotEmpty)
+                            .toSet()
+                            .toList();
+                        if (!warehouses.contains('Stores - NL')) {
+                          warehouses.insert(0, 'Stores - NL');
+                        }
+                        final currentWarehouse = warehouses.contains(_selectedWarehouse)
+                            ? _selectedWarehouse
+                            : warehouses.first;
+
+                        return DropdownButtonFormField<String>(
+                          value: currentWarehouse,
+                          decoration: _inputDecoration(
+                            'Fulfillment Source Warehouse (Inventory Ledger)',
+                            prefixIcon: Icons.warehouse_rounded,
+                          ),
+                          isExpanded: true,
+                          items: warehouses.map((w) {
+                            return DropdownMenuItem<String>(
+                              value: w,
+                              child: Text(
+                                w,
+                                style: GoogleFonts.inter(fontSize: 13),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) {
+                              setState(() => _selectedWarehouse = val);
+                            }
+                          },
+                        );
                       },
                     ),
 

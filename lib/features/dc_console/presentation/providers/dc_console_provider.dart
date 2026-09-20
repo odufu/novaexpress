@@ -754,6 +754,11 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     double? customDeliveryFee,
     double? customPlatformFee,
     double? customFailedAttemptFee,
+    bool hasInventoryManagement = true,
+    String? logoUrl,
+    String? primaryColor,
+    String? secondaryColor,
+    String? accentColor,
     dynamic authDataSource,
   }) async {
     state = state.copyWith(isLoading: true);
@@ -789,6 +794,11 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
           customDeliveryFee: customDeliveryFee,
           customPlatformFee: customPlatformFee,
           customFailedAttemptFee: customFailedAttemptFee,
+          hasInventoryManagement: hasInventoryManagement,
+          logoUrl: logoUrl,
+          primaryColor: primaryColor,
+          secondaryColor: secondaryColor,
+          accentColor: accentColor,
           authDataSource: authDataSource,
         );
       } catch (dbErr) {
@@ -828,6 +838,16 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
           customDeliveryFee: customDeliveryFee,
           customPlatformFeeValue: customPlatformFee,
           customFailedAttemptFee: customFailedAttemptFee,
+          hasInventoryManagement: hasInventoryManagement,
+          logoUrl: logoUrl,
+          primaryColor: primaryColor ?? '#0D9488',
+          secondaryColor: secondaryColor ?? '#1E293B',
+          accentColor: accentColor ?? '#F59E0B',
+          brandTheme: {
+            'primary': primaryColor ?? '#0D9488',
+            'secondary': secondaryColor ?? '#1E293B',
+            'accent': accentColor ?? '#F59E0B',
+          },
           createdAt: DateTime.now(),
         );
 
@@ -891,6 +911,108 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
       return updatedClient;
     } catch (e) {
       debugPrint('[DC_CONSOLE_PROVIDER] ❌ updateClientFinancialTariffs error: $e');
+      rethrow;
+    }
+  }
+
+  Future<ClientProfile> updateClientFullProfileAndTariffs({
+    required String clientId,
+    required String companyName,
+    required String contactPerson,
+    required String email,
+    required String phone,
+    required String address,
+    required String city,
+    required String stateName,
+    required String tier,
+    required int closerLimit,
+    required bool hasInventoryManagement,
+    required List<String> servicesEnabled,
+    required List<String> operatingStates,
+    String? logoUrl,
+    String? primaryColor,
+    String? secondaryColor,
+    String? accentColor,
+    double? customDeliveryFee,
+    double? customFailedAttemptFee,
+    double? customPlatformFee,
+    String? bankName,
+    String? bankAccountNumber,
+    String? bankAccountName,
+    String? settlementFrequency,
+    String? settlementDay,
+  }) async {
+    try {
+      if (!isTestEnvironment) {
+        try {
+          final db = Supabase.instance.client;
+          await db.rpc('fn_update_client_profile_and_tariffs', params: {
+            'p_client_id': clientId,
+            'p_company_name': companyName,
+            'p_contact_person': contactPerson,
+            'p_email': email,
+            'p_phone': phone,
+            'p_address': address,
+            'p_city': city,
+            'p_state': stateName,
+            'p_tier': tier,
+            'p_closer_limit': closerLimit,
+            'p_has_inventory_management': hasInventoryManagement,
+            'p_services_enabled': servicesEnabled,
+            'p_operating_states': operatingStates,
+            'p_logo_url': logoUrl,
+            'p_primary_color': primaryColor,
+            'p_secondary_color': secondaryColor,
+            'p_accent_color': accentColor,
+            'p_custom_delivery_fee': customDeliveryFee,
+            'p_custom_failed_attempt_fee': customFailedAttemptFee,
+            'p_custom_platform_fee': customPlatformFee,
+            'p_bank_name': bankName,
+            'p_account_number': bankAccountNumber,
+            'p_account_name': bankAccountName,
+            'p_settlement_frequency': settlementFrequency,
+            'p_settlement_day': settlementDay,
+          });
+        } catch (dbErr) {
+          debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ Note on fn_update_client_profile_and_tariffs RPC: $dbErr');
+        }
+      }
+
+      final current = state.clients.firstWhere((c) => c.id == clientId, orElse: () => state.clients.first);
+      final updatedClient = current.copyWith(
+        companyName: companyName,
+        contactPerson: contactPerson,
+        email: email,
+        phone: phone,
+        address: address,
+        city: city,
+        state: stateName,
+        tier: tier,
+        closerLimit: closerLimit,
+        isEnterprise: tier == 'enterprise',
+        hasInventoryManagement: hasInventoryManagement,
+        servicesEnabled: servicesEnabled,
+        operatingStates: operatingStates,
+        logoUrl: logoUrl,
+        primaryColor: primaryColor,
+        secondaryColor: secondaryColor,
+        accentColor: accentColor,
+        customDeliveryFee: customDeliveryFee,
+        customFailedAttemptFee: customFailedAttemptFee,
+        customPlatformFeeValue: customPlatformFee,
+        bankName: bankName,
+        accountNumber: bankAccountNumber,
+        accountName: bankAccountName,
+        settlementFrequency: settlementFrequency,
+        settlementDay: settlementDay,
+      );
+
+      final updatedList = state.clients.map((c) => c.id == clientId ? updatedClient : c).toList();
+      state = state.copyWith(clients: updatedList);
+      debugPrint('[DC_CONSOLE_PROVIDER] 🏢 Updated full profile & brand for client "${updatedClient.companyName}".');
+      return updatedClient;
+    } catch (e) {
+      debugPrint('[DC_CONSOLE_PROVIDER] ❌ updateClientFullProfileAndTariffs error: $e');
       rethrow;
     }
   }

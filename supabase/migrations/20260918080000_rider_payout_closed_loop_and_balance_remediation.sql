@@ -295,10 +295,9 @@ BEGIN
 END;
 $$;
 
--- 5. Grant Permissions
-GRANT EXECUTE ON FUNCTION public.log_delivery_failure TO authenticated, service_role, anon;
-GRANT EXECUTE ON FUNCTION public.fn_rider_confirm_payout_receipt TO authenticated, service_role, anon;
-GRANT EXECUTE ON FUNCTION public.confirm_delivery_pod TO authenticated, service_role, anon;
+GRANT EXECUTE ON FUNCTION public.log_delivery_failure(UUID, UUID, VARCHAR, TIMESTAMPTZ, TEXT) TO authenticated, service_role, anon;
+GRANT EXECUTE ON FUNCTION public.fn_rider_confirm_payout_receipt(UUID, UUID, TEXT) TO authenticated, service_role, anon;
+GRANT EXECUTE ON FUNCTION public.confirm_delivery_pod(UUID, UUID, TEXT, TEXT, NUMERIC, VARCHAR) TO authenticated, service_role, anon;
 GRANT SELECT, INSERT, UPDATE ON public.payout_requests TO authenticated, service_role;
 
 -- 6. Reload Schema Cache

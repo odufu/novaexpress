@@ -11,6 +11,7 @@ import 'client_closer_workspace_page.dart';
 import 'client_closers_page.dart';
 import 'client_dashboard_page.dart';
 import 'client_finance_page.dart';
+import 'client_inventory_page.dart';
 import 'client_orders_page.dart';
 import 'client_products_page.dart';
 import 'closer_mobile_portal_page.dart';
@@ -129,6 +130,8 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
         return const ClientClosersPage();
       case 'orders':
         return const ClientOrdersPage();
+      case 'inventory':
+        return const ClientInventoryPage();
       case 'finance':
         return const ClientFinancePage();
       case 'products':
@@ -141,6 +144,7 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
         return ClientDashboardPage(
           onNavigateToOrders: () => ref.read(clientActiveTabProvider.notifier).state = 'orders',
           onNavigateToProducts: () => ref.read(clientActiveTabProvider.notifier).state = 'products',
+          onNavigateToInventory: () => ref.read(clientActiveTabProvider.notifier).state = 'inventory',
         );
     }
   }
@@ -156,6 +160,8 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
     required bool isDark,
   }) {
     final width = isCollapsed ? 76.0 : 255.0;
+    final brandPrimary = state.clientProfile.brandPrimaryColor;
+    final brandLogo = state.clientProfile.logoUrl;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
@@ -172,18 +178,42 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
             child: Row(
               mainAxisAlignment: isCollapsed ? MainAxisAlignment.center : MainAxisAlignment.spaceBetween,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF37021), // NovaXpress Signature Orange
-                    borderRadius: BorderRadius.circular(10),
+                if (brandLogo != null && brandLogo.trim().isNotEmpty)
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: brandPrimary, width: 1.5),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Image.network(
+                      brandLogo.trim(),
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: brandPrimary,
+                        child: Icon(
+                          isCloser ? Icons.headset_mic_rounded : Icons.storefront_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: brandPrimary,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      isCloser ? Icons.headset_mic_rounded : Icons.storefront_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
                   ),
-                  child: Icon(
-                    isCloser ? Icons.headset_mic_rounded : Icons.storefront_rounded,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
                 if (!isCollapsed) ...[
                   const SizedBox(width: 10),
                   Expanded(
@@ -192,7 +222,9 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          isCloser ? 'NovaXpress Sales' : 'NovaXpress Merchant',
+                          isCloser
+                              ? '${state.clientProfile.companyName} Sales'
+                              : state.clientProfile.companyName,
                           style: GoogleFonts.inter(
                             color: Colors.white,
                             fontSize: 15,
@@ -308,6 +340,16 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
                     isCollapsed: isCollapsed,
                     isDrawer: isDrawer,
                   ),
+                  if (state.clientProfile.hasInventoryManagement)
+                    _buildNavItem(
+                      key: 'inventory',
+                      title: 'Inventory & Stock',
+                      icon: Icons.warehouse_rounded,
+                      badge: state.stockBalances.isNotEmpty ? '${state.uniqueWarehousesCount} Hubs' : null,
+                      isSelected: activeTab == 'inventory',
+                      isCollapsed: isCollapsed,
+                      isDrawer: isDrawer,
+                    ),
                   if (state.clientProfile.isEnterprise)
                     _buildNavItem(
                       key: 'closers',
@@ -352,7 +394,7 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
                           fullName: isCloser ? (authUser?.fullName ?? 'Amaka Chioma') : state.clientProfile.companyName,
                           radius: 18,
                           showBorder: true,
-                          borderColor: const Color(0xFFF37021),
+                          borderColor: brandPrimary,
                           borderWidth: 1.5,
                         ),
                       ),
@@ -410,6 +452,8 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
     required bool isCollapsed,
     required bool isDrawer,
   }) {
+    final brandPrimary = ref.watch(clientPortalProvider).clientProfile.brandPrimaryColor;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 4),
       child: Material(
@@ -435,7 +479,7 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
                 Icon(
                   icon,
                   size: 20,
-                  color: isSelected ? const Color(0xFFF37021) : const Color(0xFF8293B5),
+                  color: isSelected ? brandPrimary : const Color(0xFF8293B5),
                 ),
                 if (!isCollapsed) ...[
                   const SizedBox(width: 12),
@@ -454,7 +498,7 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                       decoration: BoxDecoration(
-                        color: isSelected ? const Color(0xFFF37021) : const Color(0xFF1A2B48),
+                        color: isSelected ? brandPrimary : const Color(0xFF1A2B48),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
@@ -470,8 +514,8 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
                     Container(
                       width: 6,
                       height: 6,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFF37021),
+                      decoration: BoxDecoration(
+                        color: brandPrimary,
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -494,6 +538,8 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
         return isCloser ? 'Booked Orders Pipeline' : 'Deliveries & Customer Orders';
       case 'finance':
         return 'Finance & Settlements Command';
+      case 'inventory':
+        return 'Inventory & Stock';
       case 'products':
         return 'Product Catalog & Deals';
       case 'dashboard':
@@ -515,6 +561,7 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
     final isCompact = screenWidth < 800;
     final isVeryCompact = screenWidth < 500;
     final activeTitle = _getActiveTabTitle(activeTab, isCloser);
+    final brandPrimary = state.clientProfile.brandPrimaryColor;
 
     return Container(
       height: 60,
@@ -555,7 +602,7 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
                     width: 7,
                     height: 7,
                     decoration: BoxDecoration(
-                      color: isCloser ? const Color(0xFFF37021) : const Color(0xFF10B981),
+                      color: isCloser ? brandPrimary : const Color(0xFF10B981),
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -606,7 +653,7 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
                     builder: (context) => const ClientCreateOrderModal(),
                   );
                 },
-                icon: const Icon(Icons.add_circle_rounded, color: Color(0xFFF37021), size: 24),
+                icon: Icon(Icons.add_circle_rounded, color: brandPrimary, size: 24),
                 tooltip: 'Book Order',
               )
             else
@@ -623,7 +670,7 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
                   style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFF37021),
+                  backgroundColor: brandPrimary,
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   elevation: 0,
@@ -648,7 +695,7 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
                 fullName: isCloser ? (authUser?.fullName ?? 'Amaka Chioma') : state.clientProfile.companyName,
                 radius: 15,
                 showBorder: true,
-                borderColor: const Color(0xFFF37021),
+                borderColor: brandPrimary,
                 borderWidth: 1.5,
               ),
             ),
@@ -664,9 +711,12 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
     ClientPortalState state,
     bool isDark,
   ) {
+    final brandPrimary = state.clientProfile.brandPrimaryColor;
     final navItems = [
       (key: 'dashboard', label: 'Dashboard', icon: Icons.dashboard_rounded),
       (key: 'orders', label: 'Orders', icon: Icons.local_shipping_rounded),
+      if (state.clientProfile.hasInventoryManagement)
+        (key: 'inventory', label: 'Inventory', icon: Icons.warehouse_rounded),
       (key: 'products', label: 'Products', icon: Icons.inventory_2_rounded),
       (key: 'finance', label: 'Finance', icon: Icons.account_balance_wallet_rounded),
       if (state.clientProfile.isEnterprise)
@@ -706,7 +756,7 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
                       Icon(
                         item.icon,
                         size: 20,
-                        color: isSelected ? const Color(0xFFF37021) : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                        color: isSelected ? brandPrimary : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                       ),
                       const SizedBox(height: 3),
                       Text(
@@ -714,7 +764,7 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
                         style: GoogleFonts.inter(
                           fontSize: 10.5,
                           fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
-                          color: isSelected ? const Color(0xFFF37021) : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                          color: isSelected ? brandPrimary : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,

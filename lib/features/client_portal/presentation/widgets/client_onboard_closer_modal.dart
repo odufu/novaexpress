@@ -36,16 +36,45 @@ class _ClientOnboardCloserModalState extends ConsumerState<ClientOnboardCloserMo
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+
+    final name = _nameController.text.trim();
+    final email = _emailController.text.trim();
+    final phone = _phoneController.text.trim();
+    final target = int.tryParse(_targetController.text.trim()) ?? 50;
+    final commission = double.tryParse(_commissionController.text.trim()) ?? 500.0;
+    final password = _passwordController.text.trim().isNotEmpty ? _passwordController.text.trim() : 'Closer123!';
+
+    // Client-side quick check against currently loaded team closers
+    final existingClosers = ref.read(clientPortalProvider).closers;
+    final cleanDigits = phone.replaceAll(RegExp(r'\D'), '');
+    final phoneExists = existingClosers.any((c) {
+      final cDigits = c.phone.replaceAll(RegExp(r'\D'), '');
+      return cDigits.isNotEmpty && cDigits == cleanDigits;
+    });
+    if (phoneExists) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFFEF4444),
+          content: Text("⚠️ Phone number '$phone' is already assigned to a closer in your team."),
+        ),
+      );
+      return;
+    }
+
+    final emailExists = existingClosers.any((c) => c.email.trim().toLowerCase() == email.toLowerCase());
+    if (emailExists) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFFEF4444),
+          content: Text("⚠️ Email '$email' is already registered to a closer in your team."),
+        ),
+      );
+      return;
+    }
+
     ref.read(onboardCloserSubmittingProvider.notifier).state = true;
 
     try {
-      final name = _nameController.text.trim();
-      final email = _emailController.text.trim();
-      final phone = _phoneController.text.trim();
-      final target = int.tryParse(_targetController.text.trim()) ?? 50;
-      final commission = double.tryParse(_commissionController.text.trim()) ?? 500.0;
-      final password = _passwordController.text.trim().isNotEmpty ? _passwordController.text.trim() : 'Closer123!';
-
       final closer = await ref.read(clientPortalProvider.notifier).createCloser(
         fullName: name,
         email: email,
@@ -70,6 +99,19 @@ class _ClientOnboardCloserModalState extends ConsumerState<ClientOnboardCloserMo
         if (reason.startsWith('Exception: ')) {
           reason = reason.substring(11);
         }
+        if (reason.contains('users_phone_number_key') || (reason.contains('phone_number') && reason.contains('already exists'))) {
+          reason = "Phone number '$phone' is already registered to another account. Please use a unique phone number.";
+        } else if (reason.contains('client_closers_closer_code_key') || (reason.contains('closer_code') && reason.contains('already exists'))) {
+          reason = "Closer code collision detected. Please try again to generate a new unique code.";
+        } else if (reason.contains('users_email_key') || (reason.contains('email') && reason.contains('already exists'))) {
+          reason = "Email '$email' is already registered. Please use a unique email address.";
+        } else if (reason.contains('PostgresException')) {
+          final detailMatch = RegExp(r'details:\s*(.+?)(?:,\s*hint:|$)').firstMatch(reason);
+          if (detailMatch != null) {
+            reason = detailMatch.group(1)!.trim();
+          }
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: const Color(0xFFEF4444),

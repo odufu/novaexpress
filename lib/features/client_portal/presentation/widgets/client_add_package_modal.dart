@@ -349,9 +349,10 @@ class _ClientAddPackageModalState extends ConsumerState<ClientAddPackageModal> {
                           spacing: 8,
                           runSpacing: 6,
                           children: [
-                            _buildPresetChip('2-Pack Deal', 2, 2, 0, 1.7, isDark),
-                            _buildPresetChip('3-Pack Value', 3, 3, 0, 2.3, isDark),
-                            _buildPresetChip('4+1 Free Mega Deal', 5, 4, 1, 3.2, isDark),
+                            _buildPresetChip('1 Box (Single)', 1, 1, 0, 1.0, isDark),
+                            _buildPresetChip('2 Boxes Deal', 2, 2, 0, 1.63, isDark),
+                            _buildPresetChip('3 Boxes Value', 3, 3, 0, 2.09, isDark),
+                            _buildPresetChip('4+1 Free Mega Deal', 5, 4, 1, 2.56, isDark),
                           ],
                         ),
                         const SizedBox(height: 16),

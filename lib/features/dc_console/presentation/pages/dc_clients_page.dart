@@ -8,6 +8,7 @@ import '../providers/dc_console_provider.dart';
 import '../widgets/dc_onboard_client_modal.dart';
 import '../widgets/dc_client_asset_portfolio_modal.dart';
 import '../widgets/dc_daily_merchant_settlement_modal.dart';
+import '../widgets/dc_edit_client_modal.dart';
 
 class DCClientsPage extends ConsumerWidget {
   const DCClientsPage({super.key});
@@ -598,22 +599,44 @@ class DCClientsPage extends ConsumerWidget {
               children: [
                 Text('Service Tier', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8))),
                 const SizedBox(height: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: isEnterprise
-                        ? const Color(0xFF6366F1).withValues(alpha: 0.12)
-                        : const Color(0xFF0D9488).withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    isEnterprise ? 'ENTERPRISE' : 'STANDARD',
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: isEnterprise ? const Color(0xFF6366F1) : const Color(0xFF0D9488),
+                Wrap(
+                  spacing: 4,
+                  runSpacing: 4,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: isEnterprise
+                            ? const Color(0xFF6366F1).withValues(alpha: 0.12)
+                            : const Color(0xFF0D9488).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        isEnterprise ? 'ENTERPRISE' : 'STANDARD',
+                        style: GoogleFonts.inter(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          color: isEnterprise ? const Color(0xFF6366F1) : const Color(0xFF0D9488),
+                        ),
+                      ),
                     ),
-                  ),
+                    if (client.hasInventoryManagement)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'INVENTORY',
+                          style: GoogleFonts.inter(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF10B981),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ],
             ),
@@ -684,6 +707,20 @@ class DCClientsPage extends ConsumerWidget {
                 ),
               ),
               const SizedBox(width: 12),
+              OutlinedButton.icon(
+                onPressed: () => DCEditClientModal.show(context, client),
+                icon: const Icon(Icons.edit_note_rounded, size: 14, color: Color(0xFF6366F1)),
+                label: Text(
+                  'Manage / Edit',
+                  style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF6366F1)),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0xFF6366F1)),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+              const SizedBox(width: 8),
               OutlinedButton.icon(
                 onPressed: () => DCClientAssetPortfolioModal.show(context, client),
                 icon: const Icon(Icons.analytics_outlined, size: 14, color: Color(0xFF0D9488)),

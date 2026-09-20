@@ -2,6 +2,9 @@ import '../../domain/entities/client_closer.dart';
 import '../../domain/entities/client_profile.dart';
 import '../../domain/entities/client_settlement.dart';
 import '../../domain/entities/customer_lead.dart';
+import '../../domain/entities/client_supplier.dart';
+import '../../domain/entities/client_stock_invoice.dart';
+import '../../domain/entities/client_stock_balance.dart';
 import '../../domain/repositories/client_portal_repository.dart';
 import '../datasources/client_portal_remote_datasource.dart';
 
@@ -156,5 +159,80 @@ class ClientPortalRepositoryImpl implements ClientPortalRepository {
     } catch (_) {
       return {};
     }
+  }
+
+  // --- Inventory & Landed Cost Supply Management ---
+
+  @override
+  Future<List<ClientSupplier>> getSuppliers(String clientId) async {
+    try {
+      return await _remoteDataSource.fetchSuppliers(clientId);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  @override
+  Future<ClientSupplier> createSupplier(ClientSupplier supplier) async {
+    return await _remoteDataSource.createSupplier(supplier);
+  }
+
+  @override
+  Future<void> updateSupplier(ClientSupplier supplier) async {
+    await _remoteDataSource.updateSupplier(supplier);
+  }
+
+  @override
+  Future<List<ClientStockInvoice>> getStockInvoices(String clientId) async {
+    try {
+      return await _remoteDataSource.fetchStockInvoices(clientId);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  @override
+  Future<ClientStockInvoice> raiseStockInvoice({
+    required ClientStockInvoice invoice,
+    required List<ClientStockInvoiceItem> items,
+  }) async {
+    return await _remoteDataSource.raiseStockInvoice(invoice: invoice, items: items);
+  }
+
+  @override
+  Future<void> attachPaymentReceipt({
+    required String invoiceId,
+    required String receiptUrl,
+  }) async {
+    await _remoteDataSource.attachPaymentReceipt(
+      invoiceId: invoiceId,
+      receiptUrl: receiptUrl,
+    );
+  }
+
+  @override
+  Future<List<ClientStockBalance>> getStockBalances(
+    String clientId, {
+    String? warehouseFilter,
+    String? itemFilter,
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    try {
+      return await _remoteDataSource.fetchStockBalances(
+        clientId,
+        warehouseFilter: warehouseFilter,
+        itemFilter: itemFilter,
+        startDate: startDate,
+        endDate: endDate,
+      );
+    } catch (_) {
+      return [];
+    }
+  }
+
+  @override
+  Future<void> importStockBalanceCsv(String clientId, String csvContent) async {
+    await _remoteDataSource.importStockBalanceCsv(clientId, csvContent);
   }
 }

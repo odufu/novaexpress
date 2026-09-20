@@ -12,6 +12,14 @@ final onboardClientSubmittingProvider = StateProvider.autoDispose<bool>((ref) =>
 class DCOnboardClientModal extends ConsumerStatefulWidget {
   const DCOnboardClientModal({super.key});
 
+  static Future<void> show(BuildContext context) {
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const DCOnboardClientModal(),
+    );
+  }
+
   @override
   ConsumerState<DCOnboardClientModal> createState() => _DCOnboardClientModalState();
 }
@@ -38,8 +46,61 @@ class _DCOnboardClientModalState extends ConsumerState<DCOnboardClientModal> {
   final _customFailedAttemptFeeController = TextEditingController();
   bool _showCustomFeeOverrides = false;
 
+  // Brand Identity Controllers
+  final _logoUrlController = TextEditingController();
+  final _primaryColorController = TextEditingController(text: '#0D9488');
+  final _secondaryColorController = TextEditingController(text: '#031632');
+  final _accentColorController = TextEditingController(text: '#10B981');
+  String _selectedPresetName = 'Novacare Emerald';
+
+  static const List<Map<String, dynamic>> _brandPresets = [
+    {
+      'name': 'Novacare Emerald',
+      'primary': '#0D9488',
+      'secondary': '#031632',
+      'accent': '#10B981',
+      'color': Color(0xFF0D9488),
+    },
+    {
+      'name': 'NovaXpress Blaze',
+      'primary': '#F37021',
+      'secondary': '#031632',
+      'accent': '#3B82F6',
+      'color': Color(0xFFF37021),
+    },
+    {
+      'name': 'Royal Sapphire',
+      'primary': '#2563EB',
+      'secondary': '#0F172A',
+      'accent': '#38BDF8',
+      'color': Color(0xFF2563EB),
+    },
+    {
+      'name': 'Imperial Violet',
+      'primary': '#7C3AED',
+      'secondary': '#1E1B4B',
+      'accent': '#C084FC',
+      'color': Color(0xFF7C3AED),
+    },
+    {
+      'name': 'Crimson Ruby',
+      'primary': '#DC2626',
+      'secondary': '#450A0A',
+      'accent': '#F87171',
+      'color': Color(0xFFDC2626),
+    },
+    {
+      'name': 'Corporate Slate',
+      'primary': '#334155',
+      'secondary': '#0F172A',
+      'accent': '#64748B',
+      'color': Color(0xFF334155),
+    },
+  ];
+
   int _currentStep = 0; // 0: Company & Depot, 1: Login Credentials, 2: Tier & Settlement
   String _tier = 'enterprise'; // 'enterprise' or 'standard_merchant'
+  bool _enableInventoryManagement = true; // Value-added inventory service
   String _selectedState = 'FCT - Abuja';
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -138,6 +199,10 @@ class _DCOnboardClientModalState extends ConsumerState<DCOnboardClientModal> {
     _customDeliveryFeeController.dispose();
     _customPlatformFeeController.dispose();
     _customFailedAttemptFeeController.dispose();
+    _logoUrlController.dispose();
+    _primaryColorController.dispose();
+    _secondaryColorController.dispose();
+    _accentColorController.dispose();
     super.dispose();
   }
 
@@ -198,6 +263,7 @@ class _DCOnboardClientModalState extends ConsumerState<DCOnboardClientModal> {
         city: city,
         stateName: _selectedState,
         tier: _tier,
+        hasInventoryManagement: _enableInventoryManagement,
         closerLimit: closerLimit,
         bankName: bankName.isNotEmpty ? bankName : null,
         bankAccountNumber: bankAccNum.isNotEmpty ? bankAccNum : null,
@@ -205,6 +271,10 @@ class _DCOnboardClientModalState extends ConsumerState<DCOnboardClientModal> {
         customDeliveryFee: (customDelivery != null && customDelivery > 0) ? customDelivery : null,
         customPlatformFee: (customPlatform != null && customPlatform > 0) ? customPlatform : null,
         customFailedAttemptFee: (customFailed != null && customFailed > 0) ? customFailed : null,
+        logoUrl: _logoUrlController.text.trim().isNotEmpty ? _logoUrlController.text.trim() : null,
+        primaryColor: _primaryColorController.text.trim().isNotEmpty ? _primaryColorController.text.trim() : null,
+        secondaryColor: _secondaryColorController.text.trim().isNotEmpty ? _secondaryColorController.text.trim() : null,
+        accentColor: _accentColorController.text.trim().isNotEmpty ? _accentColorController.text.trim() : null,
       );
 
       if (mounted) {
@@ -342,20 +412,19 @@ Initial Password: ${_createdPassword ?? 'ClientPass2026!'}
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
+              Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 8,
+                runSpacing: 4,
                 children: [
-                  Flexible(
-                    child: Text(
-                      'Onboard Client Account',
-                      style: GoogleFonts.inter(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                        color: isDark ? Colors.white : const Color(0xFF0F172A),
-                      ),
-                      overflow: TextOverflow.ellipsis,
+                  Text(
+                    'Onboard Client Account',
+                    style: GoogleFonts.inter(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
                     ),
                   ),
-                  const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
@@ -394,6 +463,7 @@ Initial Password: ${_createdPassword ?? 'ClientPass2026!'}
   // Step Selector Indicator
   // ===========================================================================
   Widget _buildStepSelector(bool isDark) {
+    final isCompact = MediaQuery.of(context).size.width < 520;
     final steps = [
       ('1', 'Company & Depot', Icons.business_rounded),
       ('2', 'Login & Auth', Icons.lock_person_rounded),
@@ -457,20 +527,22 @@ Initial Password: ${_createdPassword ?? 'ClientPass2026!'}
                               style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
                             ),
                     ),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        steps[idx].$2,
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                          color: isSelected
-                              ? const Color(0xFF0D9488)
-                              : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569)),
+                    if (!isCompact) ...[
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          steps[idx].$2,
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                            color: isSelected
+                                ? const Color(0xFF0D9488)
+                                : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569)),
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -488,104 +560,92 @@ Initial Password: ${_createdPassword ?? 'ClientPass2026!'}
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              flex: 3,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildLabel('Company / Brand Name', isDark, isRequired: true),
-                  const SizedBox(height: 6),
-                  TextFormField(
-                    controller: _companyNameController,
-                    style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13.5),
-                    decoration: _inputDecoration(
-                      hintText: 'e.g. Acme Health Products',
-                      icon: Icons.store_rounded,
-                      isDark: isDark,
-                    ),
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) return 'Company name is required';
-                      if (v.trim().length < 2) return 'Company name too short';
-                      return null;
-                    },
-                  ),
-                ],
+        _buildResponsivePair(
+          context,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildLabel('Company / Brand Name', isDark, isRequired: true),
+              const SizedBox(height: 6),
+              TextFormField(
+                controller: _companyNameController,
+                style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13.5),
+                decoration: _inputDecoration(
+                  hintText: 'e.g. Acme Health Products',
+                  icon: Icons.store_rounded,
+                  isDark: isDark,
+                ),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'Company name is required';
+                  if (v.trim().length < 2) return 'Company name too short';
+                  return null;
+                },
               ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              flex: 2,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildLabel('Client Code (ID)', isDark, isRequired: true),
-                  const SizedBox(height: 6),
-                  TextFormField(
-                    controller: _clientCodeController,
-                    style: GoogleFonts.firaCode(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: const Color(0xFF0D9488),
-                    ),
-                    decoration: _inputDecoration(
-                      hintText: 'CLI-NOV-01',
-                      icon: Icons.tag_rounded,
-                      isDark: isDark,
-                    ),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Code required' : null,
-                  ),
-                ],
+            ],
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildLabel('Client Code (ID)', isDark, isRequired: true),
+              const SizedBox(height: 6),
+              TextFormField(
+                controller: _clientCodeController,
+                style: GoogleFonts.firaCode(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF0D9488),
+                ),
+                decoration: _inputDecoration(
+                  hintText: 'CLI-NOV-01',
+                  icon: Icons.tag_rounded,
+                  isDark: isDark,
+                ),
+                validator: (v) => (v == null || v.trim().isEmpty) ? 'Code required' : null,
               ),
-            ),
-          ],
+            ],
+          ),
+          flex1: 3,
+          flex2: 2,
         ),
         const SizedBox(height: 16),
 
-        Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildLabel('Operating State', isDark, isRequired: true),
-                  const SizedBox(height: 6),
-                  DropdownButtonFormField<String>(
-                    value: NigeriaLocations.states.contains(_selectedState) ? _selectedState : NigeriaLocations.states.first,
-                    isExpanded: true,
-                    dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-                    style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13.5),
-                    items: NigeriaLocations.states.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
-                    onChanged: (val) {
-                      if (val != null) setState(() => _selectedState = val);
-                    },
-                    decoration: _inputDecoration(hintText: 'Select State', icon: Icons.map_rounded, isDark: isDark),
-                  ),
-                ],
+        _buildResponsivePair(
+          context,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildLabel('Operating State', isDark, isRequired: true),
+              const SizedBox(height: 6),
+              DropdownButtonFormField<String>(
+                value: NigeriaLocations.states.contains(_selectedState) ? _selectedState : NigeriaLocations.states.first,
+                isExpanded: true,
+                dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13.5),
+                items: NigeriaLocations.states.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                onChanged: (val) {
+                  if (val != null) setState(() => _selectedState = val);
+                },
+                decoration: _inputDecoration(hintText: 'Select State', icon: Icons.map_rounded, isDark: isDark),
               ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildLabel('City / Primary Depot', isDark, isRequired: true),
-                  const SizedBox(height: 6),
-                  TextFormField(
-                    controller: _cityController,
-                    style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13.5),
-                    decoration: _inputDecoration(
-                      hintText: 'e.g. Abuja Municipal (AMAC)',
-                      icon: Icons.location_city_rounded,
-                      isDark: isDark,
-                    ),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'City required' : null,
-                  ),
-                ],
+            ],
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildLabel('City / Primary Depot', isDark, isRequired: true),
+              const SizedBox(height: 6),
+              TextFormField(
+                controller: _cityController,
+                style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13.5),
+                decoration: _inputDecoration(
+                  hintText: 'e.g. Abuja Municipal (AMAC)',
+                  icon: Icons.location_city_rounded,
+                  isDark: isDark,
+                ),
+                validator: (v) => (v == null || v.trim().isEmpty) ? 'City required' : null,
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         const SizedBox(height: 16),
 
@@ -602,7 +662,367 @@ Initial Password: ${_createdPassword ?? 'ClientPass2026!'}
           ),
           validator: (v) => (v == null || v.trim().isEmpty) ? 'Physical address required' : null,
         ),
+        const SizedBox(height: 20),
+
+        // Brand Identity & Dynamic Theming Configuration
+        _buildBrandIdentitySection(isDark),
       ],
+    );
+  }
+
+  Color _parseHex(String hex, Color fallback) {
+    String clean = hex.replaceAll('#', '').trim();
+    if (clean.length == 6) clean = 'FF$clean';
+    if (clean.length != 8) return fallback;
+    try {
+      return Color(int.parse(clean, radix: 16));
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  Widget _buildBrandIdentitySection(bool isDark) {
+    final currentPrimary = _parseHex(_primaryColorController.text, const Color(0xFF0D9488));
+    final currentSecondary = _parseHex(_secondaryColorController.text, const Color(0xFF031632));
+    final currentAccent = _parseHex(_accentColorController.text, const Color(0xFF10B981));
+    final currentCompanyName = _companyNameController.text.trim().isNotEmpty
+        ? _companyNameController.text.trim()
+        : 'Novacare Health';
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: currentPrimary.withValues(alpha: 0.35),
+          width: 1.5,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: currentPrimary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.palette_rounded, size: 20, color: currentPrimary),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Merchant Brand Identity & Dynamic Theming',
+                      style: GoogleFonts.inter(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
+                    ),
+                    Text(
+                      'Logo & color sets dynamically style the Merchant Operations Hub and Telesales Closer Desks.',
+                      style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Brand Logo URL Input with Live Preview
+          _buildLabel('Brand Logo URL (PNG / SVG / JPEG)', isDark),
+          const SizedBox(height: 6),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Logo Avatar Preview
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: currentPrimary.withValues(alpha: 0.4)),
+                ),
+                alignment: Alignment.center,
+                child: _logoUrlController.text.trim().isNotEmpty
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          _logoUrlController.text.trim(),
+                          width: 38,
+                          height: 38,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => Icon(Icons.storefront_rounded, color: currentPrimary, size: 22),
+                        ),
+                      )
+                    : Icon(Icons.storefront_rounded, color: currentPrimary, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextFormField(
+                  controller: _logoUrlController,
+                  onChanged: (_) => setState(() {}),
+                  style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13),
+                  decoration: _inputDecoration(
+                    hintText: 'https://example.com/logo.png',
+                    icon: Icons.image_rounded,
+                    isDark: isDark,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Preset Brand Theme Palette Selector
+          _buildLabel('Select Brand Theme Preset', isDark),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _brandPresets.map((preset) {
+              final isSelected = _selectedPresetName == preset['name'];
+              final color = preset['color'] as Color;
+              return InkWell(
+                onTap: () {
+                  setState(() {
+                    _selectedPresetName = preset['name'] as String;
+                    _primaryColorController.text = preset['primary'] as String;
+                    _secondaryColorController.text = preset['secondary'] as String;
+                    _accentColorController.text = preset['accent'] as String;
+                  });
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? color.withValues(alpha: 0.12)
+                        : (isDark ? const Color(0xFF1E293B) : Colors.white),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isSelected ? color : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                      width: isSelected ? 1.8 : 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 14,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                        ),
+                        child: isSelected
+                            ? const Icon(Icons.check, size: 10, color: Colors.white)
+                            : null,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        preset['name'] as String,
+                        style: GoogleFonts.inter(
+                          fontSize: 11.5,
+                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                          color: isSelected ? color : (isDark ? Colors.white : const Color(0xFF334155)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 16),
+
+          // Custom Hex Inputs (Primary, Secondary, Accent)
+          _buildLabel('Custom Brand Color Hex Codes', isDark),
+          const SizedBox(height: 8),
+          _buildResponsiveTriple(
+            context,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Primary Color', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
+                const SizedBox(height: 4),
+                TextFormField(
+                  controller: _primaryColorController,
+                  onChanged: (_) => setState(() {}),
+                  style: GoogleFonts.firaCode(fontSize: 12, fontWeight: FontWeight.w600),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    prefixIcon: Container(
+                      margin: const EdgeInsets.all(8),
+                      width: 16,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: currentPrimary,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ],
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Secondary Color', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
+                const SizedBox(height: 4),
+                TextFormField(
+                  controller: _secondaryColorController,
+                  onChanged: (_) => setState(() {}),
+                  style: GoogleFonts.firaCode(fontSize: 12, fontWeight: FontWeight.w600),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    prefixIcon: Container(
+                      margin: const EdgeInsets.all(8),
+                      width: 16,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: currentSecondary,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ],
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Accent Color', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
+                const SizedBox(height: 4),
+                TextFormField(
+                  controller: _accentColorController,
+                  onChanged: (_) => setState(() {}),
+                  style: GoogleFonts.firaCode(fontSize: 12, fontWeight: FontWeight.w600),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    prefixIcon: Container(
+                      margin: const EdgeInsets.all(8),
+                      width: 16,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: currentAccent,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Live Interface Theme Preview Box
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: currentSecondary,
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 10,
+                  runSpacing: 8,
+                  children: [
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 250),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: currentPrimary,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Icon(Icons.storefront_rounded, size: 14, color: Colors.white),
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  currentCompanyName,
+                                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  'Live Merchant Portal & Closer Preview',
+                                  style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8)),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: currentPrimary,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'Book Order',
+                            style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: currentAccent,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'Closer Active',
+                            style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w700, color: Colors.white),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -636,53 +1056,47 @@ Initial Password: ${_createdPassword ?? 'ClientPass2026!'}
         ),
         const SizedBox(height: 16),
 
-        Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildLabel('Primary Contact Person (Admin)', isDark, isRequired: true),
-                  const SizedBox(height: 6),
-                  TextFormField(
-                    controller: _contactPersonController,
-                    style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13.5),
-                    decoration: _inputDecoration(
-                      hintText: 'e.g. John Doe',
-                      icon: Icons.person_rounded,
-                      isDark: isDark,
-                    ),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Contact person required' : null,
-                  ),
-                ],
+        _buildResponsivePair(
+          context,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildLabel('Primary Contact Person (Admin)', isDark, isRequired: true),
+              const SizedBox(height: 6),
+              TextFormField(
+                controller: _contactPersonController,
+                style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13.5),
+                decoration: _inputDecoration(
+                  hintText: 'e.g. John Doe',
+                  icon: Icons.person_rounded,
+                  isDark: isDark,
+                ),
+                validator: (v) => (v == null || v.trim().isEmpty) ? 'Contact person required' : null,
               ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildLabel('Business Phone Number', isDark, isRequired: true),
-                  const SizedBox(height: 6),
-                  TextFormField(
-                    controller: _phoneController,
-                    keyboardType: TextInputType.phone,
-                    style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13.5),
-                    decoration: _inputDecoration(
-                      hintText: '08034455667',
-                      icon: Icons.phone_rounded,
-                      isDark: isDark,
-                    ),
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) return 'Phone required';
-                      if (v.trim().length < 10) return 'Invalid phone number';
-                      return null;
-                    },
-                  ),
-                ],
+            ],
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildLabel('Business Phone Number', isDark, isRequired: true),
+              const SizedBox(height: 6),
+              TextFormField(
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
+                style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13.5),
+                decoration: _inputDecoration(
+                  hintText: '08034455667',
+                  icon: Icons.phone_rounded,
+                  isDark: isDark,
+                ),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'Phone required';
+                  if (v.trim().length < 10) return 'Invalid phone number';
+                  return null;
+                },
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         const SizedBox(height: 16),
 
@@ -831,85 +1245,80 @@ Initial Password: ${_createdPassword ?? 'ClientPass2026!'}
         const SizedBox(height: 16),
 
         // Password & Confirm Password Row
-        Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        _buildResponsivePair(
+          context,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _buildLabel('Initial Password', isDark, isRequired: true),
-                      InkWell(
-                        onTap: _generateRandomPassword,
-                        child: Text(
-                          '⚡ Auto-Generate',
-                          style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF0D9488)),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  TextFormField(
-                    controller: _passwordController,
-                    obscureText: _obscurePassword,
-                    style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13.5),
-                    decoration: _inputDecoration(
-                      hintText: 'Min 6 chars',
-                      icon: Icons.lock_rounded,
-                      isDark: isDark,
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                          size: 18,
-                          color: const Color(0xFF94A3B8),
-                        ),
-                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                      ),
+                  _buildLabel('Initial Password', isDark, isRequired: true),
+                  InkWell(
+                    onTap: _generateRandomPassword,
+                    child: Text(
+                      '⚡ Auto-Generate',
+                      style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF0D9488)),
                     ),
-                    validator: (v) {
-                      if (v == null || v.isEmpty) return 'Password required';
-                      if (v.length < 6) return 'At least 6 characters required';
-                      return null;
-                    },
                   ),
                 ],
               ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildLabel('Confirm Password', isDark, isRequired: true),
-                  const SizedBox(height: 6),
-                  TextFormField(
-                    controller: _confirmPasswordController,
-                    obscureText: _obscureConfirmPassword,
-                    style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13.5),
-                    decoration: _inputDecoration(
-                      hintText: 'Re-enter password',
-                      icon: Icons.check_rounded,
-                      isDark: isDark,
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscureConfirmPassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                          size: 18,
-                          color: const Color(0xFF94A3B8),
-                        ),
-                        onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
-                      ),
+              const SizedBox(height: 6),
+              TextFormField(
+                controller: _passwordController,
+                obscureText: _obscurePassword,
+                style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13.5),
+                decoration: _inputDecoration(
+                  hintText: 'Min 6 chars',
+                  icon: Icons.lock_rounded,
+                  isDark: isDark,
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                      size: 18,
+                      color: const Color(0xFF94A3B8),
                     ),
-                    validator: (v) {
-                      if (v != _passwordController.text) return 'Passwords do not match';
-                      return null;
-                    },
+                    onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                   ),
-                ],
+                ),
+                validator: (v) {
+                  if (v == null || v.isEmpty) return 'Password required';
+                  if (v.length < 6) return 'At least 6 characters required';
+                  return null;
+                },
               ),
-            ),
-          ],
+            ],
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildLabel('Confirm Password', isDark, isRequired: true),
+              const SizedBox(height: 6),
+              TextFormField(
+                controller: _confirmPasswordController,
+                obscureText: _obscureConfirmPassword,
+                style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13.5),
+                decoration: _inputDecoration(
+                  hintText: 'Re-enter password',
+                  icon: Icons.check_rounded,
+                  isDark: isDark,
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscureConfirmPassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                      size: 18,
+                      color: const Color(0xFF94A3B8),
+                    ),
+                    onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                  ),
+                ),
+                validator: (v) {
+                  if (v != _passwordController.text) return 'Passwords do not match';
+                  return null;
+                },
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -926,96 +1335,90 @@ Initial Password: ${_createdPassword ?? 'ClientPass2026!'}
       children: [
         _buildLabel('Client Service Tier', isDark),
         const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: InkWell(
-                onTap: () => setState(() => _tier = 'enterprise'),
+        _buildResponsivePair(
+          context,
+          InkWell(
+            onTap: () => setState(() => _tier = 'enterprise'),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: isEnterprise
+                    ? const Color(0xFF6366F1).withValues(alpha: 0.08)
+                    : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
                 borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: isEnterprise
-                        ? const Color(0xFF6366F1).withValues(alpha: 0.08)
-                        : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isEnterprise ? const Color(0xFF6366F1) : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
-                      width: isEnterprise ? 2 : 1,
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                border: Border.all(
+                  color: isEnterprise ? const Color(0xFF6366F1) : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                  width: isEnterprise ? 2 : 1,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      Row(
-                        children: [
-                          Icon(Icons.workspace_premium_rounded, color: isEnterprise ? const Color(0xFF6366F1) : const Color(0xFF64748B), size: 18),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Enterprise Client',
-                            style: GoogleFonts.inter(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: isEnterprise ? const Color(0xFF4338CA) : (isDark ? Colors.white : const Color(0xFF334155)),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
+                      Icon(Icons.workspace_premium_rounded, color: isEnterprise ? const Color(0xFF6366F1) : const Color(0xFF64748B), size: 18),
+                      const SizedBox(width: 6),
                       Text(
-                        'Telesales closers team, leads dialer & live performance',
-                        style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                        'Enterprise Client',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: isEnterprise ? const Color(0xFF4338CA) : (isDark ? Colors.white : const Color(0xFF334155)),
+                        ),
                       ),
                     ],
                   ),
-                ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Telesales closers team, leads dialer & live performance',
+                    style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: InkWell(
-                onTap: () => setState(() => _tier = 'standard_merchant'),
+          ),
+          InkWell(
+            onTap: () => setState(() => _tier = 'standard_merchant'),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: !isEnterprise
+                    ? const Color(0xFF0D9488).withValues(alpha: 0.08)
+                    : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
                 borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: !isEnterprise
-                        ? const Color(0xFF0D9488).withValues(alpha: 0.08)
-                        : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: !isEnterprise ? const Color(0xFF0D9488) : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
-                      width: !isEnterprise ? 2 : 1,
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                border: Border.all(
+                  color: !isEnterprise ? const Color(0xFF0D9488) : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                  width: !isEnterprise ? 2 : 1,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      Row(
-                        children: [
-                          Icon(Icons.storefront_rounded, color: !isEnterprise ? const Color(0xFF0D9488) : const Color(0xFF64748B), size: 18),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Standard Merchant',
-                            style: GoogleFonts.inter(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: !isEnterprise ? const Color(0xFF0D9488) : (isDark ? Colors.white : const Color(0xFF334155)),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
+                      Icon(Icons.storefront_rounded, color: !isEnterprise ? const Color(0xFF0D9488) : const Color(0xFF64748B), size: 18),
+                      const SizedBox(width: 6),
                       Text(
-                        'Direct order intake and inventory depot fulfillment',
-                        style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                        'Standard Merchant',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: !isEnterprise ? const Color(0xFF0D9488) : (isDark ? Colors.white : const Color(0xFF334155)),
+                        ),
                       ),
                     ],
                   ),
-                ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Direct order intake and inventory depot fulfillment',
+                    style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
         const SizedBox(height: 16),
 
@@ -1035,38 +1438,123 @@ Initial Password: ${_createdPassword ?? 'ClientPass2026!'}
           const SizedBox(height: 16),
         ],
 
+        // Value-Added Services / Module Add-ons
+        _buildLabel('Value-Added Services & Modules', isDark),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: _enableInventoryManagement
+                ? const Color(0xFF0D9488).withValues(alpha: 0.08)
+                : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: _enableInventoryManagement
+                  ? const Color(0xFF0D9488)
+                  : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+              width: _enableInventoryManagement ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: _enableInventoryManagement
+                      ? const Color(0xFF0D9488).withValues(alpha: 0.15)
+                      : (isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0)),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.inventory_2_rounded,
+                  color: _enableInventoryManagement ? const Color(0xFF0D9488) : const Color(0xFF64748B),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        Text(
+                          'Inventory & Stock',
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0D9488).withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'Pangea Compatible',
+                            style: GoogleFonts.inter(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF0D9488),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Enables supplier directory, stock intake invoices, landed cost math (packaging & freight), and multi-warehouse balance reports.',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        color: const Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Switch.adaptive(
+                value: _enableInventoryManagement,
+                activeColor: const Color(0xFF0D9488),
+                onChanged: (val) {
+                  setState(() => _enableInventoryManagement = val);
+                },
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
         // Settlement Bank Details
         _buildLabel('Settlement Bank (For COD Remittances & Payouts)', isDark),
         const SizedBox(height: 6),
-        Row(
-          children: [
-            Expanded(
-              flex: 2,
-              child: TextFormField(
-                controller: _bankNameController,
-                style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13.5),
-                decoration: _inputDecoration(
-                  hintText: 'e.g. Access Bank',
-                  icon: Icons.account_balance_rounded,
-                  isDark: isDark,
-                ),
-              ),
+        _buildResponsivePair(
+          context,
+          TextFormField(
+            controller: _bankNameController,
+            style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13.5),
+            decoration: _inputDecoration(
+              hintText: 'e.g. Access Bank',
+              icon: Icons.account_balance_rounded,
+              isDark: isDark,
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              flex: 3,
-              child: TextFormField(
-                controller: _bankAccountNumberController,
-                keyboardType: TextInputType.number,
-                style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13.5),
-                decoration: _inputDecoration(
-                  hintText: '10-digit NUBAN',
-                  icon: Icons.numbers_rounded,
-                  isDark: isDark,
-                ),
-              ),
+          ),
+          TextFormField(
+            controller: _bankAccountNumberController,
+            keyboardType: TextInputType.number,
+            style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13.5),
+            decoration: _inputDecoration(
+              hintText: '10-digit NUBAN',
+              icon: Icons.numbers_rounded,
+              isDark: isDark,
             ),
-          ],
+          ),
+          flex1: 2,
+          flex2: 3,
         ),
         const SizedBox(height: 10),
         TextFormField(
@@ -1139,48 +1627,42 @@ Initial Password: ${_createdPassword ?? 'ClientPass2026!'}
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildLabel('1. Delivery Fee (₦ / successful order)', isDark),
-                                const SizedBox(height: 6),
-                                TextFormField(
-                                  controller: _customDeliveryFeeController,
-                                  keyboardType: TextInputType.number,
-                                  style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13),
-                                  decoration: _inputDecoration(
-                                    hintText: '5000',
-                                    icon: Icons.local_shipping_rounded,
-                                    isDark: isDark,
-                                  ),
-                                ),
-                              ],
+                      _buildResponsivePair(
+                        context,
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildLabel('1. Delivery Fee (₦ / successful order)', isDark),
+                            const SizedBox(height: 6),
+                            TextFormField(
+                              controller: _customDeliveryFeeController,
+                              keyboardType: TextInputType.number,
+                              style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13),
+                              decoration: _inputDecoration(
+                                hintText: '5000',
+                                icon: Icons.local_shipping_rounded,
+                                isDark: isDark,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildLabel('2. Failed Attempt Fee (₦ / failed drop)', isDark),
-                                const SizedBox(height: 6),
-                                TextFormField(
-                                  controller: _customFailedAttemptFeeController,
-                                  keyboardType: TextInputType.number,
-                                  style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13),
-                                  decoration: _inputDecoration(
-                                    hintText: '1000',
-                                    icon: Icons.cancel_presentation_rounded,
-                                    isDark: isDark,
-                                  ),
-                                ),
-                              ],
+                          ],
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildLabel('2. Failed Attempt Fee (₦ / failed drop)', isDark),
+                            const SizedBox(height: 6),
+                            TextFormField(
+                              controller: _customFailedAttemptFeeController,
+                              keyboardType: TextInputType.number,
+                              style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13),
+                              decoration: _inputDecoration(
+                                hintText: '1000',
+                                icon: Icons.cancel_presentation_rounded,
+                                isDark: isDark,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 12),
                       Column(
@@ -1241,8 +1723,11 @@ Initial Password: ${_createdPassword ?? 'ClientPass2026!'}
   // Action Navigation Bar
   // ===========================================================================
   Widget _buildActionBar(bool isSubmitting, bool isDark) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Wrap(
+      alignment: WrapAlignment.spaceBetween,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 12,
+      runSpacing: 12,
       children: [
         if (_currentStep > 0)
           OutlinedButton.icon(
@@ -1257,6 +1742,7 @@ Initial Password: ${_createdPassword ?? 'ClientPass2026!'}
         else
           const SizedBox.shrink(),
         Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             TextButton(
               onPressed: isSubmitting ? null : () => Navigator.of(context).pop(),
@@ -1429,22 +1915,84 @@ Initial Password: ${_createdPassword ?? 'ClientPass2026!'}
     );
   }
 
-  Widget _buildLabel(String text, bool isDark, {bool isRequired = false}) {
-    return Row(
-      children: [
-        Text(
-          text,
-          style: GoogleFonts.inter(
-            fontSize: 12.5,
-            fontWeight: FontWeight.w600,
-            color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
-          ),
-        ),
-        if (isRequired) ...[
-          const SizedBox(width: 4),
-          const Text('*', style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold)),
+  Widget _buildResponsivePair(
+    BuildContext context,
+    Widget first,
+    Widget second, {
+    int flex1 = 1,
+    int flex2 = 1,
+    double spacing = 14,
+  }) {
+    final isNarrow = MediaQuery.of(context).size.width < 560;
+    if (isNarrow) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          first,
+          SizedBox(height: spacing),
+          second,
         ],
+      );
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(flex: flex1, child: first),
+        SizedBox(width: spacing),
+        Expanded(flex: flex2, child: second),
       ],
+    );
+  }
+
+  Widget _buildResponsiveTriple(
+    BuildContext context,
+    Widget first,
+    Widget second,
+    Widget third, {
+    double spacing = 10,
+  }) {
+    final isNarrow = MediaQuery.of(context).size.width < 560;
+    if (isNarrow) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          first,
+          SizedBox(height: spacing),
+          second,
+          SizedBox(height: spacing),
+          third,
+        ],
+      );
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: first),
+        SizedBox(width: spacing),
+        Expanded(child: second),
+        SizedBox(width: spacing),
+        Expanded(child: third),
+      ],
+    );
+  }
+
+  Widget _buildLabel(String text, bool isDark, {bool isRequired = false}) {
+    return RichText(
+      text: TextSpan(
+        text: text,
+        style: GoogleFonts.inter(
+          fontSize: 12.5,
+          fontWeight: FontWeight.w600,
+          color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+        ),
+        children: [
+          if (isRequired)
+            const TextSpan(
+              text: ' *',
+              style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold),
+            ),
+        ],
+      ),
     );
   }
 

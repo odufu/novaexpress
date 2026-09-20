@@ -98,6 +98,11 @@ abstract class DCConsoleRepository {
     double? customDeliveryFee,
     double? customPlatformFee,
     double? customFailedAttemptFee,
+    bool hasInventoryManagement = true,
+    String? logoUrl,
+    String? primaryColor,
+    String? secondaryColor,
+    String? accentColor,
     dynamic authDataSource,
   });
 

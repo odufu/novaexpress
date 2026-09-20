@@ -1,0 +1,919 @@
+Item,Item Name,Item Group,Warehouse,Stock UOM,Balance Qty,Balance Value,Opening Qty,Opening Value,In Qty,In Value,Out Qty,Out Value,Valuation Rate,Reserved Stock,Company
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Stores - NL,Nos,21171,40406035.5,24177,46131425.51,34,66752.39,3040,5792142.4,1908.556,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Adeyemo Adeola LOGISTICS - Novacare Ltd - NL,Nos,101,194424.8,101,194424.8,0,0,0,0,1924.998,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,PELICAN DELIVERY AND LOGISTICS SERVICES LOGISTICS - Novacare Ltd - NL,Nos,63,315000,63,315000,0,0,0,0,5000,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,KENNEDY OROWO EDEYE Logistics - Novacare Ltd - NL,Nos,252,480138.12,367,699248.77,0,0,115,219110.65,1905.31,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Efe Brendon Avwia Logistics - Novacare Ltd - NL,Nos,321,413604.51,436,632715.16,0,0,115,219110.65,1905.31,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Ibylogistics Limited LOGISTICS - Novacare Ltd - NL,Nos,611,1178347.91,680,1309814.3,0,0,69,131466.39,1928.556,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Chidimma maryjane Iloegbunam Logistics - Novacare Ltd - NL,Nos,604,1150863.04,604,1150863.04,0,0,0,0,1905.402,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Hambolu babatunde philips Logistics - Novacare Ltd - NL,Nos,465,883969.15,597,1135470.07,0,0,132,251500.92,1905.31,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,BLUE AMAZON LOGISTICS LTD LOGISTICS - Novacare Ltd - NL,Nos,421,810829.16,439,845496.44,0,0,18,34667.28,1925.96,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Changfa Jesse David - Novacare Ltd - NL,Nos,4,7621.24,4,7621.24,0,0,0,0,1905.31,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Olufunke Babalola Logistics - Novacare Ltd - NL,Nos,17,80000,17,80000,0,0,0,0,5000,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Teekina kuroakegha Gbeneteh Logistics - Novacare Ltd - NL,Nos,124,239393.16,-152,-285360.08,320,609699.2,44,84945.96,1930.59,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Olufunke Babalola Logistics - Novacare Ltd - NL,Nos,361,688284.31,410,782203.1,0,0,49,93918.79,1906.605,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Emmanuel Nnamdi Ugwu Logistics - Novacare Ltd - NL,Nos,152,298179.92,173,339375.83,0,0,21,41195.91,1961.71,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Omoga Victor Ohe-obe Logistics - Novacare Ltd - NL,Nos,331,630657.61,443,844052.33,0,0,112,213394.72,1905.31,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Oluwadamilare Emmanuel Logistics - Novacare Ltd - NL,Nos,373,712280.8,468,893692.8,0,0,95,181412,1909.6,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Etimbuk Gregory Logistics - Novacare Ltd - NL,Nos,654,1246072.74,414,788798.34,320,609699.2,80,152424.8,1905.31,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,YAYA JOB - Novacare Ltd - NL,Nos,19,47500,19,47500,0,0,0,0,2500,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,Victor Ogbenyi Logistics - Novacare Ltd - NL,Nos,3,146.97,3,146.97,0,0,0,0,1248.99,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Victor Ogbenyi Logistics - Novacare Ltd - NL,Nos,565,944500.15,502,824465.62,320,609699.2,257,489664.67,1905.31,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Enny logistics LOGISTICS - Novacare Ltd - NL,Nos,526,257053.32,440,94684.8,160,304849.6,74,142481.08,1919.303,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,RAPH XPRESS LOGISTICS - Novacare Ltd - NL,Nos,25,56410.25,25,56410.25,0,0,0,0,2256.41,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Chidi Godstime Egege Logistics - Novacare Ltd - NL,Nos,252,480138.12,357,680195.67,0,0,105,200057.55,1905.31,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,YAYA JOB - Novacare Ltd - NL,Nos,410,802542.2,410,802542.2,0,0,0,0,1957.42,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,John Hamza shuaibu Logistics - Novacare Ltd - NL,Nos,-2,-10000,-1,-5000,0,0,1,5000,5000,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,John Hamza shuaibu Logistics - Novacare Ltd - NL,Nos,30,57159.3,185,352482.35,0,0,155,295323.05,1905.31,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,RAPH XPRESS LOGISTICS - Novacare Ltd - NL,Nos,1027,1956753.37,857,1632850.67,320,609699.2,150,285796.5,1905.31,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,smart logistics LOGISTICS - Novacare Ltd - NL,Nos,294,572849.6,335,654849.6,0,0,41,82000,1948.468,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Emmanuel Nnamdi Ugwu Logistics - Novacare Ltd - NL,Nos,17,42500,17,42500,0,0,0,0,2500,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Durojaiye Ilashe Joseph Logistics - Novacare Ltd - NL,Nos,34,170000,34,170000,0,0,0,0,5000,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Durojaiye Ilashe Joseph Logistics - Novacare Ltd - NL,Nos,437,835778.27,303,580763.13,160,304849.6,26,49834.46,1912.536,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Abdulsalam Abubakar Logistics - Novacare Ltd - NL,Nos,332,632562.92,421,802135.51,0,0,89,169572.59,1905.31,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Olupona oluwaseyi Logistics - Novacare Ltd - NL,Nos,758,1447029.58,758,1447029.58,0,0,0,0,1909.01,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Olupona oluwaseyi Logistics - Novacare Ltd - NL,Nos,134,395300,134,395300,0,0,0,0,2950,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Adeyinka Ekundayo Isreal Logistics - Novacare Ltd - NL,Nos,780,1495033.8,780,1495033.8,0,0,0,0,1916.71,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Olawale Olusola Logistics - Novacare Ltd - NL,Nos,798,1565699.2,863,1695699.2,0,0,65,130000,1962.029,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,ADICHA LOGISTICS - Novacare Ltd - NL,Nos,342,651616.02,364,693532.84,0,0,22,41916.82,1905.31,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,ZIBRA & CO LTD LOGISTICS - Novacare Ltd - NL,Nos,423,805946.13,503,958370.93,0,0,80,152424.8,1905.31,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,ZIBRA & CO LTD LOGISTICS - Novacare Ltd - NL,Nos,412,1231400,463,1381850,0,0,51,150450,2988.835,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Smart move Logistics Logistics LOGISTICS - Novacare Ltd - NL,Nos,150,285864,203,386869.28,0,0,53,101005.28,1905.76,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Efe Brendon Avwia Logistics - Novacare Ltd - NL,Nos,28,50499.88,28,50499.88,0,0,0,0,2785.71,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,PELICAN DELIVERY AND LOGISTICS SERVICES LOGISTICS - Novacare Ltd - NL,Nos,255,485854.05,326,621199.46,0,0,71,135345.41,1905.31,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Chidimma maryjane Iloegbunam Logistics - Novacare Ltd - NL,Nos,75,375000,75,375000,0,0,0,0,5000,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Sheriff Adesola Raifu Logistics - Novacare Ltd - NL,Nos,185,352482.35,298,567782.38,0,0,113,215300.03,1905.31,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Shittu Adebamke Yusuff Logistics - Novacare Ltd - NL,Nos,343,686000,401,802000,0,0,58,116000,2000,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,Enny logistics LOGISTICS - Novacare Ltd - NL,Nos,21,33600,21,33600,0,0,0,0,1600,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Tajudeen A Ayetigbo LOGISTICS - Novacare Ltd - NL,Nos,19,47500,19,47500,0,0,0,0,2500,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,HOG logistics LOGISTICS - Novacare Ltd - NL,Nos,197,375346.07,371,706870.01,0,0,174,331523.94,1905.31,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Olufunke Babalola Logistics - Novacare Ltd - NL,Nos,422,1258900,440,1312000,0,0,18,53100,2987.915,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,ADICHA LOGISTICS - Novacare Ltd - NL,Nos,5,25000,5,25000,0,0,0,0,5000,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,smart logistics LOGISTICS - Novacare Ltd - NL,Nos,30,75000,30,75000,0,0,0,0,2500,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Olupona oluwaseyi Logistics - Novacare Ltd - NL,Nos,84,420000,84,420000,0,0,0,0,5000,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Ibrahim Abdulrashid Logistics - Novacare Ltd - NL,Nos,449,871347.2,456,885347.2,0,0,7,14000,1940.64,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Abu Momoh Logistics - Novacare Ltd - NL,Nos,418,836000,418,836000,0,0,0,0,2000,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Chidimma maryjane Iloegbunam Logistics - Novacare Ltd - NL,Nos,13,34728.59,13,34728.59,0,0,0,0,2671.43,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Yohanna Vanduna Logistics - Novacare Ltd - NL,Nos,455,869379.8,481,919392.36,0,0,26,50012.56,1910.725,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,RAPH XPRESS LOGISTICS - Novacare Ltd - NL,Nos,66,184800,67,187600,0,0,1,2800,2800,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Adetola Sam Adewuyi LOGISTICS - Novacare Ltd - NL,Nos,164,312516.44,209,398768.39,0,0,45,86251.95,1905.588,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Akanimo Edet Akpan Logistics - Novacare Ltd - NL,Nos,351,672576.17,396,759213.32,0,0,45,86637.15,1916.171,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Okoli Nnaemeka Augustine Logistics - Novacare Ltd - NL,Nos,128,243879.68,317,603983.27,0,0,189,360103.59,1905.31,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Chidi Godstime Egege Logistics - Novacare Ltd - NL,Nos,25,62500,25,62500,0,0,0,0,2500,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Etimbuk Gregory Logistics - Novacare Ltd - NL,Nos,113,565000,113,565000,0,0,0,0,5000,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Msuega Terlanga Japhet Logistics - Novacare Ltd - NL,Nos,352,671033.92,408,778369.68,0,0,56,107335.76,1906.346,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Raphael Michael Logistics - Novacare Ltd - NL,Nos,862,1642377.22,629,1198439.99,320,609699.2,87,165761.97,1905.31,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Hezekiah Victor Adesanmi Logistics - Novacare Ltd - NL,Nos,182,347017.22,182,347017.22,0,0,0,0,1906.688,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Akanimo Edet Akpan Logistics - Novacare Ltd - NL,Nos,36,90000,36,90000,0,0,0,0,2500,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Ibitoye adewale Logistics - Novacare Ltd - NL,Nos,157,299133.67,242,466235.44,0,0,85,167101.77,1905.31,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Ibitoye adewale Logistics - Novacare Ltd - NL,Nos,68,184232.4,68,184232.4,0,0,0,0,2709.3,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,Anthony Ezekiel Logistics - Novacare Ltd - NL,Nos,21,37800,21,37800,0,0,0,0,1800,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Anthony Ezekiel Logistics - Novacare Ltd - NL,Nos,40,120000,40,120000,0,0,0,0,3000,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,TEMIBASH LOGISTICS LOGISTICS - Novacare Ltd - NL,Nos,179,344673.6,225,436673.6,0,0,46,92000,1925.551,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,Adeyemo Adeola LOGISTICS - Novacare Ltd - NL,Nos,3,3746.97,3,3746.97,0,0,0,0,1248.99,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,KENNEDY OROWO EDEYE Logistics - Novacare Ltd - NL,Nos,446,1331700,518,1544100,0,0,72,212400,2985.874,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,ZIBRA & CO LTD LOGISTICS - Novacare Ltd - NL,Nos,8,22400,8,22400,0,0,0,0,2800,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,ZIBRA & CO LTD LOGISTICS - Novacare Ltd - NL,Nos,18,36000,18,36000,0,0,0,0,2000,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Adekunle Logistic - Novacare Ltd - NL,Nos,192,334000,226,402000,0,0,34,68000,2000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Raphael Michael Logistics - Novacare Ltd - NL,Nos,60,300000,60,300000,0,0,0,0,5000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Oluwadamilare Emmanuel Logistics - Novacare Ltd - NL,Nos,8,40000,8,40000,0,0,0,0,5000,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,ATP Logistics LOGISTICS - Novacare Ltd - NL,Nos,892,1699536.52,726,1383255.06,320,609699.2,154,293417.74,1905.31,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,HOG logistics LOGISTICS - Novacare Ltd - NL,Nos,49,122500,49,122500,0,0,0,0,2500,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Hambolu babatunde philips Logistics - Novacare Ltd - NL,Nos,429,1273550,510,1512500,0,0,81,238950,2968.648,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Olaseni Adewumi James Logistics - Novacare Ltd - NL,Nos,173,346000,239,478000,0,0,66,132000,2000,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,Usiju Ladu Logistics - Novacare Ltd - NL,Nos,36,44963.64,36,44963.64,0,0,0,0,1248.99,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Toheeb Biola Popoola Logistics - Novacare Ltd - NL,Nos,367,699248.77,121,230542.51,320,609699.2,74,140992.94,1905.31,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,ATP Logistics LOGISTICS - Novacare Ltd - NL,Nos,43,120400,43,120400,0,0,0,0,2800,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Victor Ogbenyi Logistics - Novacare Ltd - NL,Nos,5,1500,5,1500,0,0,0,0,2800,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,GINIKA ANAMBRA - Novacare Ltd - NL,Nos,203,386777.93,280,533486.8,0,0,77,146708.87,1905.31,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,ATP Logistics LOGISTICS - Novacare Ltd - NL,Nos,98,490000,99,495000,0,0,1,5000,5000,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Tajudeen A Ayetigbo LOGISTICS - Novacare Ltd - NL,Nos,521,1016243.42,532,1037920.24,0,0,11,21676.82,1950.563,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Alatiya Absalom Emmanuel Logistics - Novacare Ltd - NL,Nos,37,92500,37,92500,0,0,0,0,2500,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Alatiya Absalom Emmanuel Logistics - Novacare Ltd - NL,Nos,364,697699.2,413,795699.2,0,0,49,98000,1916.756,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,John Hamza shuaibu Logistics - Novacare Ltd - NL,Nos,98,257599.86,98,257599.86,0,0,0,0,2628.57,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Arinze Esther Logistics - Novacare Ltd - NL,Nos,308,586835.48,372,708985.92,0,0,64,122150.44,1905.31,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Olufunke Babalola Logistics - Novacare Ltd - NL,Nos,20,24500,20,24500,0,0,0,0,1600,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Teekina kuroakegha Gbeneteh Logistics - Novacare Ltd - NL,Nos,19,47500,19,47500,0,0,0,0,2500,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Ezekiel Ameh Logistics - Novacare Ltd - NL,Nos,204,388683.24,242,461085.02,0,0,38,72401.78,1905.31,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,George O.O LOGISTICS - Novacare Ltd - NL,Nos,437,832620.47,540,1028867.4,0,0,103,196246.93,1905.31,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Ezekiel Ameh Logistics - Novacare Ltd - NL,Nos,52,260000,52,260000,0,0,0,0,5000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,RAPH XPRESS LOGISTICS - Novacare Ltd - NL,Nos,83,415000,85,425000,0,0,2,10000,5000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Chidimma maryjane Iloegbunam Logistics - Novacare Ltd - NL,Nos,343,1011850,343,1011850,0,0,0,0,2950,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Adetola Sam Adewuyi LOGISTICS - Novacare Ltd - NL,Nos,29,49300,32,54400,0,0,3,5100,1700,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Victor Ogbenyi Logistics - Novacare Ltd - NL,Nos,35,120000,35,120000,0,0,0,0,5000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Changfa Jesse David - Novacare Ltd - NL,Nos,56,165200,65,191750,0,0,9,26550,2950,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Ibylogistics Limited LOGISTICS - Novacare Ltd - NL,Nos,32,160000,33,165000,0,0,1,5000,5000,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Emmanuel Olapeju Awoyemi Logistics - Novacare Ltd - NL,Nos,454,892849.6,454,892849.6,0,0,0,0,1966.629,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Ola Cash - Novacare Ltd - NL,Nos,32,160000,34,170000,0,0,2,10000,5000,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Ola Cash - Novacare Ltd - NL,Nos,162,309016.62,241,459709.91,0,0,79,150693.29,1907.51,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Ola Cash - Novacare Ltd - NL,Nos,11,22000,11,22000,0,0,0,0,2000,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Ola Cash - Novacare Ltd - NL,Nos,32,64000,32,64000,0,0,0,0,2000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Ola Cash - Novacare Ltd - NL,Nos,264,778800,279,823050,0,0,15,44250,2950,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Emmanuel Olapeju Awoyemi Logistics - Novacare Ltd - NL,Nos,20,50000,20,50000,0,0,0,0,2500,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Hambolu babatunde philips Logistics - Novacare Ltd - NL,Nos,46,92000,46,92000,0,0,0,0,2000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,John Hamza shuaibu Logistics - Novacare Ltd - NL,Nos,291,873000,397,1187150,0,0,106,314150,3000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Tajudeen A Ayetigbo LOGISTICS - Novacare Ltd - NL,Nos,56,280000,57,285000,0,0,1,5000,5000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Adekunle Logistic - Novacare Ltd - NL,Nos,218,539550,244,603900,0,0,26,64350,2475,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,George O.O LOGISTICS - Novacare Ltd - NL,Nos,18,90000,23,115000,0,0,5,25000,5000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Adeyemo Adeola LOGISTICS - Novacare Ltd - NL,Nos,14,28000,14,28000,0,0,0,0,2000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Adeyemo Adeola LOGISTICS - Novacare Ltd - NL,Nos,8,40000,8,40000,0,0,0,0,5000,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Adeyemo Adeola LOGISTICS - Novacare Ltd - NL,Nos,60,150000,60,150000,0,0,0,0,2500,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Etimbuk Gregory Logistics - Novacare Ltd - NL,Nos,323,960850,202,595900,160,480000,39,115050,2974.768,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Velocitŕ logistics LOGISTICS - Novacare Ltd - NL,Nos,543,1036937.64,593,1134071.64,0,0,50,97134,1909.646,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Velocitŕ logistics LOGISTICS - Novacare Ltd - NL,Nos,13,24700,13,24700,0,0,0,0,1900,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Victor Ogbenyi Logistics - Novacare Ltd - NL,Nos,466,1394000,256,764000,320,960000,110,330000,3000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Olawale Olusola Logistics - Novacare Ltd - NL,Nos,31,155000,31,155000,0,0,0,0,5000,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Fomax logistics LOGISTICS - Novacare Ltd - NL,Nos,642,1253699.2,778,1525699.2,0,0,136,272000,1952.802,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,ATP Logistics LOGISTICS - Novacare Ltd - NL,Nos,351,1053000,323,968850,160,480000,132,395850,3000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Adetola Sam Adewuyi LOGISTICS - Novacare Ltd - NL,Nos,37,185000,38,190000,0,0,1,5000,5000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Shittu Adebamke Yusuff Logistics - Novacare Ltd - NL,Nos,26,130000,26,130000,0,0,0,0,5000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Abdulsalam Abubakar Logistics - Novacare Ltd - NL,Nos,44,220000,44,220000,0,0,0,0,5000,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Anthony Ezekiel Logistics - Novacare Ltd - NL,Nos,328,636656.32,356,691957.44,0,0,28,55301.12,1941.025,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,"Express Logistics, Ebonyi LOGISTICS - Novacare Ltd - NL",Nos,216,411546.96,277,527770.87,0,0,61,116223.91,1905.31,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Toheeb Biola Popoola Logistics - Novacare Ltd - NL,Nos,55,145750,55,145750,0,0,0,0,2650,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Enny logistics LOGISTICS - Novacare Ltd - NL,Nos,25,39000,25,39000,0,0,0,0,3360,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,AHUAKAGHA CHIZURUOKE COSMOS Logistics - Novacare Ltd - NL,Nos,-2,-4000,-2,-4000,0,0,0,0,2000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Omoga Victor Ohe-obe Logistics - Novacare Ltd - NL,Nos,310,930000,343,1027850,0,0,33,97850,3000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,KENNEDY OROWO EDEYE Logistics - Novacare Ltd - NL,Nos,44,220000,44,220000,0,0,0,0,5000,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,KENNEDY OROWO EDEYE Logistics - Novacare Ltd - NL,Nos,38,102600,38,102600,0,0,0,0,2700,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,PELICAN DELIVERY AND LOGISTICS SERVICES LOGISTICS - Novacare Ltd - NL,Nos,194,572300,238,702100,0,0,44,129800,2950,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,"Express Logistics, Ebonyi LOGISTICS - Novacare Ltd - NL",Nos,18,45000,18,45000,0,0,0,0,2500,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Teekina kuroakegha Gbeneteh Logistics - Novacare Ltd - NL,Nos,20,100000,20,100000,0,0,0,0,5000,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Smart move Logistics Logistics LOGISTICS - Novacare Ltd - NL,Nos,29,81200,29,81200,0,0,0,0,2800,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Adekunle Logistic - Novacare Ltd - NL,Nos,25,65000,25,65000,0,0,0,0,2800,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Usiju Ladu Logistics - Novacare Ltd - NL,Nos,300,575013,331,635347.2,0,0,31,60334.2,1916.71,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,FOMAX PH. LOGISTICS - Novacare Ltd - NL,Nos,250,479177.5,293,561596.03,0,0,43,82418.53,1916.71,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,YAYA JOB - Novacare Ltd - NL,Nos,267,787650,267,787650,0,0,0,0,2950,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Okoli Nnaemeka Augustine Logistics - Novacare Ltd - NL,Nos,9,18000,9,18000,0,0,0,0,2000,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Omoga Victor Ohe-obe Logistics - Novacare Ltd - NL,Nos,5,14000,5,14000,0,0,0,0,2800,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Abdulsalam Abubakar Logistics - Novacare Ltd - NL,Nos,20,50000,20,50000,0,0,0,0,2500,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,RAPH XPRESS LOGISTICS - Novacare Ltd - NL,Nos,557,1671000,375,1122250,320,960000,138,411250,3000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Changfa Jesse David - Novacare Ltd - NL,Nos,3,15000,3,15000,0,0,0,0,5000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Teekina kuroakegha Gbeneteh Logistics - Novacare Ltd - NL,Nos,242,713900,119,343050,160,480000,37,109150,2950,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,PELICAN DELIVERY AND LOGISTICS SERVICES LOGISTICS - Novacare Ltd - NL,Nos,22,55000,22,55000,0,0,0,0,2500,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Hambolu babatunde philips Logistics - Novacare Ltd - NL,Nos,60,300000,61,305000,0,0,1,5000,5000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,RAFH EXPRESS LOGISTICS ABUJA - Novacare Ltd - NL,Nos,12,60000,12,60000,0,0,0,0,5000,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Hambolu babatunde philips Logistics - Novacare Ltd - NL,Nos,51,81600,51,81600,0,0,0,0,1600,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,FOMAX ASABA (DELTA) LOGISTICS - Novacare Ltd - NL,Nos,353,706000,363,726000,0,0,10,20000,2000,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,FOMAX ASABA (DELTA) LOGISTICS - Novacare Ltd - NL,Nos,40,100000,40,100000,0,0,0,0,2500,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,RAPH XPRESS LOGISTICS - Novacare Ltd - NL,Nos,18,90000,18,90000,0,0,0,0,5000,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Ezekiel Ameh Logistics - Novacare Ltd - NL,Nos,21,58800,21,58800,0,0,0,0,2800,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Akanimo Edet Akpan Logistics - Novacare Ltd - NL,Nos,13,26000,13,26000,0,0,0,0,2000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Chidimma maryjane Iloegbunam Logistics - Novacare Ltd - NL,Nos,46,230000,46,230000,0,0,0,0,5000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Anthony Ezekiel Logistics - Novacare Ltd - NL,Nos,400,1197217.6,408,1220939.36,0,0,8,23721.76,2993.044,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Fomax logistics LOGISTICS - Novacare Ltd - NL,Nos,60,300000,60,300000,0,0,0,0,5000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Velocitŕ logistics LOGISTICS - Novacare Ltd - NL,Nos,18,90000,18,90000,0,0,0,0,5000,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,APPLE ABIA TAZE LOGISTICS SERVICES - Novacare Ltd - NL,Nos,219,313262.89,263,397096.53,0,0,44,83833.64,1905.31,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Stores - NL,Nos,4,11200,4,11200,0,0,0,0,2800,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Stores - NL,Nos,1451,7255000,1556,7780000,0,0,105,525000,5000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Stores - NL,Nos,11303,33927500,15597,46791000,26,96500,4320,12960000,3001.637,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Stores - NL,Nos,930,1860000,930,1860000,0,0,0,0,2000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Stores - NL,Nos,6335,22172500,6375,22312500,0,0,40,140000,3500,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Hezekiah Victor Adesanmi Logistics - Novacare Ltd - NL,Nos,60,300000,60,300000,0,0,0,0,5000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Ezekiel Ameh Logistics - Novacare Ltd - NL,Nos,13,26000,13,26000,0,0,0,0,2000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Olagunju Damilola Logistics - Novacare Ltd - NL,Nos,21,105000,23,115000,0,0,2,10000,5000,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Olagunju Damilola Logistics - Novacare Ltd - NL,Nos,152,289607.12,328,630868.72,0,0,176,341261.6,1905.31,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Olagunju Damilola Logistics - Novacare Ltd - NL,Nos,34,91580.7,34,91580.7,0,0,0,0,2693.55,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,TEMIBASH LOGISTICS LOGISTICS - Novacare Ltd - NL,Nos,28,70000,28,70000,0,0,0,0,2500,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Emmanuel Olapeju Awoyemi Logistics - Novacare Ltd - NL,Nos,20,40000,20,40000,0,0,0,0,2000,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,APPLE ANAMBRA DELIVERY SERVICES - Novacare Ltd - NL,Nos,271,526849.6,271,526849.6,0,0,0,0,1944.094,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,George O.O LOGISTICS - Novacare Ltd - NL,Nos,22,61600,22,61600,0,0,0,0,2800,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,RAFH EXPRESS LOGISTICS ABUJA - Novacare Ltd - NL,Nos,468,909347.2,468,909347.2,0,0,0,0,1943.05,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Raphael Michael Logistics - Novacare Ltd - NL,Nos,752,2234400,479,1413050,320,960000,47,138650,2971.277,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,APPLE ANAMBRA DELIVERY SERVICES - Novacare Ltd - NL,Nos,14,28000,14,28000,0,0,0,0,2000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Akanimo Edet Akpan Logistics - Novacare Ltd - NL,Nos,76,380000,76,380000,0,0,0,0,5000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Hambolu babatunde philips Logistics - Novacare Ltd - NL,Nos,106,410000,112,440000,0,0,6,30000,3867.925,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Olaseni Adewumi James Logistics - Novacare Ltd - NL,Nos,70,189000,70,189000,0,0,0,0,2700,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Chidi Godstime Egege Logistics - Novacare Ltd - NL,Nos,48,240000,51,255000,0,0,3,15000,5000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,smart logistics LOGISTICS - Novacare Ltd - NL,Nos,12,60000,12,60000,0,0,0,0,5000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Raphael Michael Logistics - Novacare Ltd - NL,Nos,122,550000,122,550000,0,0,0,0,4508.197,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Raphael Michael Logistics - Novacare Ltd - NL,Nos,19,38000,19,38000,0,0,0,0,2000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Tajudeen A Ayetigbo LOGISTICS - Novacare Ltd - NL,Nos,8,16000,8,16000,0,0,0,0,2000,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Sheriff Adesola Raifu Logistics - Novacare Ltd - NL,Nos,28,101232.88,28,101232.88,0,0,0,0,3615.46,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Velocitŕ logistics LOGISTICS - Novacare Ltd - NL,Nos,300,900000,349,1045550,0,0,49,145550,3000,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,Smart move Logistics Logistics LOGISTICS - Novacare Ltd - NL,Nos,13,23400,13,23400,0,0,0,0,1800,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Toheeb Biola Popoola Logistics - Novacare Ltd - NL,Nos,27,135000,27,135000,0,0,0,0,5000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Alatiya Absalom Emmanuel Logistics - Novacare Ltd - NL,Nos,42,210000,43,215000,0,0,1,5000,5000,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,GINIKA ANAMBRA - Novacare Ltd - NL,Nos,17,34000,17,34000,0,0,0,0,2000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Olawale Olusola Logistics - Novacare Ltd - NL,Nos,149,447000,183,547850,0,0,34,100850,3000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Arinze Esther Logistics - Novacare Ltd - NL,Nos,37,185000,37,185000,0,0,0,0,5000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,HOG logistics LOGISTICS - Novacare Ltd - NL,Nos,22,110000,24,120000,0,0,2,10000,5000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Victor Ogbenyi Logistics - Novacare Ltd - NL,Nos,19,38000,19,38000,0,0,0,0,2000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Victor Ogbenyi Logistics - Novacare Ltd - NL,Nos,25,95588.25,26,100588.25,0,0,1,5000,3823.53,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,APPLE ABIA TAZE LOGISTICS SERVICES - Novacare Ltd - NL,Nos,26,65000,26,65000,0,0,0,0,2500,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,APPLE ABIA TAZE LOGISTICS SERVICES - Novacare Ltd - NL,Nos,65,325000,65,325000,0,0,0,0,5000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,APPLE ABIA TAZE LOGISTICS SERVICES - Novacare Ltd - NL,Nos,138,276000,151,302000,0,0,13,26000,2000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,APPLE ABIA TAZE LOGISTICS SERVICES - Novacare Ltd - NL,Nos,17,34000,17,34000,0,0,0,0,2000,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,APPLE ABIA TAZE LOGISTICS SERVICES - Novacare Ltd - NL,Nos,11,19800,11,19800,0,0,0,0,1800,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,APPLE ABIA TAZE LOGISTICS SERVICES - Novacare Ltd - NL,Nos,110,550000,110,550000,0,0,0,0,5000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Adekunle Logistic - Novacare Ltd - NL,Nos,49,245000,50,250000,0,0,1,5000,5000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Adekunle Logistic - Novacare Ltd - NL,Nos,93,405000,93,405000,0,0,0,0,4354.839,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,FLYMARK LOGISTICS KD - Novacare Ltd - NL,Nos,300,600000,307,614000,0,0,7,14000,2000,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Ibylogistics Limited LOGISTICS - Novacare Ltd - NL,Nos,103,257500,103,257500,0,0,0,0,2500,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Efe Brendon Avwia Logistics - Novacare Ltd - NL,Nos,10,15000,10,15000,0,0,0,0,5000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Ibylogistics Limited LOGISTICS - Novacare Ltd - NL,Nos,263,789000,309,927000,0,0,46,138000,3000,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,FOMAX PH. LOGISTICS - Novacare Ltd - NL,Nos,50,140000,50,140000,0,0,0,0,2800,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,Hambolu babatunde philips Logistics - Novacare Ltd - NL,Nos,1,1800,1,1800,0,0,0,0,1800,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Okoli Nnaemeka Augustine Logistics - Novacare Ltd - NL,Nos,68,340000,69,345000,0,0,1,5000,5000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Chidimma maryjane Iloegbunam Logistics - Novacare Ltd - NL,Nos,4,8000,4,8000,0,0,0,0,2000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Omoga Victor Ohe-obe Logistics - Novacare Ltd - NL,Nos,45,225000,45,225000,0,0,0,0,5000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Msuega Terlanga Japhet Logistics - Novacare Ltd - NL,Nos,22,110000,22,110000,0,0,0,0,5000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,FOMAX PH. LOGISTICS - Novacare Ltd - NL,Nos,433,1018000,448,1048000,0,0,15,30000,2351.039,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Anthony Ezekiel Logistics - Novacare Ltd - NL,Nos,45,225000,45,225000,0,0,0,0,5000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Olagunju Damilola Logistics - Novacare Ltd - NL,Nos,80,240000,204,609800,0,0,124,369800,3000,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Olawale Olusola Logistics - Novacare Ltd - NL,Nos,45,81000,45,81000,0,0,0,0,1800,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,BLUE AMAZON LOGISTICS LTD LOGISTICS - Novacare Ltd - NL,Nos,22,55000,22,55000,0,0,0,0,2500,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Okora Samaro Matthew LOGISTICS - Novacare Ltd - NL,Nos,159,318000,159,318000,0,0,0,0,2000,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,De Wealthz Logistics LOGISTICS - Novacare Ltd - NL,Nos,40,64000,40,64000,0,0,0,0,1600,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Emmanuel Olapeju Awoyemi Logistics - Novacare Ltd - NL,Nos,210,619500,210,619500,0,0,0,0,2950,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,APPLE ANAMBRA DELIVERY SERVICES - Novacare Ltd - NL,Nos,23,57500,23,57500,0,0,0,0,2500,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Okora Samaro Matthew LOGISTICS - Novacare Ltd - NL,Nos,43,215000,43,215000,0,0,0,0,5000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Akanimo Edet Akpan Logistics - Novacare Ltd - NL,Nos,285,855000,330,989500,0,0,45,134500,3000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Olaseni Adewumi James Logistics - Novacare Ltd - NL,Nos,155,457250,178,508000,0,0,23,50750,2950,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Olagunju Damilola Logistics - Novacare Ltd - NL,Nos,47,94000,47,94000,0,0,0,0,2000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,KENNEDY OROWO EDEYE Logistics - Novacare Ltd - NL,Nos,66,132000,66,132000,0,0,0,0,2000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Adeyemo Adeola LOGISTICS - Novacare Ltd - NL,Nos,312,624000,312,624000,0,0,0,0,2000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,BLUE AMAZON LOGISTICS LTD LOGISTICS - Novacare Ltd - NL,Nos,35,175000,35,175000,0,0,0,0,5000,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Fomax logistics LOGISTICS - Novacare Ltd - NL,Nos,15,37500,15,37500,0,0,0,0,2500,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,"Express Logistics, Ebonyi LOGISTICS - Novacare Ltd - NL",Nos,40,200000,40,200000,0,0,0,0,5000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Toheeb Biola Popoola Logistics - Novacare Ltd - NL,Nos,463,1350993.27,210,584975,320,960000,67,193981.73,2917.912,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Hezekiah Victor Adesanmi Logistics - Novacare Ltd - NL,Nos,28,70000,28,70000,0,0,0,0,2500,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,John Hamza shuaibu Logistics - Novacare Ltd - NL,Nos,218,910000,185,805000,40,140000,7,35000,4174.312,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Anthony Ezekiel Logistics - Novacare Ltd - NL,Nos,18,45000,18,45000,0,0,0,0,2500,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,George O.O LOGISTICS - Novacare Ltd - NL,Nos,313,931350,334,980000,0,0,21,48650,2975.559,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Olufunke Babalola Logistics - Novacare Ltd - NL,Nos,6,12000,6,12000,0,0,0,0,2000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Olufunke Babalola Logistics - Novacare Ltd - NL,Nos,101,505000,101,505000,0,0,0,0,5000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Olagunju Damilola Logistics - Novacare Ltd - NL,Nos,26,130000,26,130000,0,0,0,0,5000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,John Hamza shuaibu Logistics - Novacare Ltd - NL,Nos,40,80000,40,80000,0,0,0,0,2000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Smart move Logistics Logistics LOGISTICS - Novacare Ltd - NL,Nos,665,1961750,686,2023700,0,0,21,61950,2950,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Changfa Jesse David - Novacare Ltd - NL,Nos,17,42500,17,42500,0,0,0,0,2500,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,Olupona oluwaseyi Logistics - Novacare Ltd - NL,Nos,1,1248.99,1,1248.99,0,0,0,0,1248.99,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Usiju Ladu Logistics - Novacare Ltd - NL,Nos,21,52500,21,52500,0,0,0,0,2500,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,ADICHA LOGISTICS - Novacare Ltd - NL,Nos,74,207200,74,207200,0,0,0,0,2800,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,TEMIBASH LOGISTICS LOGISTICS - Novacare Ltd - NL,Nos,77,385000,77,385000,0,0,0,0,5000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Adeyinka Ekundayo Isreal Logistics - Novacare Ltd - NL,Nos,35,175000,35,175000,0,0,0,0,5000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Oluwadamilare Emmanuel Logistics - Novacare Ltd - NL,Nos,23,46000,23,46000,0,0,0,0,2000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Usiju Ladu Logistics - Novacare Ltd - NL,Nos,31,155000,31,155000,0,0,0,0,5000,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Oluwadamilare Emmanuel Logistics - Novacare Ltd - NL,Nos,41,114800,41,114800,0,0,0,0,2800,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Yohanna Vanduna Logistics - Novacare Ltd - NL,Nos,60,120000,60,120000,0,0,0,0,2000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Yohanna Vanduna Logistics - Novacare Ltd - NL,Nos,76,380000,6,30000,70,350000,0,0,5000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Teekina kuroakegha Gbeneteh Logistics - Novacare Ltd - NL,Nos,15,30000,15,30000,0,0,0,0,2000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,GINIKA ANAMBRA - Novacare Ltd - NL,Nos,11,22000,11,22000,0,0,0,0,2000,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Shittu Adebamke Yusuff Logistics - Novacare Ltd - NL,Nos,33,82500,33,82500,0,0,0,0,2500,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Adeyemo Adeola LOGISTICS - Novacare Ltd - NL,Nos,76,224200,76,224200,0,0,0,0,2950,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Usiju Ladu Logistics - Novacare Ltd - NL,Nos,194,572300,204,601800,0,0,10,29500,2950,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Durojaiye Ilashe Joseph Logistics - Novacare Ltd - NL,Nos,316,940200,174,513300,160,480000,18,53100,2975.316,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Yohanna Vanduna Logistics - Novacare Ltd - NL,Nos,13,26000,13,26000,0,0,0,0,2000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Arinze Esther Logistics - Novacare Ltd - NL,Nos,280,840000,347,1039650,0,0,67,199650,3000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Ibrahim Abdulrashid Logistics - Novacare Ltd - NL,Nos,371,902000,377,914000,0,0,6,12000,2431.267,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Ibrahim Abdulrashid Logistics - Novacare Ltd - NL,Nos,14,42000,14,42000,0,0,0,0,3000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Smart move Logistics Logistics LOGISTICS - Novacare Ltd - NL,Nos,61,305000,61,305000,0,0,0,0,5000,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,Yohanna Vanduna Logistics - Novacare Ltd - NL,Nos,25,32500,25,32500,0,0,0,0,1300,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Emmanuel Nnamdi Ugwu Logistics - Novacare Ltd - NL,Nos,151,755000,151,755000,0,0,0,0,5000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Ezekiel Ameh Logistics - Novacare Ltd - NL,Nos,391,1161450,407,1208650,0,0,16,47200,2970.46,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Velocitŕ logistics LOGISTICS - Novacare Ltd - NL,Nos,16,32000,16,32000,0,0,0,0,2000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Abdulsalam Abubakar Logistics - Novacare Ltd - NL,Nos,380,1121000,393,1159350,0,0,13,38350,2950,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Chidi Godstime Egege Logistics - Novacare Ltd - NL,Nos,443,2790850,496,2947200,0,0,53,156350,6299.887,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Tajudeen A Ayetigbo LOGISTICS - Novacare Ltd - NL,Nos,298,887100,307,913650,0,0,9,26550,2976.846,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Yohanna Vanduna Logistics - Novacare Ltd - NL,Nos,350,1016000,359,1037600,0,0,9,21600,2902.857,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Efe Brendon Avwia Logistics - Novacare Ltd - NL,Nos,406,1209700,487,1448650,0,0,81,238950,2989.409,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Durojaiye Ilashe Joseph Logistics - Novacare Ltd - NL,Nos,32,64000,32,64000,0,0,0,0,2000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Olawale Olusola Logistics - Novacare Ltd - NL,Nos,47,114000,47,114000,0,0,0,0,2425.532,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,HOG logistics LOGISTICS - Novacare Ltd - NL,Nos,182,544900,266,792700,0,0,84,247800,2993.956,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,Durojaiye Ilashe Joseph Logistics - Novacare Ltd - NL,Nos,8,9991.92,8,9991.92,0,0,0,0,1248.99,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Fomax logistics LOGISTICS - Novacare Ltd - NL,Nos,10,20000,10,20000,0,0,0,0,2000,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,"Express Logistics, Ebonyi LOGISTICS - Novacare Ltd - NL",Nos,13,16236.87,13,16236.87,0,0,0,0,1248.99,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Oluwadamilare Emmanuel Logistics - Novacare Ltd - NL,Nos,282,818704.94,165,458084.55,160,480000,43,119379.61,2903.209,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Okolie Anthony ogorchukwu Logistics - Novacare Ltd - NL,Nos,536,1041314,558,1084054.5,0,0,22,42740.5,1942.75,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,Olaseni Adewumi James Logistics - Novacare Ltd - NL,Nos,12,14987.88,12,14987.88,0,0,0,0,1248.99,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,De Wealthz Logistics LOGISTICS - Novacare Ltd - NL,Nos,470,895495.7,496,946548.8,0,0,26,51053.1,1905.31,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,ATP Logistics LOGISTICS - Novacare Ltd - NL,Nos,19,38000,19,38000,0,0,0,0,2000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Abu Momoh Logistics - Novacare Ltd - NL,Nos,370,892000,370,892000,0,0,0,0,2410.811,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,TEMIBASH LOGISTICS LOGISTICS - Novacare Ltd - NL,Nos,12,15600,12,15600,0,0,0,0,1300,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Ibitoye adewale Logistics - Novacare Ltd - NL,Nos,25,125000,25,125000,0,0,0,0,5000,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,Teekina kuroakegha Gbeneteh Logistics - Novacare Ltd - NL,Nos,16,19983.84,16,19983.84,0,0,0,0,1248.99,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Msuega Terlanga Japhet Logistics - Novacare Ltd - NL,Nos,211,630450,266,792700,0,0,55,162250,2987.915,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Raphael Michael Logistics - Novacare Ltd - NL,Nos,37,92500,37,92500,0,0,0,0,2500,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Hezekiah Victor Adesanmi Logistics - Novacare Ltd - NL,Nos,116,342200,116,342200,0,0,0,0,2950,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Adetola Sam Adewuyi LOGISTICS - Novacare Ltd - NL,Nos,366,1079700,388,1144600,0,0,22,64900,2950,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Alatiya Absalom Emmanuel Logistics - Novacare Ltd - NL,Nos,302,3533000,324,3931800,0,0,22,398800,11698.675,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Fomax logistics LOGISTICS - Novacare Ltd - NL,Nos,1154,2460000,1266,2684000,0,0,112,224000,2131.716,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,HOG logistics LOGISTICS - Novacare Ltd - NL,Nos,71,295000,71,295000,0,0,0,0,4154.93,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Emmanuel Nnamdi Ugwu Logistics - Novacare Ltd - NL,Nos,14,28000,14,28000,0,0,0,0,2000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Olaseni Adewumi James Logistics - Novacare Ltd - NL,Nos,64,320000,64,320000,0,0,0,0,5000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Okoli Nnaemeka Augustine Logistics - Novacare Ltd - NL,Nos,410,1209500,532,1569400,0,0,122,359900,2950,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Etimbuk Gregory Logistics - Novacare Ltd - NL,Nos,8,24000,8,24000,0,0,0,0,3000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,De Wealthz Logistics LOGISTICS - Novacare Ltd - NL,Nos,9,45000,9,45000,0,0,0,0,5000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,FOMAX ASABA (DELTA) LOGISTICS - Novacare Ltd - NL,Nos,198,584100,209,616550,0,0,11,32450,2950,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Msuega Terlanga Japhet Logistics - Novacare Ltd - NL,Nos,12,19200,12,19200,0,0,0,0,1600,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,ADICHA LOGISTICS - Novacare Ltd - NL,Nos,228,680600,269,801550,0,0,41,120950,2985.088,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,smart logistics LOGISTICS - Novacare Ltd - NL,Nos,14,28000,14,28000,0,0,0,0,2000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Ibylogistics Limited LOGISTICS - Novacare Ltd - NL,Nos,22,44000,22,44000,0,0,0,0,2000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Sheriff Adesola Raifu Logistics - Novacare Ltd - NL,Nos,34,170000,34,170000,0,0,0,0,5000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Sheriff Adesola Raifu Logistics - Novacare Ltd - NL,Nos,15,45000,15,45000,0,0,0,0,3000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,PELICAN DELIVERY AND LOGISTICS SERVICES LOGISTICS - Novacare Ltd - NL,Nos,24,48000,24,48000,0,0,0,0,2000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Chidi Godstime Egege Logistics - Novacare Ltd - NL,Nos,29,58000,29,58000,0,0,0,0,2000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Enny logistics LOGISTICS - Novacare Ltd - NL,Nos,540,1609000,243,716850,320,960000,23,67850,2979.63,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Emmanuel Nnamdi Ugwu Logistics - Novacare Ltd - NL,Nos,181,533950,186,548700,0,0,5,14750,2950,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Olupona oluwaseyi Logistics - Novacare Ltd - NL,Nos,23,57500,23,57500,0,0,0,0,2500,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Smart move Logistics Logistics LOGISTICS - Novacare Ltd - NL,Nos,14,28000,14,28000,0,0,0,0,2000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Olaseni Adewumi James Logistics - Novacare Ltd - NL,Nos,12,24000,12,24000,0,0,0,0,2000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Efe Brendon Avwia Logistics - Novacare Ltd - NL,Nos,8,16000,8,16000,0,0,0,0,2000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Efe Brendon Avwia Logistics - Novacare Ltd - NL,Nos,21,105000,22,110000,0,0,1,5000,5000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Okolie Anthony ogorchukwu Logistics - Novacare Ltd - NL,Nos,192,566400,202,595900,0,0,10,29500,2950,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Okolie Anthony ogorchukwu Logistics - Novacare Ltd - NL,Nos,17,34000,17,34000,0,0,0,0,2000,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,RAFH EXPRESS LOGISTICS ABUJA - Novacare Ltd - NL,Nos,28,70000,28,70000,0,0,0,0,2500,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,TEMIBASH LOGISTICS LOGISTICS - Novacare Ltd - NL,Nos,87,435000,87,435000,0,0,0,0,5000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Alatiya Absalom Emmanuel Logistics - Novacare Ltd - NL,Nos,8,16000,8,16000,0,0,0,0,2000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Toheeb Biola Popoola Logistics - Novacare Ltd - NL,Nos,8,40000,8,40000,0,0,0,0,5000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Sheriff Adesola Raifu Logistics - Novacare Ltd - NL,Nos,203,609000,252,756000,0,0,49,147000,3000,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Ibrahim Abdulrashid Logistics - Novacare Ltd - NL,Nos,35,87500,35,87500,0,0,0,0,2500,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Enny logistics LOGISTICS - Novacare Ltd - NL,Nos,13,279500,13,279500,0,0,0,0,21500,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,GINIKA ANAMBRA - Novacare Ltd - NL,Nos,292,876000,312,936000,0,0,20,60000,3000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Ibrahim Abdulrashid Logistics - Novacare Ltd - NL,Nos,26,130000,26,130000,0,0,0,0,5000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,"Express Logistics, Ebonyi LOGISTICS - Novacare Ltd - NL",Nos,26,52000,26,52000,0,0,0,0,2000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Okoli Nnaemeka Augustine Logistics - Novacare Ltd - NL,Nos,10,20000,10,20000,0,0,0,0,2000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Msuega Terlanga Japhet Logistics - Novacare Ltd - NL,Nos,10,20000,10,20000,0,0,0,0,2000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,FOMAX PH. LOGISTICS - Novacare Ltd - NL,Nos,23,46000,23,46000,0,0,0,0,2000,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Okolie Anthony ogorchukwu Logistics - Novacare Ltd - NL,Nos,42,105000,42,105000,0,0,0,0,2500,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Adetola Sam Adewuyi LOGISTICS - Novacare Ltd - NL,Nos,14,28000,14,28000,0,0,0,0,2000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,TEMIBASH LOGISTICS LOGISTICS - Novacare Ltd - NL,Nos,246,733700,267,795650,0,0,21,61950,2982.52,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,GINIKA ANAMBRA - Novacare Ltd - NL,Nos,33,165000,34,170000,0,0,1,5000,5000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,HOG logistics LOGISTICS - Novacare Ltd - NL,Nos,14,28000,14,28000,0,0,0,0,2000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,RAFH EXPRESS LOGISTICS ABUJA - Novacare Ltd - NL,Nos,167,486000,167,486000,0,0,0,0,2910.18,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,ATP Logistics LOGISTICS - Novacare Ltd - NL,Nos,109,545000,109,545000,0,0,0,0,5000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,George O.O LOGISTICS - Novacare Ltd - NL,Nos,65,325000,65,325000,0,0,0,0,5000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Hezekiah Victor Adesanmi Logistics - Novacare Ltd - NL,Nos,47,94000,47,94000,0,0,0,0,2000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Anthony Ezekiel Logistics - Novacare Ltd - NL,Nos,85,425000,85,425000,0,0,0,0,5000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,"Express Logistics, Ebonyi LOGISTICS - Novacare Ltd - NL",Nos,168,503600,197,589150,0,0,29,85550,2997.619,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,Okolie Anthony ogorchukwu Logistics - Novacare Ltd - NL,Nos,10,18000,10,18000,0,0,0,0,1800,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,ADICHA LOGISTICS - Novacare Ltd - NL,Nos,37,74000,37,74000,0,0,0,0,2000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,ZIBRA & CO LTD LOGISTICS - Novacare Ltd - NL,Nos,41,205000,41,205000,0,0,0,0,5000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,George O.O LOGISTICS - Novacare Ltd - NL,Nos,4,8000,4,8000,0,0,0,0,2000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,ZIBRA & CO LTD LOGISTICS - Novacare Ltd - NL,Nos,45,225000,47,235000,0,0,2,10000,5000,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,Emmanuel Olapeju Awoyemi Logistics - Novacare Ltd - NL,Nos,7,9100,7,9100,0,0,0,0,1300,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Sheriff Adesola Raifu Logistics - Novacare Ltd - NL,Nos,65,371316.4,66,377028.96,0,0,1,5712.56,5712.56,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Arinze Esther Logistics - Novacare Ltd - NL,Nos,17,47600,17,47600,0,0,0,0,2800,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,smart logistics LOGISTICS - Novacare Ltd - NL,Nos,271,799450,289,852550,0,0,18,53100,2950,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,Toheeb Biola Popoola Logistics - Novacare Ltd - NL,Nos,5,6244.95,5,6244.95,0,0,0,0,1248.99,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,John Hamza shuaibu Logistics - Novacare Ltd - NL,Nos,1,1248.99,1,1248.99,0,0,0,0,1248.99,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Emmanuel Olapeju Awoyemi Logistics - Novacare Ltd - NL,Nos,20,36000,20,36000,0,0,0,0,1800,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Emmanuel Olapeju Awoyemi Logistics - Novacare Ltd - NL,Nos,16,80000,16,80000,0,0,0,0,5000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Omoga Victor Ohe-obe Logistics - Novacare Ltd - NL,Nos,27,81000,27,81000,0,0,0,0,3000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,FLYMARK LOGISTICS KD - Novacare Ltd - NL,Nos,32,160000,32,160000,0,0,0,0,5000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Okolie Anthony ogorchukwu Logistics - Novacare Ltd - NL,Nos,53,265000,53,265000,0,0,0,0,5000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Abdulsalam Abubakar Logistics - Novacare Ltd - NL,Nos,9,18000,9,18000,0,0,0,0,2000,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,Ibrahim Abdulrashid Logistics - Novacare Ltd - NL,Nos,38,68400,38,68400,0,0,0,0,1800,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Ibrahim Abdulrashid Logistics - Novacare Ltd - NL,Nos,123,615000,123,615000,0,0,0,0,5000,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,Akanimo Edet Akpan Logistics - Novacare Ltd - NL,Nos,8,12800,8,12800,0,0,0,0,1600,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Akanimo Edet Akpan Logistics - Novacare Ltd - NL,Nos,201,1005000,201,1005000,0,0,0,0,5000,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Abu Momoh Logistics - Novacare Ltd - NL,Nos,35,93500,35,93500,0,0,0,0,2671.429,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Abu Momoh Logistics - Novacare Ltd - NL,Nos,74,370000,74,370000,0,0,0,0,5000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Abu Momoh Logistics - Novacare Ltd - NL,Nos,39,195000,39,195000,0,0,0,0,5000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Yohanna Vanduna Logistics - Novacare Ltd - NL,Nos,97,485000,97,485000,0,0,0,0,5000,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,ATP Logistics LOGISTICS - Novacare Ltd - NL,Nos,5,6500,5,6500,0,0,0,0,1300,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Velocitŕ logistics LOGISTICS - Novacare Ltd - NL,Nos,37,185000,37,185000,0,0,0,0,5000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,YAYA JOB - Novacare Ltd - NL,Nos,71,355000,71,355000,0,0,0,0,5000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,YAYA JOB - Novacare Ltd - NL,Nos,56,280000,56,280000,0,0,0,0,5000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,YAYA JOB - Novacare Ltd - NL,Nos,12,24000,12,24000,0,0,0,0,2000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,APPLE ANAMBRA DELIVERY SERVICES - Novacare Ltd - NL,Nos,32,160000,32,160000,0,0,0,0,5000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,APPLE ANAMBRA DELIVERY SERVICES - Novacare Ltd - NL,Nos,150,442500,151,445450,0,0,1,2950,2950,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,APPLE ANAMBRA DELIVERY SERVICES - Novacare Ltd - NL,Nos,39,195000,39,195000,0,0,0,0,5000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,APPLE ANAMBRA DELIVERY SERVICES - Novacare Ltd - NL,Nos,11,22000,11,22000,0,0,0,0,2000,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,PELICAN DELIVERY AND LOGISTICS SERVICES LOGISTICS - Novacare Ltd - NL,Nos,2,2600,2,2600,0,0,0,0,1300,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,PELICAN DELIVERY AND LOGISTICS SERVICES LOGISTICS - Novacare Ltd - NL,Nos,89,311500,89,311500,0,0,0,0,3500,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,GINIKA ANAMBRA - Novacare Ltd - NL,Nos,33,165000,33,165000,0,0,0,0,5000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,BLUE AMAZON LOGISTICS LTD LOGISTICS - Novacare Ltd - NL,Nos,75,375000,75,375000,0,0,0,0,5000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Chidi Godstime Egege Logistics - Novacare Ltd - NL,Nos,126,630000,127,635000,0,0,1,5000,5000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Ibitoye adewale Logistics - Novacare Ltd - NL,Nos,101,505000,101,505000,0,0,0,0,5000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Ezekiel Ameh Logistics - Novacare Ltd - NL,Nos,22,110000,23,115000,0,0,1,5000,5000,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,TRUST LOGISTICS PDA - Novacare Ltd - NL,Nos,298,580486.12,299,582434.06,0,0,1,1947.94,1947.94,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,TRUST LOGISTICS PDA - Novacare Ltd - NL,Nos,35,87500,35,87500,0,0,0,0,2500,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,TRUST LOGISTICS PDA - Novacare Ltd - NL,Nos,13,16900,13,16900,0,0,0,0,1300,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,TRUST LOGISTICS PDA - Novacare Ltd - NL,Nos,24,120000,24,120000,0,0,0,0,5000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,TRUST LOGISTICS PDA - Novacare Ltd - NL,Nos,144,288000,145,290000,0,0,1,2000,2000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,TRUST LOGISTICS PDA - Novacare Ltd - NL,Nos,46,230000,46,230000,0,0,0,0,5000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,TRUST LOGISTICS PDA - Novacare Ltd - NL,Nos,14,28000,14,28000,0,0,0,0,2000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Okolie Anthony ogorchukwu Logistics - Novacare Ltd - NL,Nos,82,287000,82,287000,0,0,0,0,3500,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Alatiya Absalom Emmanuel Logistics - Novacare Ltd - NL,Nos,161,745000,161,745000,0,0,0,0,4627.329,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Olawale Olusola Logistics - Novacare Ltd - NL,Nos,118,590000,118,590000,0,0,0,0,5000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Adetola Sam Adewuyi LOGISTICS - Novacare Ltd - NL,Nos,102,510000,102,510000,0,0,0,0,5000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Abdulsalam Abubakar Logistics - Novacare Ltd - NL,Nos,110,550000,110,550000,0,0,0,0,5000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Fomax logistics LOGISTICS - Novacare Ltd - NL,Nos,3,15000,3,15000,0,0,0,0,5000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Msuega Terlanga Japhet Logistics - Novacare Ltd - NL,Nos,95,475000,97,485000,0,0,2,10000,5000,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,Shittu Adebamke Yusuff Logistics - Novacare Ltd - NL,Nos,10,12489.9,10,12489.9,0,0,0,0,1248.99,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Shittu Adebamke Yusuff Logistics - Novacare Ltd - NL,Nos,64,260000,64,260000,0,0,0,0,4062.5,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Durojaiye Ilashe Joseph Logistics - Novacare Ltd - NL,Nos,108,540000,108,540000,0,0,0,0,5000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,"Express Logistics, Ebonyi LOGISTICS - Novacare Ltd - NL",Nos,85,425000,85,425000,0,0,0,0,5000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Usiju Ladu Logistics - Novacare Ltd - NL,Nos,109,545000,109,545000,0,0,0,0,5000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Olupona oluwaseyi Logistics - Novacare Ltd - NL,Nos,114,570000,114,570000,0,0,0,0,5000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Olupona oluwaseyi Logistics - Novacare Ltd - NL,Nos,55,110000,55,110000,0,0,0,0,2000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,ADICHA LOGISTICS - Novacare Ltd - NL,Nos,14,70000,14,70000,0,0,0,0,5000,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Etimbuk Gregory Logistics - Novacare Ltd - NL,Nos,66,118800,66,118800,0,0,0,0,1800,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,Etimbuk Gregory Logistics - Novacare Ltd - NL,Nos,15,27000,15,27000,0,0,0,0,1800,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Etimbuk Gregory Logistics - Novacare Ltd - NL,Nos,112,560000,112,560000,0,0,0,0,5000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,FOMAX PH. LOGISTICS - Novacare Ltd - NL,Nos,19,38000,19,38000,0,0,0,0,2000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Adekunle Logistic - Novacare Ltd - NL,Nos,19,38000,19,38000,0,0,0,0,2000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,TEMIBASH LOGISTICS LOGISTICS - Novacare Ltd - NL,Nos,33,66000,33,66000,0,0,0,0,2000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Teekina kuroakegha Gbeneteh Logistics - Novacare Ltd - NL,Nos,58,290000,58,290000,0,0,0,0,5000,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,RAPH XPRESS LOGISTICS - Novacare Ltd - NL,Nos,16,20800,16,20800,0,0,0,0,1300,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Oluwadamilare Emmanuel Logistics - Novacare Ltd - NL,Nos,90,450000,90,450000,0,0,0,0,5000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Toheeb Biola Popoola Logistics - Novacare Ltd - NL,Nos,31,62000,31,62000,0,0,0,0,2000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Arinze Esther Logistics - Novacare Ltd - NL,Nos,32,160000,32,160000,0,0,0,0,5000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Arinze Esther Logistics - Novacare Ltd - NL,Nos,22,44000,22,44000,0,0,0,0,2000,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,Hezekiah Victor Adesanmi Logistics - Novacare Ltd - NL,Nos,4,4995.96,4,4995.96,0,0,0,0,1248.99,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Hezekiah Victor Adesanmi Logistics - Novacare Ltd - NL,Nos,55,275000,55,275000,0,0,0,0,5000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,FOMAX ASABA (DELTA) LOGISTICS - Novacare Ltd - NL,Nos,13,26000,13,26000,0,0,0,0,2000,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Okora Samaro Matthew LOGISTICS - Novacare Ltd - NL,Nos,22,55000,22,55000,0,0,0,0,2500,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,Okora Samaro Matthew LOGISTICS - Novacare Ltd - NL,Nos,5,6500,5,6500,0,0,0,0,1300,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Okora Samaro Matthew LOGISTICS - Novacare Ltd - NL,Nos,14,28000,14,28000,0,0,0,0,2000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Okora Samaro Matthew LOGISTICS - Novacare Ltd - NL,Nos,65,325000,65,325000,0,0,0,0,5000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Okora Samaro Matthew LOGISTICS - Novacare Ltd - NL,Nos,11,22000,11,22000,0,0,0,0,2000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Tajudeen A Ayetigbo LOGISTICS - Novacare Ltd - NL,Nos,122,550000,122,550000,0,0,0,0,4508.197,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,FOMAX ASABA (DELTA) LOGISTICS - Novacare Ltd - NL,Nos,96,480000,96,480000,0,0,0,0,5000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,FOMAX ASABA (DELTA) LOGISTICS - Novacare Ltd - NL,Nos,39,195000,39,195000,0,0,0,0,5000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,KENNEDY OROWO EDEYE Logistics - Novacare Ltd - NL,Nos,66,330000,66,330000,0,0,0,0,5000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,smart logistics LOGISTICS - Novacare Ltd - NL,Nos,24,120000,24,120000,0,0,0,0,5000,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,HOG logistics LOGISTICS - Novacare Ltd - NL,Nos,4,5200,4,5200,0,0,0,0,1300,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,RAFH EXPRESS LOGISTICS ABUJA - Novacare Ltd - NL,Nos,4,5200,4,5200,0,0,0,0,1300,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,RAFH EXPRESS LOGISTICS ABUJA - Novacare Ltd - NL,Nos,70,245000,70,245000,0,0,0,0,3500,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,RAFH EXPRESS LOGISTICS ABUJA - Novacare Ltd - NL,Nos,15,30000,15,30000,0,0,0,0,2000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Ibylogistics Limited LOGISTICS - Novacare Ltd - NL,Nos,94,470000,94,470000,0,0,0,0,5000,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Olagunju Damilola Logistics - Novacare Ltd - NL,Nos,32,57600,32,57600,0,0,0,0,1800,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,FLYMARK LOGISTICS KD - Novacare Ltd - NL,Nos,13,26000,13,26000,0,0,0,0,2000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,De Wealthz Logistics LOGISTICS - Novacare Ltd - NL,Nos,588,1758600,605,1808750,0,0,17,50150,2990.816,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Enny logistics LOGISTICS - Novacare Ltd - NL,Nos,71,355000,36,180000,35,175000,0,0,5000,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,DINO LOGISTICS - Novacare Ltd - NL,Nos,921,1770108.51,921,1770108.51,0,0,0,0,1921.942,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,DINO LOGISTICS - Novacare Ltd - NL,Nos,65,182000,65,182000,0,0,0,0,2800,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Changfa Jesse David - Novacare Ltd - NL,Nos,41,205000,41,205000,0,0,0,0,5000,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,NOVA XPRESS ABUJA - Novacare Ltd - NL,Nos,5035,9650634.85,5336,10227564.56,0,0,301,576929.71,1916.71,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,NOVA XPRESS ABUJA - Novacare Ltd - NL,Nos,824,2430800,980,2891000,0,0,156,460200,2950,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,NOVA XPRESS ABUJA - Novacare Ltd - NL,Nos,606,3030000,616,3080000,0,0,10,50000,5000,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,NOVA XPRESS ABUJA - Novacare Ltd - NL,Nos,2,5000,2,5000,0,0,0,0,2500,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,NOVA XPRESS ABUJA - Novacare Ltd - NL,Nos,200,493000,200,493000,0,0,0,0,2465,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,NOVA XPRESS ABUJA - Novacare Ltd - NL,Nos,21,42000,27,54000,0,0,6,12000,2000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Emmanuel Nnamdi Ugwu Logistics - Novacare Ltd - NL,Nos,34,119000,34,119000,0,0,0,0,3500,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,DINO LOGISTICS - Novacare Ltd - NL,Nos,235,702000,235,702000,0,0,0,0,2987.234,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Shittu Adebamke Yusuff Logistics - Novacare Ltd - NL,Nos,176,527200,192,574400,0,0,16,47200,2995.455,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,BLUE AMAZON LOGISTICS LTD LOGISTICS - Novacare Ltd - NL,Nos,201,592950,221,651950,0,0,20,59000,2950,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Adeyinka Ekundayo Isreal Logistics - Novacare Ltd - NL,Nos,407,1177567.16,407,1177567.16,0,0,0,0,2893.285,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Ibitoye adewale Logistics - Novacare Ltd - NL,Nos,126,378000,175,524250,0,0,49,146250,3000,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,Usiju Ladu Logistics - Novacare Ltd - NL,Nos,12,36000,12,36000,0,0,0,0,3000,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,Chidi Godstime Egege Logistics - Novacare Ltd - NL,Nos,1,1300,1,1300,0,0,0,0,1300,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,De Wealthz Logistics LOGISTICS - Novacare Ltd - NL,Nos,10,18000,10,18000,0,0,0,0,1800,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Okoli Nnaemeka Augustine Logistics - Novacare Ltd - NL,Nos,73,365000,73,365000,0,0,0,0,5000,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,Omoga Victor Ohe-obe Logistics - Novacare Ltd - NL,Nos,8,12800,8,12800,0,0,0,0,1600,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,DASHGO DELIVERY CALABAR - Novacare Ltd - NL,Nos,490,933715.9,532,1014217.72,0,0,42,80501.82,1905.543,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,DASHGO DELIVERY CALABAR - Novacare Ltd - NL,Nos,282,839900,306,910700,0,0,24,70800,2978.369,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,DASHGO DELIVERY CALABAR - Novacare Ltd - NL,Nos,23,115000,24,120000,0,0,1,5000,5000,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,DASHGO DELIVERY CALABAR - Novacare Ltd - NL,Nos,20,50000,20,50000,0,0,0,0,2500,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,DASHGO DELIVERY CALABAR - Novacare Ltd - NL,Nos,36,126000,36,126000,0,0,0,0,3500,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Oluwadamilare Emmanuel Logistics - Novacare Ltd - NL,Nos,24,43200,24,43200,0,0,0,0,1800,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Olufunke Babalola Logistics - Novacare Ltd - NL,Nos,12,21600,12,21600,0,0,0,0,1800,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,George O.O LOGISTICS - Novacare Ltd - NL,Nos,5,9000,5,9000,0,0,0,0,1800,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,Stores - NL,Nos,21,35700,21,35700,0,0,0,0,1700,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Stores - NL,Nos,100,179800,100,179800,0,0,0,0,1798,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Efe Brendon Avwia Logistics - Novacare Ltd - NL,Nos,10,18000,10,18000,0,0,0,0,1800,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Arinze Esther Logistics - Novacare Ltd - NL,Nos,9,14400,9,14400,0,0,0,0,1600,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,De Wealthz Logistics LOGISTICS - Novacare Ltd - NL,Nos,25,125000,25,125000,0,0,0,0,5000,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Tajudeen A Ayetigbo LOGISTICS - Novacare Ltd - NL,Nos,15,33000,15,33000,0,0,0,0,2200,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,NOVA XPRESS ABUJA - Novacare Ltd - NL,Nos,12,21600,12,21600,0,0,0,0,1800,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Yohanna Vanduna Logistics - Novacare Ltd - NL,Nos,18,39600,18,39600,0,0,0,0,2200,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Alatiya Absalom Emmanuel Logistics - Novacare Ltd - NL,Nos,28,50400,28,50400,0,0,0,0,1800,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Victor Ogbenyi Logistics - Novacare Ltd - NL,Nos,41,73800,41,73800,0,0,0,0,1800,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Sheriff Adesola Raifu Logistics - Novacare Ltd - NL,Nos,18,32400,18,32400,0,0,0,0,1800,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Chidi Godstime Egege Logistics - Novacare Ltd - NL,Nos,13,20800,13,20800,0,0,0,0,1600,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Emmanuel Olapeju Awoyemi Logistics - Novacare Ltd - NL,Nos,60,300000,60,300000,0,0,0,0,5000,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Ibitoye adewale Logistics - Novacare Ltd - NL,Nos,14,25200,14,25200,0,0,0,0,1800,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Raphael Michael Logistics - Novacare Ltd - NL,Nos,16,28800,16,28800,0,0,0,0,1800,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Chidimma maryjane Iloegbunam Logistics - Novacare Ltd - NL,Nos,11,17600,11,17600,0,0,0,0,1600,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,DINO LOGISTICS - Novacare Ltd - NL,Nos,35,175000,35,175000,0,0,0,0,5000,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,DINO LOGISTICS - Novacare Ltd - NL,Nos,74,118400,74,118400,0,0,0,0,1600,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,DINO LOGISTICS - Novacare Ltd - NL,Nos,45,225000,45,225000,0,0,0,0,5000,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Anthony Ezekiel Logistics - Novacare Ltd - NL,Nos,30,48000,30,48000,0,0,0,0,1600,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,APPLE ABIA TAZE LOGISTICS SERVICES - Novacare Ltd - NL,Nos,18,32400,18,32400,0,0,0,0,1800,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Ibrahim Abdulrashid Logistics - Novacare Ltd - NL,Nos,17,27200,17,27200,0,0,0,0,1600,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Adekunle Logistic - Novacare Ltd - NL,Nos,7,11200,7,11200,0,0,0,0,1600,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Olawale Olusola Logistics - Novacare Ltd - NL,Nos,18,28800,18,28800,0,0,0,0,1600,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Okolie Anthony ogorchukwu Logistics - Novacare Ltd - NL,Nos,28,44800,28,44800,0,0,0,0,1600,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Shittu Adebamke Yusuff Logistics - Novacare Ltd - NL,Nos,20,32000,20,32000,0,0,0,0,1600,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Akanimo Edet Akpan Logistics - Novacare Ltd - NL,Nos,36,57600,36,57600,0,0,0,0,1600,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Usiju Ladu Logistics - Novacare Ltd - NL,Nos,15,24000,15,24000,0,0,0,0,1600,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,HOG logistics LOGISTICS - Novacare Ltd - NL,Nos,28,44800,28,44800,0,0,0,0,1600,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Adetola Sam Adewuyi LOGISTICS - Novacare Ltd - NL,Nos,24,31200,24,31200,0,0,0,0,1300,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Ibylogistics Limited LOGISTICS - Novacare Ltd - NL,Nos,7,11200,7,11200,0,0,0,0,1600,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Hambolu babatunde philips Logistics - Novacare Ltd - NL,Nos,29,46400,29,46400,0,0,0,0,1600,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,KENNEDY OROWO EDEYE Logistics - Novacare Ltd - NL,Nos,22,35200,22,35200,0,0,0,0,1600,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Ezekiel Ameh Logistics - Novacare Ltd - NL,Nos,9,14400,9,14400,0,0,0,0,1600,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,TEMIBASH LOGISTICS LOGISTICS - Novacare Ltd - NL,Nos,20,32000,20,32000,0,0,0,0,1600,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,smart logistics LOGISTICS - Novacare Ltd - NL,Nos,16,25600,16,25600,0,0,0,0,1600,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,John Hamza shuaibu Logistics - Novacare Ltd - NL,Nos,20,32000,20,32000,0,0,0,0,1600,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,Stores - NL,Nos,3063,5972850,3543,6908850,0,0,480,936000,1950,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,Stores - NL,Nos,-379,-871700,-349,-802700,0,0,30,69000,2300,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,NOVA XPRESS ABUJA - Novacare Ltd - NL,Nos,-304,-592800,-220,-429000,0,0,84,163800,1950,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,NOVA XPRESS ABUJA - Novacare Ltd - NL,Nos,15,29250,18,35100,0,0,3,5850,1950,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Smart move Logistics Logistics LOGISTICS - Novacare Ltd - NL,Nos,18,28800,18,28800,0,0,0,0,1600,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,NOVA XPRESS ABUJA - Novacare Ltd - NL,Nos,11,17600,11,17600,0,0,0,0,1600,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,RAPH XPRESS LOGISTICS - Novacare Ltd - NL,Nos,94,183300,149,290550,0,0,55,107250,1950,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,RAPH XPRESS LOGISTICS - Novacare Ltd - NL,Nos,48,105850,49,107800,0,0,1,1950,2205.208,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,John Hamza shuaibu Logistics - Novacare Ltd - NL,Nos,253,493350,109,212550,250,487500,106,206700,1950,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,John Hamza shuaibu Logistics - Novacare Ltd - NL,Nos,45,103500,26,59800,30,69000,11,25300,2300,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,Oluwadamilare Emmanuel Logistics - Novacare Ltd - NL,Nos,35,71750,35,71750,0,0,0,0,2050,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,Oluwadamilare Emmanuel Logistics - Novacare Ltd - NL,Nos,69,134550,0,0,80,156000,11,21450,1950,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,Hambolu babatunde philips Logistics - Novacare Ltd - NL,Nos,-53,-103350,28,54600,0,0,81,157950,1950,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,Hambolu babatunde philips Logistics - Novacare Ltd - NL,Nos,40,92000,44,101200,0,0,4,9200,2300,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,Velocitŕ logistics LOGISTICS - Novacare Ltd - NL,Nos,-54,-105300,-9,-17550,0,0,45,87750,1950,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,Velocitŕ logistics LOGISTICS - Novacare Ltd - NL,Nos,35,80500,36,82800,0,0,1,2300,2300,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,Victor Ogbenyi Logistics - Novacare Ltd - NL,Nos,-37,-72150,7,13650,0,0,44,85800,1950,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,Victor Ogbenyi Logistics - Novacare Ltd - NL,Nos,33,75900,33,75900,0,0,0,0,2300,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,FOMAX ASABA (DELTA) LOGISTICS - Novacare Ltd - NL,Nos,24,46800,45,87750,0,0,21,40950,1950,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,FOMAX ASABA (DELTA) LOGISTICS - Novacare Ltd - NL,Nos,20,46000,21,48300,0,0,1,2300,2300,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,FOMAX PH. LOGISTICS - Novacare Ltd - NL,Nos,-78,-152100,-35,-68250,0,0,43,83850,1950,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,FOMAX PH. LOGISTICS - Novacare Ltd - NL,Nos,18,41400,21,48300,0,0,3,6900,2300,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,DINO LOGISTICS - Novacare Ltd - NL,Nos,8,24000,8,24000,0,0,0,0,3000,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,BLUE AMAZON LOGISTICS LTD LOGISTICS - Novacare Ltd - NL,Nos,20,32000,20,32000,0,0,0,0,1600,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Omoga Victor Ohe-obe Logistics - Novacare Ltd - NL,Nos,67,234500,67,234500,0,0,0,0,3500,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Omoga Victor Ohe-obe Logistics - Novacare Ltd - NL,Nos,35,63000,35,63000,0,0,0,0,1800,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Changfa Jesse David - Novacare Ltd - NL,Nos,18,28800,18,28800,0,0,0,0,1600,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Stores - NL,Nos,78,156000,105,210000,3,6000,30,60000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Stores - NL,Nos,138,248400,234,421200,4,7200,100,180000,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Sheriff Adesola Raifu Logistics - Novacare Ltd - NL,Nos,18,36000,24,48000,0,0,6,12000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Sheriff Adesola Raifu Logistics - Novacare Ltd - NL,Nos,23,41400,32,57600,0,0,9,16200,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Enny logistics LOGISTICS - Novacare Ltd - NL,Nos,38,76000,42,84000,0,0,4,8000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Enny logistics LOGISTICS - Novacare Ltd - NL,Nos,27,48600,29,52200,20,36000,22,39600,1800,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Velocitŕ logistics LOGISTICS - Novacare Ltd - NL,Nos,24,43200,38,68400,0,0,14,25200,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Abdulsalam Abubakar Logistics - Novacare Ltd - NL,Nos,2,4000,11,22000,0,0,9,18000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Abdulsalam Abubakar Logistics - Novacare Ltd - NL,Nos,7,12600,14,25200,0,0,7,12600,1800,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Fomax logistics LOGISTICS - Novacare Ltd - NL,Nos,39,70200,60,108000,0,0,21,37800,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Fomax logistics LOGISTICS - Novacare Ltd - NL,Nos,46,92000,76,152000,0,0,30,60000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Hambolu babatunde philips Logistics - Novacare Ltd - NL,Nos,6,10800,13,23400,0,0,7,12600,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Hambolu babatunde philips Logistics - Novacare Ltd - NL,Nos,8,16000,15,30000,0,0,7,14000,2000,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Hezekiah Victor Adesanmi Logistics - Novacare Ltd - NL,Nos,39,78000,39,78000,0,0,0,0,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Hezekiah Victor Adesanmi Logistics - Novacare Ltd - NL,Nos,33,59400,33,59400,0,0,0,0,1800,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Durojaiye Ilashe Joseph Logistics - Novacare Ltd - NL,Nos,61,109800,63,113400,0,0,2,3600,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Durojaiye Ilashe Joseph Logistics - Novacare Ltd - NL,Nos,55,110000,59,118000,0,0,4,8000,2000,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Chidimma maryjane Iloegbunam Logistics - Novacare Ltd - NL,Nos,64,128000,64,128000,0,0,0,0,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Chidimma maryjane Iloegbunam Logistics - Novacare Ltd - NL,Nos,26,46800,26,46800,0,0,0,0,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Ibrahim Abdulrashid Logistics - Novacare Ltd - NL,Nos,15,30000,16,32000,0,0,1,2000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Ibrahim Abdulrashid Logistics - Novacare Ltd - NL,Nos,10,18000,11,19800,0,0,1,1800,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Omoga Victor Ohe-obe Logistics - Novacare Ltd - NL,Nos,12,24000,22,44000,0,0,10,20000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Omoga Victor Ohe-obe Logistics - Novacare Ltd - NL,Nos,4,7200,12,21600,0,0,8,14400,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Olagunju Damilola Logistics - Novacare Ltd - NL,Nos,10,20000,19,38000,0,0,9,18000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Olagunju Damilola Logistics - Novacare Ltd - NL,Nos,14,25200,26,46800,0,0,12,21600,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Abu Momoh Logistics - Novacare Ltd - NL,Nos,56,112000,56,112000,0,0,0,0,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Abu Momoh Logistics - Novacare Ltd - NL,Nos,53,95400,53,95400,0,0,0,0,1800,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,John Hamza shuaibu Logistics - Novacare Ltd - NL,Nos,19,34200,36,64800,0,0,17,30600,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,John Hamza shuaibu Logistics - Novacare Ltd - NL,Nos,3,6000,63,126000,0,0,60,120000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,"Express Logistics, Ebonyi LOGISTICS - Novacare Ltd - NL",Nos,48,86400,49,88200,0,0,1,1800,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,"Express Logistics, Ebonyi LOGISTICS - Novacare Ltd - NL",Nos,51,102000,55,110000,0,0,4,8000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Oluwadamilare Emmanuel Logistics - Novacare Ltd - NL,Nos,29,52200,33,59400,0,0,4,7200,1800,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,ADICHA LOGISTICS - Novacare Ltd - NL,Nos,9,16200,11,19800,0,0,2,3600,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,ADICHA LOGISTICS - Novacare Ltd - NL,Nos,-2,-4000,6,12000,0,0,8,16000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Changfa Jesse David - Novacare Ltd - NL,Nos,16,28800,16,28800,0,0,0,0,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Changfa Jesse David - Novacare Ltd - NL,Nos,2,4000,2,4000,0,0,0,0,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Okoli Nnaemeka Augustine Logistics - Novacare Ltd - NL,Nos,17,31166.61,31,56833.23,0,0,14,25666.62,1833.33,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Okoli Nnaemeka Augustine Logistics - Novacare Ltd - NL,Nos,4,8000,15,30000,0,0,11,22000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,ZIBRA & CO LTD LOGISTICS - Novacare Ltd - NL,Nos,7,12600,16,28800,0,0,9,16200,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,ZIBRA & CO LTD LOGISTICS - Novacare Ltd - NL,Nos,-4,-8000,7,14000,0,0,11,22000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Arinze Esther Logistics - Novacare Ltd - NL,Nos,21,37800,22,39600,0,0,1,1800,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Arinze Esther Logistics - Novacare Ltd - NL,Nos,25,50000,30,60000,0,0,5,10000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Ola Cash - Novacare Ltd - NL,Nos,9,16200,19,34200,0,0,10,18000,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Ola Cash - Novacare Ltd - NL,Nos,19,38000,20,40000,0,0,1,2000,2000,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Adekunle Logistic - Novacare Ltd - NL,Nos,31,62000,34,68000,0,0,3,6000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Adekunle Logistic - Novacare Ltd - NL,Nos,40,72000,43,77400,0,0,3,5400,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Ibitoye adewale Logistics - Novacare Ltd - NL,Nos,23,46000,42,84000,0,0,19,38000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Ibitoye adewale Logistics - Novacare Ltd - NL,Nos,13,23400,34,61200,0,0,21,37800,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Chidi Godstime Egege Logistics - Novacare Ltd - NL,Nos,7,14000,22,44000,0,0,15,30000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Chidi Godstime Egege Logistics - Novacare Ltd - NL,Nos,33,59400,39,70200,0,0,6,10800,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Olufunke Babalola Logistics - Novacare Ltd - NL,Nos,37,74000,40,80000,0,0,3,6000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Olufunke Babalola Logistics - Novacare Ltd - NL,Nos,29,52200,34,61200,0,0,5,9000,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Raphael Michael Logistics - Novacare Ltd - NL,Nos,69,138000,51,102000,30,60000,12,24000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Raphael Michael Logistics - Novacare Ltd - NL,Nos,52,93600,36,64800,30,54000,14,25200,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,HOG logistics LOGISTICS - Novacare Ltd - NL,Nos,2,4000,2,4000,0,0,0,0,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,HOG logistics LOGISTICS - Novacare Ltd - NL,Nos,10,18367.3,17,31224.41,0,0,7,12857.11,1836.73,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Akanimo Edet Akpan Logistics - Novacare Ltd - NL,Nos,50,90000,50,90000,0,0,0,0,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Akanimo Edet Akpan Logistics - Novacare Ltd - NL,Nos,26,52000,27,54000,0,0,1,2000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Olaseni Adewumi James Logistics - Novacare Ltd - NL,Nos,36,64800,41,73800,0,0,5,9000,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Olaseni Adewumi James Logistics - Novacare Ltd - NL,Nos,41,82000,44,88000,0,0,3,6000,2000,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Teekina kuroakegha Gbeneteh Logistics - Novacare Ltd - NL,Nos,17,34000,24,48000,0,0,7,14000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Teekina kuroakegha Gbeneteh Logistics - Novacare Ltd - NL,Nos,29,52200,39,70200,0,0,10,18000,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,KENNEDY OROWO EDEYE Logistics - Novacare Ltd - NL,Nos,19,38000,20,40000,0,0,1,2000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,KENNEDY OROWO EDEYE Logistics - Novacare Ltd - NL,Nos,17,30600,24,43200,0,0,7,12600,1800,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,AHUAKAGHA CHIZURUOKE COSMOS Logistics - Novacare Ltd - NL,Nos,34,78200,34,78200,0,0,0,0,2300,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,AHUAKAGHA CHIZURUOKE COSMOS Logistics - Novacare Ltd - NL,Nos,22,42900,22,42900,0,0,0,0,1950,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Adetola Sam Adewuyi LOGISTICS - Novacare Ltd - NL,Nos,22,39600,32,57600,0,0,10,18000,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Adetola Sam Adewuyi LOGISTICS - Novacare Ltd - NL,Nos,22,44000,33,66000,0,0,11,22000,2000,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Victor Ogbenyi Logistics - Novacare Ltd - NL,Nos,9,18000,20,40000,0,0,11,22000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Victor Ogbenyi Logistics - Novacare Ltd - NL,Nos,14,25200,38,68400,0,0,24,43200,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,RAPH XPRESS LOGISTICS - Novacare Ltd - NL,Nos,1,2000,5,10000,0,0,4,8000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,RAPH XPRESS LOGISTICS - Novacare Ltd - NL,Nos,5,9000,31,55800,0,0,26,46800,1800,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Ibylogistics Limited LOGISTICS - Novacare Ltd - NL,Nos,9,16200,11,19800,0,0,2,3600,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Ibylogistics Limited LOGISTICS - Novacare Ltd - NL,Nos,14,28000,14,28000,0,0,0,0,2000,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,DINO LOGISTICS - Novacare Ltd - NL,Nos,9,18000,9,18000,0,0,0,0,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,DINO LOGISTICS - Novacare Ltd - NL,Nos,5,9000,5,9000,0,0,0,0,1800,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Olupona oluwaseyi Logistics - Novacare Ltd - NL,Nos,62,111600,62,111600,0,0,0,0,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Olupona oluwaseyi Logistics - Novacare Ltd - NL,Nos,59,118000,59,118000,0,0,0,0,2000,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Tajudeen A Ayetigbo LOGISTICS - Novacare Ltd - NL,Nos,24,48000,27,54000,0,0,3,6000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Tajudeen A Ayetigbo LOGISTICS - Novacare Ltd - NL,Nos,15,27000,19,34200,0,0,4,7200,1800,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Ezekiel Ameh Logistics - Novacare Ltd - NL,Nos,1,1800,3,5400,0,0,2,3600,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Ezekiel Ameh Logistics - Novacare Ltd - NL,Nos,14,28000,23,46000,0,0,9,18000,2000,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,Ezekiel Ameh Logistics - Novacare Ltd - NL,Nos,15,29250,25,48750,0,0,10,19500,1950,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Etimbuk Gregory Logistics - Novacare Ltd - NL,Nos,22,44000,42,84000,0,0,20,40000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Etimbuk Gregory Logistics - Novacare Ltd - NL,Nos,37,66600,39,70200,0,0,2,3600,1800,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,GINIKA ANAMBRA - Novacare Ltd - NL,Nos,36,70200,40,78000,0,0,4,7800,1950,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,Tajudeen A Ayetigbo LOGISTICS - Novacare Ltd - NL,Nos,11,21450,11,21450,0,0,0,0,1950,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,Olufunke Babalola Logistics - Novacare Ltd - NL,Nos,28,54600,45,87750,0,0,17,33150,1950,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,Yohanna Vanduna Logistics - Novacare Ltd - NL,Nos,4,7800,27,52650,0,0,23,44850,1950,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,Msuega Terlanga Japhet Logistics - Novacare Ltd - NL,Nos,14,27300,28,54600,0,0,14,27300,1950,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,DASHGO DELIVERY CALABAR - Novacare Ltd - NL,Nos,42,81900,46,89700,0,0,4,7800,1950,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,Emmanuel Nnamdi Ugwu Logistics - Novacare Ltd - NL,Nos,28,54600,28,54600,0,0,0,0,1950,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,Chidi Godstime Egege Logistics - Novacare Ltd - NL,Nos,2,3900,18,35100,0,0,16,31200,1950,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,Emmanuel Olapeju Awoyemi Logistics - Novacare Ltd - NL,Nos,30,58500,30,58500,0,0,0,0,1950,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,Omoga Victor Ohe-obe Logistics - Novacare Ltd - NL,Nos,86,167700,127,247650,0,0,41,79950,1950,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,DINO LOGISTICS - Novacare Ltd - NL,Nos,30,58500,30,58500,0,0,0,0,1950,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,Okoli Nnaemeka Augustine Logistics - Novacare Ltd - NL,Nos,142,276900,177,345150,0,0,35,68250,1950,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,Olaseni Adewumi James Logistics - Novacare Ltd - NL,Nos,41,79950,49,95550,0,0,8,15600,1950,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,"Express Logistics, Ebonyi LOGISTICS - Novacare Ltd - NL",Nos,30,58500,32,62400,0,0,2,3900,1950,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,HOG logistics LOGISTICS - Novacare Ltd - NL,Nos,83,161850,106,206700,0,0,23,44850,1950,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,BLUE AMAZON LOGISTICS LTD LOGISTICS - Novacare Ltd - NL,Nos,23,44850,23,44850,0,0,0,0,1950,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,TEMIBASH LOGISTICS LOGISTICS - Novacare Ltd - NL,Nos,74,144300,74,144300,0,0,0,0,1950,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,Ibylogistics Limited LOGISTICS - Novacare Ltd - NL,Nos,-55,-107250,-16,-31200,0,0,39,76050,1950,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,Akanimo Edet Akpan Logistics - Novacare Ltd - NL,Nos,10,19500,15,29250,0,0,5,9750,1950,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,Durojaiye Ilashe Joseph Logistics - Novacare Ltd - NL,Nos,1,1950,24,46800,0,0,23,44850,1950,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,Durojaiye Ilashe Joseph Logistics - Novacare Ltd - NL,Nos,29,66700,29,66700,0,0,0,0,2300,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,Adetola Sam Adewuyi LOGISTICS - Novacare Ltd - NL,Nos,48,93600,57,111150,0,0,9,17550,1950,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,ATP Logistics LOGISTICS - Novacare Ltd - NL,Nos,48,93600,-39,-76050,150,292500,63,122850,1950,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,Usiju Ladu Logistics - Novacare Ltd - NL,Nos,-3,-5850,4,7800,0,0,7,13650,1950,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,Toheeb Biola Popoola Logistics - Novacare Ltd - NL,Nos,38,81100,38,81100,0,0,0,0,2134.211,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,Toheeb Biola Popoola Logistics - Novacare Ltd - NL,Nos,-36,-70200,2,3900,0,0,38,74100,1950,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,NOVA XPRESS ABUJA - Novacare Ltd - NL,Nos,298,536400,365,657000,0,0,67,120600,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,NOVA XPRESS ABUJA - Novacare Ltd - NL,Nos,540,1080000,578,1156000,0,0,38,76000,2000,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,Adetola Sam Adewuyi LOGISTICS - Novacare Ltd - NL,Nos,34,78200,34,78200,0,0,0,0,2300,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,DINO LOGISTICS - Novacare Ltd - NL,Nos,30,69000,30,69000,0,0,0,0,2300,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,Ibylogistics Limited LOGISTICS - Novacare Ltd - NL,Nos,37,85100,37,85100,0,0,0,0,2300,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,Olaseni Adewumi James Logistics - Novacare Ltd - NL,Nos,36,82800,39,89700,0,0,3,6900,2300,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,TEMIBASH LOGISTICS LOGISTICS - Novacare Ltd - NL,Nos,32,73600,32,73600,0,0,0,0,2300,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,DASHGO DELIVERY CALABAR - Novacare Ltd - NL,Nos,30,69000,30,69000,0,0,0,0,2300,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,Sheriff Adesola Raifu Logistics - Novacare Ltd - NL,Nos,18,41400,22,50600,0,0,4,9200,2300,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,GINIKA ANAMBRA - Novacare Ltd - NL,Nos,29,66700,29,66700,0,0,0,0,2300,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,Okoli Nnaemeka Augustine Logistics - Novacare Ltd - NL,Nos,26,59800,29,66700,0,0,3,6900,2300,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,Chidi Godstime Egege Logistics - Novacare Ltd - NL,Nos,42,96600,42,96600,0,0,0,0,2300,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,Usiju Ladu Logistics - Novacare Ltd - NL,Nos,26,59800,26,59800,0,0,0,0,2300,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,Yohanna Vanduna Logistics - Novacare Ltd - NL,Nos,21,48300,23,52900,0,0,2,4600,2300,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,Raphael Michael Logistics - Novacare Ltd - NL,Nos,-13,-25350,8,15600,0,0,21,40950,1950,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,Raphael Michael Logistics - Novacare Ltd - NL,Nos,30,69000,33,75900,0,0,3,6900,2300,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,Tajudeen A Ayetigbo LOGISTICS - Novacare Ltd - NL,Nos,17,39100,17,39100,0,0,0,0,2300,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,Akanimo Edet Akpan Logistics - Novacare Ltd - NL,Nos,32,73600,32,73600,0,0,0,0,2300,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,"Express Logistics, Ebonyi LOGISTICS - Novacare Ltd - NL",Nos,40,92000,42,96600,0,0,2,4600,2300,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,Omoga Victor Ohe-obe Logistics - Novacare Ltd - NL,Nos,31,71300,32,73600,0,0,1,2300,2300,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,ATP Logistics LOGISTICS - Novacare Ltd - NL,Nos,37,85100,41,94300,0,0,4,9200,2300,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,HOG logistics LOGISTICS - Novacare Ltd - NL,Nos,38,87400,41,94300,0,0,3,6900,2300,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,Olufunke Babalola Logistics - Novacare Ltd - NL,Nos,23,52900,23,52900,0,0,0,0,2300,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,Msuega Terlanga Japhet Logistics - Novacare Ltd - NL,Nos,45,103500,46,105800,0,0,1,2300,2300,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Alatiya Absalom Emmanuel Logistics - Novacare Ltd - NL,Nos,25,50000,32,64000,0,0,7,14000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Alatiya Absalom Emmanuel Logistics - Novacare Ltd - NL,Nos,41,73800,47,84600,0,0,6,10800,1800,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,Sheriff Adesola Raifu Logistics - Novacare Ltd - NL,Nos,69,134550,93,181350,0,0,24,46800,1950,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,Emmanuel Nnamdi Ugwu Logistics - Novacare Ltd - NL,Nos,30,69000,30,69000,0,0,0,0,2300,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,BLUE AMAZON LOGISTICS LTD LOGISTICS - Novacare Ltd - NL,Nos,29,66700,29,66700,0,0,0,0,2300,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,Olawale Olusola Logistics - Novacare Ltd - NL,Nos,27,52650,39,76050,0,0,12,23400,1950,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,Olawale Olusola Logistics - Novacare Ltd - NL,Nos,26,59800,28,64400,0,0,2,4600,2300,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,PELICAN DELIVERY AND LOGISTICS SERVICES LOGISTICS - Novacare Ltd - NL,Nos,46,82800,46,82800,0,0,0,0,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Yohanna Vanduna Logistics - Novacare Ltd - NL,Nos,33,66000,36,72000,0,0,3,6000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Yohanna Vanduna Logistics - Novacare Ltd - NL,Nos,44,79200,44,79200,0,0,0,0,1800,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,"Express Logistics, Ebonyi LOGISTICS - Novacare Ltd - NL",Nos,16,25600,16,25600,0,0,0,0,1600,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,SAGE LOGISTICS - Novacare Ltd - NL,Nos,48,144000,109,327000,0,0,61,183000,3000,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,SAGE LOGISTICS - Novacare Ltd - NL,Nos,234,445842.54,276,525865.56,0,0,42,80023.02,1905.31,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,George O.O LOGISTICS - Novacare Ltd - NL,Nos,2,3400,2,3400,0,0,0,0,1700,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,imole logistics - Novacare Ltd - NL,Nos,62,118129.22,127,241974.37,0,0,65,123845.15,1905.31,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,imole logistics - Novacare Ltd - NL,Nos,161,474950,170,501500,0,0,9,26550,2950,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,ANIEADOLF CREATIONS - Novacare Ltd - NL,Nos,350,675605,379,731583.7,0,0,29,55978.7,1930.3,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,ANIEADOLF CREATIONS - Novacare Ltd - NL,Nos,165,485827.65,190,559437.9,0,0,25,73610.25,2944.41,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,ANIEADOLF CREATIONS - Novacare Ltd - NL,Nos,7,14000,30,60000,0,0,23,46000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,ANIEADOLF CREATIONS - Novacare Ltd - NL,Nos,23,42000,66,128000,0,0,43,86000,1826.087,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Shittu Adebamke Yusuff Logistics - Novacare Ltd - NL,Nos,42,84000,46,92000,0,0,4,8000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Shittu Adebamke Yusuff Logistics - Novacare Ltd - NL,Nos,44,79200,47,84600,0,0,3,5400,1800,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Toheeb Biola Popoola Logistics - Novacare Ltd - NL,Nos,10,13000,10,13000,0,0,0,0,1300,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,Tajudeen A Ayetigbo LOGISTICS - Novacare Ltd - NL,Nos,20,36000,20,36000,0,0,0,0,1800,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Msuega Terlanga Japhet Logistics - Novacare Ltd - NL,Nos,26,41600,26,41600,0,0,0,0,1600,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,GetIT Express Logistics - Novacare Ltd - NL,Nos,320,608000,320,608000,0,0,0,0,1900,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,GetIT Express Logistics - Novacare Ltd - NL,Nos,110,324500,110,324500,0,0,0,0,2950,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,GetIT Express Logistics - Novacare Ltd - NL,Nos,20,36000,20,36000,0,0,0,0,1800,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,YAYA JOB - Novacare Ltd - NL,Nos,37,66600,37,66600,0,0,0,0,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,YAYA JOB - Novacare Ltd - NL,Nos,37,74000,37,74000,0,0,0,0,2000,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Msuega Terlanga Japhet Logistics - Novacare Ltd - NL,Nos,24,48000,37,74000,0,0,13,26000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Msuega Terlanga Japhet Logistics - Novacare Ltd - NL,Nos,38,68400,46,84000,0,0,8,15600,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,GetIT Express Logistics - Novacare Ltd - NL,Nos,20,40000,20,40000,0,0,0,0,2000,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,APPLE ANAMBRA DELIVERY SERVICES - Novacare Ltd - NL,Nos,37,74000,37,74000,0,0,0,0,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,APPLE ANAMBRA DELIVERY SERVICES - Novacare Ltd - NL,Nos,37,67833.21,38,69666.54,0,0,1,1833.33,1833.33,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,byke messengers logistic - Novacare Ltd - NL,Nos,456,868821.36,541,1036548.8,0,0,85,167727.44,1905.31,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,byke messengers logistic - Novacare Ltd - NL,Nos,412,1236000,135,405000,320,960000,43,129000,3000,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,AB LOGISTICS KADUNA - Novacare Ltd - NL,Nos,153,306000,169,338000,0,0,16,32000,2000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,AB LOGISTICS KADUNA - Novacare Ltd - NL,Nos,330,736000,336,748000,0,0,6,12000,2230.303,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,PEAKLINK LOGISTICS LTD - Novacare Ltd - NL,Nos,163,310751.86,197,377644.14,0,0,34,66892.28,1906.453,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,PEAKLINK LOGISTICS LTD - Novacare Ltd - NL,Nos,241,718520.55,258,761369.9,0,0,17,42849.35,2981.413,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Solomon Uduak Ikpembe - Novacare Ltd - NL,Nos,182,346776.32,42,80041.92,160,304849.6,20,38115.2,1905.364,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Solomon Uduak Ikpembe - Novacare Ltd - NL,Nos,482,1441900,189,561550,320,960000,27,79650,2991.494,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,ISMAIL MUHAMMAD LIMAN - Novacare Ltd - NL,Nos,534,1022548.8,217,418849.6,320,609699.2,3,6000,1914.885,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,ISMAIL MUHAMMAD LIMAN - Novacare Ltd - NL,Nos,410,1216000,98,272000,320,960000,8,16000,2965.854,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,ATOMIC LOGISTICS EDO - Novacare Ltd - NL,Nos,171,325808.01,224,426800.24,0,0,53,100992.23,1905.31,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,ATOMIC LOGISTICS EDO - Novacare Ltd - NL,Nos,263,783850,282,839900,0,0,19,56050,2980.418,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Aruoriwo Adhuze - Novacare Ltd - NL,Nos,232,444676.72,276,529011.96,0,0,44,84335.24,1916.71,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Aruoriwo Adhuze - Novacare Ltd - NL,Nos,202,595900,218,643100,0,0,16,47200,2950,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,ug express logistics ltd - Novacare Ltd - NL,Nos,306,595733.04,342,665819.28,0,0,36,70086.24,1946.84,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,ug express logistics ltd - Novacare Ltd - NL,Nos,294,664000,329,734000,0,0,35,70000,2258.503,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Smart move Logistics Logistics LOGISTICS - Novacare Ltd - NL,Nos,104,520000,105,525000,0,0,1,5000,5000,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,Connect Logistics - Novacare Ltd - NL,Nos,24,46800,33,64350,0,0,9,17550,1950,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,Connect Logistics - Novacare Ltd - NL,Nos,25,57500,26,59800,0,0,1,2300,2300,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,Teekina kuroakegha Gbeneteh Logistics - Novacare Ltd - NL,Nos,26,50700,28,54600,0,0,2,3900,1950,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,Teekina kuroakegha Gbeneteh Logistics - Novacare Ltd - NL,Nos,154,300300,158,308100,0,0,4,7800,1950,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,Shittu Adebamke Yusuff Logistics - Novacare Ltd - NL,Nos,29,56550,37,72150,0,0,8,15600,1950,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,Shittu Adebamke Yusuff Logistics - Novacare Ltd - NL,Nos,34,78200,37,85100,0,0,3,6900,2300,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,imole logistics - Novacare Ltd - NL,Nos,20,40000,20,40000,0,0,0,0,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,imole logistics - Novacare Ltd - NL,Nos,9,16200,12,21600,0,0,3,5400,1800,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,Olawale Olusola Logistics - Novacare Ltd - NL,Nos,10,18000,10,18000,0,0,0,0,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Olawale Olusola Logistics - Novacare Ltd - NL,Nos,3,6000,8,16000,0,0,5,10000,2000,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Etimbuk Gregory Logistics - Novacare Ltd - NL,Nos,38,68400,38,68400,0,0,0,0,1800,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Ola Cash - Novacare Ltd - NL,Nos,29,52200,29,52200,0,0,0,0,1800,0,Novacare Ltd
+Push Board Pro,Push Board Pro,Novacare,Ola Cash - Novacare Ltd - NL,Nos,10,20000,10,20000,0,0,0,0,2000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Ola Cash - Novacare Ltd - NL,Nos,69,345000,69,345000,0,0,0,0,5000,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Velocitŕ logistics LOGISTICS - Novacare Ltd - NL,Nos,41,73800,41,73800,0,0,0,0,1800,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,Okoli Nnaemeka Augustine Logistics - Novacare Ltd - NL,Nos,6,10800,6,10800,0,0,0,0,1800,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Okoli Nnaemeka Augustine Logistics - Novacare Ltd - NL,Nos,23,39100,23,39100,0,0,0,0,1700,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,TRUST LOGISTICS BENUE - Novacare Ltd - NL,Nos,320,960000,320,960000,0,0,0,0,3000,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,John Peter Adamawa - Novacare Ltd - NL,Nos,4,7800,12,23400,0,0,8,15600,1950,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,John Peter Adamawa - Novacare Ltd - NL,Nos,24,55200,25,57500,0,0,1,2300,2300,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Enny logistics LOGISTICS - Novacare Ltd - NL,Nos,27,48600,27,48600,0,0,0,0,1800,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Enny logistics LOGISTICS - Novacare Ltd - NL,Nos,112,560000,112,560000,0,0,0,0,5000,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,YAYA JOB - Novacare Ltd - NL,Nos,23,41400,23,41400,0,0,0,0,1800,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,GINIKA ANAMBRA - Novacare Ltd - NL,Nos,10,16000,10,16000,0,0,0,0,1600,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,GINIKA ANAMBRA - Novacare Ltd - NL,Nos,30,60000,30,60000,0,0,0,0,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,GINIKA ANAMBRA - Novacare Ltd - NL,Nos,12,21999.96,28,51333.24,0,0,16,29333.28,1833.33,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Abdulsalam Abubakar Logistics - Novacare Ltd - NL,Nos,18,32400,18,32400,0,0,0,0,1800,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Olaseni Adewumi James Logistics - Novacare Ltd - NL,Nos,94,470000,94,470000,0,0,0,0,5000,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Olaseni Adewumi James Logistics - Novacare Ltd - NL,Nos,24,43200,24,43200,0,0,0,0,1800,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,FLYMARK LOGISTICS KD - Novacare Ltd - NL,Nos,25,73750,32,94400,0,0,7,20650,2950,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Hezekiah Victor Adesanmi Logistics - Novacare Ltd - NL,Nos,29,46400,29,46400,0,0,0,0,1600,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Anthony Ezekiel Logistics - Novacare Ltd - NL,Nos,31,62000,31,62000,0,0,0,0,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Anthony Ezekiel Logistics - Novacare Ltd - NL,Nos,8,14745.12,23,42392.22,0,0,15,27647.1,1843.14,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,Adeyinka Ekundayo Isreal Logistics - Novacare Ltd - NL,Nos,35,56000,35,56000,0,0,0,0,1600,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,Ezekiel Ameh Logistics - Novacare Ltd - NL,Nos,26,59800,26,59800,0,0,0,0,2300,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,De Wealthz Logistics LOGISTICS - Novacare Ltd - NL,Nos,9,16200,9,16200,0,0,0,0,1800,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Teekina kuroakegha Gbeneteh Logistics - Novacare Ltd - NL,Nos,9,16200,9,16200,0,0,0,0,1800,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,TRUST LOGISTICS PDA - Novacare Ltd - NL,Nos,18,32400,18,32400,0,0,0,0,1800,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Olupona oluwaseyi Logistics - Novacare Ltd - NL,Nos,32,57600,32,57600,0,0,0,0,1800,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,FOMAX ASABA (DELTA) LOGISTICS - Novacare Ltd - NL,Nos,14,25200,14,25200,0,0,0,0,1800,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,Fomax logistics LOGISTICS - Novacare Ltd - NL,Nos,20,36000,20,36000,0,0,0,0,1800,0,Novacare Ltd
+Nail Repair,Nail Repair,Novacare,FLYMARK LOGISTICS KD - Novacare Ltd - NL,Nos,11,19800,11,19800,0,0,0,0,1800,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,FLYMARK LOGISTICS KD - Novacare Ltd - NL,Nos,15,75000,17,85000,0,0,2,10000,5000,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,FLYMARK LOGISTICS KD - Novacare Ltd - NL,Nos,26,46800,26,46800,0,0,0,0,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,TEMIBASH LOGISTICS LOGISTICS - Novacare Ltd - NL,Nos,32,64000,34,68000,0,0,2,4000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,TEMIBASH LOGISTICS LOGISTICS - Novacare Ltd - NL,Nos,30,54000,35,63000,0,0,5,9000,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,FOMAX PH. LOGISTICS - Novacare Ltd - NL,Nos,16,32000,27,54000,0,0,11,22000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,FOMAX PH. LOGISTICS - Novacare Ltd - NL,Nos,22,39600,25,45000,0,0,3,5400,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,DASHGO DELIVERY CALABAR - Novacare Ltd - NL,Nos,20,40000,20,40000,0,0,0,0,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,DASHGO DELIVERY CALABAR - Novacare Ltd - NL,Nos,18,32400,23,41400,0,0,5,9000,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,APPLE ABIA TAZE LOGISTICS SERVICES - Novacare Ltd - NL,Nos,19,38000,21,42000,0,0,2,4000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,APPLE ABIA TAZE LOGISTICS SERVICES - Novacare Ltd - NL,Nos,11,19800,17,30600,0,0,6,10800,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,PELICAN DELIVERY AND LOGISTICS SERVICES LOGISTICS - Novacare Ltd - NL,Nos,16,32000,34,68000,0,0,18,36000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,PELICAN DELIVERY AND LOGISTICS SERVICES LOGISTICS - Novacare Ltd - NL,Nos,26,46800,31,55800,0,0,5,9000,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Adeyinka Ekundayo Isreal Logistics - Novacare Ltd - NL,Nos,32,64000,32,64000,0,0,0,0,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Adeyinka Ekundayo Isreal Logistics - Novacare Ltd - NL,Nos,38,68400,38,68400,0,0,0,0,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Adolf Umoh Aniekeme - Novacare Ltd - NL,Nos,60,120000,60,120000,0,0,0,0,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Adolf Umoh Aniekeme - Novacare Ltd - NL,Nos,58,104400,58,104400,0,0,0,0,1800,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Olawale Olusola Logistics - Novacare Ltd - NL,Nos,14,25200,15,27000,0,0,1,1800,1800,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Emmanuel Nnamdi Ugwu Logistics - Novacare Ltd - NL,Nos,38,68400,38,68400,0,0,0,0,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Emmanuel Nnamdi Ugwu Logistics - Novacare Ltd - NL,Nos,10,20000,14,28000,0,0,4,8000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,BLUE AMAZON LOGISTICS LTD LOGISTICS - Novacare Ltd - NL,Nos,38,68400,38,68400,0,0,0,0,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,BLUE AMAZON LOGISTICS LTD LOGISTICS - Novacare Ltd - NL,Nos,32,64000,34,68000,0,0,2,4000,2000,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,De Wealthz Logistics LOGISTICS - Novacare Ltd - NL,Nos,28,56000,36,72000,0,0,8,16000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,De Wealthz Logistics LOGISTICS - Novacare Ltd - NL,Nos,24,48000,35,70000,0,0,11,22000,2000,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Emmanuel Olapeju Awoyemi Logistics - Novacare Ltd - NL,Nos,39,78000,39,78000,0,0,0,0,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Emmanuel Olapeju Awoyemi Logistics - Novacare Ltd - NL,Nos,38,68400,38,68400,0,0,0,0,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,FOMAX ASABA (DELTA) LOGISTICS - Novacare Ltd - NL,Nos,40,80000,40,80000,0,0,0,0,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,FOMAX ASABA (DELTA) LOGISTICS - Novacare Ltd - NL,Nos,40,72000,40,72000,0,0,0,0,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,AB LOGISTICS KADUNA - Novacare Ltd - NL,Nos,40,80000,40,80000,0,0,0,0,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,AB LOGISTICS KADUNA - Novacare Ltd - NL,Nos,37,66600,39,70200,0,0,2,3600,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Toheeb Biola Popoola Logistics - Novacare Ltd - NL,Nos,21,42000,24,48000,0,0,3,6000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Toheeb Biola Popoola Logistics - Novacare Ltd - NL,Nos,60,108000,11,19800,50,90000,1,1800,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,PEAKLINK LOGISTICS LTD - Novacare Ltd - NL,Nos,40,80000,40,80000,0,0,0,0,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,PEAKLINK LOGISTICS LTD - Novacare Ltd - NL,Nos,40,72000,40,72000,0,0,0,0,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Smart move Logistics Logistics LOGISTICS - Novacare Ltd - NL,Nos,18,36000,19,38000,0,0,1,2000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Smart move Logistics Logistics LOGISTICS - Novacare Ltd - NL,Nos,30,60000,31,62000,0,0,1,2000,2000,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,George O.O LOGISTICS - Novacare Ltd - NL,Nos,1,2000,3,6000,0,0,2,4000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,George O.O LOGISTICS - Novacare Ltd - NL,Nos,8,14400,9,16200,0,0,1,1800,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Aruoriwo Adhuze - Novacare Ltd - NL,Nos,49,98000,54,108000,0,0,5,10000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Aruoriwo Adhuze - Novacare Ltd - NL,Nos,52,93600,56,100800,0,0,4,7200,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Efe Brendon Avwia Logistics - Novacare Ltd - NL,Nos,28,56000,31,62000,0,0,3,6000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Efe Brendon Avwia Logistics - Novacare Ltd - NL,Nos,29,52200,37,66600,0,0,8,14400,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,byke messengers logistic - Novacare Ltd - NL,Nos,32,64000,39,78000,0,0,7,14000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,byke messengers logistic - Novacare Ltd - NL,Nos,33,59400,43,77400,0,0,10,18000,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Solomon Uduak Ikpembe - Novacare Ltd - NL,Nos,31,62000,40,80000,0,0,9,18000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Solomon Uduak Ikpembe - Novacare Ltd - NL,Nos,42,75600,46,82800,0,0,4,7200,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,ug express logistics ltd - Novacare Ltd - NL,Nos,20,40000,25,50000,0,0,5,10000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,ug express logistics ltd - Novacare Ltd - NL,Nos,17,34000,24,48000,0,0,7,14000,2000,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,ISMAIL MUHAMMAD LIMAN - Novacare Ltd - NL,Nos,21,42000,24,48000,0,0,3,6000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,ISMAIL MUHAMMAD LIMAN - Novacare Ltd - NL,Nos,39,70200,39,70200,0,0,0,0,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Usiju Ladu Logistics - Novacare Ltd - NL,Nos,18,36000,25,50000,0,0,7,14000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Usiju Ladu Logistics - Novacare Ltd - NL,Nos,36,64800,38,68400,0,0,2,3600,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,TRUST LOGISTICS PDA - Novacare Ltd - NL,Nos,37,74000,37,74000,0,0,0,0,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,TRUST LOGISTICS PDA - Novacare Ltd - NL,Nos,39,70200,39,70200,0,0,0,0,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Okolie Anthony ogorchukwu Logistics - Novacare Ltd - NL,Nos,6,12000,12,24000,0,0,6,12000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Okolie Anthony ogorchukwu Logistics - Novacare Ltd - NL,Nos,27,48600,34,61200,0,0,7,12600,1800,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,ANIEADOLF CREATIONS - Novacare Ltd - NL,Nos,28,140000,30,150000,0,0,2,10000,5000,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,APPLE ANAMBRA DELIVERY SERVICES - Novacare Ltd - NL,Nos,15,27000,15,27000,0,0,0,0,1800,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,smart logistics LOGISTICS - Novacare Ltd - NL,Nos,8,16000,17,34000,0,0,9,18000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,smart logistics LOGISTICS - Novacare Ltd - NL,Nos,13,23400,13,23400,0,0,0,0,1800,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,groza logistics ltd - Novacare Ltd - NL,Nos,130,247690.3,176,336849.6,0,0,46,89159.3,1905.31,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,groza logistics ltd - Novacare Ltd - NL,Nos,20,59000,96,268000,0,0,76,209000,2950,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,groza logistics ltd - Novacare Ltd - NL,Nos,26,52000,28,56000,0,0,2,4000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,groza logistics ltd - Novacare Ltd - NL,Nos,20,36000,20,36000,0,0,0,0,1800,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,groza logistics ltd - Novacare Ltd - NL,Nos,84,420000,84,420000,0,0,0,0,5000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,AB LOGISTICS KADUNA - Novacare Ltd - NL,Nos,40,200000,40,200000,0,0,0,0,5000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,PEAKLINK LOGISTICS LTD - Novacare Ltd - NL,Nos,43,215000,43,215000,0,0,0,0,5000,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Adolf Umoh Aniekeme - Novacare Ltd - NL,Nos,400,800000,400,800000,0,0,0,0,2000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Adolf Umoh Aniekeme - Novacare Ltd - NL,Nos,387,926000,387,926000,0,0,0,0,2392.765,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Adolf Umoh Aniekeme - Novacare Ltd - NL,Nos,35,175000,35,175000,0,0,0,0,5000,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,ATP Logistics LOGISTICS - Novacare Ltd - NL,Nos,14,28000,30,60000,0,0,16,32000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,ATP Logistics LOGISTICS - Novacare Ltd - NL,Nos,6,10800,23,41400,0,0,17,30600,1800,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,Steve temienor - Novacare Ltd - NL,Nos,84,163800,138,269100,0,0,54,105300,1950,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,Steve temienor - Novacare Ltd - NL,Nos,22,50600,26,59800,0,0,4,9200,2300,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,FOMAX PH. LOGISTICS - Novacare Ltd - NL,Nos,20,36000,20,36000,0,0,0,0,1800,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,Abutu Emmanuel - Novacare Ltd - NL,Nos,32,62400,42,81900,0,0,10,19500,1950,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,Abutu Emmanuel - Novacare Ltd - NL,Nos,14,32200,19,43700,0,0,5,11500,2300,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,ATOMIC LOGISTICS EDO - Novacare Ltd - NL,Nos,26,52000,46,92000,0,0,20,40000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,ATOMIC LOGISTICS EDO - Novacare Ltd - NL,Nos,30,54000,49,88200,0,0,19,34200,1800,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,Adekunle Logistic - Novacare Ltd - NL,Nos,29,56550,35,68250,0,0,6,11700,1950,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,Adekunle Logistic - Novacare Ltd - NL,Nos,27,62100,27,62100,0,0,0,0,2300,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,SAGE LOGISTICS - Novacare Ltd - NL,Nos,3,6000,24,48000,0,0,21,42000,2000,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,Eagles Frontier Logistics - Novacare Ltd - NL,Nos,4,7800,8,15600,0,0,4,7800,1950,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,Eagles Frontier Logistics - Novacare Ltd - NL,Nos,21,48300,22,50600,0,0,1,2300,2300,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,PresteveGO Logistics - Novacare Ltd - NL,Nos,18,36000,33,66000,0,0,15,30000,2000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,PresteveGO Logistics - Novacare Ltd - NL,Nos,437,1305150,132,389400,320,960000,15,44250,2986.613,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,PresteveGO Logistics - Novacare Ltd - NL,Nos,94,176000,95,178000,0,0,1,2000,1872.34,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,PresteveGO Logistics - Novacare Ltd - NL,Nos,96,192000,96,192000,0,0,0,0,2000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,PresteveGO Logistics - Novacare Ltd - NL,Nos,18,90000,18,90000,0,0,0,0,5000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,SAGE LOGISTICS - Novacare Ltd - NL,Nos,15,27000,30,54000,0,0,15,27000,1800,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,Oluwatobi Femi-Fasan - Novacare Ltd - NL,Nos,-36,-70200,-3,-5850,0,0,33,64350,1950,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,Oluwatobi Femi-Fasan - Novacare Ltd - NL,Nos,49,112700,50,115000,0,0,1,2300,2300,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Adeyemo Adeola LOGISTICS - Novacare Ltd - NL,Nos,19,38000,19,38000,0,0,0,0,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Adeyemo Adeola LOGISTICS - Novacare Ltd - NL,Nos,20,36000,20,36000,0,0,0,0,1800,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,ISMAIL MUHAMMAD LIMAN - Novacare Ltd - NL,Nos,67,335000,67,335000,0,0,0,0,5000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Solomon Uduak Ikpembe - Novacare Ltd - NL,Nos,30,150000,30,150000,0,0,0,0,5000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Aruoriwo Adhuze - Novacare Ltd - NL,Nos,13,65000,13,65000,0,0,0,0,5000,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,RAPH XPRESS LOGISTICS - Novacare Ltd - NL,Nos,18,32400,18,32400,0,0,0,0,1800,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,SOLOPEE LOGISTCS - Novacare Ltd - NL,Nos,271,516339.01,306,583024.86,0,0,35,66685.85,1905.31,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,SOLOPEE LOGISTCS - Novacare Ltd - NL,Nos,42,84000,47,94000,0,0,5,10000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,SOLOPEE LOGISTCS - Novacare Ltd - NL,Nos,24,43200,30,54000,0,0,6,10800,1800,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,SOLOPEE LOGISTCS - Novacare Ltd - NL,Nos,438,1308100,137,404150,320,960000,19,56050,2986.53,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,SOLOPEE LOGISTCS - Novacare Ltd - NL,Nos,34,170000,34,170000,0,0,0,0,5000,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,Blessing Hezekiah - Novacare Ltd - NL,Nos,17,33150,17,33150,0,0,0,0,1950,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,Blessing Hezekiah - Novacare Ltd - NL,Nos,29,66700,30,69000,0,0,1,2300,2300,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,ug express logistics ltd - Novacare Ltd - NL,Nos,49,245000,49,245000,0,0,0,0,5000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,ATOMIC LOGISTICS EDO - Novacare Ltd - NL,Nos,33,165000,33,165000,0,0,0,0,5000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,ug express logistic ebonyi - Novacare Ltd - NL,Nos,219,654050,232,692400,0,0,13,38350,2986.53,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,ug express logistic ebonyi - Novacare Ltd - NL,Nos,35,175000,35,175000,0,0,0,0,5000,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,ug express logistic ebonyi - Novacare Ltd - NL,Nos,55,110000,60,120000,0,0,5,10000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,ug express logistic ebonyi - Novacare Ltd - NL,Nos,55,99000,60,108000,0,0,5,9000,1800,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Gimway Concept - Novacare Ltd - NL,Nos,201,382967.31,376,716396.56,0,0,175,333429.25,1905.31,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Gimway Concept - Novacare Ltd - NL,Nos,13,38350,58,171100,0,0,45,132750,2950,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Gimway Concept - Novacare Ltd - NL,Nos,15,75000,15,75000,0,0,0,0,5000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,SAGE LOGISTICS - Novacare Ltd - NL,Nos,45,225000,45,225000,0,0,0,0,5000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Steve temienor - Novacare Ltd - NL,Nos,-240,-5160000,-240,-5160000,0,0,0,0,21500,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,Davtom Logistics - Novacare Ltd - NL,Nos,70,136500,70,136500,0,0,0,0,1950,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,Davtom Logistics - Novacare Ltd - NL,Nos,30,69000,30,69000,0,0,0,0,2300,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,Daniel Ekpo - Novacare Ltd - NL,Nos,59,115050,71,138450,0,0,12,23400,1950,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,Daniel Ekpo - Novacare Ltd - NL,Nos,26,59800,28,64400,0,0,2,4600,2300,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,Sabi logistics - Novacare Ltd - NL,Nos,77,146708.87,122,232447.82,0,0,45,85738.95,1905.31,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,Sabi logistics - Novacare Ltd - NL,Nos,345,1035000,68,204000,320,960000,43,129000,3000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,Sabi logistics - Novacare Ltd - NL,Nos,18,90000,18,90000,0,0,0,0,5000,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Sabi logistics - Novacare Ltd - NL,Nos,38,76000,40,80000,0,0,2,4000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Sabi logistics - Novacare Ltd - NL,Nos,28,50400,35,63000,0,0,7,12600,1800,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,Fomax logistics LOGISTICS - Novacare Ltd - NL,Nos,558,1088100,693,1351350,0,0,135,263250,1950,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,Fomax logistics LOGISTICS - Novacare Ltd - NL,Nos,294,676200,295,678500,0,0,1,2300,2300,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,ATOMIC LOGISTICS EDO - Novacare Ltd - NL,Nos,40,140000,40,140000,0,0,0,0,3500,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,SOLOPEE LOGISTCS - Novacare Ltd - NL,Nos,40,140000,40,140000,0,0,0,0,3500,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,imole logistics - Novacare Ltd - NL,Nos,40,140000,40,140000,0,0,0,0,3500,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,ug express logistic ebonyi - Novacare Ltd - NL,Nos,40,140000,40,140000,0,0,0,0,3500,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,groza logistics ltd - Novacare Ltd - NL,Nos,40,140000,40,140000,0,0,0,0,3500,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,Gimway Concept - Novacare Ltd - NL,Nos,18,36000,20,40000,0,0,2,4000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,Gimway Concept - Novacare Ltd - NL,Nos,20,36000,20,36000,0,0,0,0,1800,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,Gimway Concept - Novacare Ltd - NL,Nos,40,140000,40,140000,0,0,0,0,3500,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,byke messengers logistic - Novacare Ltd - NL,Nos,40,140000,40,140000,0,0,0,0,3500,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,milly logistics - Novacare Ltd - NL,Nos,206,412000,237,474000,0,0,31,62000,2000,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,milly logistics - Novacare Ltd - NL,Nos,155,775000,155,775000,0,0,0,0,5000,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,milly logistics - Novacare Ltd - NL,Nos,44,220000,44,220000,0,0,0,0,5000,0,Novacare Ltd
+Grazer Herbal Balm,Grazer Herbal Balm,Novacare,milly logistics - Novacare Ltd - NL,Nos,65,117000,65,117000,0,0,0,0,1800,0,Novacare Ltd
+Clear Vision Tea,Clear Vision Tea,Novacare,milly logistics - Novacare Ltd - NL,Nos,6,12000,6,12000,0,0,0,0,2000,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,milly logistics - Novacare Ltd - NL,Nos,211,622450,240,708000,0,0,29,85550,2950,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,milly logistics - Novacare Ltd - NL,Nos,31,62000,32,64000,0,0,1,2000,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,milly logistics - Novacare Ltd - NL,Nos,19,38000,20,40000,0,0,1,2000,2000,0,Novacare Ltd
+Hair Growth Oil,Hair Growth Oil ,Novacare,milly logistics - Novacare Ltd - NL,Nos,74,140600,74,140600,0,0,0,0,1900,0,Novacare Ltd
+ORAVITA CAPSULE,ORAVITA CAPSULE,Leafora,milly logistics - Novacare Ltd - NL,Nos,-24,-55200,-7,-16100,0,0,17,39100,2300,0,Novacare Ltd
+Grazer Herbal Tea,Grazer Herbal Tea,Novacare,yusuf joy - Novacare Ltd - NL,Nos,157,299133.67,160,304849.6,0,0,3,5715.93,1905.31,0,Novacare Ltd
+Ura Clear Tea,Ura Clear Tea,Novacare,yusuf joy - Novacare Ltd - NL,Nos,158,474000,160,480000,0,0,2,6000,3000,0,Novacare Ltd
+ALPHA MAN TEA,ALPHA MAN HERBAL TEA,Novacare,yusuf joy - Novacare Ltd - NL,Nos,15,30000,15,30000,0,0,0,0,2000,0,Novacare Ltd
+RESPIRA TEA,RESPIRA LUNG TEA,Novacare,yusuf joy - Novacare Ltd - NL,Nos,15,27000,15,27000,0,0,0,0,1800,0,Novacare Ltd
+Compression Vest,Compression Vest,Novacare,yusuf joy - Novacare Ltd - NL,Nos,40,140000,40,140000,0,0,0,0,3500,0,Novacare Ltd
+Hair Dye Shampoo,Hair Dye Shampoo,Novacare,yusuf joy - Novacare Ltd - NL,Nos,35,175000,35,175000,0,0,0,0,5000,0,Novacare Ltd
+VELORA HERBAL TEA,VELORA HERBAL TEA,Leafora,milly logistics - Novacare Ltd - NL,Nos,-1,-1950,0,0,0,0,1,1950,1950,0,Novacare Ltd
+Total,,,,,135798,344690960.6,146974,369770943.6,8212,20838594.79,19388,45918577.76,2456066.791,,

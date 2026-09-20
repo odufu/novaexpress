@@ -16,6 +16,7 @@ import '../widgets/dc_order_detail_modal.dart';
 import '../widgets/dc_csv_order_import_modal.dart';
 import '../widgets/dc_assign_order_modal.dart';
 import '../../../pipeline_chat/presentation/widgets/order_pipeline_chat_sheet.dart';
+import '../../../client_portal/presentation/widgets/pangea_excel_data_table.dart';
 
 final dcOrdersDateFilterProvider = StateProvider.autoDispose<String>((ref) => 'all_time');
 final dcOrdersCustomDateRangeProvider = StateProvider.autoDispose<DateTimeRange?>((ref) => null);
@@ -1376,242 +1377,359 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
         borderRadius: BorderRadius.circular(16),
         child: Column(
           children: [
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: DataTable(
-                showCheckboxColumn: false,
-                headingRowColor: WidgetStateProperty.all(isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
-                headingRowHeight: 46,
-                dataRowMaxHeight: 64,
-                columnSpacing: 18,
-                columns: [
-                  const DataColumn(label: Text('Order # & Date', style: TextStyle(fontWeight: FontWeight.bold))),
-                  const DataColumn(label: Text('Customer & Phone', style: TextStyle(fontWeight: FontWeight.bold))),
-                  const DataColumn(label: Text('Destination', style: TextStyle(fontWeight: FontWeight.bold))),
-                  const DataColumn(label: Text('Product & Qty', style: TextStyle(fontWeight: FontWeight.bold))),
-                  const DataColumn(label: Text('Amount & Payment', style: TextStyle(fontWeight: FontWeight.bold))),
-                  const DataColumn(label: Text('Client', style: TextStyle(fontWeight: FontWeight.bold))),
-                  const DataColumn(label: Text('Assigned Rider', style: TextStyle(fontWeight: FontWeight.bold))),
-                  const DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.bold))),
-                  const DataColumn(label: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold))),
-                ],
-                rows: pagedOrders.map((order) {
-                  final isUnassigned = order.deliveryAgentId == null || order.deliveryAgentId!.isEmpty;
-                  final isDelivered = order.status == 'delivered';
-                  final isFailed = order.status == 'cancelled' || order.status == 'failed' || order.status == 'call_back';
-                  final isReturned = order.status == 'returned';
-                  final isPrepaid = order.paymentType == 'prepaid' || order.isDirectTransfer;
-
-                  return DataRow(
-                    onSelectChanged: (_) {
-                      showDialog(
-                        context: context,
-                        builder: (ctx) => DCOrderDetailModal(order: order),
-                      );
-                    },
-                    mouseCursor: WidgetStateProperty.all(SystemMouseCursors.click),
-                    color: WidgetStateProperty.resolveWith<Color?>((states) {
-                      if (states.contains(WidgetState.hovered)) {
-                        return isDark ? const Color(0xFF334155).withValues(alpha: 0.5) : const Color(0xFFF1F5F9);
-                      }
-                      return null;
-                    }),
-                    cells: [
-                      // 1. Order # & Date
-                      DataCell(
-                        InkWell(
-                          onTap: () => showDialog(context: context, builder: (ctx) => DCOrderDetailModal(order: order)),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                '#${order.orderNumber}',
-                                style: GoogleFonts.jetBrainsMono(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
-                              ),
-                              Text(
-                                DateTimeFormatter.formatRelativeTime(order.createdAt),
-                                style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF94A3B8)),
-                              ),
-                            ],
+            PangeaExcelDataTable<OrderEntity>(
+              items: pagedOrders,
+              enablePagination: false,
+              rowHeight: 74.0,
+              brandPrimary: const Color(0xFF2563EB),
+              onRowTap: (order) => showDialog(
+                context: context,
+                builder: (ctx) => DCOrderDetailModal(order: order),
+              ),
+              columns: [
+                // 1. Order # & Date
+                ExcelColumnDef<OrderEntity>(
+                  key: 'order_number',
+                  group: 'Order Identification',
+                  label: 'ORDER # & DATE',
+                  defaultWidth: 160,
+                  minWidth: 120,
+                  searchString: (o) => '${o.orderNumber} ${DateTimeFormatter.formatRelativeTime(o.createdAt)}',
+                  sortValue: (o) => o.createdAt,
+                  cellBuilder: (context, order, row, isDark, brand) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '#${order.orderNumber}',
+                          style: GoogleFonts.jetBrainsMono(
+                            fontSize: 12.0,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF2563EB),
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-
-                      // 2. Customer & Phone
-                      DataCell(
-                        InkWell(
-                          onTap: () => showDialog(context: context, builder: (ctx) => DCOrderDetailModal(order: order)),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                order.customerName,
-                                style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              Text(
-                                order.customerPhone,
-                                style: GoogleFonts.jetBrainsMono(fontSize: 11, color: const Color(0xFF64748B)),
-                              ),
-                            ],
+                        Text(
+                          DateTimeFormatter.formatRelativeTime(order.createdAt),
+                          style: GoogleFonts.inter(
+                            fontSize: 10.0,
+                            color: const Color(0xFF94A3B8),
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
+                      ],
+                    );
+                  },
+                ),
 
-                      // 3. Destination
-                      DataCell(
-                        InkWell(
-                          onTap: () => showDialog(context: context, builder: (ctx) => DCOrderDetailModal(order: order)),
-                          child: Container(
-                            constraints: const BoxConstraints(maxWidth: 180),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  order.deliveryAddress,
-                                  style: GoogleFonts.inter(fontSize: 11.5),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                Text(
-                                  '${order.deliveryCity}, ${order.deliveryState}',
-                                  style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
-                            ),
-                          ),
+                // 2. Customer & Phone
+                ExcelColumnDef<OrderEntity>(
+                  key: 'customer',
+                  group: 'Recipient Details',
+                  label: 'CUSTOMER & PHONE',
+                  defaultWidth: 170,
+                  minWidth: 130,
+                  searchString: (o) => '${o.customerName} ${o.customerPhone}',
+                  sortValue: (o) => o.customerName,
+                  cellBuilder: (context, order, row, isDark, brand) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          order.customerName,
+                          style: GoogleFonts.inter(fontSize: 12.0, fontWeight: FontWeight.bold),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-
-                      // 4. Product & Qty
-                      DataCell(
-                        InkWell(
-                          onTap: () => showDialog(context: context, builder: (ctx) => DCOrderDetailModal(order: order)),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  '${order.quantity}x',
-                                  style: GoogleFonts.jetBrainsMono(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF8B5CF6)),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(order.productName, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500)),
-                            ],
-                          ),
+                        Text(
+                          order.customerPhone,
+                          style: GoogleFonts.jetBrainsMono(fontSize: 10.5, color: const Color(0xFF64748B)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
+                      ],
+                    );
+                  },
+                ),
 
-                      // 5. Amount & Payment
-                      DataCell(
-                        InkWell(
-                          onTap: () => showDialog(context: context, builder: (ctx) => DCOrderDetailModal(order: order)),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                CurrencyFormatter.formatNaira(order.totalAmount),
-                                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF16A34A)),
-                              ),
-                              Text(
-                                isPrepaid ? '⚡ Prepaid' : '💵 Pay on Del',
-                                style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B)),
-                              ),
-                            ],
-                          ),
+                // 3. Destination
+                ExcelColumnDef<OrderEntity>(
+                  key: 'destination',
+                  group: 'Recipient Details',
+                  label: 'DESTINATION',
+                  defaultWidth: 180,
+                  minWidth: 130,
+                  searchString: (o) => '${o.deliveryAddress} ${o.deliveryCity} ${o.deliveryState}',
+                  sortValue: (o) => '${o.deliveryState} ${o.deliveryCity}',
+                  cellBuilder: (context, order, row, isDark, brand) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          order.deliveryAddress,
+                          style: GoogleFonts.inter(fontSize: 11.0),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-
-                      // 6. Client
-                      DataCell(
-                        InkWell(
-                          onTap: () => showDialog(context: context, builder: (ctx) => DCOrderDetailModal(order: order)),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(order.clientName.isNotEmpty ? order.clientName : (order.clientId != null && order.clientId!.length > 8 ? 'Client ${order.clientId!.substring(0, 8)}' : 'Client Merchant'), style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
-                              if (order.packageDealName != null && order.packageDealName!.isNotEmpty)
-                                Text('🏷️ ${order.packageDealName}', style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF0D9488))),
-                            ],
-                          ),
+                        Text(
+                          '${order.deliveryCity}, ${order.deliveryState}',
+                          style: GoogleFonts.inter(fontSize: 10.0, color: const Color(0xFF64748B)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
+                      ],
+                    );
+                  },
+                ),
 
-                      // 7. Assigned Rider
-                      DataCell(
-                        InkWell(
-                          onTap: () => showDialog(context: context, builder: (ctx) => DCOrderDetailModal(order: order)),
-                          child: Text(
-                            isUnassigned ? 'Unassigned' : (order.deliveryAgentName ?? order.deliveryAgentCode ?? 'Assigned'),
-                            style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w500, color: isUnassigned ? const Color(0xFFEA580C) : const Color(0xFF2563EB)),
-                          ),
-                        ),
-                      ),
+                // 4. Product & Qty
+                ExcelColumnDef<OrderEntity>(
+                  key: 'product_qty',
+                  group: 'Package & Deal Details',
+                  label: 'PRODUCT & QTY',
+                  defaultWidth: 190,
+                  minWidth: 140,
+                  searchString: (o) => '${o.productName} ${o.packageDealName ?? ""} ${o.totalPhysicalQuantity}',
+                  sortValue: (o) => o.totalPhysicalQuantity,
+                  cellBuilder: (context, order, row, isDark, brand) {
+                    final physicalQty = order.totalPhysicalQuantity;
+                    final hasPackage = order.packageDealName != null && order.packageDealName!.isNotEmpty;
 
-                      // 8. Status
-                      DataCell(
-                        InkWell(
-                          onTap: () => showDialog(context: context, builder: (ctx) => DCOrderDetailModal(order: order)),
-                          child: _buildOrderStatusBadge(order),
-                        ),
-                      ),
-
-                      // 9. Actions
-                      DataCell(
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            if (isUnassigned && !isDelivered && !isFailed && !isReturned) ...[
-                              ElevatedButton.icon(
-                                onPressed: () {
-                                  _showAssignRiderModal(context, isDark, order, dcState, ordersState);
-                                },
-                                icon: const Icon(Icons.send_rounded, size: 13, color: Colors.white),
-                                label: const Text('Assign Rider', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFFF37021),
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF8B5CF6).withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                '${physicalQty}x',
+                                style: GoogleFonts.jetBrainsMono(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: const Color(0xFF8B5CF6),
                                 ),
                               ),
-                              const SizedBox(width: 6),
-                            ],
-                            IconButton(
-                              icon: const Icon(Icons.chat_bubble_outline_rounded, size: 16, color: Color(0xFF0D9488)),
-                              tooltip: 'Pipeline Chat & Incident Audit',
-                              onPressed: () => OrderPipelineChatSheet.showForOrder(context, order),
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.visibility_outlined, size: 16, color: Color(0xFF2563EB)),
-                              tooltip: 'View Order Details & Audit Trail',
-                              onPressed: () {
-                                showDialog(
-                                  context: context,
-                                  builder: (ctx) => DCOrderDetailModal(order: order),
-                                );
-                              },
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                order.productName,
+                                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           ],
                         ),
+                        if (hasPackage) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            order.packageDealName!,
+                            style: GoogleFonts.inter(
+                              fontSize: 10.0,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFFF37021),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ],
+                    );
+                  },
+                ),
+
+                // 5. Amount & Payment
+                ExcelColumnDef<OrderEntity>(
+                  key: 'amount',
+                  group: 'Commercials',
+                  label: 'AMOUNT & PAYMENT',
+                  defaultWidth: 150,
+                  minWidth: 110,
+                  align: TextAlign.right,
+                  searchString: (o) => '${o.totalAmount} ${o.paymentType}',
+                  sortValue: (o) => o.totalAmount,
+                  cellBuilder: (context, order, row, isDark, brand) {
+                    final isPrepaid = order.paymentType == 'prepaid' || order.isDirectTransfer;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          CurrencyFormatter.formatNaira(order.totalAmount),
+                          style: GoogleFonts.inter(
+                            fontSize: 12.0,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF16A34A),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          isPrepaid ? '⚡ Prepaid' : '💵 Pay on Del',
+                          style: GoogleFonts.inter(fontSize: 10.0, color: const Color(0xFF64748B)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    );
+                  },
+                ),
+
+                // 6. Client
+                ExcelColumnDef<OrderEntity>(
+                  key: 'client',
+                  group: 'Merchant',
+                  label: 'CLIENT',
+                  defaultWidth: 160,
+                  minWidth: 120,
+                  searchString: (o) => '${o.clientName} ${o.packageDealName ?? ''}',
+                  sortValue: (o) => o.clientName,
+                  cellBuilder: (context, order, row, isDark, brand) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          order.clientName.isNotEmpty
+                              ? order.clientName
+                              : (order.clientId != null && order.clientId!.length > 8
+                                  ? 'Client ${order.clientId!.substring(0, 8)}'
+                                  : 'Client Merchant'),
+                          style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w600),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (order.packageDealName != null && order.packageDealName!.isNotEmpty)
+                          Text(
+                            '🏷️ ${order.packageDealName}',
+                            style: GoogleFonts.inter(fontSize: 9.5, color: const Color(0xFF0D9488)),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                      ],
+                    );
+                  },
+                ),
+
+                // 7. Assigned Rider
+                ExcelColumnDef<OrderEntity>(
+                  key: 'rider',
+                  group: 'Fulfillment',
+                  label: 'ASSIGNED RIDER',
+                  defaultWidth: 160,
+                  minWidth: 120,
+                  searchString: (o) => o.deliveryAgentName ?? o.deliveryAgentCode ?? 'Unassigned',
+                  sortValue: (o) => o.deliveryAgentName ?? o.deliveryAgentCode ?? '',
+                  cellBuilder: (context, order, row, isDark, brand) {
+                    final isUnassigned = order.deliveryAgentId == null || order.deliveryAgentId!.isEmpty;
+                    return Text(
+                      isUnassigned ? 'Unassigned' : (order.deliveryAgentName ?? order.deliveryAgentCode ?? 'Assigned'),
+                      style: GoogleFonts.inter(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w500,
+                        color: isUnassigned ? const Color(0xFFEA580C) : const Color(0xFF2563EB),
                       ),
-                    ],
-                  );
-                }).toList(),
-              ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    );
+                  },
+                ),
+
+                // 8. Status
+                ExcelColumnDef<OrderEntity>(
+                  key: 'status',
+                  group: 'Fulfillment',
+                  label: 'STATUS',
+                  defaultWidth: 140,
+                  minWidth: 110,
+                  align: TextAlign.center,
+                  searchString: (o) => o.status,
+                  sortValue: (o) => o.status,
+                  cellBuilder: (context, order, row, isDark, brand) {
+                    return Center(child: _buildOrderStatusBadge(order));
+                  },
+                ),
+
+                // 9. Actions
+                ExcelColumnDef<OrderEntity>(
+                  key: 'actions',
+                  group: 'Actions',
+                  label: 'ACTIONS',
+                  defaultWidth: 215,
+                  minWidth: 160,
+                  align: TextAlign.center,
+                  cellBuilder: (context, order, row, isDark, brand) {
+                    final isUnassigned = order.deliveryAgentId == null || order.deliveryAgentId!.isEmpty;
+                    final isDelivered = order.status == 'delivered';
+                    final isFailed = order.status == 'cancelled' || order.status == 'failed' || order.status == 'call_back';
+                    final isReturned = order.status == 'returned';
+
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (isUnassigned && !isDelivered && !isFailed && !isReturned) ...[
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              _showAssignRiderModal(context, isDark, order, dcState, ordersState);
+                            },
+                            icon: const Icon(Icons.send_rounded, size: 12, color: Colors.white),
+                            label: const Text('Assign', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.white)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFF37021),
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                        ],
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                          icon: const Icon(Icons.chat_bubble_outline_rounded, size: 16, color: Color(0xFF0D9488)),
+                          tooltip: 'Pipeline Chat & Incident Audit',
+                          onPressed: () => OrderPipelineChatSheet.showForOrder(context, order),
+                        ),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                          icon: const Icon(Icons.visibility_outlined, size: 16, color: Color(0xFF2563EB)),
+                          tooltip: 'View Order Details & Audit Trail',
+                          onPressed: () {
+                            showDialog(
+                              context: context,
+                              builder: (ctx) => DCOrderDetailModal(order: order),
+                            );
+                          },
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ],
             ),
 
             // Pagination Controls Toolbar (Fully Responsive without overflow)

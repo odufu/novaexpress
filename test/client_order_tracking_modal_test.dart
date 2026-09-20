@@ -65,7 +65,8 @@ void main() {
     );
 
     testWidgets('1. Assigned Order Modal displays Live Delivery Handler & Followup actions', (tester) async {
-      await tester.binding.setSurfaceSize(const Size(1200, 900));
+      await tester.binding.setSurfaceSize(const Size(1280, 2000));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
 
       await tester.pumpWidget(
         ProviderScope(
@@ -100,14 +101,16 @@ void main() {
       expect(find.text('Copy Contact'), findsOneWidget);
 
       // Verify fulfillment timeline steps
+      await tester.scrollUntilVisible(find.text('FULFILLMENT TIMELINE'), 50.0);
       expect(find.text('FULFILLMENT TIMELINE'), findsOneWidget);
+      await tester.scrollUntilVisible(find.text('1. Order Created & Commercial Package Reserved'), 50.0);
       expect(find.text('1. Order Created & Commercial Package Reserved'), findsOneWidget);
+      await tester.scrollUntilVisible(find.text('2. Routed to Regional Distribution Center'), 50.0);
       expect(find.text('2. Routed to Regional Distribution Center'), findsOneWidget);
-
-      await tester.scrollUntilVisible(find.text('3. Assigned to Field Delivery Agent (PDA)'), 100);
+      await tester.scrollUntilVisible(find.text('3. Assigned to Field Delivery Agent (PDA)'), 50.0);
       expect(find.text('3. Assigned to Field Delivery Agent (PDA)'), findsOneWidget);
 
-      await tester.scrollUntilVisible(find.text('Amina Mohammed'), 100);
+      await tester.scrollUntilVisible(find.text('Amina Mohammed'), 50.0);
       expect(find.text('Amina Mohammed'), findsOneWidget);
       expect(find.text('Call Customer'), findsOneWidget);
       expect(find.text('WhatsApp Customer'), findsOneWidget);

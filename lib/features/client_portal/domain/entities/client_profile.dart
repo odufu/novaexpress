@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 /// Client / Merchant Profile Entity
 class ClientProfile {
   final String id;
@@ -25,9 +27,40 @@ class ClientProfile {
   final double? customPlatformFeeValue;
   final String? customPaystackFeeAbsorbedBy;
   final double? customFailedAttemptFee;
+  final bool hasInventoryManagement;
+  final List<String> servicesEnabled;
+  final List<String> operatingStates;
+  final String? logoUrl;
+  final String? primaryColor;
+  final String? secondaryColor;
+  final String? accentColor;
+  final Map<String, dynamic>? brandTheme;
 
   double? get customPlatformFee => customPlatformFeeValue;
   String get name => companyName;
+
+  Color get brandPrimaryColor => _parseColor(primaryColor) ?? const Color(0xFF0D9488);
+  Color get brandSecondaryColor => _parseColor(secondaryColor) ?? const Color(0xFF1E293B);
+  Color get brandAccentColor => _parseColor(accentColor) ?? const Color(0xFFF59E0B);
+
+  static Color? _parseColor(String? hexString) {
+    if (hexString == null || hexString.trim().isEmpty) return null;
+    final buffer = StringBuffer();
+    String cleanHex = hexString.replaceAll('#', '').trim();
+    if (cleanHex.length == 6) {
+      buffer.write('ff');
+      buffer.write(cleanHex);
+    } else if (cleanHex.length == 8) {
+      buffer.write(cleanHex);
+    } else {
+      return null;
+    }
+    try {
+      return Color(int.parse(buffer.toString(), radix: 16));
+    } catch (_) {
+      return null;
+    }
+  }
 
   const ClientProfile({
     required this.id,
@@ -55,6 +88,14 @@ class ClientProfile {
     this.customPlatformFeeValue,
     this.customPaystackFeeAbsorbedBy,
     this.customFailedAttemptFee,
+    this.hasInventoryManagement = true,
+    this.servicesEnabled = const ['fulfillment', 'delivery', 'inventory_management'],
+    this.operatingStates = const ['Federal Capital Territory', 'Lagos', 'Rivers', 'Kano', 'Oyo', 'Enugu'],
+    this.logoUrl,
+    this.primaryColor,
+    this.secondaryColor,
+    this.accentColor,
+    this.brandTheme,
   });
 
   factory ClientProfile.fromJson(Map<String, dynamic> json) {
@@ -74,6 +115,11 @@ class ClientProfile {
         json['manager_name']?.toString() ??
         '';
     final resolvedEmail = json['email']?.toString() ?? '';
+
+    List<String> opStates = const ['Federal Capital Territory', 'Lagos', 'Rivers', 'Kano', 'Oyo', 'Enugu'];
+    if (json['operating_states'] is List) {
+      opStates = (json['operating_states'] as List).map((e) => e.toString()).toList();
+    }
 
     return ClientProfile(
       id: json['id']?.toString() ?? '',
@@ -102,6 +148,27 @@ class ClientProfile {
           (json['custom_platform_fee'] as num?)?.toDouble(),
       customPaystackFeeAbsorbedBy: json['custom_paystack_fee_absorbed_by']?.toString(),
       customFailedAttemptFee: (json['custom_failed_attempt_fee'] as num?)?.toDouble(),
+      hasInventoryManagement: json['has_inventory_management'] == true ||
+          json['has_inventory'] == true ||
+          isEnt ||
+          resolvedCompany.toLowerCase().contains('novacare') ||
+          resolvedCompany.toLowerCase().contains('novacale'),
+      servicesEnabled: json['services_enabled'] is List
+          ? (json['services_enabled'] as List).map((e) => e.toString()).toList()
+          : const ['fulfillment', 'delivery', 'inventory_management'],
+      operatingStates: opStates,
+      logoUrl: json['logo_url']?.toString() ?? json['logo']?.toString(),
+      primaryColor: json['brand_color_primary']?.toString() ??
+          (json['brand_theme'] is Map ? json['brand_theme']['primary']?.toString() : null),
+      secondaryColor: json['brand_color_secondary']?.toString() ??
+          (json['brand_theme'] is Map ? json['brand_theme']['secondary']?.toString() : null),
+      accentColor: json['brand_color_accent']?.toString() ??
+          (json['brand_theme'] is Map ? json['brand_theme']['accent']?.toString() : null),
+      brandTheme: json['brand_theme'] is Map<String, dynamic>
+          ? json['brand_theme'] as Map<String, dynamic>
+          : (json['brand_theme'] is Map
+              ? Map<String, dynamic>.from(json['brand_theme'] as Map)
+              : null),
     );
   }
 
@@ -133,6 +200,14 @@ class ClientProfile {
       'custom_platform_fee': customPlatformFee,
       'custom_paystack_fee_absorbed_by': customPaystackFeeAbsorbedBy,
       'custom_failed_attempt_fee': customFailedAttemptFee,
+      'has_inventory_management': hasInventoryManagement,
+      'services_enabled': servicesEnabled,
+      'operating_states': operatingStates,
+      'logo_url': logoUrl,
+      'brand_color_primary': primaryColor,
+      'brand_color_secondary': secondaryColor,
+      'brand_color_accent': accentColor,
+      'brand_theme': brandTheme,
     };
   }
 
@@ -162,6 +237,14 @@ class ClientProfile {
     double? customPlatformFeeValue,
     String? customPaystackFeeAbsorbedBy,
     double? customFailedAttemptFee,
+    bool? hasInventoryManagement,
+    List<String>? servicesEnabled,
+    List<String>? operatingStates,
+    String? logoUrl,
+    String? primaryColor,
+    String? secondaryColor,
+    String? accentColor,
+    Map<String, dynamic>? brandTheme,
   }) {
     return ClientProfile(
       id: id ?? this.id,
@@ -189,6 +272,14 @@ class ClientProfile {
       customPlatformFeeValue: customPlatformFeeValue ?? this.customPlatformFeeValue,
       customPaystackFeeAbsorbedBy: customPaystackFeeAbsorbedBy ?? this.customPaystackFeeAbsorbedBy,
       customFailedAttemptFee: customFailedAttemptFee ?? this.customFailedAttemptFee,
+      hasInventoryManagement: hasInventoryManagement ?? this.hasInventoryManagement,
+      servicesEnabled: servicesEnabled ?? this.servicesEnabled,
+      operatingStates: operatingStates ?? this.operatingStates,
+      logoUrl: logoUrl ?? this.logoUrl,
+      primaryColor: primaryColor ?? this.primaryColor,
+      secondaryColor: secondaryColor ?? this.secondaryColor,
+      accentColor: accentColor ?? this.accentColor,
+      brandTheme: brandTheme ?? this.brandTheme,
     );
   }
 }

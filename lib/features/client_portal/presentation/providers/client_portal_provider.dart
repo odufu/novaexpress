@@ -1,3 +1,4 @@
+import 'dart:io' show Platform;
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart' show WidgetsBinding;
@@ -22,6 +23,10 @@ import '../../domain/entities/client_closer.dart';
 import '../../domain/entities/client_profile.dart';
 import '../../domain/entities/client_settlement.dart';
 import '../../domain/entities/customer_lead.dart';
+import '../../domain/entities/client_supplier.dart';
+import '../../domain/entities/client_stock_invoice.dart';
+import '../../domain/entities/client_stock_balance.dart';
+import '../../domain/entities/client_unit_economics.dart';
 
 /// Financial metrics summary per product or aggregate
 class ClientProductFinanceSummary {
@@ -181,6 +186,14 @@ class ClientPortalState {
   final String selectedLeadStatusFilter; // 'all', 'new_lead', 'calling', 'call_back', 'confirmed', 'order_created'
   final String selectedFinanceProductFilter; // 'all' or specific product name
   final String selectedFinanceTimeFilter; // 'all_time', 'month', 'week', 'today'
+  final List<ClientSupplier> suppliers;
+  final List<ClientStockInvoice> stockInvoices;
+  final List<ClientStockBalance> stockBalances;
+  final String selectedInventoryWarehouseFilter; // 'all' or specific warehouse
+  final String selectedInventoryItemFilter; // 'all' or specific item
+  final bool isInventoryLoading;
+  final DateTime? inventoryStartDate;
+  final DateTime? inventoryEndDate;
 
   const ClientPortalState({
     required this.clientProfile,
@@ -200,6 +213,14 @@ class ClientPortalState {
     this.selectedLeadStatusFilter = 'all',
     this.selectedFinanceProductFilter = 'all',
     this.selectedFinanceTimeFilter = 'all_time',
+    this.suppliers = const [],
+    this.stockInvoices = const [],
+    this.stockBalances = const [],
+    this.selectedInventoryWarehouseFilter = 'all',
+    this.selectedInventoryItemFilter = 'all',
+    this.isInventoryLoading = false,
+    this.inventoryStartDate,
+    this.inventoryEndDate,
   });
 
   ClientPortalState copyWith({
@@ -220,6 +241,14 @@ class ClientPortalState {
     String? selectedLeadStatusFilter,
     String? selectedFinanceProductFilter,
     String? selectedFinanceTimeFilter,
+    List<ClientSupplier>? suppliers,
+    List<ClientStockInvoice>? stockInvoices,
+    List<ClientStockBalance>? stockBalances,
+    String? selectedInventoryWarehouseFilter,
+    String? selectedInventoryItemFilter,
+    bool? isInventoryLoading,
+    DateTime? inventoryStartDate,
+    DateTime? inventoryEndDate,
   }) {
     return ClientPortalState(
       clientProfile: clientProfile ?? this.clientProfile,
@@ -239,7 +268,182 @@ class ClientPortalState {
       selectedLeadStatusFilter: selectedLeadStatusFilter ?? this.selectedLeadStatusFilter,
       selectedFinanceProductFilter: selectedFinanceProductFilter ?? this.selectedFinanceProductFilter,
       selectedFinanceTimeFilter: selectedFinanceTimeFilter ?? this.selectedFinanceTimeFilter,
+      suppliers: suppliers ?? this.suppliers,
+      stockInvoices: stockInvoices ?? this.stockInvoices,
+      stockBalances: stockBalances ?? this.stockBalances,
+      selectedInventoryWarehouseFilter: selectedInventoryWarehouseFilter ?? this.selectedInventoryWarehouseFilter,
+      selectedInventoryItemFilter: selectedInventoryItemFilter ?? this.selectedInventoryItemFilter,
+      isInventoryLoading: isInventoryLoading ?? this.isInventoryLoading,
+      inventoryStartDate: inventoryStartDate ?? this.inventoryStartDate,
+      inventoryEndDate: inventoryEndDate ?? this.inventoryEndDate,
     );
+  }
+
+  // Inventory & Landed Cost KPIs
+  double get totalInventoryValuation => stockBalances.fold(0.0, (sum, b) => sum + b.balanceValue);
+  double get totalStockValuation => totalInventoryValuation;
+
+  double get totalInventoryUnits => stockBalances.fold(0.0, (sum, b) => sum + b.balanceQty);
+  double get totalStockQuantity => totalInventoryUnits;
+
+  int get totalReservedStock => stockBalances.fold(0.0, (sum, b) => sum + b.reservedStock).toInt();
+
+  int get uniqueInventoryWarehousesCount {
+    final set = stockBalances.map((b) => b.warehouse).toSet();
+    return set.length;
+  }
+  int get uniqueWarehousesCount => uniqueInventoryWarehousesCount;
+
+  List<String> get uniqueWarehouses => stockBalances.map((b) => b.warehouse).toSet().toList()..sort();
+
+  int get lowStockInventoryCount => stockBalances.where((b) => b.balanceQty <= b.lowStockThreshold && b.balanceQty > 0).length;
+
+  int get outOfStockInventoryCount => stockBalances.where((b) => b.balanceQty <= 0).length;
+
+  /// Dynamic Unit Economics computed per product
+  List<ClientUnitEconomics> get unitEconomicsList {
+    final Map<String, ClientStockBalance> balanceByProduct = {};
+    for (final b in stockBalances) {
+      final existing = balanceByProduct[b.itemName];
+      if (existing == null || b.balanceQty > existing.balanceQty) {
+        balanceByProduct[b.itemName] = b;
+      }
+    }
+
+    // Also include catalog products if they do not yet have a stock balance row
+    for (final p in products) {
+      if (!balanceByProduct.containsKey(p.name) && p.name.isNotEmpty) {
+        balanceByProduct[p.name] = ClientStockBalance(
+          id: 'catalog-${p.id}',
+          clientId: clientProfile.id,
+          itemCode: p.sku.isNotEmpty ? p.sku : 'PROD-${p.id.length > 6 ? p.id.substring(0, 6) : p.id}',
+          itemName: p.name,
+          itemGroup: p.category.isNotEmpty ? p.category : 'General',
+          warehouse: 'Fulfillment Hub',
+          stockUom: 'Nos',
+          openingQty: 0,
+          openingValue: 0.0,
+          inQty: 0,
+          inValue: 0.0,
+          outQty: 0,
+          outValue: 0.0,
+          balanceQty: p.totalStockAcrossHubs.toDouble(),
+          balanceValue: p.totalStockAcrossHubs.toDouble() * (p.defaultUnitPrice > 0 ? p.defaultUnitPrice * 0.4 : 1500.0),
+          valuationRate: (p.defaultUnitPrice > 0 ? p.defaultUnitPrice * 0.4 : 1500.0),
+          reservedStock: 0,
+          company: clientProfile.companyName,
+          updatedAt: DateTime.now(),
+        );
+      }
+    }
+
+    return balanceByProduct.values.map((bal) {
+      // Find latest intake item for granular breakdown or infer from valuation rate
+      ClientStockInvoiceItem? latestItem;
+      for (final inv in stockInvoices) {
+        for (final it in inv.items) {
+          if (it.productName.toLowerCase() == bal.itemName.toLowerCase() ||
+              it.productSku.toLowerCase() == bal.itemCode.toLowerCase()) {
+            latestItem = it;
+            break;
+          }
+        }
+        if (latestItem != null) break;
+      }
+
+      final double rate = bal.valuationRate > 0 ? bal.valuationRate : 1500.0;
+      final double base = latestItem != null ? latestItem.supplierUnitPrice : (rate * 0.65);
+      final double pack = latestItem != null ? latestItem.packagingCostPerUnit : (rate * 0.18);
+      final double trans = latestItem != null ? latestItem.transportationCostPerUnit : (rate - base - pack);
+
+      // Find catalog retail selling price
+      double retail = 0.0;
+      final matchedProd = products.where((p) => p.name.toLowerCase() == bal.itemName.toLowerCase()).firstOrNull;
+      if (matchedProd != null && matchedProd.defaultUnitPrice > 0) {
+        retail = matchedProd.defaultUnitPrice;
+      } else {
+        // Fallback standard retail price estimation based on commercial packages
+        final pkgs = packages.where((p) => p.productName.toLowerCase() == bal.itemName.toLowerCase()).toList();
+        if (pkgs.isNotEmpty) {
+          retail = pkgs.first.unitPrice;
+        } else {
+          retail = rate * 4.5; // Typical 4.5x gross multiplier for health & direct response
+        }
+      }
+
+      // Find orders matching this product
+      final matchingOrders = orders.where((o) {
+        // Date range filtering if active
+        if (inventoryStartDate != null || inventoryEndDate != null) {
+          final dt = (o.deliveredAt ?? o.createdAt).toLocal();
+          if (inventoryStartDate != null && dt.isBefore(inventoryStartDate!)) return false;
+          if (inventoryEndDate != null) {
+            final endOfDay = DateTime(inventoryEndDate!.year, inventoryEndDate!.month, inventoryEndDate!.day, 23, 59, 59);
+            if (dt.isAfter(endOfDay)) return false;
+          }
+        }
+
+        final oProd = o.productName.trim().toLowerCase();
+        final balName = bal.itemName.trim().toLowerCase();
+        final oSku = (o.productSku ?? '').trim().toLowerCase();
+        final balSku = bal.itemCode.trim().toLowerCase();
+        return (oProd.isNotEmpty && (oProd == balName || oProd.contains(balName) || balName.contains(oProd))) ||
+            (oSku.isNotEmpty && balSku.isNotEmpty && oSku == balSku);
+      }).toList();
+
+      final deliveredOrders = matchingOrders.where((o) =>
+          o.isDelivered ||
+          o.status.toLowerCase() == 'delivered' ||
+          o.status.toLowerCase() == 'completed').toList();
+      final failedOrders = matchingOrders.where((o) =>
+          o.isFailed ||
+          o.status.toLowerCase() == 'cancelled' ||
+          o.status.toLowerCase() == 'failed' ||
+          o.status.toLowerCase() == 'rejected').toList();
+
+      // Quantity Sold: Total physical units delivered across orders (including promotional bundle units)
+      final int qtySold = deliveredOrders.fold<int>(
+        0,
+        (sum, o) => sum + (o.totalPhysicalQuantity > 0 ? o.totalPhysicalQuantity : (o.quantity > 0 ? o.quantity : 1)),
+      );
+
+      // Value Sold: Actual cash/money recovered by selling packages (sum of order amounts, not unit price * qty)
+      final double valSold = deliveredOrders.fold<double>(
+        0.0,
+        (sum, o) => sum + o.totalAmount,
+      );
+
+      // Client-specific negotiated fee tariffs from onboarding
+      final double deliveryFeeRate = (clientProfile.customDeliveryFee != null && clientProfile.customDeliveryFee! > 0)
+          ? clientProfile.customDeliveryFee!
+          : 5000.0;
+      final double failedFeeRate = (clientProfile.customFailedAttemptFee != null && clientProfile.customFailedAttemptFee! > 0)
+          ? clientProfile.customFailedAttemptFee!
+          : 500.0;
+      final double platformFeeRate = (clientProfile.customPlatformFeeValue != null && clientProfile.customPlatformFeeValue! > 0)
+          ? clientProfile.customPlatformFeeValue!
+          : 500.0;
+      final String platformFeeType = clientProfile.customPlatformFeeType ?? 'flat';
+
+      return ClientUnitEconomics.calculate(
+        productName: bal.itemName,
+        productSku: bal.itemCode,
+        baseSupplierPrice: base,
+        packagingAddon: pack,
+        transportationAddon: trans > 0 ? trans : 0.0,
+        catalogRetailPrice: retail,
+        totalUnitsOnHand: bal.balanceQty,
+        quantitySold: qtySold,
+        valueSold: valSold,
+        deliveredOrdersCount: deliveredOrders.length,
+        failedOrdersCount: failedOrders.length,
+        totalOrdersCount: matchingOrders.length,
+        deliveryFeeRate: deliveryFeeRate,
+        failedFeeRate: failedFeeRate,
+        platformChargeRate: platformFeeRate,
+        platformFeeType: platformFeeType,
+      );
+    }).toList();
   }
 
   // Analytics KPIs
@@ -826,6 +1030,107 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
     state = state.copyWith(selectedFinanceTimeFilter: timeFilter);
   }
 
+  // --- Inventory & Landed Cost Supply Management Actions ---
+
+  void setInventoryWarehouseFilter(String warehouse) {
+    state = state.copyWith(selectedInventoryWarehouseFilter: warehouse);
+  }
+
+  void setInventoryItemFilter(String item) {
+    state = state.copyWith(selectedInventoryItemFilter: item);
+  }
+
+  Future<void> reloadInventoryData({DateTime? startDate, DateTime? endDate}) async {
+    final clientId = state.clientProfile.id.isNotEmpty
+        ? state.clientProfile.id
+        : (_ref.read(authProvider).user?.clientId ?? '33333333-3333-4333-8333-333333333333');
+    state = state.copyWith(
+      isInventoryLoading: true,
+      inventoryStartDate: startDate,
+      inventoryEndDate: endDate,
+    );
+    try {
+      final sups = await _repository.getSuppliers(clientId);
+      final invs = await _repository.getStockInvoices(clientId);
+      final bals = await _repository.getStockBalances(
+        clientId,
+        warehouseFilter: state.selectedInventoryWarehouseFilter,
+        itemFilter: state.selectedInventoryItemFilter,
+        startDate: startDate,
+        endDate: endDate,
+      );
+      state = state.copyWith(
+        suppliers: sups,
+        stockInvoices: invs,
+        stockBalances: bals,
+        isInventoryLoading: false,
+      );
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] ⚠️ reloadInventoryData error: $e');
+      state = state.copyWith(isInventoryLoading: false);
+    }
+  }
+
+  Future<ClientSupplier> createSupplier(ClientSupplier supplier) async {
+    final created = await _repository.createSupplier(supplier);
+    state = state.copyWith(suppliers: [created, ...state.suppliers.where((s) => s.id != created.id)]);
+    return created;
+  }
+
+  Future<void> updateSupplier(ClientSupplier supplier) async {
+    await _repository.updateSupplier(supplier);
+    state = state.copyWith(
+      suppliers: state.suppliers.map((s) => s.id == supplier.id ? supplier : s).toList(),
+    );
+  }
+
+  Future<ClientStockInvoice> raiseStockInvoice({
+    required ClientStockInvoice invoice,
+    required List<ClientStockInvoiceItem> items,
+  }) async {
+    final created = await _repository.raiseStockInvoice(invoice: invoice, items: items);
+    state = state.copyWith(
+      stockInvoices: [created, ...state.stockInvoices.where((i) => i.id != created.id)],
+    );
+    await reloadInventoryData();
+    return created;
+  }
+
+  Future<void> attachPaymentReceipt({
+    required String invoiceId,
+    required String receiptUrl,
+  }) async {
+    await _repository.attachPaymentReceipt(
+      invoiceId: invoiceId,
+      receiptUrl: receiptUrl,
+    );
+    state = state.copyWith(
+      stockInvoices: state.stockInvoices.map((inv) {
+        if (inv.id == invoiceId) {
+          return inv.copyWith(paymentReceiptUrl: receiptUrl);
+        }
+        return inv;
+      }).toList(),
+    );
+  }
+
+  Future<void> importStockBalanceCsv(String csvContent) async {
+    final clientId = state.clientProfile.id.isNotEmpty
+        ? state.clientProfile.id
+        : (_ref.read(authProvider).user?.clientId ?? '33333333-3333-4333-8333-333333333333');
+    await _repository.importStockBalanceCsv(clientId, csvContent);
+    await reloadInventoryData();
+  }
+
+  String generateStockBalanceCsv() {
+    final buffer = StringBuffer();
+    buffer.writeln('Item,Item Name,Item Group,Warehouse,Stock UOM,Balance Qty,Balance Value,Opening Qty,Opening Value,In Qty,In Value,Out Qty,Out Value,Valuation Rate,Reserved Stock,Company');
+    for (final b in state.stockBalances) {
+      buffer.writeln('${b.itemCode},"${b.itemName}","${b.itemGroup}","${b.warehouse}",${b.stockUom},${b.balanceQty},${b.balanceValue.toStringAsFixed(2)},${b.openingQty},${b.openingValue.toStringAsFixed(2)},${b.inQty},${b.inValue.toStringAsFixed(2)},${b.outQty},${b.outValue.toStringAsFixed(2)},${b.valuationRate.toStringAsFixed(4)},${b.reservedStock},"${b.company}"');
+    }
+    return buffer.toString();
+  }
+
   /// Exports settlement statement CSV content for the client
   String generateSettlementCsv() {
     final buffer = StringBuffer();
@@ -1071,6 +1376,19 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         );
       }
 
+      // 5. Fetch Inventory suppliers, invoices, and balances
+      List<ClientSupplier> suppliers = [];
+      List<ClientStockInvoice> stockInvoices = [];
+      List<ClientStockBalance> stockBalances = [];
+
+      try {
+        suppliers = await _repository.getSuppliers(clientId);
+        stockInvoices = await _repository.getStockInvoices(clientId);
+        stockBalances = await _repository.getStockBalances(clientId);
+      } catch (e) {
+        debugPrint('[CLIENT_PORTAL] ⚠️ Error loading inventory data: $e');
+      }
+
       if (!mounted) return;
       state = state.copyWith(
         clientProfile: profileToUse,
@@ -1081,6 +1399,9 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         leads: clientLeads,
         settlements: clientSettlements,
         assetCustodyData: custodyData,
+        suppliers: suppliers,
+        stockInvoices: stockInvoices,
+        stockBalances: stockBalances,
         isLoading: false,
       );
     } catch (e) {
@@ -1148,8 +1469,16 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
   }) async {
     state = state.copyWith(isLoading: true);
     try {
-      final suffix = (100 + state.closers.length + 1).toString().padLeft(3, '0');
-      final closerCode = 'CLS-NOVA-$suffix';
+      int maxExisting = 0;
+      for (final c in state.closers) {
+        final match = RegExp(r'\d+$').firstMatch(c.closerCode);
+        if (match != null) {
+          final n = int.tryParse(match.group(0)!);
+          if (n != null && n > maxExisting) maxExisting = n;
+        }
+      }
+      final candidateNum = maxExisting >= 100 ? maxExisting + 1 : (maxExisting > 0 ? maxExisting + 1 : 101);
+      final closerCode = 'CLS-NOVA-${candidateNum.toString().padLeft(3, '0')}';
       final fallbackId = '00000000-0000-4000-8000-${DateTime.now().millisecondsSinceEpoch.toString().padLeft(12, '0')}';
 
       ClientCloser newCloser;
@@ -1166,11 +1495,12 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
           commissionRate: commissionRate,
         );
       } catch (dbErr) {
-        if (dbErr.toString().contains('already exists')) {
+        if (dbErr.toString().contains('already exists') || dbErr.toString().contains('registered')) {
           rethrow;
         }
         debugPrint('[CLIENT_PORTAL] ⚠️ Remote createCloser error: $dbErr.');
-        if (!const bool.fromEnvironment('flutter.test')) {
+        final isTestMode = !kIsWeb && (Platform.environment.containsKey('FLUTTER_TEST') || const bool.fromEnvironment('flutter.test'));
+        if (!isTestMode) {
           rethrow;
         }
         newCloser = ClientCloser(
@@ -1221,8 +1551,15 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
       );
       return newCloser;
     } catch (e) {
-      state = state.copyWith(isLoading: false, errorMessage: e.toString());
-      rethrow;
+      var err = e.toString();
+      if (err.startsWith('Exception: ')) err = err.substring(11);
+      if (err.contains('users_phone_number_key') || (err.contains('phone_number') && err.contains('already exists'))) {
+        err = "Phone number '$phone' is already registered to another account. Please use a unique phone number.";
+      } else if (err.contains('client_closers_closer_code_key') || (err.contains('closer_code') && err.contains('already exists'))) {
+        err = "Closer code collision detected. Please try again to generate a new unique closer code.";
+      }
+      state = state.copyWith(isLoading: false, errorMessage: err);
+      throw Exception(err);
     }
   }
 
@@ -1557,6 +1894,9 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
     required String productName,
     required int quantity,
     required double totalAmount,
+    int? paidQuantity,
+    int? freeQuantity,
+    String? sourceWarehouse,
     String? packageId,
     String? packageName,
     String paymentType = 'Pay on Delivery (Cash/POS)',
@@ -1595,6 +1935,10 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
               ? authUser!.clientCompanyName!
               : 'Novacare Health & Wellness Ltd');
 
+      final effectivePaidQty = paidQuantity ?? (packageId != null ? quantity : 1);
+      final effectiveFreeQty = freeQuantity ?? 0;
+      final effectiveWarehouse = sourceWarehouse ?? 'Stores - NL';
+
       final provisionalOrder = OrderEntity(
         id: orderId,
         orderNumber: orderNumber,
@@ -1612,6 +1956,8 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         basePrice: totalAmount,
         upsellAmount: 0.0,
         quantity: quantity,
+        paidQuantity: effectivePaidQty,
+        freeQuantity: effectiveFreeQty,
         productName: productName,
         packageDealId: packageId,
         packageDealName: packageName,
@@ -1683,6 +2029,8 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         basePrice: totalAmount,
         upsellAmount: 0.0,
         quantity: quantity,
+        paidQuantity: effectivePaidQty,
+        freeQuantity: effectiveFreeQty,
         productName: productName,
         packageDealId: packageId,
         packageDealName: packageName,
@@ -1734,6 +2082,9 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
           'package_deal_id': newOrder.packageDealId,
           'package_deal_name': newOrder.packageDealName,
           'quantity': newOrder.quantity,
+          'paid_quantity': effectivePaidQty,
+          'free_quantity': effectiveFreeQty,
+          'source_warehouse': effectiveWarehouse,
           'fulfillment_type': 'client_package',
           'client_name': newOrder.clientName,
           'client_id': newOrder.clientId,
@@ -1779,6 +2130,9 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
               'package_deal_id': newOrder.packageDealId,
               'package_deal_name': newOrder.packageDealName,
               'quantity': newOrder.quantity,
+              'paid_quantity': effectivePaidQty,
+              'free_quantity': effectiveFreeQty,
+              'source_warehouse': effectiveWarehouse,
               'fulfillment_type': 'client_package',
               'client_name': newOrder.clientName,
               'client_id': newOrder.clientId,
@@ -1839,6 +2193,7 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
     String category = 'Health & Wellness',
     String? description,
     String? imageUrl,
+    String? preferredSupplierId,
     required List<String> coveringStates,
   }) async {
     state = state.copyWith(isLoading: true);
@@ -1939,6 +2294,7 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         clientId: validClientId,
         description: description,
         imageUrl: imageUrl,
+        preferredSupplierId: preferredSupplierId,
         coveringStates: coveringStates,
       );
 

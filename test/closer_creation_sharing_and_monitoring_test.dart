@@ -345,4 +345,51 @@ $companyName Management''';
       expect(leaderboard.last.id, closer2.id);
     });
   });
+
+  group('Closer Code Collision Prevention & Pre-flight Error Formatting', () {
+    test('Calculates next closer code suffix higher than any existing suffix in team', () {
+      final existingClosers = [
+        const ClientCloser(id: '1', clientId: 'c1', closerCode: 'CLS-NOVA-001', fullName: 'Amaka', email: 'a@n.com', phone: '0801'),
+        const ClientCloser(id: '2', clientId: 'c1', closerCode: 'CLS-NOVA-002', fullName: 'Chidinma', email: 'b@n.com', phone: '0802'),
+        const ClientCloser(id: '3', clientId: 'c1', closerCode: 'CLS-NOVA-103', fullName: 'Prince', email: 'c@n.com', phone: '0803'),
+      ];
+
+      int maxExisting = 0;
+      for (final c in existingClosers) {
+        final match = RegExp(r'\d+$').firstMatch(c.closerCode);
+        if (match != null) {
+          final n = int.tryParse(match.group(0)!);
+          if (n != null && n > maxExisting) maxExisting = n;
+        }
+      }
+
+      final candidateNum = maxExisting >= 100 ? maxExisting + 1 : (maxExisting > 0 ? maxExisting + 1 : 101);
+      final generatedCode = 'CLS-NOVA-${candidateNum.toString().padLeft(3, '0')}';
+
+      expect(maxExisting, 103);
+      expect(candidateNum, 104);
+      expect(generatedCode, 'CLS-NOVA-104');
+    });
+
+    test('Translates postgres duplicate key exceptions to user-friendly messages', () {
+      String formatError(String raw) {
+        if (raw.contains('users_phone_number_key') || (raw.contains('phone_number') && raw.contains('already exists'))) {
+          return "Phone number is already registered to another account. Please use a unique phone number.";
+        } else if (raw.contains('client_closers_closer_code_key') || (raw.contains('closer_code') && raw.contains('already exists'))) {
+          return "Closer code collision detected. Please try again to generate a new unique code.";
+        } else if (raw.contains('users_email_key') || (raw.contains('email') && raw.contains('already exists'))) {
+          return "Email is already registered. Please use a unique email address.";
+        }
+        return raw;
+      }
+
+      const phoneErr = 'PostgresException(message: duplicate key value violates unique constraint "users_phone_number_key", code: 23505, details: Key (phone_number)=(08085040146) already exists., hint: null)';
+      const closerErr = 'PostgresException(message: duplicate key value violates unique constraint "client_closers_closer_code_key", code: 23505, details: Key (closer_code)=(CLS-NOVA-104) already exists., hint: null)';
+      const emailErr = 'PostgresException(message: duplicate key value violates unique constraint "users_email_key", code: 23505, details: Key (email)=(closer@novacare.com) already exists., hint: null)';
+
+      expect(formatError(phoneErr), contains('already registered to another account'));
+      expect(formatError(closerErr), contains('Closer code collision detected'));
+      expect(formatError(emailErr), contains('Email is already registered'));
+    });
+  });
 }

@@ -9,6 +9,7 @@ import '../../../../core/widgets/product_image_widget.dart';
 import '../../../dc_console/domain/entities/distribution_center.dart';
 import '../../../dc_console/presentation/providers/dc_console_provider.dart';
 import '../providers/client_portal_provider.dart';
+import 'client_add_supplier_modal.dart';
 
 class ClientAddProductModal extends ConsumerStatefulWidget {
   const ClientAddProductModal({super.key});
@@ -36,6 +37,7 @@ class _ClientAddProductModalState extends ConsumerState<ClientAddProductModal> {
   final _lowStockThresholdCtrl = TextEditingController(text: '10');
   final _descCtrl = TextEditingController();
   String _selectedCategory = 'Health & Wellness';
+  String? _selectedSupplierId;
 
   final List<String> _categories = [
     'Health & Wellness',
@@ -128,6 +130,7 @@ class _ClientAddProductModalState extends ConsumerState<ClientAddProductModal> {
         lowStockThreshold: lowStock,
         description: _descCtrl.text.trim().isNotEmpty ? _descCtrl.text.trim() : null,
         imageUrl: _selectedImageUrl,
+        preferredSupplierId: _selectedSupplierId,
         coveringStates: _selectedStates.toList(),
       );
 
@@ -514,6 +517,58 @@ class _ClientAddProductModalState extends ConsumerState<ClientAddProductModal> {
                             ),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Preferred Procurement Supplier Selector
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Preferred Procurement Supplier / Vendor',
+                            style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF334155)),
+                          ),
+                          TextButton.icon(
+                            onPressed: () async {
+                              final newSupp = await ClientAddSupplierModal.show(context);
+                              if (newSupp != null && mounted) {
+                                setState(() => _selectedSupplierId = newSupp.id);
+                              }
+                            },
+                            icon: const Icon(Icons.add_business_rounded, size: 14, color: Color(0xFF0D9488)),
+                            label: Text(
+                              '+ Register New Vendor',
+                              style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color(0xFF0D9488)),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      DropdownButtonFormField<String?>(
+                        value: _selectedSupplierId,
+                        dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                        style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : Colors.black87),
+                        decoration: InputDecoration(
+                          hintText: 'Select direct supplier (Optional)',
+                          filled: true,
+                          fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        ),
+                        items: [
+                          const DropdownMenuItem<String?>(
+                            value: null,
+                            child: Text('No Preferred Supplier Attached (Unassigned)'),
+                          ),
+                          ...ref.watch(clientPortalProvider).suppliers.map(
+                            (s) => DropdownMenuItem<String?>(
+                              value: s.id,
+                              child: Text('${s.supplierName} • ${s.category} (${s.leadTimeDays}d lead)'),
+                            ),
+                          ),
+                        ],
+                        onChanged: (val) => setState(() => _selectedSupplierId = val),
                       ),
                       const SizedBox(height: 16),
 

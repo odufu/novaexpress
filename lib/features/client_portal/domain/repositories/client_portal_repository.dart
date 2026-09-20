@@ -2,6 +2,9 @@ import '../entities/client_closer.dart';
 import '../entities/client_profile.dart';
 import '../entities/client_settlement.dart';
 import '../entities/customer_lead.dart';
+import '../entities/client_supplier.dart';
+import '../entities/client_stock_invoice.dart';
+import '../entities/client_stock_balance.dart';
 
 abstract class ClientPortalRepository {
   /// Onboards a new Closer for an Enterprise Client
@@ -74,4 +77,26 @@ abstract class ClientPortalRepository {
 
   /// Fetches live merchant asset custody breakdown (liquid cash & in-kind inventory)
   Future<Map<String, dynamic>> getMerchantAssetCustody(String clientId);
+
+  // --- Inventory & Landed Cost Supply Management ---
+  Future<List<ClientSupplier>> getSuppliers(String clientId);
+  Future<ClientSupplier> createSupplier(ClientSupplier supplier);
+  Future<void> updateSupplier(ClientSupplier supplier);
+  Future<List<ClientStockInvoice>> getStockInvoices(String clientId);
+  Future<ClientStockInvoice> raiseStockInvoice({
+    required ClientStockInvoice invoice,
+    required List<ClientStockInvoiceItem> items,
+  });
+  Future<void> attachPaymentReceipt({
+    required String invoiceId,
+    required String receiptUrl,
+  });
+  Future<List<ClientStockBalance>> getStockBalances(
+    String clientId, {
+    String? warehouseFilter,
+    String? itemFilter,
+    DateTime? startDate,
+    DateTime? endDate,
+  });
+  Future<void> importStockBalanceCsv(String clientId, String csvContent);
 }

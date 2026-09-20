@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import '../../../../core/helpers/formatters.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/widgets/product_image_widget.dart';
@@ -8,12 +9,15 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../dc_console/domain/entities/product_package.dart';
 import '../../../dc_console/presentation/providers/product_catalog_provider.dart';
 import '../providers/client_portal_provider.dart';
+import '../widgets/pangea_excel_data_table.dart';
+import '../widgets/client_operational_cost_breakdown_modal.dart';
 import '../widgets/client_add_product_modal.dart';
 import '../widgets/client_add_package_modal.dart';
 import '../widgets/client_consignments_modal.dart';
 import '../widgets/client_create_order_modal.dart';
 import '../widgets/client_product_detail_modal.dart';
 import '../widgets/client_supply_stock_modal.dart';
+import '../widgets/client_raise_stock_invoice_modal.dart';
 
 class ClientProductsPage extends ConsumerStatefulWidget {
   const ClientProductsPage({super.key});
@@ -94,7 +98,26 @@ class _ClientProductsPageState extends ConsumerState<ClientProductsPage> {
       final idKey = p.id.trim();
       final dedupKey = skuKey.isNotEmpty ? skuKey : idKey;
       if (dedupKey.isNotEmpty && seenSkus.add(dedupKey)) {
-        rawProducts.add(p);
+        // Calculate live network stock from state.stockBalances if product totalStockAcrossHubs is 0
+        var effectiveStock = p.totalStockAcrossHubs;
+        if (effectiveStock <= 0) {
+          final pSku = p.sku.trim().toUpperCase();
+          final pName = p.name.trim().toLowerCase();
+          int liveSum = 0;
+          for (final b in state.stockBalances) {
+            final bCode = b.itemCode.trim().toUpperCase();
+            final bName = b.itemName.trim().toLowerCase();
+            if ((pSku.isNotEmpty && bCode == pSku) ||
+                (pName.isNotEmpty && bName == pName) ||
+                (pName.isNotEmpty && (bName.contains(pName) || pName.contains(bName)))) {
+              liveSum += b.balanceQty.toInt();
+            }
+          }
+          if (liveSum > 0) {
+            effectiveStock = liveSum;
+          }
+        }
+        rawProducts.add(p.copyWith(totalStockAcrossHubs: effectiveStock));
       }
     }
 
@@ -757,436 +780,396 @@ class _ClientProductsPageState extends ConsumerState<ClientProductsPage> {
     );
   }
 
-  // --- 4A. Data Table View (Desktop Default) ---
+  // --- 4A. Excel-Style Data Table View (Desktop Default) ---
   Widget _buildDataTable(
     List<CatalogProduct> products,
     Map<String, _ProductMetrics> metricsMap,
     ProductCatalogState catalogState,
     bool isDark,
   ) {
+    final portalState = ref.watch(clientPortalProvider);
+    final brandPrimary = portalState.clientProfile.brandPrimaryColor;
+
+    final columns = <ExcelColumnDef<CatalogProduct>>[
+      // Column 1: Product & SKU
+      ExcelColumnDef<CatalogProduct>(
+        key: 'product',
+        group: 'Product Details',
+        label: 'PRODUCT & SKU',
+        defaultWidth: 230,
+        minWidth: 170,
+        searchString: (p) => '${p.name} ${p.sku} ${p.category}',
+        sortValue: (p) => p.name,
+        cellBuilder: (context, product, row, isDark, brand) {
+          return InkWell(
+            onTap: () => _openProductDetail(product),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: brand.withValues(alpha: 0.3),
+                      width: 1.2,
+                    ),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(7),
+                    child: ProductImageWidget(
+                      imageUrl: product.imageUrl,
+                      width: 34,
+                      height: 34,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        product.name,
+                        style: GoogleFonts.inter(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (product.sku.isNotEmpty)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF1E294A) : const Color(0xFFE2E8F0),
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                              child: Text(
+                                product.sku,
+                                style: GoogleFonts.jetBrainsMono(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                                ),
+                              ),
+                            ),
+                          if (product.sku.isNotEmpty && product.category.isNotEmpty)
+                            const SizedBox(width: 5),
+                          if (product.category.isNotEmpty)
+                            Flexible(
+                              child: Text(
+                                product.category,
+                                style: GoogleFonts.inter(
+                                  fontSize: 10,
+                                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+
+      // Column 2: Retail Price
+      ExcelColumnDef<CatalogProduct>(
+        key: 'retailPrice',
+        group: 'Commercial Pricing',
+        label: 'RETAIL PRICE',
+        defaultWidth: 125,
+        minWidth: 95,
+        align: TextAlign.right,
+        sortValue: (p) => p.defaultUnitPrice,
+        cellBuilder: (context, p, row, isDark, brand) => Text(
+          '₦${Formatters.currency(p.defaultUnitPrice)}',
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: const Color(0xFFF37021),
+          ),
+        ),
+      ),
+
+      // Column 3: Quantity Sold
+      ExcelColumnDef<CatalogProduct>(
+        key: 'quantitySold',
+        group: 'Sales Performance',
+        label: 'QUANTITY SOLD',
+        defaultWidth: 130,
+        minWidth: 95,
+        align: TextAlign.right,
+        sortValue: (p) {
+          final key = p.id.isNotEmpty ? p.id : p.name;
+          return metricsMap[key]?.unitsSold ?? 0;
+        },
+        cellBuilder: (context, p, row, isDark, brand) {
+          final key = p.id.isNotEmpty ? p.id : p.name;
+          final m = metricsMap[key] ?? const _ProductMetrics();
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF37021).withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.local_fire_department_rounded, size: 12, color: Color(0xFFF37021)),
+                const SizedBox(width: 4),
+                Text(
+                  '${m.unitsSold} units',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFFF37021),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+
+      // Column 4: Value Sold (Packages)
+      ExcelColumnDef<CatalogProduct>(
+        key: 'valueSold',
+        group: 'Sales Performance',
+        label: 'VALUE SOLD (PACKAGES)',
+        defaultWidth: 175,
+        minWidth: 130,
+        align: TextAlign.right,
+        sortValue: (p) {
+          final key = p.id.isNotEmpty ? p.id : p.name;
+          return metricsMap[key]?.revenue ?? 0.0;
+        },
+        cellBuilder: (context, p, row, isDark, brand) {
+          final key = p.id.isNotEmpty ? p.id : p.name;
+          final m = metricsMap[key] ?? const _ProductMetrics();
+          return Text(
+            '₦${Formatters.currency(m.revenue)}',
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF10B981),
+            ),
+          );
+        },
+      ),
+
+      // Column 5: Operations Cost (with instant hover breakdown card and click modal)
+      ExcelColumnDef<CatalogProduct>(
+        key: 'operationsCost',
+        group: 'Operations Cost',
+        label: 'OPERATIONS COST',
+        defaultWidth: 175,
+        minWidth: 140,
+        align: TextAlign.right,
+        sortValue: (p) {
+          final eco = portalState.unitEconomicsList.where((e) =>
+            e.productName.toLowerCase() == p.name.toLowerCase() ||
+            (p.sku.isNotEmpty && e.productSku.toLowerCase() == p.sku.toLowerCase())
+          ).firstOrNull;
+          return eco?.totalOperationsCost ?? 0.0;
+        },
+        cellBuilder: (context, p, row, isDark, brand) {
+          final eco = portalState.unitEconomicsList.where((e) =>
+            e.productName.toLowerCase() == p.name.toLowerCase() ||
+            (p.sku.isNotEmpty && e.productSku.toLowerCase() == p.sku.toLowerCase())
+          ).firstOrNull;
+          if (eco != null) {
+            return ClientOperationalCostCell(
+              economics: eco,
+              brandPrimary: brand,
+              isDark: isDark,
+            );
+          }
+          return Text(
+            '₦0.00',
+            style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)),
+          );
+        },
+      ),
+
+      // Column 6: Hub Stock
+      ExcelColumnDef<CatalogProduct>(
+        key: 'hubStock',
+        group: 'Inventory Fulfillment',
+        label: 'HUB STOCK',
+        defaultWidth: 120,
+        minWidth: 90,
+        align: TextAlign.right,
+        sortValue: (p) => p.totalStockAcrossHubs,
+        cellBuilder: (context, p, row, isDark, brand) {
+          final count = p.totalStockAcrossHubs;
+          final isOut = count <= 0;
+          final isLow = count > 0 && count <= p.lowStockThreshold;
+
+          final Color badgeColor = isOut
+              ? const Color(0xFFEF4444)
+              : (isLow ? const Color(0xFFF59E0B) : const Color(0xFF10B981));
+
+          final formattedUnits = NumberFormat('#,###').format(count);
+
+          return InkWell(
+            onTap: () => _openProductDetail(p, initialTabIndex: 1),
+            borderRadius: BorderRadius.circular(6),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+              decoration: BoxDecoration(
+                color: badgeColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: badgeColor.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    isOut ? Icons.warning_amber_rounded : (isLow ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded),
+                    size: 12,
+                    color: badgeColor,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    isOut ? '0 (Out)' : '$formattedUnits units',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: badgeColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+
+      // Column 7: Deals
+      ExcelColumnDef<CatalogProduct>(
+        key: 'deals',
+        group: 'Inventory Fulfillment',
+        label: 'DEALS',
+        defaultWidth: 100,
+        minWidth: 75,
+        align: TextAlign.center,
+        sortValue: (p) => catalogState.getPackagesForProduct(p.name).length,
+        cellBuilder: (context, p, row, isDark, brand) {
+          final pkgs = catalogState.getPackagesForProduct(p.name);
+          return InkWell(
+            onTap: () => _openProductDetail(p, initialTabIndex: 2),
+            borderRadius: BorderRadius.circular(6),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+              decoration: BoxDecoration(
+                color: pkgs.isNotEmpty
+                    ? const Color(0xFFEC4899).withValues(alpha: 0.12)
+                    : (isDark ? const Color(0xFF1E294A) : const Color(0xFFF1F5F9)),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                pkgs.isNotEmpty ? '${pkgs.length} Deals' : '+ Deal',
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: pkgs.isNotEmpty ? const Color(0xFFEC4899) : const Color(0xFF94A3B8),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+
+      // Column 8: Actions
+      ExcelColumnDef<CatalogProduct>(
+        key: 'actions',
+        group: 'Manage',
+        label: 'ACTIONS',
+        defaultWidth: 130,
+        minWidth: 100,
+        align: TextAlign.center,
+        cellBuilder: (context, p, row, isDark, brand) {
+          final hasInv = portalState.clientProfile.hasInventoryManagement;
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                tooltip: hasInv ? 'Stock Intake & Landed Cost' : 'Supply Consignment to Hub',
+                icon: Icon(hasInv ? Icons.receipt_long_rounded : Icons.local_shipping_rounded, size: 15),
+                style: IconButton.styleFrom(
+                  backgroundColor: const Color(0xFF10B981).withValues(alpha: 0.12),
+                  foregroundColor: const Color(0xFF10B981),
+                  padding: const EdgeInsets.all(6),
+                  minimumSize: Size.zero,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                ),
+                onPressed: () {
+                  if (hasInv) {
+                    ClientRaiseStockInvoiceModal.show(context, initialProduct: p);
+                  } else {
+                    ClientSupplyStockModal.show(context, p);
+                  }
+                },
+              ),
+              const SizedBox(width: 4),
+              IconButton(
+                tooltip: 'Create Order',
+                icon: const Icon(Icons.add_shopping_cart_rounded, size: 15),
+                style: IconButton.styleFrom(
+                  backgroundColor: const Color(0xFFF37021).withValues(alpha: 0.12),
+                  foregroundColor: const Color(0xFFF37021),
+                  padding: const EdgeInsets.all(6),
+                  minimumSize: Size.zero,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                ),
+                onPressed: () => ClientCreateOrderModal.show(context, product: p),
+              ),
+              const SizedBox(width: 4),
+              IconButton(
+                tooltip: 'Details & Deals',
+                icon: const Icon(Icons.insights_rounded, size: 15),
+                style: IconButton.styleFrom(
+                  backgroundColor: const Color(0xFF2563EB).withValues(alpha: 0.12),
+                  foregroundColor: const Color(0xFF2563EB),
+                  padding: const EdgeInsets.all(6),
+                  minimumSize: Size.zero,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                ),
+                onPressed: () => _openProductDetail(p),
+              ),
+            ],
+          );
+        },
+      ),
+    ];
+
     return Container(
+      height: 520,
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF151D36) : Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minWidth: 1000),
-            child: DataTable(
-              headingRowColor: WidgetStateProperty.all(
-                isDark ? const Color(0xFF0B1021) : const Color(0xFFF8FAFC),
-              ),
-              dataRowMinHeight: 68,
-              dataRowMaxHeight: 74,
-              horizontalMargin: 16,
-              columnSpacing: 24,
-              columns: [
-                DataColumn(
-                  label: Text(
-                    'PRODUCT',
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                    ),
-                  ),
-                ),
-                DataColumn(
-                  label: Text(
-                    'RETAIL PRICE',
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                    ),
-                  ),
-                ),
-                DataColumn(
-                  label: Text(
-                    'UNITS SOLD',
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                    ),
-                  ),
-                ),
-                DataColumn(
-                  label: Text(
-                    'REVENUE',
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                    ),
-                  ),
-                ),
-                DataColumn(
-                  label: Text(
-                    'HUB STOCK',
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                    ),
-                  ),
-                ),
-                DataColumn(
-                  label: Text(
-                    'DEALS',
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                    ),
-                  ),
-                ),
-                DataColumn(
-                  label: Text(
-                    'COVERAGE',
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                    ),
-                  ),
-                ),
-                DataColumn(
-                  label: Text(
-                    'ACTIONS',
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                    ),
-                  ),
-                ),
-              ],
-              rows: products.map((product) {
-                final key = product.id.isNotEmpty ? product.id : product.name;
-                final metrics = metricsMap[key] ?? const _ProductMetrics();
-                final packages = catalogState.getPackagesForProduct(product.name);
-
-                return DataRow(
-                  cells: [
-                    // Column 1: Product Thumbnail & Name
-                    DataCell(
-                      InkWell(
-                        onTap: () => _openProductDetail(product),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: const Color(0xFF2563EB).withValues(alpha: 0.2),
-                                  width: 1.2,
-                                ),
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(7),
-                                child: ProductImageWidget(
-                                  imageUrl: product.imageUrl,
-                                  width: 38,
-                                  height: 38,
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Flexible(
-                              child: ConstrainedBox(
-                                constraints: const BoxConstraints(maxWidth: 165),
-                                child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    product.name,
-                                    style: GoogleFonts.inter(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                      color: isDark ? Colors.white : const Color(0xFF0F172A),
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 3),
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                                        decoration: BoxDecoration(
-                                          color: isDark ? const Color(0xFF1E294A) : const Color(0xFFE2E8F0),
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: Text(
-                                          product.sku,
-                                          style: GoogleFonts.jetBrainsMono(
-                                            fontSize: 9.5,
-                                            fontWeight: FontWeight.w700,
-                                            color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Flexible(
-                                        child: Text(
-                                          product.category,
-                                          style: GoogleFonts.inter(
-                                            fontSize: 10.5,
-                                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                    // Column 2: Retail Price
-                    DataCell(
-                      Text(
-                        '₦${Formatters.currency(product.defaultUnitPrice)}',
-                        style: GoogleFonts.inter(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFFF37021),
-                        ),
-                      ),
-                    ),
-
-                    // Column 3: Units Sold
-                    DataCell(
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF37021).withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: const Color(0xFFF37021).withValues(alpha: 0.25)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.local_fire_department_rounded, size: 13, color: Color(0xFFF37021)),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${metrics.unitsSold} sold',
-                              style: GoogleFonts.inter(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: const Color(0xFFF37021),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    // Column 4: Revenue
-                    DataCell(
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF10B981).withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.25)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.payments_rounded, size: 13, color: Color(0xFF10B981)),
-                            const SizedBox(width: 4),
-                            Text(
-                              '₦${Formatters.currency(metrics.revenue)}',
-                              style: GoogleFonts.inter(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: const Color(0xFF10B981),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    // Column 5: Hub Stock
-                    DataCell(
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
-                        decoration: BoxDecoration(
-                          color: product.totalStockAcrossHubs > 0
-                              ? const Color(0xFF2563EB).withValues(alpha: 0.12)
-                              : const Color(0xFFEF4444).withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: product.totalStockAcrossHubs > 0
-                                ? const Color(0xFF2563EB).withValues(alpha: 0.25)
-                                : const Color(0xFFEF4444).withValues(alpha: 0.25),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.inventory_2_rounded,
-                              size: 13,
-                              color: product.totalStockAcrossHubs > 0
-                                  ? const Color(0xFF2563EB)
-                                  : const Color(0xFFEF4444),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              product.totalStockAcrossHubs > 0
-                                  ? '${product.totalStockAcrossHubs} units'
-                                  : 'Out of stock (0)',
-                              style: GoogleFonts.inter(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: product.totalStockAcrossHubs > 0
-                                    ? const Color(0xFF2563EB)
-                                    : const Color(0xFFEF4444),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    // Column 6: Deals (Compact Clickable Badge to open Product Detail Deals Tab)
-                    DataCell(
-                      InkWell(
-                        onTap: () => _openProductDetail(product, initialTabIndex: 2),
-                        borderRadius: BorderRadius.circular(6),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
-                          decoration: BoxDecoration(
-                            color: packages.isNotEmpty
-                                ? const Color(0xFFEC4899).withValues(alpha: 0.12)
-                                : (isDark ? const Color(0xFF1E294A) : const Color(0xFFF1F5F9)),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                              color: packages.isNotEmpty
-                                  ? const Color(0xFFEC4899).withValues(alpha: 0.3)
-                                  : (isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.local_offer_rounded,
-                                size: 12,
-                                color: packages.isNotEmpty
-                                    ? const Color(0xFFEC4899)
-                                    : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                packages.isNotEmpty ? '${packages.length} Deals' : '+ Deal',
-                                style: GoogleFonts.inter(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: packages.isNotEmpty
-                                      ? const Color(0xFFEC4899)
-                                      : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569)),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // Column 7: Coverage
-                    DataCell(
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 140),
-                        child: Text(
-                          product.coveringStates.isNotEmpty
-                              ? '${product.coveringStates.length} states (${product.coveringStates.join(", ")})'
-                              : 'All Regional Hubs',
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF64748B),
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ),
-
-                    // Column 8: Actions
-                    DataCell(
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // Supply Stock
-                          IconButton(
-                            tooltip: 'Supply Stock',
-                            style: IconButton.styleFrom(
-                              backgroundColor: const Color(0xFF10B981).withValues(alpha: 0.12),
-                              foregroundColor: const Color(0xFF10B981),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                            ),
-                            icon: const Icon(Icons.local_shipping_rounded, size: 15),
-                            onPressed: () => ClientSupplyStockModal.show(context, product),
-                          ),
-                          const SizedBox(width: 6),
-
-                          // Create Order
-                          IconButton(
-                            tooltip: 'Create Order',
-                            style: IconButton.styleFrom(
-                              backgroundColor: const Color(0xFFF37021).withValues(alpha: 0.12),
-                              foregroundColor: const Color(0xFFF37021),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                            ),
-                            icon: const Icon(Icons.add_shopping_cart_rounded, size: 15),
-                            onPressed: () => ClientCreateOrderModal.show(context, product: product),
-                          ),
-                          const SizedBox(width: 6),
-
-                          // View Details & Deals
-                          IconButton(
-                            tooltip: 'Details & Deals',
-                            style: IconButton.styleFrom(
-                              backgroundColor: const Color(0xFF2563EB).withValues(alpha: 0.12),
-                              foregroundColor: const Color(0xFF2563EB),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                            ),
-                            icon: const Icon(Icons.insights_rounded, size: 15),
-                            onPressed: () => _openProductDetail(product),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                );
-              }).toList(),
-            ),
-          ),
+        child: PangeaExcelDataTable<CatalogProduct>(
+          items: products,
+          columns: columns,
+          brandPrimary: brandPrimary,
+          emptyMessage: 'No products match your filter criteria',
         ),
       ),
     );
@@ -1544,25 +1527,39 @@ class _ClientProductsPageState extends ConsumerState<ClientProductsPage> {
           // Action Buttons
           Row(
             children: [
-              // Supply Stock
+              // Supply Stock / Stock Intake
               Expanded(
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF10B981),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
-                    elevation: 0,
-                  ),
-                  onPressed: () => ClientSupplyStockModal.show(context, product),
-                  icon: const Icon(Icons.local_shipping_rounded, size: 13),
-                  label: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      'Supply Stock',
-                      style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700),
-                    ),
-                  ),
+                child: Builder(
+                  builder: (context) {
+                    final hasInv = ref.read(clientPortalProvider).clientProfile.hasInventoryManagement;
+                    return ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF10B981),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
+                        elevation: 0,
+                      ),
+                      onPressed: () {
+                        if (hasInv) {
+                          ClientRaiseStockInvoiceModal.show(context, initialProduct: product);
+                        } else {
+                          ClientSupplyStockModal.show(context, product);
+                        }
+                      },
+                      icon: Icon(
+                        hasInv ? Icons.receipt_long_rounded : Icons.local_shipping_rounded,
+                        size: 13,
+                      ),
+                      label: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          hasInv ? 'Stock Intake' : 'Supply Stock',
+                          style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
               const SizedBox(width: 8),

@@ -161,6 +161,7 @@ class CatalogProduct {
   final String? description;
   final String? imageUrl;
   final int totalStockAcrossHubs;
+  final String? preferredSupplierId;
   final List<String> coveringStates;
   final List<ProductPackage> packages;
 
@@ -179,9 +180,12 @@ class CatalogProduct {
     this.description,
     this.imageUrl,
     this.totalStockAcrossHubs = 100,
+    this.preferredSupplierId,
     this.coveringStates = const [],
     this.packages = const [],
   });
+
+  int get stockQuantity => totalStockAcrossHubs;
 
   CatalogProduct copyWith({
     String? id,
@@ -198,6 +202,7 @@ class CatalogProduct {
     String? description,
     String? imageUrl,
     int? totalStockAcrossHubs,
+    String? preferredSupplierId,
     List<String>? coveringStates,
     List<ProductPackage>? packages,
   }) {
@@ -216,6 +221,7 @@ class CatalogProduct {
       description: description ?? this.description,
       imageUrl: imageUrl ?? this.imageUrl,
       totalStockAcrossHubs: totalStockAcrossHubs ?? this.totalStockAcrossHubs,
+      preferredSupplierId: preferredSupplierId ?? this.preferredSupplierId,
       coveringStates: coveringStates ?? this.coveringStates,
       packages: packages ?? this.packages,
     );
@@ -237,6 +243,7 @@ class CatalogProduct {
       if (description != null) 'description': description,
       'image_url': imageUrl,
       'total_stock': totalStockAcrossHubs,
+      if (preferredSupplierId != null) 'preferred_supplier_id': preferredSupplierId,
       'covering_states': coveringStates,
       'packages': packages.map((p) => p.toJson()).toList(),
     };
@@ -272,6 +279,7 @@ class CatalogProduct {
       description: json['description'] as String?,
       imageUrl: json['image_url'] as String?,
       totalStockAcrossHubs: (json['total_stock'] as num?)?.toInt() ?? 100,
+      preferredSupplierId: json['preferred_supplier_id']?.toString(),
       coveringStates: parsedCoveringStates,
       packages: (json['packages'] as List<dynamic>?)
               ?.map((e) => ProductPackage.fromJson(e as Map<String, dynamic>))
