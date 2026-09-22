@@ -211,6 +211,7 @@ class DCDashboardPage extends ConsumerWidget {
                     color: const Color(0xFFF37021),
                     isDark: isDark,
                     width: cardWidth,
+                    onTap: () => ref.read(dcConsoleProvider.notifier).setActiveTab(1),
                   ),
                   _buildMetricCard(
                     title: 'In-Transit Orders',
@@ -220,15 +221,17 @@ class DCDashboardPage extends ConsumerWidget {
                     color: const Color(0xFF2563EB),
                     isDark: isDark,
                     width: cardWidth,
+                    onTap: () => ref.read(dcConsoleProvider.notifier).setActiveTab(1),
                   ),
                   _buildMetricCard(
                     title: 'Cash in Fleet Custody',
                     value: CurrencyFormatter.formatNaira(pendingRemittance),
-                    subtext: 'Pending COD remittance',
-                    icon: Icons.account_balance_wallet_outlined,
+                    subtext: 'Tap to view rider remittances',
+                    icon: Icons.receipt_long_rounded,
                     color: const Color(0xFF10B981),
                     isDark: isDark,
                     width: cardWidth,
+                    onTap: () => ref.read(dcConsoleProvider.notifier).setActiveTab(2),
                   ),
                   _buildMetricCard(
                     title: 'Returns Awaiting QC',
@@ -238,6 +241,7 @@ class DCDashboardPage extends ConsumerWidget {
                     color: const Color(0xFF8B5CF6),
                     isDark: isDark,
                     width: cardWidth,
+                    onTap: () => ref.read(dcConsoleProvider.notifier).setActiveTab(6),
                   ),
                 ],
               );

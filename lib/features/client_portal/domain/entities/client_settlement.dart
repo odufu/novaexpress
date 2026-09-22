@@ -56,9 +56,71 @@ class ClientSettlement {
 
   bool get isCompleted =>
       status.toLowerCase() == 'completed' ||
-      status.toLowerCase() == 'settled';
+      status.toLowerCase() == 'settled' ||
+      status.toLowerCase() == 'approved';
   bool get isPending => status.toLowerCase() == 'pending';
   bool get isProcessing => status.toLowerCase() == 'processing';
+  bool get isRemitted =>
+      status.toLowerCase() == 'remitted' ||
+      status.toLowerCase() == 'pending_approval' ||
+      status.toLowerCase() == 'pending_merchant_approval';
+  bool get hasReceipt => proofOfPaymentUrl != null && proofOfPaymentUrl!.trim().isNotEmpty;
+
+  ClientSettlement copyWith({
+    String? id,
+    String? settlementNumber,
+    String? clientId,
+    String? companyId,
+    String? distributionCenterId,
+    DateTime? periodStart,
+    DateTime? periodEnd,
+    int? totalOrdersCount,
+    double? grossCollections,
+    double? logisticsFeesDeducted,
+    double? platformFeesDeducted,
+    double? gatewayFeesDeducted,
+    double? failedAttemptFeesDeducted,
+    double? otherChargesDeducted,
+    double? netPayoutAmount,
+    Map<String, dynamic>? chargesBreakdown,
+    String? destinationBankName,
+    String? destinationAccountNumber,
+    String? destinationAccountName,
+    String? payoutReference,
+    String? proofOfPaymentUrl,
+    String? status,
+    String? notes,
+    DateTime? settledAt,
+    DateTime? createdAt,
+  }) {
+    return ClientSettlement(
+      id: id ?? this.id,
+      settlementNumber: settlementNumber ?? this.settlementNumber,
+      clientId: clientId ?? this.clientId,
+      companyId: companyId ?? this.companyId,
+      distributionCenterId: distributionCenterId ?? this.distributionCenterId,
+      periodStart: periodStart ?? this.periodStart,
+      periodEnd: periodEnd ?? this.periodEnd,
+      totalOrdersCount: totalOrdersCount ?? this.totalOrdersCount,
+      grossCollections: grossCollections ?? this.grossCollections,
+      logisticsFeesDeducted: logisticsFeesDeducted ?? this.logisticsFeesDeducted,
+      platformFeesDeducted: platformFeesDeducted ?? this.platformFeesDeducted,
+      gatewayFeesDeducted: gatewayFeesDeducted ?? this.gatewayFeesDeducted,
+      failedAttemptFeesDeducted: failedAttemptFeesDeducted ?? this.failedAttemptFeesDeducted,
+      otherChargesDeducted: otherChargesDeducted ?? this.otherChargesDeducted,
+      netPayoutAmount: netPayoutAmount ?? this.netPayoutAmount,
+      chargesBreakdown: chargesBreakdown ?? this.chargesBreakdown,
+      destinationBankName: destinationBankName ?? this.destinationBankName,
+      destinationAccountNumber: destinationAccountNumber ?? this.destinationAccountNumber,
+      destinationAccountName: destinationAccountName ?? this.destinationAccountName,
+      payoutReference: payoutReference ?? this.payoutReference,
+      proofOfPaymentUrl: proofOfPaymentUrl ?? this.proofOfPaymentUrl,
+      status: status ?? this.status,
+      notes: notes ?? this.notes,
+      settledAt: settledAt ?? this.settledAt,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
 
   factory ClientSettlement.fromJson(Map<String, dynamic> json) {
     return ClientSettlement(

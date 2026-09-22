@@ -1,8 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../../client_portal/domain/entities/client_profile.dart';
+import '../../../client_portal/domain/entities/client_settlement.dart';
+import '../../../client_portal/presentation/widgets/client_settlement_detail_modal.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
 import '../../presentation/providers/product_catalog_provider.dart';
@@ -52,7 +55,7 @@ class _DCClientAssetPortfolioModalState
   void initState() {
     super.initState();
     _client = widget.client;
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 6, vsync: this);
     _deliveryFeeController = TextEditingController(
       text: (_client.customDeliveryFee ?? 5000.0).toStringAsFixed(0),
     );
@@ -128,25 +131,7 @@ class _DCClientAssetPortfolioModalState
             // Header: Client Info & Dismiss
             Row(
               children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: _client.isEnterprise
-                        ? const Color(0xFF6366F1).withValues(alpha: 0.15)
-                        : const Color(0xFF0D9488).withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    _client.isEnterprise
-                        ? Icons.corporate_fare_rounded
-                        : Icons.storefront_rounded,
-                    color: _client.isEnterprise
-                        ? const Color(0xFF6366F1)
-                        : const Color(0xFF0D9488),
-                    size: 26,
-                  ),
-                ),
+                _buildClientAvatar(_client, size: 48, iconSize: 26),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -178,6 +163,22 @@ class _DCClientAssetPortfolioModalState
                                 fontSize: 10.5,
                                 fontWeight: FontWeight.w700,
                                 color: const Color(0xFF0D9488),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: (_client.isActive ? const Color(0xFF10B981) : const Color(0xFFEF4444)).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              _client.isActive ? 'Active' : 'Deactivated',
+                              style: GoogleFonts.inter(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                                color: _client.isActive ? const Color(0xFF10B981) : const Color(0xFFEF4444),
                               ),
                             ),
                           ),
@@ -300,6 +301,7 @@ class _DCClientAssetPortfolioModalState
                 Tab(text: 'Hub Inventory'),
                 Tab(text: 'Orders & Real-time Chat'),
                 Tab(text: 'Financials & Remittance'),
+                Tab(text: 'Settlements'),
                 Tab(text: 'Settings & Tariffs'),
               ],
             ),
@@ -314,6 +316,7 @@ class _DCClientAssetPortfolioModalState
                   _buildHubInventoryTab(clientStockItems, isDark),
                   _buildOrdersTab(clientOrders, isDark, currency),
                   _buildFinancialsTab(codCollected, totalOrderValue, deliveredOrders, unsettledDeliveredOrders, isDark, currency),
+                  _buildSettlementsTab(isDark, currency, deliveredOrders, unsettledDeliveredOrders),
                   _buildClientSettingsTab(isDark, currency),
                 ],
               ),
@@ -967,6 +970,128 @@ class _DCClientAssetPortfolioModalState
           ),
           const SizedBox(height: 16),
 
+          // Account Status & Security Card
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: (_client.isActive ? const Color(0xFF10B981) : const Color(0xFFEF4444)).withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: (_client.isActive ? const Color(0xFF10B981) : const Color(0xFFEF4444)).withValues(alpha: 0.25),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  _client.isActive ? Icons.verified_user_rounded : Icons.block_rounded,
+                  color: _client.isActive ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                  size: 26,
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Account Status: ${_client.isActive ? "ACTIVE" : "DEACTIVATED"}',
+                        style: GoogleFonts.inter(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: _client.isActive ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _client.isActive
+                            ? 'Client portal access and automated dispatch active for ${_client.companyName}.'
+                            : 'Merchant portal logins and dispatch suspended.',
+                        style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
+                      ),
+                    ],
+                  ),
+                ),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        final email = _client.email.trim();
+                        if (email.isEmpty) return;
+                        try {
+                          await ref.read(dcConsoleProvider.notifier).sendClientPasswordResetEmail(email);
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              backgroundColor: const Color(0xFF10B981),
+                              content: Text('Password reset email dispatched to $email!'),
+                            ),
+                          );
+                        } catch (e) {
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(backgroundColor: const Color(0xFFEF4444), content: Text('Failed: $e')),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.email_outlined, size: 14),
+                      label: const Text('Reset Password'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      ),
+                    ),
+                    ElevatedButton(
+                      onPressed: () async {
+                        final target = !_client.isActive;
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+                            title: Text(target ? 'Reactivate Account?' : 'Deactivate Account?'),
+                            content: Text(
+                              target
+                                  ? 'Restore active access for ${_client.companyName}?'
+                                  : 'Suspend merchant access for ${_client.companyName}?',
+                            ),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: target ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                                  foregroundColor: Colors.white,
+                                ),
+                                onPressed: () => Navigator.of(ctx).pop(true),
+                                child: Text(target ? 'Reactivate' : 'Deactivate'),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirm == true) {
+                          try {
+                            await ref.read(dcConsoleProvider.notifier).toggleClientActiveStatus(_client.id, target);
+                            if (!mounted) return;
+                            setState(() => _client = _client.copyWith(isActive: target));
+                          } catch (e) {
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(backgroundColor: const Color(0xFFEF4444), content: Text('Error: $e')),
+                            );
+                          }
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _client.isActive ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                      child: Text(_client.isActive ? 'Deactivate' : 'Reactivate'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
           // 1. Operational Charges Card
           Container(
             padding: const EdgeInsets.all(16),
@@ -1239,5 +1364,511 @@ class _DCClientAssetPortfolioModalState
         );
       }
     }
+  }
+
+  // --- Settlements Tab ---
+  Widget _buildSettlementsTab(
+    bool isDark,
+    NumberFormat currency,
+    List<OrderEntity> deliveredOrders,
+    List<OrderEntity> unsettledDeliveredOrders,
+  ) {
+    return FutureBuilder<List<ClientSettlement>>(
+      future: ref.read(dcConsoleProvider.notifier).fetchDcClientSettlements(clientId: _client.id),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator(color: Color(0xFF0D9488)));
+        }
+
+        final settlements = snapshot.data ?? [];
+        final totalSettledValue = settlements.fold(0.0, (sum, s) => sum + s.netPayoutAmount);
+        final acknowledgedCount = settlements.where((s) => s.isCompleted).length;
+        final pendingCount = settlements.where((s) => s.isRemitted || s.isPending || s.isProcessing).length;
+
+        return ListView(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          children: [
+            // Settlements Summary KPI Bar
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Total Net Disbursed', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8))),
+                        const SizedBox(height: 3),
+                        Text(
+                          currency.format(totalSettledValue),
+                          style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800, color: const Color(0xFF10B981)),
+                        ),
+                        Text('${settlements.length} Total Batches', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8))),
+                      ],
+                    ),
+                  ),
+                  Container(width: 1, height: 40, color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Acknowledged', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8))),
+                        const SizedBox(height: 3),
+                        Row(
+                          children: [
+                            const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 16),
+                            const SizedBox(width: 5),
+                            Text(
+                              '$acknowledgedCount Batches',
+                              style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                            ),
+                          ],
+                        ),
+                        Text('Confirmed by Merchant', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF10B981))),
+                      ],
+                    ),
+                  ),
+                  Container(width: 1, height: 40, color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Pending Acknowledgment', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8))),
+                        const SizedBox(height: 3),
+                        Row(
+                          children: [
+                            const Icon(Icons.schedule_rounded, color: Color(0xFFF59E0B), size: 16),
+                            const SizedBox(width: 5),
+                            Text(
+                              '$pendingCount Batches',
+                              style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                            ),
+                          ],
+                        ),
+                        Text('Awaiting merchant sign-off', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFFF59E0B))),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Shortcut: Initiate Settlement if pending orders exist
+            if (unsettledDeliveredOrders.isNotEmpty)
+              Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0D9488).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF0D9488).withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline_rounded, color: Color(0xFF0D9488), size: 20),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        '${unsettledDeliveredOrders.length} delivered orders awaiting remittance batch settlement.',
+                        style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                      ),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        DCDailyMerchantSettlementModal.show(
+                          context: context,
+                          client: _client,
+                          eligibleOrders: deliveredOrders,
+                        );
+                      },
+                      icon: const Icon(Icons.account_balance_wallet_rounded, size: 14),
+                      label: const Text('Initiate Settlement Batch'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0D9488),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            // Section Title
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Historical Settlement Batches',
+                  style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700),
+                ),
+                Text(
+                  'Click batch for itemized deductions & payment receipts',
+                  style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+
+            if (settlements.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(32),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  children: [
+                    Icon(Icons.receipt_long_outlined, size: 48, color: isDark ? const Color(0xFF475569) : const Color(0xFF94A3B8)),
+                    const SizedBox(height: 12),
+                    Text(
+                      'No Settlement Batches Found',
+                      style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Settlements generated for this merchant will appear here along with live confirmation status and payment receipts.',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)),
+                    ),
+                  ],
+                ),
+              )
+            else
+              ...settlements.map((s) {
+                final isAcknowledged = s.isCompleted;
+                final isPendingAck = s.isRemitted || s.isPending || s.isProcessing;
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: isAcknowledged
+                          ? const Color(0xFF10B981).withValues(alpha: 0.3)
+                          : const Color(0xFFF59E0B).withValues(alpha: 0.3),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.03),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(14),
+                    onTap: () => ClientSettlementDetailModal.show(
+                      context: context,
+                      settlement: s,
+                      isDcView: true,
+                      clientName: _client.companyName,
+                      clientLogo: _client.logoUrl,
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Top row: Settlement Number, Date, Status Chip
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0D9488).withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  s.settlementNumber,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                    color: const Color(0xFF0D9488),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                DateFormat('dd MMM yyyy, hh:mm a').format(s.settledAt),
+                                style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF94A3B8)),
+                              ),
+                              const Spacer(),
+
+                              // Status Chip: Acknowledged or Pending
+                              if (isAcknowledged)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.verified_rounded, size: 14, color: Color(0xFF10B981)),
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        'Acknowledged & Approved',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                          color: const Color(0xFF10B981),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              else if (isPendingAck)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.4)),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.schedule_rounded, size: 14, color: Color(0xFFF59E0B)),
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        'Disbursed • Pending Acknowledgment',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                          color: const Color(0xFFF59E0B),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              else
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF64748B).withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    s.status.toUpperCase(),
+                                    style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF64748B)),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Financial Values Grid
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Net Remittance', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8))),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      currency.format(s.netPayoutAmount),
+                                      style: GoogleFonts.inter(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w800,
+                                        color: const Color(0xFF10B981),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Gross Collected', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8))),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      currency.format(s.grossCollections),
+                                      style: GoogleFonts.inter(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Total Deductions', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8))),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      currency.format(s.logisticsFeesDeducted + s.platformFeesDeducted + s.gatewayFeesDeducted + s.failedAttemptFeesDeducted),
+                                      style: GoogleFonts.inter(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: const Color(0xFFEF4444),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Delivered Orders', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8))),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '${s.totalOrdersCount} Orders',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          const Divider(height: 1),
+                          const SizedBox(height: 10),
+
+                          // Bank Account & Receipt Attached Chip
+                          Row(
+                            children: [
+                              Icon(Icons.account_balance_rounded, size: 14, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                              const SizedBox(width: 6),
+                              Text(
+                                '${s.destinationBankName} • ${s.destinationAccountNumber} (${s.destinationAccountName})',
+                                style: GoogleFonts.inter(fontSize: 11.5, color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569)),
+                              ),
+                              const Spacer(),
+                              if (s.hasReceipt)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0284C7).withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.attach_file_rounded, size: 12, color: Color(0xFF0284C7)),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Receipt Attached',
+                                        style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w700, color: const Color(0xFF0284C7)),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              const SizedBox(width: 10),
+                              const Icon(Icons.chevron_right_rounded, size: 18, color: Color(0xFF94A3B8)),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildClientAvatar(ClientProfile client, {double size = 48, double iconSize = 26}) {
+    final isEnterprise = client.isEnterprise;
+    final fallbackIcon = Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: isEnterprise
+            ? const Color(0xFF6366F1).withValues(alpha: 0.15)
+            : const Color(0xFF0D9488).withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(
+        isEnterprise ? Icons.corporate_fare_rounded : Icons.storefront_rounded,
+        color: isEnterprise ? const Color(0xFF6366F1) : const Color(0xFF0D9488),
+        size: iconSize,
+      ),
+    );
+
+    final logo = client.logoUrl?.trim();
+    if (logo == null || logo.isEmpty) return fallbackIcon;
+
+    if (logo.startsWith('data:image')) {
+      try {
+        final commaIdx = logo.indexOf(',');
+        final base64Str = commaIdx != -1 ? logo.substring(commaIdx + 1) : logo;
+        final bytes = base64Decode(base64Str.trim());
+        return Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isEnterprise
+                  ? const Color(0xFF6366F1).withValues(alpha: 0.2)
+                  : const Color(0xFF0D9488).withValues(alpha: 0.2),
+            ),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(11),
+            child: Padding(
+              padding: const EdgeInsets.all(3),
+              child: Image.memory(
+                bytes,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => fallbackIcon,
+              ),
+            ),
+          ),
+        );
+      } catch (_) {
+        return fallbackIcon;
+      }
+    }
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isEnterprise
+              ? const Color(0xFF6366F1).withValues(alpha: 0.2)
+              : const Color(0xFF0D9488).withValues(alpha: 0.2),
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(11),
+        child: Padding(
+          padding: const EdgeInsets.all(3),
+          child: Image.network(
+            logo,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => fallbackIcon,
+          ),
+        ),
+      ),
+    );
   }
 }

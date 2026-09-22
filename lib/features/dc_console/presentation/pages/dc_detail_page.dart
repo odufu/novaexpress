@@ -21,6 +21,7 @@ import '../widgets/dc_order_detail_modal.dart';
 import '../widgets/dc_product_detail_modal.dart';
 import '../widgets/dc_remittance_detail_modal.dart';
 import '../widgets/dc_rider_detail_modal.dart';
+import '../../../client_portal/presentation/widgets/pangea_excel_data_table.dart';
 
 class DCDetailPage extends ConsumerStatefulWidget {
   final DistributionCenter dc;
@@ -1039,32 +1040,162 @@ class _DCDetailPageState extends ConsumerState<DCDetailPage> with SingleTickerPr
   }
 
   Widget _buildOrdersTable(BuildContext context, List<OrderEntity> orders, bool isDark) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: DataTable(
-            headingRowColor: WidgetStateProperty.all(isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
-            horizontalMargin: 16,
-            columnSpacing: 20,
-            columns: const [
-              DataColumn(label: Text('Order # & Date', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('Customer & Phone', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('Destination', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('Product & Qty', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('Amount & Payment', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('Client', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('Assigned Rider', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold))),
-            ],
-            rows: orders.map((o) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: PangeaExcelDataTable<OrderEntity>(
+        items: orders,
+        enablePagination: true,
+        initialPageSize: 20,
+        rowHeight: 64.0,
+        brandPrimary: const Color(0xFF2563EB),
+        onRowTap: (o) => showDialog(context: context, builder: (ctx) => DCOrderDetailModal(order: o)),
+        columns: [
+          ExcelColumnDef<OrderEntity>(
+            key: 'order_number',
+            group: 'Order Identification',
+            label: 'ORDER # & DATE',
+            defaultWidth: 160,
+            minWidth: 120,
+            searchString: (o) => '${o.orderNumber} ${DateFormat('dd MMM, hh:mm a').format(o.createdAt)}',
+            sortValue: (o) => o.createdAt,
+            cellBuilder: (context, o, row, isDark, brand) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    o.orderNumber.startsWith('#') ? o.orderNumber : '#${o.orderNumber}',
+                    style: GoogleFonts.firaCode(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    DateFormat('dd MMM, hh:mm a').format(o.createdAt),
+                    style: const TextStyle(fontSize: 10.5, color: Color(0xFF94A3B8)),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              );
+            },
+          ),
+          ExcelColumnDef<OrderEntity>(
+            key: 'customer',
+            group: 'Recipient Details',
+            label: 'CUSTOMER & PHONE',
+            defaultWidth: 170,
+            minWidth: 130,
+            searchString: (o) => '${o.customerName} ${o.customerPhone}',
+            sortValue: (o) => o.customerName,
+            cellBuilder: (context, o, row, isDark, brand) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(o.customerName, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
+                  Text(o.customerPhone, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)), overflow: TextOverflow.ellipsis),
+                ],
+              );
+            },
+          ),
+          ExcelColumnDef<OrderEntity>(
+            key: 'destination',
+            group: 'Recipient Details',
+            label: 'DESTINATION',
+            defaultWidth: 160,
+            minWidth: 120,
+            searchString: (o) => '${o.lga ?? ""} ${_currentDc.state}',
+            sortValue: (o) => o.lga ?? '',
+            cellBuilder: (context, o, row, isDark, brand) {
+              return Text('${o.lga ?? 'LGA'}, ${_currentDc.state}', style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis);
+            },
+          ),
+          ExcelColumnDef<OrderEntity>(
+            key: 'product',
+            group: 'Cargo Package',
+            label: 'PRODUCT & QTY',
+            defaultWidth: 180,
+            minWidth: 130,
+            searchString: (o) => '${o.quantity} ${o.productName}',
+            sortValue: (o) => o.productName,
+            cellBuilder: (context, o, row, isDark, brand) {
+              return Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text('${o.quantity}x', style: const TextStyle(fontSize: 11, color: Color(0xFF8B5CF6), fontWeight: FontWeight.bold)),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(o.productName, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
+                  ),
+                ],
+              );
+            },
+          ),
+          ExcelColumnDef<OrderEntity>(
+            key: 'amount',
+            group: 'Financial Settlement',
+            label: 'AMOUNT & PAYMENT',
+            defaultWidth: 160,
+            minWidth: 120,
+            align: TextAlign.right,
+            searchString: (o) => '${o.totalAmount} ${o.isPod ? "Pay on Del" : "Prepaid"}',
+            sortValue: (o) => o.totalAmount,
+            cellBuilder: (context, o, row, isDark, brand) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(CurrencyFormatter.formatNaira(o.totalAmount), style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF10B981)), overflow: TextOverflow.ellipsis),
+                  Text(o.isPod ? '💵 Pay on Del' : '💳 Prepaid', style: const TextStyle(fontSize: 10.5, color: Color(0xFF64748B)), overflow: TextOverflow.ellipsis),
+                ],
+              );
+            },
+          ),
+          ExcelColumnDef<OrderEntity>(
+            key: 'client',
+            group: 'Merchant Client',
+            label: 'CLIENT',
+            defaultWidth: 140,
+            minWidth: 100,
+            searchString: (o) => o.clientCompany,
+            sortValue: (o) => o.clientCompany,
+            cellBuilder: (context, o, row, isDark, brand) {
+              return Text(o.clientCompany, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis);
+            },
+          ),
+          ExcelColumnDef<OrderEntity>(
+            key: 'rider',
+            group: 'Logistics Assignment',
+            label: 'ASSIGNED RIDER',
+            defaultWidth: 150,
+            minWidth: 110,
+            searchString: (o) => o.deliveryAgentName ?? (o.deliveryAgentId != null ? 'Assigned' : 'Unassigned'),
+            sortValue: (o) => o.deliveryAgentName ?? '',
+            cellBuilder: (context, o, row, isDark, brand) {
+              return Text(
+                o.deliveryAgentName ?? (o.deliveryAgentId != null ? 'Assigned' : 'Unassigned'),
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: o.deliveryAgentId != null ? FontWeight.bold : FontWeight.normal,
+                  color: o.deliveryAgentId != null ? const Color(0xFF2563EB) : const Color(0xFFF97316),
+                ),
+                overflow: TextOverflow.ellipsis,
+              );
+            },
+          ),
+          ExcelColumnDef<OrderEntity>(
+            key: 'status',
+            group: 'Fulfillment Status',
+            label: 'STATUS',
+            defaultWidth: 130,
+            minWidth: 100,
+            searchString: (o) => o.status,
+            sortValue: (o) => o.status,
+            cellBuilder: (context, o, row, isDark, brand) {
               final isDelivered = o.status.toLowerCase() == 'delivered';
               final isFailed = o.status.toLowerCase() == 'failed';
               final isInTransit = o.status.toLowerCase() == 'in_transit';
@@ -1077,104 +1208,41 @@ class _DCDetailPageState extends ConsumerState<DCDetailPage> with SingleTickerPr
                           ? const Color(0xFF0284C7)
                           : const Color(0xFFF97316);
 
-              return DataRow(
-                onSelectChanged: (_) {
-                  showDialog(context: context, builder: (ctx) => DCOrderDetailModal(order: o));
-                },
-                cells: [
-                  DataCell(
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          o.orderNumber.startsWith('#') ? o.orderNumber : '#${o.orderNumber}',
-                          style: GoogleFonts.firaCode(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
-                        ),
-                        Text(
-                          DateFormat('dd MMM, hh:mm a').format(o.createdAt),
-                          style: const TextStyle(fontSize: 10.5, color: Color(0xFF94A3B8)),
-                        ),
-                      ],
-                    ),
+              return Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: statusColor.withValues(alpha: 0.4)),
                   ),
-                  DataCell(
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(o.customerName, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
-                        Text(o.customerPhone, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                      ],
-                    ),
+                  child: Text(
+                    o.status.toUpperCase(),
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: statusColor),
                   ),
-                  DataCell(
-                    Text('${o.lga ?? 'LGA'}, ${_currentDc.state}', style: const TextStyle(fontSize: 12)),
-                  ),
-                  DataCell(
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text('${o.quantity}x', style: const TextStyle(fontSize: 11, color: Color(0xFF8B5CF6), fontWeight: FontWeight.bold)),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(o.productName, style: const TextStyle(fontSize: 12)),
-                      ],
-                    ),
-                  ),
-                  DataCell(
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(CurrencyFormatter.formatNaira(o.totalAmount), style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
-                        Text(o.isPod ? '💵 Pay on Del' : '💳 Prepaid', style: const TextStyle(fontSize: 10.5, color: Color(0xFF64748B))),
-                      ],
-                    ),
-                  ),
-                  DataCell(Text(o.clientCompany, style: const TextStyle(fontSize: 12))),
-                  DataCell(
-                    Text(
-                      o.deliveryAgentName ?? (o.deliveryAgentId != null ? 'Assigned' : 'Unassigned'),
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: o.deliveryAgentId != null ? FontWeight.bold : FontWeight.normal,
-                        color: o.deliveryAgentId != null ? const Color(0xFF2563EB) : const Color(0xFFF97316),
-                      ),
-                    ),
-                  ),
-                  DataCell(
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: statusColor.withValues(alpha: 0.4)),
-                      ),
-                      child: Text(
-                        o.status.toUpperCase(),
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: statusColor),
-                      ),
-                    ),
-                  ),
-                  DataCell(
-                    IconButton(
-                      icon: const Icon(Icons.visibility_outlined, size: 18, color: Color(0xFF2563EB)),
-                      onPressed: () {
-                        showDialog(context: context, builder: (ctx) => DCOrderDetailModal(order: o));
-                      },
-                    ),
-                  ),
-                ],
+                ),
               );
-            }).toList(),
+            },
           ),
-        ),
+          ExcelColumnDef<OrderEntity>(
+            key: 'actions',
+            group: 'Action',
+            label: 'ACTIONS',
+            defaultWidth: 80,
+            minWidth: 60,
+            cellBuilder: (context, o, row, isDark, brand) {
+              return Center(
+                child: IconButton(
+                  icon: const Icon(Icons.visibility_outlined, size: 18, color: Color(0xFF2563EB)),
+                  onPressed: () {
+                    showDialog(context: context, builder: (ctx) => DCOrderDetailModal(order: o));
+                  },
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }
@@ -1428,97 +1496,187 @@ class _DCDetailPageState extends ConsumerState<DCDetailPage> with SingleTickerPr
   }
 
   Widget _buildRemittanceTable(BuildContext context, List<DCRemittanceLifecycleItem> remittances, bool isDark) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: DataTable(
-            headingRowColor: WidgetStateProperty.all(isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
-            columns: const [
-              DataColumn(label: Text('RIDER / AGENT', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('ORDERS', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('AMOUNT TO REMIT', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('NET REMITTANCE', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('PAYMENT METHOD', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('OPENING DATE', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('CLOSING DATE', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('REMITTANCE STATUS', style: TextStyle(fontWeight: FontWeight.bold))),
-            ],
-            rows: remittances.map((r) {
-              return DataRow(
-                onSelectChanged: (_) {
-                  // User explicitly requested: "on tapping it it shows that remitance details"
-                  showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true,
-                    backgroundColor: Colors.transparent,
-                    builder: (ctx) => DCRemittanceDetailModal(remittance: r),
-                  );
-                },
-                cells: [
-                  DataCell(
-                    Row(
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: PangeaExcelDataTable<DCRemittanceLifecycleItem>(
+        items: remittances,
+        enablePagination: true,
+        initialPageSize: 20,
+        rowHeight: 64.0,
+        brandPrimary: const Color(0xFF2563EB),
+        onRowTap: (r) {
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (ctx) => DCRemittanceDetailModal(remittance: r),
+          );
+        },
+        columns: [
+          ExcelColumnDef<DCRemittanceLifecycleItem>(
+            key: 'rider',
+            group: 'Logistics Field Agent',
+            label: 'RIDER / AGENT',
+            defaultWidth: 180,
+            minWidth: 140,
+            searchString: (r) => '${r.riderName} ${r.riderCode}',
+            sortValue: (r) => r.riderName,
+            cellBuilder: (context, r, row, isDark, brand) {
+              return Row(
+                children: [
+                  CircleAvatar(
+                    radius: 14,
+                    backgroundColor: const Color(0xFF2563EB).withValues(alpha: 0.2),
+                    child: Text(r.riderName.isNotEmpty ? r.riderName[0].toUpperCase() : 'R', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        CircleAvatar(
-                          radius: 14,
-                          backgroundColor: const Color(0xFF2563EB).withValues(alpha: 0.2),
-                          child: Text(r.riderName.isNotEmpty ? r.riderName[0].toUpperCase() : 'R', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
-                        ),
-                        const SizedBox(width: 8),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(r.riderName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
-                            Text(r.riderCode, style: GoogleFonts.firaCode(fontSize: 10.5, color: const Color(0xFF94A3B8))),
-                          ],
-                        ),
+                        Text(r.riderName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5), overflow: TextOverflow.ellipsis),
+                        Text(r.riderCode, style: GoogleFonts.firaCode(fontSize: 10.5, color: const Color(0xFF94A3B8)), overflow: TextOverflow.ellipsis),
                       ],
-                    ),
-                  ),
-                  DataCell(
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF2563EB).withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text('${r.orderCount} Orders', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
-                    ),
-                  ),
-                  DataCell(Text(CurrencyFormatter.formatNaira(r.grossAmount), style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold))),
-                  DataCell(Text(CurrencyFormatter.formatNaira(r.netAmount), style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF10B981)))),
-                  DataCell(Text(r.paymentMethod, style: const TextStyle(fontSize: 12))),
-                  DataCell(Text(DateFormat('dd MMM, hh:mm a').format(r.openingDate), style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)))),
-                  DataCell(Text(r.closingDate != null ? DateFormat('dd MMM, hh:mm a').format(r.closingDate!) : 'Open', style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)))),
-                  DataCell(
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: r.isVerified ? const Color(0xFF10B981).withValues(alpha: 0.15) : const Color(0xFFF59E0B).withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        r.isVerified ? 'REMITTED & CLEARED' : 'AWAITING REMITTANCE',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: r.isVerified ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
-                        ),
-                      ),
                     ),
                   ),
                 ],
               );
-            }).toList(),
+            },
           ),
-        ),
+          ExcelColumnDef<DCRemittanceLifecycleItem>(
+            key: 'orders',
+            group: 'Logistics Field Agent',
+            label: 'ORDERS',
+            defaultWidth: 120,
+            minWidth: 90,
+            searchString: (r) => '${r.orderCount}',
+            sortValue: (r) => r.orderCount,
+            cellBuilder: (context, r, row, isDark, brand) {
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2563EB).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text('${r.orderCount} Orders', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
+              );
+            },
+          ),
+          ExcelColumnDef<DCRemittanceLifecycleItem>(
+            key: 'gross',
+            group: 'Financial Settlement',
+            label: 'AMOUNT TO REMIT',
+            defaultWidth: 150,
+            minWidth: 110,
+            align: TextAlign.right,
+            searchString: (r) => '${r.grossAmount}',
+            sortValue: (r) => r.grossAmount,
+            cellBuilder: (context, r, row, isDark, brand) {
+              return Text(CurrencyFormatter.formatNaira(r.grossAmount), style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis);
+            },
+          ),
+          ExcelColumnDef<DCRemittanceLifecycleItem>(
+            key: 'net',
+            group: 'Financial Settlement',
+            label: 'NET REMITTANCE',
+            defaultWidth: 150,
+            minWidth: 110,
+            align: TextAlign.right,
+            searchString: (r) => '${r.netAmount}',
+            sortValue: (r) => r.netAmount,
+            cellBuilder: (context, r, row, isDark, brand) {
+              return Text(CurrencyFormatter.formatNaira(r.netAmount), style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF10B981)), overflow: TextOverflow.ellipsis);
+            },
+          ),
+          ExcelColumnDef<DCRemittanceLifecycleItem>(
+            key: 'method',
+            group: 'Payment Details',
+            label: 'PAYMENT METHOD',
+            defaultWidth: 140,
+            minWidth: 100,
+            searchString: (r) => r.paymentMethod,
+            sortValue: (r) => r.paymentMethod,
+            cellBuilder: (context, r, row, isDark, brand) {
+              return Text(r.paymentMethod, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis);
+            },
+          ),
+          ExcelColumnDef<DCRemittanceLifecycleItem>(
+            key: 'open_date',
+            group: 'Timeline',
+            label: 'OPENING DATE',
+            defaultWidth: 150,
+            minWidth: 110,
+            searchString: (r) => DateFormat('dd MMM, hh:mm a').format(r.openingDate),
+            sortValue: (r) => r.openingDate,
+            cellBuilder: (context, r, row, isDark, brand) {
+              return Text(DateFormat('dd MMM, hh:mm a').format(r.openingDate), style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)), overflow: TextOverflow.ellipsis);
+            },
+          ),
+          ExcelColumnDef<DCRemittanceLifecycleItem>(
+            key: 'close_date',
+            group: 'Timeline',
+            label: 'CLOSING DATE',
+            defaultWidth: 150,
+            minWidth: 110,
+            searchString: (r) => r.closingDate != null ? DateFormat('dd MMM, hh:mm a').format(r.closingDate!) : 'Open',
+            sortValue: (r) => r.closingDate ?? DateTime(2099),
+            cellBuilder: (context, r, row, isDark, brand) {
+              return Text(r.closingDate != null ? DateFormat('dd MMM, hh:mm a').format(r.closingDate!) : 'Open', style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)), overflow: TextOverflow.ellipsis);
+            },
+          ),
+          ExcelColumnDef<DCRemittanceLifecycleItem>(
+            key: 'status',
+            group: 'Audit Status',
+            label: 'REMITTANCE STATUS',
+            defaultWidth: 170,
+            minWidth: 130,
+            searchString: (r) => r.isVerified ? 'REMITTED & CLEARED' : 'AWAITING REMITTANCE',
+            sortValue: (r) => r.isVerified ? 1 : 0,
+            cellBuilder: (context, r, row, isDark, brand) {
+              return Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: r.isVerified ? const Color(0xFF10B981).withValues(alpha: 0.15) : const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    r.isVerified ? 'REMITTED & CLEARED' : 'AWAITING REMITTANCE',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: r.isVerified ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+          ExcelColumnDef<DCRemittanceLifecycleItem>(
+            key: 'actions',
+            group: 'Action',
+            label: 'ACTIONS',
+            defaultWidth: 80,
+            minWidth: 60,
+            cellBuilder: (context, r, row, isDark, brand) {
+              return Center(
+                child: IconButton(
+                  icon: const Icon(Icons.visibility_outlined, size: 18, color: Color(0xFF2563EB)),
+                  onPressed: () {
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (ctx) => DCRemittanceDetailModal(remittance: r),
+                    );
+                  },
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }
@@ -1727,82 +1885,181 @@ class _DCDetailPageState extends ConsumerState<DCDetailPage> with SingleTickerPr
     final dcDrivers = ref.watch(dcConsoleProvider).drivers;
     final stockState = ref.watch(stockProvider);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: DataTable(
-            headingRowColor: WidgetStateProperty.all(isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
-            columns: const [
-              DataColumn(label: Text('Product & SKU', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('Category', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('Warehouse Shelf', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('In-Transit Saddlebag', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('Total Available', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold))),
-            ],
-            rows: stocks.map((item) {
-              final isLow = item.availableCount <= item.lowStockThreshold;
-              return DataRow(
-                cells: [
-                  DataCell(
-                    Row(
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: PangeaExcelDataTable<StockItemEntity>(
+        items: stocks,
+        brandPrimary: const Color(0xFFF37021),
+        rowHeight: 48,
+        enablePagination: true,
+        initialPageSize: 10,
+        onRowTap: (item) {
+          DCProductDetailModal.show(
+            context,
+            item: item,
+            drivers: dcDrivers,
+            allocations: stockState.riderAllocations,
+          );
+        },
+        columns: [
+          ExcelColumnDef<StockItemEntity>(
+            key: 'product',
+            label: 'PRODUCT & SKU',
+            defaultWidth: 260,
+            minWidth: 200,
+            sortValue: (item) => item.name,
+            searchString: (item) => '${item.name} ${item.sku}',
+            cellBuilder: (context, item, row, isDark, brand) {
+              return Row(
+                children: [
+                  ProductImageWidget(imageUrl: item.imageAsset, width: 32, height: 32, borderRadius: 6),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        ProductImageWidget(imageUrl: item.imageAsset, width: 32, height: 32, borderRadius: 6),
-                        const SizedBox(width: 8),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
-                            Text(item.sku, style: GoogleFonts.firaCode(fontSize: 10.5, color: const Color(0xFF2563EB))),
-                          ],
+                        Text(
+                          item.name,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          item.sku,
+                          style: GoogleFonts.firaCode(fontSize: 10.5, color: const Color(0xFF2563EB)),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
                   ),
-                  DataCell(Text(item.category, style: const TextStyle(fontSize: 12))),
-                  DataCell(Text('${item.availableCount} units', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5))),
-                  DataCell(Text('${item.assignedCount} units', style: const TextStyle(color: Color(0xFFF97316), fontSize: 12.5))),
-                  DataCell(Text('${item.availableCount + item.assignedCount} units', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5))),
-                  DataCell(
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: isLow ? const Color(0xFFEF4444).withValues(alpha: 0.12) : const Color(0xFF10B981).withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        isLow ? 'LOW STOCK' : 'HEALTHY',
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isLow ? const Color(0xFFEF4444) : const Color(0xFF10B981)),
-                      ),
-                    ),
-                  ),
-                  DataCell(
-                    IconButton(
-                      icon: const Icon(Icons.info_outline_rounded, size: 18, color: Color(0xFF2563EB)),
-                      onPressed: () {
-                        DCProductDetailModal.show(
-                          context,
-                          item: item,
-                          drivers: dcDrivers,
-                          allocations: stockState.riderAllocations,
-                        );
-                      },
-                    ),
-                  ),
                 ],
               );
-            }).toList(),
+            },
           ),
-        ),
+          ExcelColumnDef<StockItemEntity>(
+            key: 'category',
+            label: 'CATEGORY',
+            defaultWidth: 140,
+            minWidth: 100,
+            sortValue: (item) => item.category,
+            searchString: (item) => item.category,
+            cellBuilder: (context, item, row, isDark, brand) {
+              return Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  item.category,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF334155),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              );
+            },
+          ),
+          ExcelColumnDef<StockItemEntity>(
+            key: 'warehouseShelf',
+            label: 'WAREHOUSE SHELF',
+            defaultWidth: 150,
+            minWidth: 110,
+            sortValue: (item) => item.availableCount,
+            searchString: (item) => '${item.availableCount}',
+            cellBuilder: (context, item, row, isDark, brand) {
+              return Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '${item.availableCount} units',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+                ),
+              );
+            },
+          ),
+          ExcelColumnDef<StockItemEntity>(
+            key: 'inTransit',
+            label: 'IN-TRANSIT SADDLEBAG',
+            defaultWidth: 170,
+            minWidth: 130,
+            sortValue: (item) => item.assignedCount,
+            searchString: (item) => '${item.assignedCount}',
+            cellBuilder: (context, item, row, isDark, brand) {
+              return Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '${item.assignedCount} units',
+                  style: const TextStyle(color: Color(0xFFF97316), fontWeight: FontWeight.w600, fontSize: 12.5),
+                ),
+              );
+            },
+          ),
+          ExcelColumnDef<StockItemEntity>(
+            key: 'totalAvailable',
+            label: 'TOTAL AVAILABLE',
+            defaultWidth: 150,
+            minWidth: 110,
+            sortValue: (item) => item.availableCount + item.assignedCount,
+            searchString: (item) => '${item.availableCount + item.assignedCount}',
+            cellBuilder: (context, item, row, isDark, brand) {
+              return Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '${item.availableCount + item.assignedCount} units',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+                ),
+              );
+            },
+          ),
+          ExcelColumnDef<StockItemEntity>(
+            key: 'status',
+            label: 'STATUS',
+            defaultWidth: 130,
+            minWidth: 90,
+            sortValue: (item) => item.availableCount <= item.lowStockThreshold ? 0 : 1,
+            searchString: (item) => item.availableCount <= item.lowStockThreshold ? 'LOW STOCK' : 'HEALTHY',
+            cellBuilder: (context, item, row, isDark, brand) {
+              final isLow = item.availableCount <= item.lowStockThreshold;
+              return Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: isLow ? const Color(0xFFEF4444).withValues(alpha: 0.12) : const Color(0xFF10B981).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    isLow ? 'LOW STOCK' : 'HEALTHY',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: isLow ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+          ExcelColumnDef<StockItemEntity>(
+            key: 'actions',
+            label: 'ACTIONS',
+            defaultWidth: 90,
+            minWidth: 70,
+            cellBuilder: (context, item, row, isDark, brand) {
+              return Center(
+                child: IconButton(
+                  icon: const Icon(Icons.info_outline_rounded, size: 18, color: Color(0xFF2563EB)),
+                  tooltip: 'Item Details',
+                  onPressed: () {
+                    DCProductDetailModal.show(
+                      context,
+                      item: item,
+                      drivers: dcDrivers,
+                      allocations: stockState.riderAllocations,
+                    );
+                  },
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }
@@ -1977,90 +2234,178 @@ class _DCDetailPageState extends ConsumerState<DCDetailPage> with SingleTickerPr
   }
 
   Widget _buildRidersTable(BuildContext context, List<DCFleetDriver> riders, bool isDark) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: DataTable(
-            headingRowColor: WidgetStateProperty.all(isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
-            columns: const [
-              DataColumn(label: Text('RIDER / AGENT', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('PHONE', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('VEHICLE & PLATE', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('OPERATIONAL ZONE', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('STATUS', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('ACTIONS', style: TextStyle(fontWeight: FontWeight.bold))),
-            ],
-            rows: riders.map((r) {
-              return DataRow(
-                onSelectChanged: (_) {
-                  DCRiderDetailModal.show(context, r);
-                },
-                cells: [
-                  DataCell(
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 14,
-                          backgroundColor: const Color(0xFF2563EB).withValues(alpha: 0.15),
-                          child: Text(r.name.isNotEmpty ? r.name[0].toUpperCase() : 'R', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
-                        ),
-                        const SizedBox(width: 8),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(r.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
-                            Text(r.driverCode, style: GoogleFonts.firaCode(fontSize: 10.5, color: const Color(0xFF2563EB))),
-                          ],
-                        ),
-                      ],
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: PangeaExcelDataTable<DCFleetDriver>(
+        items: riders,
+        brandPrimary: const Color(0xFFF37021),
+        rowHeight: 48,
+        enablePagination: true,
+        initialPageSize: 10,
+        onRowTap: (r) {
+          DCRiderDetailModal.show(context, r);
+        },
+        columns: [
+          ExcelColumnDef<DCFleetDriver>(
+            key: 'rider',
+            label: 'RIDER / AGENT',
+            defaultWidth: 240,
+            minWidth: 180,
+            sortValue: (r) => r.name,
+            searchString: (r) => '${r.name} ${r.driverCode}',
+            cellBuilder: (context, r, row, isDark, brand) {
+              return Row(
+                children: [
+                  CircleAvatar(
+                    radius: 14,
+                    backgroundColor: const Color(0xFF2563EB).withValues(alpha: 0.15),
+                    child: Text(
+                      r.name.isNotEmpty ? r.name[0].toUpperCase() : 'R',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF2563EB)),
                     ),
                   ),
-                  DataCell(Text(r.phone, style: const TextStyle(fontSize: 12))),
-                  DataCell(Text('${r.vehicleType.toUpperCase()} (${r.vehiclePlate.isNotEmpty ? r.vehiclePlate : 'N/A'})', style: const TextStyle(fontSize: 12))),
-                  DataCell(Text(r.assignedZone, style: const TextStyle(fontSize: 12))),
-                  DataCell(
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: r.isActive ? const Color(0xFF10B981).withValues(alpha: 0.15) : const Color(0xFF94A3B8).withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(r.isActive ? 'ACTIVE' : 'OFF-DUTY', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: r.isActive ? const Color(0xFF10B981) : const Color(0xFF64748B))),
-                    ),
-                  ),
-                  DataCell(
-                    Row(
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        IconButton(
-                          icon: const Icon(Icons.visibility_outlined, size: 18, color: Color(0xFF2563EB)),
-                          tooltip: 'View Profile',
-                          onPressed: () {
-                            DCRiderDetailModal.show(context, r);
-                          },
+                        Text(
+                          r.name,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.phone_outlined, size: 18, color: Color(0xFF10B981)),
-                          tooltip: 'Contact / View Profile',
-                          onPressed: () {
-                            DCRiderDetailModal.show(context, r);
-                          },
+                        Text(
+                          r.driverCode,
+                          style: GoogleFonts.firaCode(fontSize: 10.5, color: const Color(0xFF2563EB)),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
                   ),
                 ],
               );
-            }).toList(),
+            },
           ),
-        ),
+          ExcelColumnDef<DCFleetDriver>(
+            key: 'phone',
+            label: 'PHONE',
+            defaultWidth: 140,
+            minWidth: 110,
+            sortValue: (r) => r.phone,
+            searchString: (r) => r.phone,
+            cellBuilder: (context, r, row, isDark, brand) {
+              return Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  r.phone,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF334155),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              );
+            },
+          ),
+          ExcelColumnDef<DCFleetDriver>(
+            key: 'vehicle',
+            label: 'VEHICLE & PLATE',
+            defaultWidth: 180,
+            minWidth: 130,
+            sortValue: (r) => r.vehicleType,
+            searchString: (r) => '${r.vehicleType} ${r.vehiclePlate}',
+            cellBuilder: (context, r, row, isDark, brand) {
+              return Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '${r.vehicleType.toUpperCase()} (${r.vehiclePlate.isNotEmpty ? r.vehiclePlate : 'N/A'})',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF334155),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              );
+            },
+          ),
+          ExcelColumnDef<DCFleetDriver>(
+            key: 'zone',
+            label: 'OPERATIONAL ZONE',
+            defaultWidth: 160,
+            minWidth: 120,
+            sortValue: (r) => r.assignedZone,
+            searchString: (r) => r.assignedZone,
+            cellBuilder: (context, r, row, isDark, brand) {
+              return Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  r.assignedZone,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              );
+            },
+          ),
+          ExcelColumnDef<DCFleetDriver>(
+            key: 'status',
+            label: 'STATUS',
+            defaultWidth: 120,
+            minWidth: 90,
+            sortValue: (r) => r.isActive ? 1 : 0,
+            searchString: (r) => r.isActive ? 'ACTIVE' : 'OFF-DUTY',
+            cellBuilder: (context, r, row, isDark, brand) {
+              return Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: r.isActive ? const Color(0xFF10B981).withValues(alpha: 0.15) : const Color(0xFF94A3B8).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    r.isActive ? 'ACTIVE' : 'OFF-DUTY',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: r.isActive ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+          ExcelColumnDef<DCFleetDriver>(
+            key: 'actions',
+            label: 'ACTIONS',
+            defaultWidth: 110,
+            minWidth: 90,
+            cellBuilder: (context, r, row, isDark, brand) {
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.visibility_outlined, size: 18, color: Color(0xFF2563EB)),
+                    tooltip: 'View Profile',
+                    onPressed: () {
+                      DCRiderDetailModal.show(context, r);
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.phone_outlined, size: 18, color: Color(0xFF10B981)),
+                    tooltip: 'Contact / View Profile',
+                    onPressed: () {
+                      DCRiderDetailModal.show(context, r);
+                    },
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
       ),
     );
   }

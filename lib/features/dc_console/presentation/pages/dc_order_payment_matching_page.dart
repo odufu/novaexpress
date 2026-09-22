@@ -17,6 +17,7 @@ import '../providers/dc_console_provider.dart';
 import '../widgets/dc_contact_rider_modal.dart';
 import '../widgets/dc_remittance_detail_modal.dart';
 import '../widgets/dc_rider_detail_modal.dart';
+import '../../../client_portal/presentation/widgets/pangea_excel_data_table.dart';
 
 final dcOrderMatchingSearchProvider =
     StateProvider.autoDispose<String>((ref) => '');
@@ -548,9 +549,16 @@ class DCOrderPaymentMatchingPageState
     final todayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59);
 
     return items.where((item) {
-      // 1. Status Filter (Remitted vs Not Remitted)
+      // 1. Status Filter (Remitted vs Pending vs Not Remitted)
+      if (selectedFilter == 'pending_approval' &&
+          !(item.status == 'pending' ||
+              item.status == 'pending_audit' ||
+              item.status == 'submitted')) {
+        return false;
+      }
       if (selectedFilter == 'not_remitted' &&
-          (item.isVerified || item.isDirectTransfer)) {
+          !(item.status == 'awaiting_remittance' ||
+              item.status == 'not_remitted')) {
         return false;
       }
       if (selectedFilter == 'remitted' &&
@@ -700,12 +708,17 @@ class DCOrderPaymentMatchingPageState
       );
     }).toList();
     final dcRiderIds = dcState.drivers.map((d) => d.id).toSet();
+    final dcRiderCodes = dcState.drivers.map((d) => d.driverCode.toLowerCase()).toSet();
     final allRemittances = financeState.remittances.where((r) {
       if (r.distributionCenterId != null &&
           r.distributionCenterId!.isNotEmpty) {
-        return r.distributionCenterId == activeDc.id;
+        return r.distributionCenterId == activeDc.id ||
+            r.distributionCenterId == activeDc.code ||
+            r.distributionCenterId == dcState.activeHubId ||
+            r.distributionCenterId == dcState.activeHubCode;
       }
-      return dcRiderIds.contains(r.deliveryAgentId);
+      return dcRiderIds.contains(r.deliveryAgentId) ||
+          dcRiderCodes.contains(r.deliveryAgentId.toLowerCase());
     }).toList();
 
     // Fast Single-Pass Processing
@@ -719,16 +732,25 @@ class DCOrderPaymentMatchingPageState
         allOrders.fold(0.0, (sum, o) => sum + o.totalAmount);
     final directPaystackItems =
         allLifecycleItems.where((i) => i.isDirectTransfer).toList();
-    final directPaystackSum =
-        directPaystackItems.fold(0.0, (sum, i) => sum + i.grossAmount);
 
-    final notRemittedItems = allLifecycleItems
-        .where((i) => !i.isVerified && !i.isDirectTransfer)
+    final pendingApprovalItems = allLifecycleItems
+        .where((i) =>
+            i.status == 'pending' ||
+            i.status == 'pending_audit' ||
+            i.status == 'submitted')
         .toList();
-    final notRemittedGross =
-        notRemittedItems.fold(0.0, (sum, i) => sum + i.grossAmount);
-    final notRemittedNet =
-        notRemittedItems.fold(0.0, (sum, i) => sum + i.netAmount);
+    final pendingApprovalSum =
+        pendingApprovalItems.fold(0.0, (sum, i) => sum + i.netAmount);
+
+    final unremittedItems = allLifecycleItems
+        .where((i) =>
+            (i.status == 'awaiting_remittance' || i.status == 'not_remitted') &&
+            !i.isDirectTransfer)
+        .toList();
+    final unremittedGross =
+        unremittedItems.fold(0.0, (sum, i) => sum + i.grossAmount);
+    final unremittedNet =
+        unremittedItems.fold(0.0, (sum, i) => sum + i.netAmount);
 
     final remittedItems = allLifecycleItems
         .where((i) => i.isVerified && !i.isDirectTransfer)
@@ -784,7 +806,7 @@ class DCOrderPaymentMatchingPageState
                             const SizedBox(width: 10),
                             Flexible(
                               child: Text(
-                                'Remittances & Reconciliation',
+                                'Rider Remittances & Reconciliation',
                                 style: GoogleFonts.inter(
                                   fontSize: isMobile ? 17 : 21,
                                   fontWeight: FontWeight.w900,
@@ -799,7 +821,7 @@ class DCOrderPaymentMatchingPageState
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Rider cash holding lifecycles, cumulative settlement breakdowns, and instant direct transfer clearances.',
+                          'Track cash collections, verify uploaded bank transfer receipts, monitor Paystack settlements, and audit DC treasury.',
                           style: GoogleFonts.inter(
                             fontSize: 12,
                             color: const Color(0xFF64748B),
@@ -865,27 +887,11 @@ class DCOrderPaymentMatchingPageState
                         isDark: isDark,
                       ),
                       _buildSummaryCard(
-                        title: 'DIRECT PAYSTACK PAID',
-                        value: CurrencyFormatter.formatNaira(directPaystackSum),
+                        title: 'AWAITING DC APPROVAL',
+                        value: CurrencyFormatter.formatNaira(pendingApprovalSum),
                         subtext:
-                            '${directPaystackItems.length} Direct Settlements • ₦0 Held',
-                        icon: Icons.bolt_rounded,
-                        iconColor: const Color(0xFF00A2D3),
-                        bgColor: isDark
-                            ? const Color(0xFF0C243B)
-                            : const Color(0xFFF0F9FF),
-                        borderColor: isDark
-                            ? const Color(0xFF0369A1)
-                            : const Color(0xFFBAE6FD),
-                        width: cardWidth,
-                        isDark: isDark,
-                      ),
-                      _buildSummaryCard(
-                        title: 'NOT REMITTED (HELD BY RIDERS)',
-                        value: CurrencyFormatter.formatNaira(notRemittedNet),
-                        subtext:
-                            '${notRemittedItems.length} Open Batches (${CurrencyFormatter.formatNaira(notRemittedGross)} Gross)',
-                        icon: Icons.warning_amber_rounded,
+                            '${pendingApprovalItems.length} Submissions • Action Required',
+                        icon: Icons.hourglass_top_rounded,
                         iconColor: const Color(0xFFF59E0B),
                         bgColor: isDark
                             ? const Color(0xFF2D2305)
@@ -893,6 +899,22 @@ class DCOrderPaymentMatchingPageState
                         borderColor: isDark
                             ? const Color(0xFFB45309)
                             : const Color(0xFFFDE68A),
+                        width: cardWidth,
+                        isDark: isDark,
+                      ),
+                      _buildSummaryCard(
+                        title: 'NOT REMITTED (HELD BY RIDERS)',
+                        value: CurrencyFormatter.formatNaira(unremittedNet),
+                        subtext:
+                            '${unremittedItems.length} Open Batches (${CurrencyFormatter.formatNaira(unremittedGross)} Gross)',
+                        icon: Icons.warning_amber_rounded,
+                        iconColor: const Color(0xFFEF4444),
+                        bgColor: isDark
+                            ? const Color(0xFF2D1515)
+                            : const Color(0xFFFEF2F2),
+                        borderColor: isDark
+                            ? const Color(0xFF991B1B)
+                            : const Color(0xFFFECACA),
                         width: cardWidth,
                         isDark: isDark,
                       ),
@@ -1158,10 +1180,16 @@ class DCOrderPaymentMatchingPageState
                               Icons.dashboard_rounded),
                           const SizedBox(width: 8),
                           _buildFilterChip(
-                              'not_remitted',
-                              '⚠️ Not Remitted (${notRemittedItems.length})',
-                              Icons.warning_amber_rounded,
+                              'pending_approval',
+                              '⏳ Pending Approval (${pendingApprovalItems.length})',
+                              Icons.hourglass_top_rounded,
                               color: const Color(0xFFF59E0B)),
+                          const SizedBox(width: 8),
+                          _buildFilterChip(
+                              'not_remitted',
+                              '⚠️ Not Remitted (${unremittedItems.length})',
+                              Icons.warning_amber_rounded,
+                              color: const Color(0xFFEF4444)),
                           const SizedBox(width: 8),
                           _buildFilterChip(
                               'remitted',
@@ -1559,277 +1587,454 @@ class DCOrderPaymentMatchingPageState
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          physics: const BouncingScrollPhysics(),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minWidth: 1050),
-            child: DataTable(
-              headingRowColor: WidgetStateProperty.all(
-                  isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
-              dataRowMinHeight: 56,
-              dataRowMaxHeight: 68,
-              horizontalMargin: 16,
-              columnSpacing: 22,
-              columns: [
-                _buildTableColumnHeader(
-                    'RIDER / AGENT', Icons.badge_outlined, isDark),
-                _buildTableColumnHeader(
-                    'ORDERS', Icons.inventory_2_outlined, isDark),
-                _buildTableColumnHeader(
-                    'AMOUNT TO REMIT', Icons.payments_outlined, isDark),
-                _buildTableColumnHeader('NET REMITTANCE',
-                    Icons.account_balance_wallet_outlined, isDark),
-                _buildTableColumnHeader(
-                    'PAYMENT METHOD', Icons.credit_card_outlined, isDark),
-                _buildTableColumnHeader(
-                    'OPENING DATE', Icons.schedule_rounded, isDark),
-                _buildTableColumnHeader(
-                    'CLOSING DATE', Icons.event_available_rounded, isDark),
-                _buildTableColumnHeader(
-                    'REMITTANCE STATUS', Icons.rule_rounded, isDark),
-                _buildTableColumnHeader('ACTION', Icons.tune_rounded, isDark),
-              ],
-              rows: items.map((item) {
-                return _buildDataRow(item, isDark);
-              }).toList(),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+        child: PangeaExcelDataTable<DCRemittanceLifecycleItem>(
+          items: items,
+          enablePagination: false,
+          rowHeight: 68.0,
+          brandPrimary: const Color(0xFFF37021),
+          onRowTap: (item) {
+            showDialog(
+              context: context,
+              builder: (ctx) => DCRemittanceDetailModal(remittance: item),
+            );
+          },
+          columns: [
+            // 1. Remittance Ref & Channel
+            ExcelColumnDef<DCRemittanceLifecycleItem>(
+              key: 'reference',
+              group: 'Remittance Identity',
+              label: 'REMITTANCE REF & CHANNEL',
+              defaultWidth: 210,
+              minWidth: 170,
+              searchString: (item) => '${item.referenceNumber} ${item.paymentMethod}',
+              sortValue: (item) => item.referenceNumber,
+              cellBuilder: (context, item, row, isDark, brand) {
+                final isPaystack = item.paymentMethod.toLowerCase().contains('paystack') ||
+                    item.referenceNumber.startsWith('PSTK');
+                final isBank = item.paymentMethod.toLowerCase().contains('bank');
+                final isDirect = item.isDirectTransfer;
 
-  DataColumn _buildTableColumnHeader(String label, IconData icon, bool isDark) {
-    return DataColumn(
-      label: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: const Color(0xFF64748B)),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: GoogleFonts.inter(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-              letterSpacing: 0.5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  DataRow _buildDataRow(DCRemittanceLifecycleItem item, bool isDark) {
-    final isDirect = item.isDirectTransfer;
-
-    return DataRow(
-      onSelectChanged: (_) {
-        showDialog(
-          context: context,
-          builder: (ctx) => DCRemittanceDetailModal(remittance: item),
-        );
-      },
-      cells: [
-        // 1. Rider / Agent (Interactive tap to open DCRiderDetailModal)
-        DataCell(
-          InkWell(
-            onTap: () => _openRiderProfile(item),
-            borderRadius: BorderRadius.circular(8),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  UserAvatarWidget(
-                    avatarUrl: item.riderAvatarUrl,
-                    fullName: item.riderName,
-                    radius: 16,
-                    showBorder: true,
-                    borderColor: item.isVerified
-                        ? const Color(0xFF10B981)
-                        : const Color(0xFFF37021),
-                  ),
-                  const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            item.riderName,
-                            style: GoogleFonts.inter(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.bold,
-                                color: isDark
-                                    ? Colors.white
-                                    : const Color(0xFF0F172A)),
-                          ),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.open_in_new_rounded,
-                              size: 11, color: Color(0xFF94A3B8)),
-                        ],
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      item.referenceNumber,
+                      style: GoogleFonts.jetBrainsMono(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
                       ),
-                      Text(
-                        item.riderCode,
-                        style: GoogleFonts.jetBrainsMono(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                            color: const Color(0xFF64748B)),
+                    ),
+                    const SizedBox(height: 3),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          isPaystack
+                              ? Icons.bolt_rounded
+                              : (isBank
+                                  ? Icons.account_balance_rounded
+                                  : (isDirect
+                                      ? Icons.flash_on_rounded
+                                      : Icons.payments_rounded)),
+                          size: 12,
+                          color: isPaystack
+                              ? const Color(0xFF00A2D3)
+                              : (isBank
+                                  ? const Color(0xFF3B82F6)
+                                  : (isDirect
+                                      ? const Color(0xFF10B981)
+                                      : const Color(0xFFF59E0B))),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          isPaystack
+                              ? 'Paystack Instant'
+                              : (isBank
+                                  ? 'Bank Transfer'
+                                  : (isDirect ? 'Direct Transfer' : 'Cash Handover')),
+                          style: GoogleFonts.inter(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w600,
+                            color: isPaystack
+                                ? const Color(0xFF00A2D3)
+                                : (isBank
+                                    ? const Color(0xFF3B82F6)
+                                    : (isDirect
+                                        ? const Color(0xFF10B981)
+                                        : const Color(0xFFF59E0B))),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                );
+              },
+            ),
+
+            // 2. Rider / Agent
+            ExcelColumnDef<DCRemittanceLifecycleItem>(
+              key: 'rider',
+              group: 'Fleet Allocation',
+              label: 'RIDER / AGENT',
+              defaultWidth: 190,
+              minWidth: 150,
+              searchString: (item) => '${item.riderName} ${item.riderCode}',
+              sortValue: (item) => item.riderName,
+              cellBuilder: (context, item, row, isDark, brand) {
+                final isPending = item.status == 'pending' ||
+                    item.status == 'pending_audit' ||
+                    item.status == 'submitted';
+
+                return InkWell(
+                  onTap: () => _openRiderProfile(item),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      UserAvatarWidget(
+                        avatarUrl: item.riderAvatarUrl,
+                        fullName: item.riderName,
+                        radius: 16,
+                        showBorder: true,
+                        borderColor: item.isVerified
+                            ? const Color(0xFF10B981)
+                            : (isPending
+                                ? const Color(0xFFF59E0B)
+                                : const Color(0xFFEF4444)),
+                      ),
+                      const SizedBox(width: 10),
+                      Flexible(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    item.riderName,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                const Icon(Icons.open_in_new_rounded,
+                                    size: 11, color: Color(0xFF94A3B8)),
+                              ],
+                            ),
+                            Text(
+                              item.riderCode,
+                              style: GoogleFonts.jetBrainsMono(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                color: const Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
-                ],
-              ),
+                );
+              },
             ),
-          ),
-        ),
 
-        // 2. Orders (Count & Reference badge)
-        DataCell(
-          InkWell(
-            onTap: () {
-              showDialog(
-                context: context,
-                builder: (ctx) => DCRemittanceDetailModal(remittance: item),
-              );
-            },
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: const Color(0xFF2563EB).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                    color: const Color(0xFF2563EB).withValues(alpha: 0.25)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.inventory_2_rounded,
-                      size: 13, color: Color(0xFF2563EB)),
-                  const SizedBox(width: 5),
-                  Text(
-                    '${item.orderCount} ${item.orderCount == 1 ? 'Order' : 'Orders'}',
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFF2563EB),
-                    ),
+            // 3. Orders
+            ExcelColumnDef<DCRemittanceLifecycleItem>(
+              key: 'orders',
+              group: 'Shipments',
+              label: 'ORDERS',
+              defaultWidth: 120,
+              minWidth: 95,
+              searchString: (item) => '${item.orderCount} orders',
+              sortValue: (item) => item.orderCount,
+              cellBuilder: (context, item, row, isDark, brand) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2563EB).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                        color: const Color(0xFF2563EB).withValues(alpha: 0.25)),
                   ),
-                ],
-              ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.inventory_2_rounded,
+                          size: 13, color: Color(0xFF2563EB)),
+                      const SizedBox(width: 5),
+                      Text(
+                        '${item.orderCount} ${item.orderCount == 1 ? 'Order' : 'Orders'}',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF2563EB),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
-          ),
-        ),
 
-        // 3. Amount to Remit (Gross Figure Only)
-        DataCell(
-          Text(
-            CurrencyFormatter.formatNaira(item.grossAmount),
-            style: GoogleFonts.jetBrainsMono(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : const Color(0xFF0F172A)),
-          ),
-        ),
+            // 4. Proof / Receipt
+            ExcelColumnDef<DCRemittanceLifecycleItem>(
+              key: 'proof',
+              group: 'Verification',
+              label: 'PROOF / RECEIPT',
+              defaultWidth: 140,
+              minWidth: 115,
+              searchString: (item) =>
+                  item.depositReceiptUrl != null ? 'receipt uploaded' : 'auto cleared',
+              cellBuilder: (context, item, row, isDark, brand) {
+                final isPaystack = item.paymentMethod.toLowerCase().contains('paystack') ||
+                    item.referenceNumber.startsWith('PSTK');
+                final isDirect = item.isDirectTransfer;
 
-        // 4. Net Remittance (Net Figure Only)
-        DataCell(
-          Text(
-            CurrencyFormatter.formatNaira(item.netAmount),
-            style: GoogleFonts.jetBrainsMono(
-              fontSize: 13,
-              fontWeight: FontWeight.w900,
-              color: item.isVerified
-                  ? const Color(0xFF10B981)
-                  : (isDirect
-                      ? const Color(0xFF00A2D3)
-                      : const Color(0xFFF59E0B)),
+                if (item.depositReceiptUrl != null &&
+                    item.depositReceiptUrl!.isNotEmpty) {
+                  return InkWell(
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (ctx) => Dialog(
+                          backgroundColor: Colors.transparent,
+                          insetPadding: const EdgeInsets.all(16),
+                          child: Stack(
+                            alignment: Alignment.topRight,
+                            children: [
+                              InteractiveViewer(
+                                panEnabled: true,
+                                minScale: 0.5,
+                                maxScale: 4.0,
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(16),
+                                  child: Image.network(
+                                    item.depositReceiptUrl!,
+                                    fit: BoxFit.contain,
+                                    errorBuilder: (_, __, ___) => Container(
+                                      padding: const EdgeInsets.all(32),
+                                      color: const Color(0xFF0F172A),
+                                      child: const Text('Could not load receipt image',
+                                          style: TextStyle(color: Colors.white)),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.close_rounded,
+                                    color: Colors.white, size: 24),
+                                onPressed: () => Navigator.of(ctx).pop(),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0284C7).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                            color: const Color(0xFF0284C7).withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.attach_file_rounded,
+                              size: 13, color: Color(0xFF0284C7)),
+                          const SizedBox(width: 4),
+                          Text(
+                            'View Slip',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFF0284C7),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                } else if (isPaystack || isDirect) {
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.bolt_rounded, size: 12, color: Color(0xFF10B981)),
+                        const SizedBox(width: 3),
+                        Text(
+                          'Auto-Cleared',
+                          style: GoogleFonts.inter(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF10B981),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                return Text('—',
+                    style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)));
+              },
             ),
-          ),
-        ),
 
-        // 5. Payment Method
-        DataCell(
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                isDirect ? Icons.bolt_rounded : Icons.payments_rounded,
-                size: 14,
-                color: isDirect
-                    ? const Color(0xFF00A2D3)
-                    : const Color(0xFFF59E0B),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                isDirect ? 'Direct Transfer' : 'Cash POD',
-                style: GoogleFonts.inter(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w500,
-                    color: isDark ? Colors.white70 : const Color(0xFF334155)),
-              ),
-            ],
-          ),
-        ),
-
-        // 6. Opening Date
-        DataCell(
-          Text(
-            _formatDateShort(item.openingDate),
-            style:
-                GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
-          ),
-        ),
-
-        // 7. Closing Date
-        DataCell(
-          Text(
-            item.closingDate != null
-                ? _formatDateShort(item.closingDate!)
-                : 'Active (Open)',
-            style: GoogleFonts.inter(
-              fontSize: 11,
-              fontWeight:
-                  item.closingDate != null ? FontWeight.w500 : FontWeight.bold,
-              color: item.closingDate != null
-                  ? const Color(0xFF64748B)
-                  : const Color(0xFFF59E0B),
+            // 5. Gross Amount
+            ExcelColumnDef<DCRemittanceLifecycleItem>(
+              key: 'gross',
+              group: 'Financial Accounting',
+              label: 'GROSS AMOUNT',
+              defaultWidth: 140,
+              minWidth: 110,
+              searchString: (item) => CurrencyFormatter.formatNaira(item.grossAmount),
+              sortValue: (item) => item.grossAmount,
+              cellBuilder: (context, item, row, isDark, brand) {
+                return Text(
+                  CurrencyFormatter.formatNaira(item.grossAmount),
+                  style: GoogleFonts.jetBrainsMono(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
+                );
+              },
             ),
-          ),
-        ),
 
-        // 8. Remittance Status (Not Remitted vs Remitted vs Direct Settled)
-        DataCell(
-          _buildStatusBadge(item.status),
-        ),
+            // 6. Net Remittance
+            ExcelColumnDef<DCRemittanceLifecycleItem>(
+              key: 'net',
+              group: 'Financial Accounting',
+              label: 'NET REMITTANCE',
+              defaultWidth: 140,
+              minWidth: 110,
+              searchString: (item) => CurrencyFormatter.formatNaira(item.netAmount),
+              sortValue: (item) => item.netAmount,
+              cellBuilder: (context, item, row, isDark, brand) {
+                final isPending = item.status == 'pending' ||
+                    item.status == 'pending_audit' ||
+                    item.status == 'submitted';
 
-        // 9. Action Button
-        DataCell(
-          ElevatedButton(
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (ctx) => DCRemittanceDetailModal(remittance: item),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFF37021).withValues(alpha: 0.12),
-              foregroundColor: const Color(0xFFF37021),
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
+                return Text(
+                  CurrencyFormatter.formatNaira(item.netAmount),
+                  style: GoogleFonts.jetBrainsMono(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    color: item.isVerified
+                        ? const Color(0xFF10B981)
+                        : (isPending
+                            ? const Color(0xFFF59E0B)
+                            : const Color(0xFFEF4444)),
+                  ),
+                );
+              },
             ),
-            child: const Text('View',
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-          ),
+
+            // 7. Date & Time
+            ExcelColumnDef<DCRemittanceLifecycleItem>(
+              key: 'date',
+              group: 'Timeline',
+              label: 'DATE & TIME',
+              defaultWidth: 145,
+              minWidth: 110,
+              searchString: (item) =>
+                  _formatDateShort(item.closingDate ?? item.openingDate),
+              sortValue: (item) => item.closingDate ?? item.openingDate,
+              cellBuilder: (context, item, row, isDark, brand) {
+                return Text(
+                  _formatDateShort(item.closingDate ?? item.openingDate),
+                  style: GoogleFonts.inter(
+                      fontSize: 11, color: const Color(0xFF64748B)),
+                );
+              },
+            ),
+
+            // 8. Remittance Status
+            ExcelColumnDef<DCRemittanceLifecycleItem>(
+              key: 'status',
+              group: 'Status & Action',
+              label: 'REMITTANCE STATUS',
+              defaultWidth: 180,
+              minWidth: 140,
+              searchString: (item) => item.status,
+              sortValue: (item) => item.status,
+              cellBuilder: (context, item, row, isDark, brand) {
+                return _buildStatusBadge(item.status);
+              },
+            ),
+
+            // 9. Actions
+            ExcelColumnDef<DCRemittanceLifecycleItem>(
+              key: 'action',
+              group: 'Status & Action',
+              label: 'ACTION',
+              defaultWidth: 140,
+              minWidth: 110,
+              cellBuilder: (context, item, row, isDark, brand) {
+                final isPending = item.status == 'pending' ||
+                    item.status == 'pending_audit' ||
+                    item.status == 'submitted';
+
+                if (isPending) {
+                  return ElevatedButton.icon(
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (ctx) => DCRemittanceDetailModal(remittance: item),
+                      );
+                    },
+                    icon: const Icon(Icons.check_circle_outline_rounded,
+                        size: 14, color: Colors.white),
+                    label: const Text('Review & Clear',
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF10B981),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  );
+                }
+
+                return ElevatedButton(
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (ctx) => DCRemittanceDetailModal(remittance: item),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFF37021).withValues(alpha: 0.12),
+                    foregroundColor: const Color(0xFFF37021),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: const Text('View',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                );
+              },
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
@@ -1843,16 +2048,26 @@ class DCOrderPaymentMatchingPageState
     bool isMobile,
   ) {
     final isDirect = item.isDirectTransfer;
+    final isPaystack = item.paymentMethod.toLowerCase().contains('paystack') ||
+        item.referenceNumber.startsWith('PSTK');
+    final isBank = item.paymentMethod.toLowerCase().contains('bank');
+    final isPending = item.status == 'pending' ||
+        item.status == 'pending_audit' ||
+        item.status == 'submitted';
 
     return Container(
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: !item.isVerified && !isDirect
-              ? const Color(0xFFF59E0B).withValues(alpha: 0.4)
-              : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-          width: !item.isVerified && !isDirect ? 1.5 : 1.0,
+          color: isPending
+              ? const Color(0xFFF59E0B).withValues(alpha: 0.6)
+              : (!item.isVerified && !isDirect
+                  ? const Color(0xFFEF4444).withValues(alpha: 0.4)
+                  : (isDark
+                      ? const Color(0xFF334155)
+                      : const Color(0xFFE2E8F0))),
+          width: isPending || (!item.isVerified && !isDirect) ? 1.5 : 1.0,
         ),
         boxShadow: [
           BoxShadow(
@@ -1891,7 +2106,9 @@ class DCOrderPaymentMatchingPageState
                         showBorder: true,
                         borderColor: item.isVerified
                             ? const Color(0xFF10B981)
-                            : const Color(0xFFF37021),
+                            : (isPending
+                                ? const Color(0xFFF59E0B)
+                                : const Color(0xFFEF4444)),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -1942,6 +2159,155 @@ class DCOrderPaymentMatchingPageState
                                   fontSize: 11.5,
                                   color: const Color(0xFF64748B)),
                             ),
+                            const SizedBox(height: 4),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 4,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: (isPaystack
+                                            ? const Color(0xFF00A2D3)
+                                            : (isBank
+                                                ? const Color(0xFF3B82F6)
+                                                : (isDirect
+                                                    ? const Color(0xFF10B981)
+                                                    : const Color(0xFFF59E0B))))
+                                        .withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        isPaystack
+                                            ? Icons.bolt_rounded
+                                            : (isBank
+                                                ? Icons.account_balance_rounded
+                                                : (isDirect
+                                                    ? Icons.flash_on_rounded
+                                                    : Icons.payments_rounded)),
+                                        size: 11,
+                                        color: isPaystack
+                                            ? const Color(0xFF00A2D3)
+                                            : (isBank
+                                                ? const Color(0xFF3B82F6)
+                                                : (isDirect
+                                                    ? const Color(0xFF10B981)
+                                                    : const Color(0xFFF59E0B))),
+                                      ),
+                                      const SizedBox(width: 3),
+                                      Text(
+                                        isPaystack
+                                            ? 'Paystack Instant'
+                                            : (isBank
+                                                ? 'Bank Transfer'
+                                                : (isDirect
+                                                    ? 'Direct Transfer'
+                                                    : 'Cash Handover')),
+                                        style: GoogleFonts.inter(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w600,
+                                          color: isPaystack
+                                              ? const Color(0xFF00A2D3)
+                                              : (isBank
+                                                  ? const Color(0xFF3B82F6)
+                                                  : (isDirect
+                                                      ? const Color(0xFF10B981)
+                                                      : const Color(0xFFF59E0B))),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (item.depositReceiptUrl != null &&
+                                    item.depositReceiptUrl!.isNotEmpty)
+                                  InkWell(
+                                    onTap: () {
+                                      showDialog(
+                                        context: context,
+                                        builder: (ctx) => Dialog(
+                                          backgroundColor: Colors.transparent,
+                                          insetPadding:
+                                              const EdgeInsets.all(16),
+                                          child: Stack(
+                                            alignment: Alignment.topRight,
+                                            children: [
+                                              InteractiveViewer(
+                                                panEnabled: true,
+                                                minScale: 0.5,
+                                                maxScale: 4.0,
+                                                child: ClipRRect(
+                                                  borderRadius:
+                                                      BorderRadius.circular(16),
+                                                  child: Image.network(
+                                                    item.depositReceiptUrl!,
+                                                    fit: BoxFit.contain,
+                                                    errorBuilder:
+                                                        (_, __, ___) =>
+                                                            Container(
+                                                      padding:
+                                                          const EdgeInsets.all(
+                                                              32),
+                                                      color: const Color(
+                                                          0xFF0F172A),
+                                                      child: const Text(
+                                                          'Could not load receipt image',
+                                                          style: TextStyle(
+                                                              color:
+                                                                  Colors.white)),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              IconButton(
+                                                icon: const Icon(
+                                                    Icons.close_rounded,
+                                                    color: Colors.white,
+                                                    size: 24),
+                                                onPressed: () =>
+                                                    Navigator.of(ctx).pop(),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF0284C7)
+                                            .withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(
+                                            color: const Color(0xFF0284C7)
+                                                .withValues(alpha: 0.3)),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.attach_file_rounded,
+                                              size: 11,
+                                              color: Color(0xFF0284C7)),
+                                          const SizedBox(width: 3),
+                                          Text(
+                                            'View Slip',
+                                            style: GoogleFonts.inter(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                              color: const Color(0xFF0284C7),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ],
                         ),
                       ),
@@ -1991,9 +2357,11 @@ class DCOrderPaymentMatchingPageState
                             fontWeight: FontWeight.w900,
                             color: item.isVerified
                                 ? const Color(0xFF10B981)
-                                : (isDirect
-                                    ? const Color(0xFF00A2D3)
-                                    : const Color(0xFFF59E0B)),
+                                : (isPending
+                                    ? const Color(0xFFF59E0B)
+                                    : (isDirect
+                                        ? const Color(0xFF00A2D3)
+                                        : const Color(0xFFEF4444))),
                           ),
                         ),
                       ],
@@ -2022,7 +2390,8 @@ class DCOrderPaymentMatchingPageState
                       children: [
                         if (!item.isVerified &&
                             !isDirect &&
-                            item.orders.isNotEmpty)
+                            item.orders.isNotEmpty &&
+                            !isPending)
                           IconButton(
                             icon: const Icon(Icons.phone_in_talk_rounded,
                                 size: 16, color: Color(0xFFF37021)),
@@ -2039,23 +2408,51 @@ class DCOrderPaymentMatchingPageState
                               );
                             },
                           ),
-                        TextButton.icon(
-                          onPressed: () {
-                            showDialog(
-                              context: context,
-                              builder: (ctx) =>
-                                  DCRemittanceDetailModal(remittance: item),
-                            );
-                          },
-                          icon:
-                              const Icon(Icons.arrow_forward_rounded, size: 14),
-                          label: const Text('View Breakdown'),
-                          style: TextButton.styleFrom(
-                            foregroundColor: const Color(0xFFF37021),
-                            textStyle: const TextStyle(
-                                fontSize: 11.5, fontWeight: FontWeight.bold),
+                        if (isPending)
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                builder: (ctx) =>
+                                    DCRemittanceDetailModal(remittance: item),
+                              );
+                            },
+                            icon: const Icon(Icons.check_circle_outline_rounded,
+                                size: 14, color: Colors.white),
+                            label: const Text('Review & Clear',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF10B981),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 6),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8)),
+                            ),
+                          )
+                        else
+                          TextButton.icon(
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                builder: (ctx) =>
+                                    DCRemittanceDetailModal(remittance: item),
+                              );
+                            },
+                            icon: const Icon(Icons.arrow_forward_rounded,
+                                size: 14),
+                            label: const Text('View Breakdown'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: const Color(0xFFF37021),
+                              textStyle: const TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.bold),
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   ],
@@ -2189,19 +2586,27 @@ class DCOrderPaymentMatchingPageState
   }
 
   Widget _buildStatusBadge(String status) {
+    final bool isPending =
+        status == 'pending' || status == 'pending_audit' || status == 'submitted';
     final bool isNotRemitted =
         status == 'awaiting_remittance' || status == 'not_remitted';
     final bool isDirect = status == 'direct_settled';
 
-    final Color badgeColor = isNotRemitted
+    final Color badgeColor = isPending
         ? const Color(0xFFF59E0B)
-        : (isDirect ? const Color(0xFF00A2D3) : const Color(0xFF10B981));
-    final String label = isNotRemitted
-        ? 'NOT REMITTED'
-        : (isDirect ? 'DIRECT SETTLED' : 'REMITTED & CLEARED');
-    final IconData icon = isNotRemitted
+        : (isNotRemitted
+            ? const Color(0xFFEF4444)
+            : (isDirect ? const Color(0xFF00A2D3) : const Color(0xFF10B981)));
+    final String label = isPending
+        ? 'AWAITING APPROVAL'
+        : (isNotRemitted
+            ? 'NOT REMITTED'
+            : (isDirect ? 'DIRECT SETTLED' : 'REMITTED & CLEARED'));
+    final IconData icon = isPending
         ? Icons.hourglass_top_rounded
-        : (isDirect ? Icons.bolt_rounded : Icons.check_circle_rounded);
+        : (isNotRemitted
+            ? Icons.error_outline_rounded
+            : (isDirect ? Icons.bolt_rounded : Icons.check_circle_rounded));
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),

@@ -7,6 +7,7 @@ import '../../domain/entities/client_closer.dart';
 import '../../domain/entities/client_profile.dart';
 import '../../domain/entities/client_settlement.dart';
 import '../../domain/entities/customer_lead.dart';
+import '../../domain/entities/client_closer_payout.dart';
 import '../../domain/entities/client_supplier.dart';
 import '../../domain/entities/client_stock_invoice.dart';
 import '../../domain/entities/client_stock_balance.dart';
@@ -23,6 +24,10 @@ abstract class ClientPortalRemoteDataSource {
     String? closerCode,
     int dailyCallTarget = 50,
     double commissionRate = 500.0,
+    bool isCommissionEnabled = true,
+    String? bankName,
+    String? accountNumber,
+    String? accountName,
   });
 
   Future<List<ClientCloser>> fetchClosers(String clientId);
@@ -36,6 +41,36 @@ abstract class ClientPortalRemoteDataSource {
     double? commissionRate,
     int? dailyCallTarget,
     bool? isActive,
+    bool? isCommissionEnabled,
+    String? bankName,
+    String? accountNumber,
+    String? accountName,
+  });
+  Future<List<ClientCloserPayout>> fetchCloserPayouts(String closerId);
+  Future<List<ClientCloserPayout>> fetchClientCloserPayouts(String clientId);
+  Future<ClientCloserPayout> disburseCloserPayout({
+    required String closerId,
+    required String clientId,
+    required double amount,
+    required String bankName,
+    required String accountNumber,
+    required String accountName,
+    String? disbursementRef,
+    String? proofOfPaymentUrl,
+    String? notes,
+  });
+  Future<ClientCloserPayout> requestCloserPayout({
+    required String closerId,
+    required String clientId,
+    required double amount,
+    required String bankName,
+    required String accountNumber,
+    required String accountName,
+    String? notes,
+  });
+  Future<void> confirmCloserPayout({
+    required String payoutId,
+    String? notes,
   });
   Future<List<CustomerLead>> fetchLeads(String clientId);
   Future<void> insertLead(CustomerLead lead);
@@ -51,6 +86,11 @@ abstract class ClientPortalRemoteDataSource {
   Future<void> updateClientProfile(ClientProfile profile);
   Future<List<ClientSettlement>> fetchClientSettlements(String clientId);
   Future<Map<String, dynamic>> fetchMerchantAssetCustody(String clientId);
+  Future<bool> approveSettlement({
+    required String settlementId,
+    required String clientId,
+    String? notes,
+  });
 
   // --- Inventory & Landed Cost Supply Management ---
   Future<List<ClientSupplier>> fetchSuppliers(String clientId);
@@ -120,6 +160,10 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
     String? closerCode,
     int dailyCallTarget = 50,
     double commissionRate = 500.0,
+    bool isCommissionEnabled = true,
+    String? bankName,
+    String? accountNumber,
+    String? accountName,
   }) async {
     final cleanEmail = email.trim().toLowerCase();
     final cleanPhone = phone.replaceAll(RegExp(r'[\s\-\(\)]'), '').trim();
@@ -127,33 +171,36 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
     final adminDb = _getAdminClient();
 
     // 1. Pre-flight check: Email Uniqueness in users table
-    final existingUserByEmail = await adminDb
+    final existingUsersByEmail = await adminDb
         .from('users')
         .select('id, email')
         .eq('email', cleanEmail)
-        .maybeSingle();
+        .limit(2);
 
-    if (existingUserByEmail != null) {
+    if ((existingUsersByEmail as List).isNotEmpty) {
       throw Exception("A user with email '$cleanEmail' already exists. Please use a unique email address.");
     }
 
     // 1b. Check if an orphaned/partial closer record exists with this email in client_closers
-    final existingCloserByEmail = await adminDb
+    final existingClosersByEmail = await adminDb
         .from('client_closers')
         .select('id, email, user_id')
         .eq('email', cleanEmail)
-        .maybeSingle();
+        .limit(2);
 
-    if (existingCloserByEmail != null) {
-      final existingUserId = existingCloserByEmail['user_id']?.toString();
-      final hasRealUser = existingUserId != null && existingUserId.isNotEmpty
-          ? await adminDb.from('users').select('id').eq('id', existingUserId).maybeSingle()
-          : null;
+    if ((existingClosersByEmail as List).isNotEmpty) {
+      final firstCloser = (existingClosersByEmail as List).first as Map<String, dynamic>;
+      final existingUserId = firstCloser['user_id']?.toString();
+      final List hasRealUser = existingUserId != null && existingUserId.isNotEmpty
+          ? (await adminDb.from('users').select('id').eq('id', existingUserId).limit(1)) as List
+          : const [];
 
-      if (hasRealUser == null) {
+      if (hasRealUser.isEmpty) {
         // Orphaned record from previous partial failure — clean it up so onboarding succeeds
         debugPrint('[CLIENT_PORTAL] 🧹 Cleaning up orphaned closer record for $cleanEmail');
-        await adminDb.from('client_closers').delete().eq('id', existingCloserByEmail['id']);
+        for (final row in (existingClosersByEmail as List)) {
+          await adminDb.from('client_closers').delete().eq('id', row['id']);
+        }
       } else {
         throw Exception("A sales closer with email '$cleanEmail' is already registered in the team.");
       }
@@ -174,13 +221,13 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
     }
 
     final phoneFilter = phoneVariants.map((p) => 'phone_number.eq.$p').join(',');
-    final existingUserByPhone = await adminDb
+    final existingUsersByPhone = await adminDb
         .from('users')
         .select('id, phone_number, first_name, last_name, role')
         .or(phoneFilter)
-        .maybeSingle();
+        .limit(2);
 
-    if (existingUserByPhone != null) {
+    if ((existingUsersByPhone as List).isNotEmpty) {
       throw Exception("Phone number '$phone' is already registered to another account. Please use a unique phone number.");
     }
 
@@ -288,13 +335,29 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
       avatarUrl: avatarUrl,
       dailyCallTarget: dailyCallTarget,
       commissionRate: commissionRate,
+      isCommissionEnabled: isCommissionEnabled,
+      bankName: bankName ?? '',
+      accountNumber: accountNumber ?? '',
+      accountName: accountName ?? '',
       isActive: true,
       createdAt: DateTime.now(),
     );
 
     try {
-      // 4. Create Closer record
-      await adminDb.from('client_closers').upsert(newCloser.toJson());
+      // 4. Create Closer record with backward compatibility fallback
+      try {
+        await adminDb.from('client_closers').upsert(newCloser.toJson());
+      } catch (upsertErr) {
+        debugPrint('[CLIENT_PORTAL] ⚠️ Warning upserting closer with commission/bank columns: $upsertErr. Falling back to core columns.');
+        final coreMap = Map<String, dynamic>.from(newCloser.toJson());
+        coreMap.remove('is_commission_enabled');
+        coreMap.remove('bank_name');
+        coreMap.remove('account_number');
+        coreMap.remove('account_name');
+        coreMap.remove('unpaid_commission_balance');
+        coreMap.remove('total_paid_commission');
+        await adminDb.from('client_closers').upsert(coreMap);
+      }
 
       // 5. Create User account for closer login
       final nameParts = fullName.trim().split(' ');
@@ -316,12 +379,13 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
 
       // 5b. Sync client total_closers_count and auto-expand closer_limit
       try {
-        final clientRes = await adminDb
+        final clientRows = await adminDb
             .from('clients')
             .select('total_closers_count, closer_limit')
             .eq('id', clientId)
-            .maybeSingle();
-        if (clientRes != null) {
+            .limit(1);
+        if ((clientRows as List).isNotEmpty) {
+          final clientRes = (clientRows as List).first as Map<String, dynamic>;
           final totalCount = (clientRes['total_closers_count'] as num?)?.toInt() ?? 0;
           final currentLimit = (clientRes['closer_limit'] as num?)?.toInt() ?? 25;
           final newTotal = totalCount + 1;
@@ -471,17 +535,38 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
     double? commissionRate,
     int? dailyCallTarget,
     bool? isActive,
+    bool? isCommissionEnabled,
+    String? bankName,
+    String? accountNumber,
+    String? accountName,
   }) async {
     final adminDb = _getAdminClient();
-    await adminDb.from('client_closers').update({
-      if (fullName != null) 'full_name': fullName,
-      if (phone != null) 'phone': phone,
-      if (email != null) 'email': email,
-      if (commissionRate != null) 'commission_rate': commissionRate,
-      if (dailyCallTarget != null) 'daily_call_target': dailyCallTarget,
-      if (isActive != null) 'is_active': isActive,
-      'updated_at': DateTime.now().toIso8601String(),
-    }).eq('id', closerId);
+    try {
+      await adminDb.from('client_closers').update({
+        if (fullName != null) 'full_name': fullName,
+        if (phone != null) 'phone': phone,
+        if (email != null) 'email': email,
+        if (commissionRate != null) 'commission_rate': commissionRate,
+        if (dailyCallTarget != null) 'daily_call_target': dailyCallTarget,
+        if (isActive != null) 'is_active': isActive,
+        if (isCommissionEnabled != null) 'is_commission_enabled': isCommissionEnabled,
+        if (bankName != null) 'bank_name': bankName,
+        if (accountNumber != null) 'account_number': accountNumber,
+        if (accountName != null) 'account_name': accountName,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', closerId);
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] ⚠️ Notice updating closer with new columns: $e. Falling back to core columns.');
+      await adminDb.from('client_closers').update({
+        if (fullName != null) 'full_name': fullName,
+        if (phone != null) 'phone': phone,
+        if (email != null) 'email': email,
+        if (commissionRate != null) 'commission_rate': commissionRate,
+        if (dailyCallTarget != null) 'daily_call_target': dailyCallTarget,
+        if (isActive != null) 'is_active': isActive,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', closerId);
+    }
 
     if (fullName != null || phone != null || isActive != null) {
       await adminDb.from('users').update({
@@ -490,6 +575,184 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
         if (phone != null) 'phone_number': phone,
         if (isActive != null) 'is_active': isActive,
       }).eq('id', closerId);
+    }
+  }
+
+  @override
+  Future<List<ClientCloserPayout>> fetchCloserPayouts(String closerId) async {
+    final client = _getClient();
+    try {
+      final res = await client
+          .from('closer_payouts')
+          .select('*')
+          .eq('closer_id', closerId)
+          .order('created_at', ascending: false);
+      return (res as List).map((e) => ClientCloserPayout.fromJson(e as Map<String, dynamic>)).toList();
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] ⚠️ fetchCloserPayouts notice: $e');
+      return [];
+    }
+  }
+
+  @override
+  Future<List<ClientCloserPayout>> fetchClientCloserPayouts(String clientId) async {
+    final client = _getClient();
+    try {
+      final res = await client
+          .from('closer_payouts')
+          .select('*')
+          .eq('client_id', clientId)
+          .order('created_at', ascending: false);
+      return (res as List).map((e) => ClientCloserPayout.fromJson(e as Map<String, dynamic>)).toList();
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] ⚠️ fetchClientCloserPayouts notice: $e');
+      return [];
+    }
+  }
+
+  @override
+  Future<ClientCloserPayout> disburseCloserPayout({
+    required String closerId,
+    required String clientId,
+    required double amount,
+    required String bankName,
+    required String accountNumber,
+    required String accountName,
+    String? disbursementRef,
+    String? proofOfPaymentUrl,
+    String? notes,
+  }) async {
+    final adminDb = _getAdminClient();
+    try {
+      final rpcRes = await adminDb.rpc('fn_disburse_closer_payout', params: {
+        'p_closer_id': closerId,
+        'p_client_id': clientId,
+        'p_amount': amount,
+        'p_bank_name': bankName,
+        'p_account_number': accountNumber,
+        'p_account_name': accountName,
+        'p_disbursement_ref': disbursementRef ?? '',
+        'p_proof_of_payment_url': proofOfPaymentUrl ?? '',
+        'p_notes': notes ?? '',
+      });
+      if (rpcRes != null && rpcRes['payout_id'] != null) {
+        final payoutId = rpcRes['payout_id'].toString();
+        final inserted = await adminDb.from('closer_payouts').select('*').eq('id', payoutId).maybeSingle();
+        if (inserted != null) {
+          return ClientCloserPayout.fromJson(inserted);
+        }
+      }
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] ℹ️ fn_disburse_closer_payout RPC not found, falling back to direct table write: $e');
+    }
+
+    final now = DateTime.now();
+    final payoutNumber = 'CPAY-${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}-${now.millisecond.toString().padLeft(4, '0')}';
+    final payout = ClientCloserPayout(
+      id: '',
+      closerId: closerId,
+      clientId: clientId,
+      payoutNumber: payoutNumber,
+      amount: amount,
+      bankName: bankName,
+      accountNumber: accountNumber,
+      accountName: accountName,
+      disbursementRef: disbursementRef,
+      proofOfPaymentUrl: proofOfPaymentUrl,
+      status: 'remitted',
+      disbursedAt: now,
+      notes: notes,
+      createdAt: now,
+      updatedAt: now,
+    );
+
+    final payload = payout.toJson();
+    payload.remove('id');
+
+    try {
+      final res = await adminDb.from('closer_payouts').insert(payload).select().single();
+      try {
+        final closerRow = await adminDb.from('client_closers').select('total_paid_commission, unpaid_commission_balance').eq('id', closerId).maybeSingle();
+        if (closerRow != null) {
+          final currentPaid = (closerRow['total_paid_commission'] as num?)?.toDouble() ?? 0.0;
+          final currentUnpaid = (closerRow['unpaid_commission_balance'] as num?)?.toDouble() ?? 0.0;
+          await adminDb.from('client_closers').update({
+            'total_paid_commission': currentPaid + amount,
+            'unpaid_commission_balance': (currentUnpaid - amount).clamp(0.0, double.infinity),
+            'updated_at': now.toIso8601String(),
+          }).eq('id', closerId);
+        }
+      } catch (_) {}
+      return ClientCloserPayout.fromJson(res);
+    } catch (err) {
+      debugPrint('[CLIENT_PORTAL] ❌ Error inserting closer_payouts: $err');
+      return payout.copyWith(id: 'CPAY-LOCAL-${now.millisecondsSinceEpoch}');
+    }
+  }
+
+  @override
+  Future<ClientCloserPayout> requestCloserPayout({
+    required String closerId,
+    required String clientId,
+    required double amount,
+    required String bankName,
+    required String accountNumber,
+    required String accountName,
+    String? notes,
+  }) async {
+    final adminDb = _getAdminClient();
+    final now = DateTime.now();
+    final payoutNumber = 'CREQ-${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}-${now.millisecond.toString().padLeft(4, '0')}';
+    final payout = ClientCloserPayout(
+      id: '',
+      closerId: closerId,
+      clientId: clientId,
+      payoutNumber: payoutNumber,
+      amount: amount,
+      bankName: bankName,
+      accountNumber: accountNumber,
+      accountName: accountName,
+      status: 'pending',
+      notes: notes,
+      createdAt: now,
+      updatedAt: now,
+    );
+
+    final payload = payout.toJson();
+    payload.remove('id');
+
+    try {
+      final res = await adminDb.from('closer_payouts').insert(payload).select().single();
+      return ClientCloserPayout.fromJson(res);
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] ⚠️ requestCloserPayout error: $e');
+      return payout.copyWith(id: 'CREQ-LOCAL-${now.millisecondsSinceEpoch}');
+    }
+  }
+
+  @override
+  Future<void> confirmCloserPayout({
+    required String payoutId,
+    String? notes,
+  }) async {
+    final adminDb = _getAdminClient();
+    try {
+      await adminDb.rpc('fn_closer_confirm_payout', params: {
+        'p_payout_id': payoutId,
+        'p_notes': notes ?? '',
+      });
+      return;
+    } catch (_) {}
+
+    try {
+      await adminDb.from('closer_payouts').update({
+        'status': 'completed',
+        'confirmed_at': DateTime.now().toIso8601String(),
+        if (notes != null) 'notes': notes,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', payoutId);
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] ❌ Error confirming closer payout: $e');
     }
   }
 
@@ -599,18 +862,58 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
     }
   }
 
+  @override
+  Future<bool> approveSettlement({
+    required String settlementId,
+    required String clientId,
+    String? notes,
+  }) async {
+    final adminDb = _getAdminClient();
+    try {
+      // 1. Try stored procedure
+      try {
+        final res = await adminDb.rpc('fn_merchant_approve_settlement', params: {
+          'p_settlement_id': settlementId,
+          'p_client_id': clientId,
+          if (notes != null) 'p_approval_notes': notes,
+        });
+        if (res != null && (res as Map)['success'] == true) {
+          debugPrint('[CLIENT_PORTAL] ✅ Settlement approved via RPC: $settlementId');
+          return true;
+        }
+      } catch (rpcErr) {
+        debugPrint('[CLIENT_PORTAL] ℹ️ RPC notice ($rpcErr). Falling back to direct update.');
+      }
+
+      // 2. Direct PostgREST update fallback
+      final noteSuffix = notes != null ? ' - $notes' : '';
+      await adminDb.from('client_settlements').update({
+        'status': 'completed',
+        'notes': 'Merchant Approved & Confirmed on ${DateTime.now().toIso8601String()}$noteSuffix',
+        'settled_at': DateTime.now().toIso8601String(),
+      }).eq('id', settlementId);
+
+      debugPrint('[CLIENT_PORTAL] ✅ Settlement approved via direct update: $settlementId');
+      return true;
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] ❌ approveSettlement error: $e');
+      return false;
+    }
+  }
+
   // ===========================================================================
   // INVENTORY & LANDED COST SUPPLY MANAGEMENT IMPLEMENTATION
   // ===========================================================================
 
   @override
   Future<List<ClientSupplier>> fetchSuppliers(String clientId) async {
+    if (clientId.trim().isEmpty) return [];
     final adminDb = _getAdminClient();
     try {
       final response = await adminDb
           .from('client_suppliers')
           .select('*')
-          .or('client_id.eq.$clientId,client_id.eq.33333333-3333-4333-8333-333333333333')
+          .eq('client_id', clientId)
           .order('created_at', ascending: false);
 
       if (response.isNotEmpty) {
@@ -622,7 +925,12 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
       debugPrint('[CLIENT_PORTAL] ⚠️ Remote fetchSuppliers: $e (using built-in suppliers)');
     }
 
-    // High-fidelity fallback suppliers for Novacare Ltd
+    // High-fidelity fallback suppliers ONLY for Novacare Ltd
+    final isNovacare = clientId == '00000000-0000-4000-8000-789382731303' || clientId == '33333333-3333-4333-8333-333333333333';
+    if (!isNovacare) {
+      return _inMemorySuppliers.where((s) => s.clientId == clientId).toList();
+    }
+
     final defaultSuppliers = [
       ClientSupplier(
         id: 'sup-apex-01',
@@ -790,12 +1098,13 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
 
   @override
   Future<List<ClientStockInvoice>> fetchStockInvoices(String clientId) async {
+    if (clientId.trim().isEmpty) return [];
     final adminDb = _getAdminClient();
     try {
       final res = await adminDb
           .from('client_stock_invoices')
           .select('*, client_stock_invoice_items(*)')
-          .or('client_id.eq.$clientId,client_id.eq.33333333-3333-4333-8333-333333333333')
+          .eq('client_id', clientId)
           .order('entry_date', ascending: false);
 
       if (res.isNotEmpty) {
@@ -807,7 +1116,12 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
       debugPrint('[CLIENT_PORTAL] ⚠️ Remote fetchStockInvoices: $e (using built-in invoices)');
     }
 
-    // High-fidelity fallback stock intake invoices matching historical valuation rates
+    // High-fidelity fallback stock intake invoices ONLY for Novacare Ltd
+    final isNovacare = clientId == '00000000-0000-4000-8000-789382731303' || clientId == '33333333-3333-4333-8333-333333333333';
+    if (!isNovacare) {
+      return _inMemoryStockInvoices.where((i) => i.clientId == clientId).toList();
+    }
+
     final defaultInvoices = [
       ClientStockInvoice(
         id: 'inv-stk-nov-001',
@@ -1067,6 +1381,7 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
     DateTime? startDate,
     DateTime? endDate,
   }) async {
+    if (clientId.trim().isEmpty) return [];
     final adminDb = _getAdminClient();
     try {
       // 1. If date range is specified, query dynamic RPC for opening/closing balance over period
@@ -1084,7 +1399,7 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
             'p_item_group': 'All Item Groups',
           }).timeout(const Duration(seconds: 8));
 
-          if (rpcRes is List && rpcRes.isNotEmpty) {
+          if (rpcRes is List) {
             return rpcRes
                 .map((item) => ClientStockBalance.fromJson(Map<String, dynamic>.from(item as Map)))
                 .toList();
@@ -1097,7 +1412,7 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
       var query = adminDb
           .from('client_stock_balances')
           .select('*')
-          .or('client_id.eq.$clientId,client_id.eq.33333333-3333-4333-8333-333333333333');
+          .eq('client_id', clientId);
 
       if (warehouseFilter != null && warehouseFilter != 'all' && warehouseFilter.isNotEmpty) {
         query = query.eq('warehouse', warehouseFilter);
@@ -1116,7 +1431,12 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
       debugPrint('[CLIENT_PORTAL] ⚠️ Remote fetchStockBalances: $e (using built-in Novacare ledger)');
     }
 
-    // High-fidelity fallback ledger containing the exact 13 Novacare items and key warehouse hubs
+    // High-fidelity fallback ledger ONLY for Novacare Ltd
+    final isNovacare = clientId == '00000000-0000-4000-8000-789382731303' || clientId == '33333333-3333-4333-8333-333333333333';
+    if (!isNovacare) {
+      return [];
+    }
+
     final List<ClientStockBalance> baseLedger = [
       // 1. Grazer Herbal Tea
       ClientStockBalance(

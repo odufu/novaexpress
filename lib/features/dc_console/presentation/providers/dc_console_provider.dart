@@ -11,6 +11,7 @@ import '../../../../core/services/local_storage_service.dart';
 import '../../../auth/data/datasources/auth_remote_datasource.dart';
 import '../../../auth/data/models/user_model.dart';
 import '../../../client_portal/domain/entities/client_profile.dart';
+import '../../../client_portal/domain/entities/client_settlement.dart';
 import '../../domain/entities/dc_finance_settings.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
 import '../../domain/entities/dc_payout_claim.dart';
@@ -941,12 +942,61 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     String? bankAccountName,
     String? settlementFrequency,
     String? settlementDay,
+    bool? isActive,
   }) async {
     try {
       if (!isTestEnvironment) {
         try {
           final db = Supabase.instance.client;
-          await db.rpc('fn_update_client_profile_and_tariffs', params: {
+          // 1. Authoritative direct PostgREST update to clients table
+          final updatePayload = <String, dynamic>{
+            'company_name': companyName,
+            'name': companyName,
+            'contact_person': contactPerson,
+            'email': email,
+            'phone': phone,
+            'address': address,
+            'city': city,
+            'state': stateName,
+            'tier': tier,
+            'closer_limit': closerLimit,
+            'has_inventory_management': hasInventoryManagement,
+            'services_enabled': servicesEnabled,
+            'operating_states': operatingStates,
+            if (logoUrl != null && logoUrl.isNotEmpty) 'logo_url': logoUrl,
+            'brand_color_primary': primaryColor,
+            'brand_color_secondary': secondaryColor,
+            'brand_color_accent': accentColor,
+            'brand_theme': {
+              'primary': primaryColor ?? '#0D9488',
+              'secondary': secondaryColor ?? '#031632',
+              'accent': accentColor ?? '#10B981',
+            },
+            'custom_delivery_fee': customDeliveryFee,
+            'custom_failed_attempt_fee': customFailedAttemptFee,
+            'custom_platform_fee': customPlatformFee,
+            'bank_name': bankName,
+            'account_number': bankAccountNumber,
+            'account_name': bankAccountName,
+            'settlement_frequency': settlementFrequency,
+            'settlement_day': settlementDay,
+            if (isActive != null) 'is_active': isActive,
+            'updated_at': DateTime.now().toIso8601String(),
+          };
+          await db.from('clients').update(updatePayload).eq('id', clientId);
+          debugPrint('[DC_CONSOLE_PROVIDER] ✅ Authoritatively updated clients table for $clientId');
+
+          // 2. Also synchronize client admin avatar in users table
+          if (logoUrl != null && logoUrl.isNotEmpty) {
+            try {
+              await db.from('users').update({
+                'avatar_url': logoUrl,
+              }).or('client_id.eq.$clientId,email.eq.$email');
+            } catch (_) {}
+          }
+
+          // 3. Attempt RPC for backward-compatible triggers if installed
+          final rpcParams = <String, dynamic>{
             'p_client_id': clientId,
             'p_company_name': companyName,
             'p_contact_person': contactPerson,
@@ -972,9 +1022,13 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
             'p_account_name': bankAccountName,
             'p_settlement_frequency': settlementFrequency,
             'p_settlement_day': settlementDay,
-          });
+          };
+          if (isActive != null) {
+            rpcParams['p_is_active'] = isActive;
+          }
+          await db.rpc('fn_update_client_profile_and_tariffs', params: rpcParams);
         } catch (dbErr) {
-          debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ Note on fn_update_client_profile_and_tariffs RPC: $dbErr');
+          debugPrint('[DC_CONSOLE_PROVIDER] ℹ️ Client update notification: $dbErr');
         }
       }
 
@@ -1005,6 +1059,7 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
         accountName: bankAccountName,
         settlementFrequency: settlementFrequency,
         settlementDay: settlementDay,
+        isActive: isActive ?? current.isActive,
       );
 
       final updatedList = state.clients.map((c) => c.id == clientId ? updatedClient : c).toList();
@@ -1013,6 +1068,68 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
       return updatedClient;
     } catch (e) {
       debugPrint('[DC_CONSOLE_PROVIDER] ❌ updateClientFullProfileAndTariffs error: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> toggleClientActiveStatus(String clientId, bool isActive) async {
+    try {
+      if (!isTestEnvironment) {
+        try {
+          final db = Supabase.instance.client;
+          await db.from('clients').update({'is_active': isActive}).eq('id', clientId);
+        } catch (dbErr) {
+          debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ Note on clients is_active update: $dbErr');
+        }
+      }
+      final updatedList = state.clients.map((c) {
+        if (c.id == clientId) {
+          return c.copyWith(isActive: isActive);
+        }
+        return c;
+      }).toList();
+      state = state.copyWith(clients: updatedList);
+      debugPrint('[DC_CONSOLE_PROVIDER] 🔒 Client $clientId active status changed to $isActive');
+    } catch (e) {
+      debugPrint('[DC_CONSOLE_PROVIDER] ❌ toggleClientActiveStatus error: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> sendClientPasswordResetEmail(String email) async {
+    try {
+      if (!isTestEnvironment) {
+        final auth = Supabase.instance.client.auth;
+        await auth.resetPasswordForEmail(email);
+      }
+      debugPrint('[DC_CONSOLE_PROVIDER] 📧 Password reset email dispatched to $email');
+    } catch (e) {
+      debugPrint('[DC_CONSOLE_PROVIDER] ❌ sendClientPasswordResetEmail error: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> adminSetClientPassword({
+    required String clientId,
+    required String email,
+    required String newPassword,
+  }) async {
+    try {
+      if (!isTestEnvironment) {
+        try {
+          final db = Supabase.instance.client;
+          await db.rpc('fn_admin_reset_client_password', params: {
+            'p_client_id': clientId,
+            'p_email': email,
+            'p_new_password': newPassword,
+          });
+        } catch (rpcErr) {
+          debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ Note on fn_admin_reset_client_password RPC: $rpcErr');
+        }
+      }
+      debugPrint('[DC_CONSOLE_PROVIDER] 🔑 Direct password updated for client $clientId / $email');
+    } catch (e) {
+      debugPrint('[DC_CONSOLE_PROVIDER] ❌ adminSetClientPassword error: $e');
       rethrow;
     }
   }
@@ -1602,13 +1719,17 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     }
   }
 
-  Future<void> approvePayoutClaim(String claimId, {String? disbursementRef}) async {
+  Future<void> approvePayoutClaim(String claimId, {String? disbursementRef, String? proofOfPaymentUrl}) async {
     final ref = disbursementRef ?? 'DISB-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
     
     // 1. Optimistically update local state & cache
     final updated = state.payoutClaims.map((c) {
       if (c.id == claimId) {
-        return c.copyWith(status: 'disbursed', disbursementRef: ref);
+        return c.copyWith(
+          status: 'disbursed',
+          disbursementRef: ref,
+          proofOfPaymentUrl: proofOfPaymentUrl,
+        );
       }
       return c;
     }).toList();
@@ -1624,6 +1745,7 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
         amount: claim.requestedAmount,
         driverId: claim.riderId,
         disbursementRef: ref,
+        proofOfPaymentUrl: proofOfPaymentUrl,
       );
       debugPrint('[DC_CONSOLE_PROVIDER] ✅ Payout claim $claimId approved via repository (Ref: $ref).');
     } catch (e) {
@@ -1696,6 +1818,20 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     required DateTime periodEnd,
     Map<String, dynamic>? customDeductions,
     List<String>? orderIds,
+    String? proofOfPaymentUrl,
+    String? payoutReference,
+    String? notes,
+    double? grossCollections,
+    double? logisticsFeesDeducted,
+    double? platformFeesDeducted,
+    double? gatewayFeesDeducted,
+    double? failedAttemptFeesDeducted,
+    double? otherChargesDeducted,
+    double? netPayoutAmount,
+    String? destinationBankName,
+    String? destinationAccountNumber,
+    String? destinationAccountName,
+    Map<String, dynamic>? chargesBreakdown,
   }) async {
     final result = await _repository.generateDailyMerchantSettlement(
       clientId: clientId,
@@ -1704,6 +1840,20 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
       periodEnd: periodEnd,
       customDeductions: customDeductions,
       orderIds: orderIds,
+      proofOfPaymentUrl: proofOfPaymentUrl,
+      payoutReference: payoutReference,
+      notes: notes,
+      grossCollections: grossCollections,
+      logisticsFeesDeducted: logisticsFeesDeducted,
+      platformFeesDeducted: platformFeesDeducted,
+      gatewayFeesDeducted: gatewayFeesDeducted,
+      failedAttemptFeesDeducted: failedAttemptFeesDeducted,
+      otherChargesDeducted: otherChargesDeducted,
+      netPayoutAmount: netPayoutAmount,
+      destinationBankName: destinationBankName,
+      destinationAccountNumber: destinationAccountNumber,
+      destinationAccountName: destinationAccountName,
+      chargesBreakdown: chargesBreakdown,
     );
     await _initDrivers();
     return result;
@@ -1716,6 +1866,13 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     );
     await _initDrivers();
     return result;
+  }
+
+  Future<List<ClientSettlement>> fetchDcClientSettlements({String? clientId}) async {
+    return await _repository.fetchDcClientSettlements(
+      dcId: state.activeDcId,
+      clientId: clientId,
+    );
   }
 }
 
@@ -1737,3 +1894,9 @@ final dcConsoleProvider = StateNotifierProvider<DCConsoleNotifier, DCConsoleStat
   final repository = ref.watch(dcConsoleRepositoryProvider);
   return DCConsoleNotifier(storage, repository);
 });
+
+final dcClientSettlementsProvider = FutureProvider.autoDispose.family<List<ClientSettlement>, String>((ref, dcId) async {
+  final repo = ref.watch(dcConsoleRepositoryProvider);
+  return await repo.fetchDcClientSettlements(dcId: dcId);
+});
+

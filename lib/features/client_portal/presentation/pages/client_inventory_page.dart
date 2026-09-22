@@ -506,6 +506,7 @@ class _ClientInventoryPageState extends ConsumerState<ClientInventoryPage> with 
               showTopToolbar: true,
               rowHeight: 60.0,
               brandPrimary: const Color(0xFF0D9488),
+              emptyMessage: 'No stock ledger positions recorded. Click "Import CSV" or "+ Raise Stock Invoice" above to add stock.',
               onRowTap: (item) => _showStockBalanceDetailModal(context, item, isDark),
             ),
           ),

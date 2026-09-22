@@ -495,17 +495,44 @@ class ClientClosersPage extends ConsumerWidget {
             // Commission & Action
             Expanded(
               flex: 2,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text('Commission', style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8))),
-                  const SizedBox(height: 2),
-                  Text(
-                    currencyFormatter.format(earnedCommission),
-                    style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF0F172A)),
-                  ),
-                ],
-              ),
+              child: closer.isCommissionEnabled
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text('Commission', style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8))),
+                        const SizedBox(height: 2),
+                        Text(
+                          currencyFormatter.format(earnedCommission),
+                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                        ),
+                        if (closer.unpaidCommissionBalance > 0) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            '${currencyFormatter.format(closer.unpaidCommissionBalance)} Due',
+                            style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: const Color(0xFFF59E0B)),
+                          ),
+                        ],
+                      ],
+                    )
+                  : Align(
+                      alignment: Alignment.centerRight,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                        ),
+                        child: Text(
+                          'Salary / Exempt',
+                          style: GoogleFonts.inter(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                          ),
+                        ),
+                      ),
+                    ),
             ),
             const SizedBox(width: 8),
             IconButton(
@@ -638,10 +665,22 @@ class ClientClosersPage extends ConsumerWidget {
                   '$bookedCount Booked ($deliveredCount dlvd • ${successRate.toStringAsFixed(0)}%)',
                   style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF10B981)),
                 ),
-                Text(
-                  currencyFormatter.format(earnedCommission),
-                  style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFFF37021)),
-                ),
+                closer.isCommissionEnabled
+                    ? Text(
+                        currencyFormatter.format(earnedCommission),
+                        style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFFF37021)),
+                      )
+                    : Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'Salary',
+                          style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                        ),
+                      ),
               ],
             ),
             const SizedBox(height: 10),

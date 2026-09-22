@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -9,6 +10,7 @@ import '../widgets/dc_onboard_client_modal.dart';
 import '../widgets/dc_client_asset_portfolio_modal.dart';
 import '../widgets/dc_daily_merchant_settlement_modal.dart';
 import '../widgets/dc_edit_client_modal.dart';
+import '../../../client_portal/presentation/widgets/pangea_excel_data_table.dart';
 
 class DCClientsPage extends ConsumerWidget {
   const DCClientsPage({super.key});
@@ -272,19 +274,19 @@ class DCClientsPage extends ConsumerWidget {
                     LayoutBuilder(
                       builder: (context, constraints) {
                         final isMobileCard = constraints.maxWidth < 750;
-                        return ListView.separated(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: state.filteredClients.length,
-                          separatorBuilder: (_, __) => Divider(height: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)),
-                          itemBuilder: (context, index) {
-                            final client = state.filteredClients[index];
-                            if (isMobileCard) {
+                        if (isMobileCard) {
+                          return ListView.separated(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: state.filteredClients.length,
+                            separatorBuilder: (_, __) => Divider(height: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)),
+                            itemBuilder: (context, index) {
+                              final client = state.filteredClients[index];
                               return _buildMobileClientCard(context, client, isDark, ordersState.orders);
-                            }
-                            return _buildClientRow(context, client, isDark, ordersState.orders);
-                          },
-                        );
+                            },
+                          );
+                        }
+                        return _buildClientsExcelTable(context, state.filteredClients, isDark, ordersState.orders);
                       },
                     ),
                 ],
@@ -292,6 +294,309 @@ class DCClientsPage extends ConsumerWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildClientsExcelTable(
+    BuildContext context,
+    List<ClientProfile> clients,
+    bool isDark,
+    List<OrderEntity> allOrders,
+  ) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: PangeaExcelDataTable<ClientProfile>(
+        items: clients,
+        brandPrimary: const Color(0xFF0D9488),
+        rowHeight: 52,
+        enablePagination: true,
+        initialPageSize: 10,
+        onRowTap: (client) {
+          DCClientAssetPortfolioModal.show(context, client);
+        },
+        columns: [
+          ExcelColumnDef<ClientProfile>(
+            key: 'client',
+            label: 'CLIENT & CODE',
+            defaultWidth: 260,
+            minWidth: 200,
+            sortValue: (c) => c.companyName,
+            searchString: (c) => '${c.companyName} ${c.code} ${c.contactPerson} ${c.email}',
+            cellBuilder: (context, client, row, isDark, brand) {
+              return Row(
+                children: [
+                  _buildClientAvatar(client, size: 36, iconSize: 18),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                client.companyName,
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF64748B).withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                client.code,
+                                style: GoogleFonts.inter(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          '${client.contactPerson} • ${client.email}',
+                          style: const TextStyle(fontSize: 10.5, color: Color(0xFF94A3B8)),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+          ExcelColumnDef<ClientProfile>(
+            key: 'tier',
+            label: 'SERVICE TIER',
+            defaultWidth: 150,
+            minWidth: 110,
+            sortValue: (c) => c.isEnterprise ? 1 : 0,
+            searchString: (c) => c.isEnterprise ? 'ENTERPRISE' : 'STANDARD',
+            cellBuilder: (context, client, row, isDark, brand) {
+              final isEnterprise = client.isEnterprise;
+              return Align(
+                alignment: Alignment.centerLeft,
+                child: Wrap(
+                  spacing: 4,
+                  runSpacing: 4,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: isEnterprise
+                            ? const Color(0xFF6366F1).withValues(alpha: 0.12)
+                            : const Color(0xFF0D9488).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        isEnterprise ? 'ENTERPRISE' : 'STANDARD',
+                        style: GoogleFonts.inter(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: isEnterprise ? const Color(0xFF6366F1) : const Color(0xFF0D9488),
+                        ),
+                      ),
+                    ),
+                    if (client.hasInventoryManagement)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'INV',
+                          style: GoogleFonts.inter(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF10B981),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+          ExcelColumnDef<ClientProfile>(
+            key: 'closers',
+            label: 'TELESALES CLOSERS',
+            defaultWidth: 170,
+            minWidth: 130,
+            sortValue: (c) => c.totalClosersCount,
+            searchString: (c) => '${c.totalClosersCount}',
+            cellBuilder: (context, client, row, isDark, brand) {
+              final isEnterprise = client.isEnterprise;
+              return Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  isEnterprise
+                      ? '${client.totalClosersCount} Active (${client.closerLimit} Max)'
+                      : 'Direct Merchant',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: isEnterprise ? const Color(0xFF6366F1) : const Color(0xFF64748B),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              );
+            },
+          ),
+          ExcelColumnDef<ClientProfile>(
+            key: 'depot',
+            label: 'DEPOT & STATE',
+            defaultWidth: 160,
+            minWidth: 120,
+            sortValue: (c) => c.state,
+            searchString: (c) => '${c.city} ${c.state}',
+            cellBuilder: (context, client, row, isDark, brand) {
+              return Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '${client.city}, ${client.state.split(" ").first}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF334155),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              );
+            },
+          ),
+          ExcelColumnDef<ClientProfile>(
+            key: 'orders',
+            label: 'ORDERS HANDLED',
+            defaultWidth: 140,
+            minWidth: 100,
+            sortValue: (c) => allOrders.where((o) => o.merchantId == c.id || o.clientId == c.id).length,
+            searchString: (c) => '${allOrders.where((o) => o.merchantId == c.id || o.clientId == c.id).length}',
+            cellBuilder: (context, client, row, isDark, brand) {
+              final orderCount = allOrders.where((o) => o.merchantId == client.id || o.clientId == client.id).length;
+              return Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0D9488).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    '$orderCount Orders',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0D9488),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+          ExcelColumnDef<ClientProfile>(
+            key: 'status',
+            label: 'STATUS',
+            defaultWidth: 120,
+            minWidth: 90,
+            sortValue: (c) => c.isActive ? 1 : 0,
+            searchString: (c) => c.isActive ? 'ACTIVE' : 'DEACTIVATED',
+            cellBuilder: (context, client, row, isDark, brand) {
+              return Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: (client.isActive ? const Color(0xFF10B981) : const Color(0xFFEF4444)).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: client.isActive ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        client.isActive ? 'Active' : 'Deactivated',
+                        style: GoogleFonts.inter(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          color: client.isActive ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          ExcelColumnDef<ClientProfile>(
+            key: 'actions',
+            label: 'ACTIONS',
+            defaultWidth: 260,
+            minWidth: 220,
+            cellBuilder: (context, client, row, isDark, brand) {
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.edit_note_rounded, size: 18, color: Color(0xFF6366F1)),
+                    tooltip: 'Manage / Edit Client',
+                    onPressed: () => DCEditClientModal.show(context, client),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.analytics_outlined, size: 18, color: Color(0xFF0D9488)),
+                    tooltip: 'View Asset Portfolio',
+                    onPressed: () => DCClientAssetPortfolioModal.show(context, client),
+                  ),
+                  const SizedBox(width: 4),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      final eligible = allOrders.where((o) =>
+                        (o.merchantId == client.id || o.clientId == client.id) &&
+                        (o.paymentMethod.toLowerCase() == 'cash' ||
+                            o.paymentMethod.toLowerCase() == 'cod' ||
+                            o.paymentMethod.toLowerCase() == 'direct_transfer' ||
+                            o.paymentType == 'direct_transfer') &&
+                        o.status.toLowerCase() == 'delivered' &&
+                        !o.isClientSettled
+                      ).toList();
+                      DCDailyMerchantSettlementModal.show(
+                        context: context,
+                        client: client,
+                        eligibleOrders: eligible,
+                      );
+                    },
+                    icon: const Icon(Icons.account_balance_wallet_rounded, size: 13, color: Colors.white),
+                    label: Text(
+                      'Settlement',
+                      style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w700, color: Colors.white),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0284C7),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      elevation: 0,
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
       ),
     );
   }
@@ -329,21 +634,7 @@ class DCClientsPage extends ConsumerWidget {
         children: [
           Row(
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: isEnterprise
-                      ? const Color(0xFF6366F1).withValues(alpha: 0.12)
-                      : const Color(0xFF0D9488).withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  isEnterprise ? Icons.corporate_fare_rounded : Icons.storefront_rounded,
-                  color: isEnterprise ? const Color(0xFF6366F1) : const Color(0xFF0D9488),
-                  size: 20,
-                ),
-              ),
+              _buildClientAvatar(client, size: 40, iconSize: 20),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -393,17 +684,28 @@ class DCClientsPage extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                  color: (client.isActive ? const Color(0xFF10B981) : const Color(0xFFEF4444)).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Container(width: 6, height: 6, decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle)),
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: client.isActive ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
                     const SizedBox(width: 4),
                     Text(
-                      'Active',
-                      style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w700, color: const Color(0xFF10B981)),
+                      client.isActive ? 'Active' : 'Deactivated',
+                      style: GoogleFonts.inter(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        color: client.isActive ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                      ),
                     ),
                   ],
                 ),
@@ -524,253 +826,6 @@ class DCClientsPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildClientRow(BuildContext context, ClientProfile client, bool isDark, List<OrderEntity> allOrders) {
-    final isEnterprise = client.isEnterprise;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-      child: Row(
-        children: [
-          // Icon Avatar
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: isEnterprise
-                  ? const Color(0xFF6366F1).withValues(alpha: 0.12)
-                  : const Color(0xFF0D9488).withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              isEnterprise ? Icons.corporate_fare_rounded : Icons.storefront_rounded,
-              color: isEnterprise ? const Color(0xFF6366F1) : const Color(0xFF0D9488),
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: 14),
-
-          // Company Name & Code
-          Expanded(
-            flex: 3,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      client.companyName,
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: isDark ? Colors.white : const Color(0xFF0F172A),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF64748B).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        client.code,
-                        style: GoogleFonts.inter(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  '${client.contactPerson} • ${client.email}',
-                  style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)),
-                ),
-              ],
-            ),
-          ),
-
-          // Tier Badge
-          Expanded(
-            flex: 2,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Service Tier', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8))),
-                const SizedBox(height: 4),
-                Wrap(
-                  spacing: 4,
-                  runSpacing: 4,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: isEnterprise
-                            ? const Color(0xFF6366F1).withValues(alpha: 0.12)
-                            : const Color(0xFF0D9488).withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        isEnterprise ? 'ENTERPRISE' : 'STANDARD',
-                        style: GoogleFonts.inter(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w700,
-                          color: isEnterprise ? const Color(0xFF6366F1) : const Color(0xFF0D9488),
-                        ),
-                      ),
-                    ),
-                    if (client.hasInventoryManagement)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF10B981).withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          'INVENTORY',
-                          style: GoogleFonts.inter(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF10B981),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          // Closers Capacity
-          Expanded(
-            flex: 2,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Telesales Closers', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8))),
-                const SizedBox(height: 2),
-                Text(
-                  isEnterprise
-                      ? '${client.totalClosersCount} Active (${client.closerLimit} Max)'
-                      : 'Direct Merchant',
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: isEnterprise ? const Color(0xFF6366F1) : const Color(0xFF64748B),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Location
-          Expanded(
-            flex: 2,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Depot State', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8))),
-                const SizedBox(height: 2),
-                Text(
-                  '${client.city}, ${client.state.split(" ").first}',
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF334155),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Status Indicator & Action
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(width: 6, height: 6, decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle)),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Active',
-                      style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF10B981)),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              OutlinedButton.icon(
-                onPressed: () => DCEditClientModal.show(context, client),
-                icon: const Icon(Icons.edit_note_rounded, size: 14, color: Color(0xFF6366F1)),
-                label: Text(
-                  'Manage / Edit',
-                  style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF6366F1)),
-                ),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFF6366F1)),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-              ),
-              const SizedBox(width: 8),
-              OutlinedButton.icon(
-                onPressed: () => DCClientAssetPortfolioModal.show(context, client),
-                icon: const Icon(Icons.analytics_outlined, size: 14, color: Color(0xFF0D9488)),
-                label: Text(
-                  'View Assets',
-                  style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF0D9488)),
-                ),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFF0D9488)),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-              ),
-              const SizedBox(width: 8),
-              ElevatedButton.icon(
-                onPressed: () {
-                  final eligible = allOrders.where((o) =>
-                    (o.merchantId == client.id || o.clientId == client.id) &&
-                    (o.paymentMethod.toLowerCase() == 'cash' ||
-                        o.paymentMethod.toLowerCase() == 'cod' ||
-                        o.paymentMethod.toLowerCase() == 'direct_transfer' ||
-                        o.paymentType == 'direct_transfer') &&
-                    o.status.toLowerCase() == 'delivered' &&
-                    !o.isClientSettled
-                  ).toList();
-                  DCDailyMerchantSettlementModal.show(
-                    context: context,
-                    client: client,
-                    eligibleOrders: eligible,
-                  );
-                },
-                icon: const Icon(Icons.account_balance_wallet_rounded, size: 14, color: Colors.white),
-                label: Text(
-                  'Client Settlement',
-                  style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0284C7),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  elevation: 0,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildKpiCard({
     required String title,
     required String value,
@@ -835,6 +890,89 @@ class DCClientsPage extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildClientAvatar(ClientProfile client, {double size = 44, double iconSize = 22}) {
+    final isEnterprise = client.isEnterprise;
+    final fallbackIcon = Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: isEnterprise
+            ? const Color(0xFF6366F1).withValues(alpha: 0.12)
+            : const Color(0xFF0D9488).withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(
+        isEnterprise ? Icons.corporate_fare_rounded : Icons.storefront_rounded,
+        color: isEnterprise ? const Color(0xFF6366F1) : const Color(0xFF0D9488),
+        size: iconSize,
+      ),
+    );
+
+    final logo = client.logoUrl?.trim();
+    if (logo == null || logo.isEmpty) {
+      return fallbackIcon;
+    }
+
+    if (logo.startsWith('data:image')) {
+      try {
+        final commaIdx = logo.indexOf(',');
+        final base64Str = commaIdx != -1 ? logo.substring(commaIdx + 1) : logo;
+        final bytes = base64Decode(base64Str.trim());
+        return Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isEnterprise
+                  ? const Color(0xFF6366F1).withValues(alpha: 0.2)
+                  : const Color(0xFF0D9488).withValues(alpha: 0.2),
+            ),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(11),
+            child: Padding(
+              padding: const EdgeInsets.all(3),
+              child: Image.memory(
+                bytes,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => fallbackIcon,
+              ),
+            ),
+          ),
+        );
+      } catch (_) {
+        return fallbackIcon;
+      }
+    }
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isEnterprise
+              ? const Color(0xFF6366F1).withValues(alpha: 0.2)
+              : const Color(0xFF0D9488).withValues(alpha: 0.2),
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(11),
+        child: Padding(
+          padding: const EdgeInsets.all(3),
+          child: Image.network(
+            logo,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => fallbackIcon,
+          ),
+        ),
       ),
     );
   }

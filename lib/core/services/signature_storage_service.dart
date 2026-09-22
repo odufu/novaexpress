@@ -191,6 +191,51 @@ class SignatureStorageService {
     );
   }
 
+  /// Uploads bank transfer receipt document or image for manual merchant settlements
+  /// with automatic multi-tier fallback (service client -> standard client -> base64 data URI).
+  static Future<String> uploadSettlementReceipt({
+    required Uint8List bytes,
+    required String settlementNumber,
+    String extension = 'pdf',
+  }) async {
+    final ext = extension.replaceAll('.', '').toLowerCase();
+    final mimeType = ext == 'pdf'
+        ? 'application/pdf'
+        : (ext == 'png'
+            ? 'image/png'
+            : (ext == 'webp' ? 'image/webp' : 'image/jpeg'));
+    final cleanNum = settlementNumber.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+    final fileName = 'settlement_receipt_${cleanNum}_${DateTime.now().millisecondsSinceEpoch}.$ext';
+    return await _uploadToBucket(
+      bucketName: SupabaseConstants.proofOfDeliveryBucket,
+      fileName: fileName,
+      bytes: bytes,
+      contentType: mimeType,
+    );
+  }
+
+  /// Uploads bank transfer proof of payment receipt for rider and closer balance payouts
+  static Future<String> uploadPayoutReceipt({
+    required Uint8List bytes,
+    required String payoutCode,
+    String extension = 'pdf',
+  }) async {
+    final ext = extension.replaceAll('.', '').toLowerCase();
+    final mimeType = ext == 'pdf'
+        ? 'application/pdf'
+        : (ext == 'png'
+            ? 'image/png'
+            : (ext == 'webp' ? 'image/webp' : 'image/jpeg'));
+    final cleanCode = payoutCode.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+    final fileName = 'payout_proof_${cleanCode}_${DateTime.now().millisecondsSinceEpoch}.$ext';
+    return await _uploadToBucket(
+      bucketName: SupabaseConstants.proofOfDeliveryBucket,
+      fileName: fileName,
+      bytes: bytes,
+      contentType: mimeType,
+    );
+  }
+
   /// Core resilient multi-tier uploader:
   /// 1. Tries Supabase.instance.client.storage
   /// 2. If RLS or unauthenticated, falls back to Supabase service client

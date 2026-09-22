@@ -23,6 +23,7 @@ import 'dc_settings_page.dart';
 import 'dc_stock_page.dart';
 import 'dc_transactions_page.dart';
 import '../../../pipeline_chat/presentation/widgets/pipeline_chat_floating_action_button.dart';
+import '../../../pipeline_chat/presentation/providers/pipeline_chat_fab_provider.dart';
 
 class DCConsoleLayout extends ConsumerStatefulWidget {
   const DCConsoleLayout({super.key});
@@ -77,6 +78,7 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
     return Scaffold(
       key: _scaffoldKey,
       floatingActionButton: const PipelineChatFloatingActionButton(),
+      floatingActionButtonLocation: ref.watch(pipelineChatFabLocationProvider),
       backgroundColor: isDark ? const Color(0xFF0B1120) : const Color(0xFFF8FAFC),
       drawer: isDesktop ? null : Drawer(child: _buildSidebar(context, dcState, dcNotifier, isDark, user, isDrawer: true)),
       bottomNavigationBar: isDesktop ? null : _buildMobileBottomNav(context, dcState, dcNotifier, isDark),
@@ -237,7 +239,7 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
               children: [
                 _buildNavItem(0, 'Dashboard', Icons.dashboard_rounded, state.activeTabIndex == 0, isCollapsed, isDrawer),
                 _buildNavItem(1, 'Deliveries & Orders', Icons.local_shipping_rounded, state.activeTabIndex == 1, isCollapsed, isDrawer),
-                _buildNavItem(2, 'Payment Matching (COD)', Icons.price_check_rounded, state.activeTabIndex == 2, isCollapsed, isDrawer),
+                _buildNavItem(2, 'Rider Remittances', Icons.receipt_long_rounded, state.activeTabIndex == 2, isCollapsed, isDrawer),
                 _buildNavItem(3, 'Inventory & Stock', Icons.inventory_2_rounded, state.activeTabIndex == 3, isCollapsed, isDrawer),
                 _buildNavItem(4, 'Vault Cash & Settlements', Icons.account_balance_wallet_rounded, state.activeTabIndex == 4, isCollapsed, isDrawer),
                 _buildNavItem(5, 'Audit Ledger', Icons.receipt_long_rounded, state.activeTabIndex == 5, isCollapsed, isDrawer),
@@ -437,7 +439,7 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
       case 1:
         return 'Deliveries & Master Orders';
       case 2:
-        return 'Payment Matching (COD)';
+        return 'Rider Remittances & Reconciliation';
       case 3:
         return 'Inventory & Stock';
       case 4:
@@ -787,7 +789,7 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
     final navItems = [
       (index: 0, label: 'Dashboard', icon: Icons.dashboard_rounded),
       (index: 1, label: 'Deliveries', icon: Icons.local_shipping_rounded),
-      (index: 2, label: 'Matching', icon: Icons.price_check_rounded),
+      (index: 2, label: 'Remittances', icon: Icons.receipt_long_rounded),
       (index: 3, label: 'Stock', icon: Icons.inventory_2_rounded),
       (index: 8, label: 'Fleet', icon: Icons.two_wheeler_rounded),
       (index: -1, label: 'More', icon: Icons.menu_open_rounded),

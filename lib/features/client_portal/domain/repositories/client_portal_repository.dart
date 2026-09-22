@@ -1,4 +1,5 @@
 import '../entities/client_closer.dart';
+import '../entities/client_closer_payout.dart';
 import '../entities/client_profile.dart';
 import '../entities/client_settlement.dart';
 import '../entities/customer_lead.dart';
@@ -18,6 +19,10 @@ abstract class ClientPortalRepository {
     String? closerCode,
     int dailyCallTarget = 50,
     double commissionRate = 500.0,
+    bool isCommissionEnabled = true,
+    String? bankName,
+    String? accountNumber,
+    String? accountName,
   });
 
   /// Fetches all closers for a client
@@ -45,6 +50,38 @@ abstract class ClientPortalRepository {
     double? commissionRate,
     int? dailyCallTarget,
     bool? isActive,
+    bool? isCommissionEnabled,
+    String? bankName,
+    String? accountNumber,
+    String? accountName,
+  });
+
+  /// Closer Payout Management
+  Future<List<ClientCloserPayout>> getCloserPayouts(String closerId);
+  Future<List<ClientCloserPayout>> getClientCloserPayouts(String clientId);
+  Future<ClientCloserPayout> disburseCloserPayout({
+    required String closerId,
+    required String clientId,
+    required double amount,
+    required String bankName,
+    required String accountNumber,
+    required String accountName,
+    String? disbursementRef,
+    String? proofOfPaymentUrl,
+    String? notes,
+  });
+  Future<ClientCloserPayout> requestCloserPayout({
+    required String closerId,
+    required String clientId,
+    required double amount,
+    required String bankName,
+    required String accountNumber,
+    required String accountName,
+    String? notes,
+  });
+  Future<void> confirmCloserPayout({
+    required String payoutId,
+    String? notes,
   });
 
   /// Fetches client customer leads
@@ -77,6 +114,13 @@ abstract class ClientPortalRepository {
 
   /// Fetches live merchant asset custody breakdown (liquid cash & in-kind inventory)
   Future<Map<String, dynamic>> getMerchantAssetCustody(String clientId);
+
+  /// Approves and confirms a client settlement
+  Future<bool> approveSettlement({
+    required String settlementId,
+    required String clientId,
+    String? notes,
+  });
 
   // --- Inventory & Landed Cost Supply Management ---
   Future<List<ClientSupplier>> getSuppliers(String clientId);

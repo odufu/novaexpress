@@ -21,6 +21,10 @@ class _ClientOnboardCloserModalState extends ConsumerState<ClientOnboardCloserMo
   final _targetController = TextEditingController(text: '50');
   final _commissionController = TextEditingController(text: '500');
   final _passwordController = TextEditingController(text: 'Closer123!');
+  final _bankNameController = TextEditingController();
+  final _accountNumberController = TextEditingController();
+  final _accountNameController = TextEditingController();
+  bool _isCommissionEnabled = true;
   bool _obscurePassword = true;
 
   @override
@@ -31,6 +35,9 @@ class _ClientOnboardCloserModalState extends ConsumerState<ClientOnboardCloserMo
     _targetController.dispose();
     _commissionController.dispose();
     _passwordController.dispose();
+    _bankNameController.dispose();
+    _accountNumberController.dispose();
+    _accountNameController.dispose();
     super.dispose();
   }
 
@@ -41,8 +48,13 @@ class _ClientOnboardCloserModalState extends ConsumerState<ClientOnboardCloserMo
     final email = _emailController.text.trim();
     final phone = _phoneController.text.trim();
     final target = int.tryParse(_targetController.text.trim()) ?? 50;
-    final commission = double.tryParse(_commissionController.text.trim()) ?? 500.0;
+    final commission = _isCommissionEnabled
+        ? (double.tryParse(_commissionController.text.trim()) ?? 500.0)
+        : 0.0;
     final password = _passwordController.text.trim().isNotEmpty ? _passwordController.text.trim() : 'Closer123!';
+    final bankName = _bankNameController.text.trim();
+    final accountNumber = _accountNumberController.text.trim();
+    final accountName = _accountNameController.text.trim();
 
     // Client-side quick check against currently loaded team closers
     final existingClosers = ref.read(clientPortalProvider).closers;
@@ -82,6 +94,10 @@ class _ClientOnboardCloserModalState extends ConsumerState<ClientOnboardCloserMo
         password: password,
         dailyCallTarget: target,
         commissionRate: commission,
+        isCommissionEnabled: _isCommissionEnabled,
+        bankName: bankName,
+        accountNumber: accountNumber,
+        accountName: accountName,
       );
 
       if (mounted) {
@@ -292,67 +308,211 @@ class _ClientOnboardCloserModalState extends ConsumerState<ClientOnboardCloserMo
                 ),
                 const SizedBox(height: 16),
 
-                // Daily Calls Target & Commission
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final isRow = constraints.maxWidth >= 450;
-                    final targetField = Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Daily Calls Target', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF334155))),
-                        const SizedBox(height: 6),
-                        TextFormField(
-                          controller: _targetController,
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            hintText: '50 calls/day',
-                            prefixIcon: const Icon(Icons.phone_in_talk_rounded, size: 20, color: Color(0xFF94A3B8)),
-                            filled: true,
-                            fillColor: const Color(0xFFF8FAFC),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                          ),
+                // Commission & Payouts Toggle
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: _isCommissionEnabled
+                        ? const Color(0xFF10B981).withValues(alpha: 0.08)
+                        : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _isCommissionEnabled
+                          ? const Color(0xFF10B981).withValues(alpha: 0.3)
+                          : const Color(0xFFE2E8F0),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: _isCommissionEnabled
+                              ? const Color(0xFF10B981).withValues(alpha: 0.15)
+                              : const Color(0xFF94A3B8).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                      ],
-                    );
-
-                    final commissionField = Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Commission per Delivered Order (₦)', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF334155))),
-                        const SizedBox(height: 6),
-                        TextFormField(
-                          controller: _commissionController,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          decoration: InputDecoration(
-                            hintText: '500',
-                            prefixIcon: const Icon(Icons.payments_outlined, size: 20, color: Color(0xFF94A3B8)),
-                            filled: true,
-                            fillColor: const Color(0xFFF8FAFC),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                          ),
+                        child: Icon(
+                          _isCommissionEnabled ? Icons.payments_rounded : Icons.money_off_rounded,
+                          color: _isCommissionEnabled ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                          size: 20,
                         ),
-                      ],
-                    );
-
-                    return isRow
-                        ? Row(
-                            children: [
-                              Expanded(child: targetField),
-                              const SizedBox(width: 14),
-                              Expanded(child: commissionField),
-                            ],
-                          )
-                        : Column(
-                            children: [
-                              targetField,
-                              const SizedBox(height: 14),
-                              commissionField,
-                            ],
-                          );
-                  },
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Enable Commission & Payouts',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF0F172A),
+                              ),
+                            ),
+                            Text(
+                              _isCommissionEnabled
+                                  ? 'Closer earns per-order commission & can request payouts.'
+                                  : 'Salary / non-commission agent. Commission metrics hidden.',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                color: const Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Switch.adaptive(
+                        value: _isCommissionEnabled,
+                        activeColor: const Color(0xFF10B981),
+                        onChanged: (val) {
+                          setState(() {
+                            _isCommissionEnabled = val;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(height: 16),
+
+                // Daily Calls Target & (Optional) Commission
+                if (_isCommissionEnabled) ...[
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isRow = constraints.maxWidth >= 450;
+                      final targetField = Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Daily Calls Target', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF334155))),
+                          const SizedBox(height: 6),
+                          TextFormField(
+                            controller: _targetController,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              hintText: '50 calls/day',
+                              prefixIcon: const Icon(Icons.phone_in_talk_rounded, size: 20, color: Color(0xFF94A3B8)),
+                              filled: true,
+                              fillColor: const Color(0xFFF8FAFC),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                            ),
+                          ),
+                        ],
+                      );
+
+                      final commissionField = Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Commission per Delivered Order (₦)', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF334155))),
+                          const SizedBox(height: 6),
+                          TextFormField(
+                            controller: _commissionController,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: InputDecoration(
+                              hintText: '500',
+                              prefixIcon: const Icon(Icons.payments_outlined, size: 20, color: Color(0xFF94A3B8)),
+                              filled: true,
+                              fillColor: const Color(0xFFF8FAFC),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                            ),
+                          ),
+                        ],
+                      );
+
+                      return isRow
+                          ? Row(
+                              children: [
+                                Expanded(child: targetField),
+                                const SizedBox(width: 14),
+                                Expanded(child: commissionField),
+                              ],
+                            )
+                          : Column(
+                              children: [
+                                targetField,
+                                const SizedBox(height: 14),
+                                commissionField,
+                              ],
+                            );
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Closer Bank Account Details
+                  Text('Disbursement Bank Account (Optional)', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF334155))),
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      children: [
+                        TextFormField(
+                          controller: _bankNameController,
+                          decoration: const InputDecoration(
+                            hintText: 'Bank Name (e.g. OPay, Zenith, GTBank)',
+                            prefixIcon: Icon(Icons.account_balance_rounded, size: 18, color: Color(0xFF94A3B8)),
+                            isDense: true,
+                            border: InputBorder.none,
+                          ),
+                        ),
+                        const Divider(height: 14),
+                        Row(
+                          children: [
+                            Expanded(
+                              flex: 2,
+                              child: TextFormField(
+                                controller: _accountNumberController,
+                                keyboardType: TextInputType.number,
+                                decoration: const InputDecoration(
+                                  hintText: 'Account Number',
+                                  prefixIcon: Icon(Icons.tag_rounded, size: 18, color: Color(0xFF94A3B8)),
+                                  isDense: true,
+                                  border: InputBorder.none,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              flex: 3,
+                              child: TextFormField(
+                                controller: _accountNameController,
+                                decoration: const InputDecoration(
+                                  hintText: 'Account Name',
+                                  prefixIcon: Icon(Icons.badge_rounded, size: 18, color: Color(0xFF94A3B8)),
+                                  isDense: true,
+                                  border: InputBorder.none,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else ...[
+                  // Target Field Only (Full Width)
+                  Text('Daily Calls Target', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF334155))),
+                  const SizedBox(height: 6),
+                  TextFormField(
+                    controller: _targetController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      hintText: '50 calls/day',
+                      prefixIcon: const Icon(Icons.phone_in_talk_rounded, size: 20, color: Color(0xFF94A3B8)),
+                      filled: true,
+                      fillColor: const Color(0xFFF8FAFC),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 16),
 
                 // Closer Login Password

@@ -68,10 +68,23 @@ class DCRemittanceLifecycleItem {
   });
 
   bool get isDirectTransfer => type == 'direct_transfer';
-  bool get isAwaitingRemittance => status == 'awaiting_remittance' || status == 'pending';
-  bool get isVerified => status == 'verified' || status == 'direct_settled' || verifiedAt != null;
+  bool get isAwaitingRemittance =>
+      status == 'awaiting_remittance' ||
+      status == 'pending' ||
+      status == 'pending_audit' ||
+      status == 'submitted';
+  bool get isVerified =>
+      status == 'verified' ||
+      status == 'direct_settled' ||
+      status == 'cleared' ||
+      verifiedAt != null;
+  bool get isPendingApproval =>
+      status == 'pending' ||
+      status == 'pending_audit' ||
+      status == 'submitted';
   int get orderCount => orders.length;
-  double get totalDeductions => commissionAmount + transportAllowance + failedStipends + posFee;
+  double get totalDeductions =>
+      commissionAmount + transportAllowance + failedStipends + posFee;
 }
 
 class DCRemittanceDetailModal extends ConsumerStatefulWidget {
@@ -748,6 +761,15 @@ class _DCRemittanceDetailModalState extends ConsumerState<DCRemittanceDetailModa
                     ),
                     const SizedBox(height: 20),
 
+                    // Proof of Remittance / Deposit Slip (if uploaded by rider)
+                    if (rem.depositReceiptUrl != null && rem.depositReceiptUrl!.isNotEmpty) ...[
+                      _buildReceiptProofCard(context, rem.depositReceiptUrl!, isDark),
+                      const SizedBox(height: 20),
+                    ] else if (rem.notes != null && rem.notes!.isNotEmpty) ...[
+                      _buildNotesAuditCard(rem.notes!, rem.verifiedByName, rem.verifiedAt, isDark),
+                      const SizedBox(height: 20),
+                    ],
+
                     // D. Orders Contained in Remittance Batch
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -947,14 +969,218 @@ class _DCRemittanceDetailModalState extends ConsumerState<DCRemittanceDetailModa
         child: Text('🟢 CLEARED & REMITTED', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF10B981))),
       );
     }
+    if (status == 'pending' || status == 'pending_audit' || status == 'submitted') {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.4)),
+        ),
+        child: Text('⏳ AWAITING DC APPROVAL', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFFF59E0B))),
+      );
+    }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+        color: const Color(0xFFEF4444).withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.4)),
+        border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.4)),
       ),
-      child: Text('🟡 AWAITING REMITTANCE', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFFF59E0B))),
+      child: Text('🔴 NOT REMITTED', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFFEF4444))),
+    );
+  }
+
+  Widget _buildReceiptProofCard(BuildContext context, String receiptUrl, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFF00A2D3).withValues(alpha: 0.35),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00A2D3).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.receipt_rounded, size: 16, color: Color(0xFF00A2D3)),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Uploaded Bank Transfer Slip / Proof of Payment',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (ctx) => Dialog(
+                      backgroundColor: Colors.transparent,
+                      insetPadding: const EdgeInsets.all(16),
+                      child: Stack(
+                        alignment: Alignment.topRight,
+                        children: [
+                          InteractiveViewer(
+                            panEnabled: true,
+                            minScale: 0.5,
+                            maxScale: 4.0,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(16),
+                              child: Image.network(
+                                receiptUrl,
+                                fit: BoxFit.contain,
+                                errorBuilder: (_, __, ___) => Container(
+                                  padding: const EdgeInsets.all(32),
+                                  color: const Color(0xFF0F172A),
+                                  child: const Text('Could not load receipt image', style: TextStyle(color: Colors.white)),
+                                ),
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded, color: Colors.white, size: 24),
+                            onPressed: () => Navigator.of(ctx).pop(),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.zoom_in_rounded, size: 16),
+                label: const Text('Zoom Slip', style: TextStyle(fontSize: 12)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          InkWell(
+            onTap: () {
+              showDialog(
+                context: context,
+                builder: (ctx) => Dialog(
+                  backgroundColor: Colors.transparent,
+                  insetPadding: const EdgeInsets.all(16),
+                  child: Stack(
+                    alignment: Alignment.topRight,
+                    children: [
+                      InteractiveViewer(
+                        panEnabled: true,
+                        minScale: 0.5,
+                        maxScale: 4.0,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: Image.network(
+                            receiptUrl,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) => Container(
+                              padding: const EdgeInsets.all(32),
+                              color: const Color(0xFF0F172A),
+                              child: const Text('Could not load receipt image', style: TextStyle(color: Colors.white)),
+                            ),
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, color: Colors.white, size: 24),
+                        onPressed: () => Navigator.of(ctx).pop(),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                height: 180,
+                width: double.infinity,
+                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFE2E8F0),
+                child: Image.network(
+                  receiptUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.broken_image_rounded, size: 36, color: Color(0xFF94A3B8)),
+                        const SizedBox(height: 6),
+                        Text('Receipt slip preview unavailable', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8))),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNotesAuditCard(String notes, String? verifiedBy, DateTime? verifiedAt, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: const Color(0xFF2563EB).withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFF2563EB)),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Remittance Audit Note',
+                  style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color(0xFF64748B)),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  notes,
+                  style: GoogleFonts.inter(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w500,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
+                ),
+                if (verifiedBy != null && verifiedBy.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Verified by: $verifiedBy',
+                    style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF10B981), fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 

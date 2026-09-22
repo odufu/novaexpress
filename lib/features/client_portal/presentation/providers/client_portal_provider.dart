@@ -20,6 +20,7 @@ import '../../../orders/presentation/providers/orders_provider.dart';
 import '../../../stock/presentation/providers/stock_provider.dart';
 import '../../../dc_console/domain/entities/distribution_center.dart';
 import '../../domain/entities/client_closer.dart';
+import '../../domain/entities/client_closer_payout.dart';
 import '../../domain/entities/client_profile.dart';
 import '../../domain/entities/client_settlement.dart';
 import '../../domain/entities/customer_lead.dart';
@@ -189,6 +190,7 @@ class ClientPortalState {
   final List<ClientSupplier> suppliers;
   final List<ClientStockInvoice> stockInvoices;
   final List<ClientStockBalance> stockBalances;
+  final List<ClientCloserPayout> closerPayouts;
   final String selectedInventoryWarehouseFilter; // 'all' or specific warehouse
   final String selectedInventoryItemFilter; // 'all' or specific item
   final bool isInventoryLoading;
@@ -203,6 +205,7 @@ class ClientPortalState {
     this.closers = const [],
     this.leads = const [],
     this.settlements = const [],
+    this.closerPayouts = const [],
     this.assetCustodyData = const {},
     this.isLoading = false,
     this.errorMessage,
@@ -231,6 +234,7 @@ class ClientPortalState {
     List<ClientCloser>? closers,
     List<CustomerLead>? leads,
     List<ClientSettlement>? settlements,
+    List<ClientCloserPayout>? closerPayouts,
     Map<String, dynamic>? assetCustodyData,
     bool? isLoading,
     String? errorMessage,
@@ -258,6 +262,7 @@ class ClientPortalState {
       closers: closers ?? this.closers,
       leads: leads ?? this.leads,
       settlements: settlements ?? this.settlements,
+      closerPayouts: closerPayouts ?? this.closerPayouts,
       assetCustodyData: assetCustodyData ?? this.assetCustodyData,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: errorMessage,
@@ -879,7 +884,7 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
       if (cName == pClient) return true;
       if (cName.contains('novacare') && pClient.contains('novacare')) return true;
       if (cName.contains('leafora') && pClient.contains('leafora')) return true;
-      if (cName.contains(pClient) || pClient.contains(cName)) return true;
+      if (cName.contains('emerald') && pClient.contains('emerald')) return true;
     }
     if (cName.contains('novacare') && product.name.toLowerCase().contains('novacare')) {
       return true;
@@ -1041,9 +1046,14 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
   }
 
   Future<void> reloadInventoryData({DateTime? startDate, DateTime? endDate}) async {
+    final user = _ref.read(authProvider).user;
     final clientId = state.clientProfile.id.isNotEmpty
         ? state.clientProfile.id
-        : (_ref.read(authProvider).user?.clientId ?? '33333333-3333-4333-8333-333333333333');
+        : (user?.clientId ?? '');
+    if (clientId.isEmpty) {
+      state = state.copyWith(isInventoryLoading: false);
+      return;
+    }
     state = state.copyWith(
       isInventoryLoading: true,
       inventoryStartDate: startDate,
@@ -1115,9 +1125,11 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
   }
 
   Future<void> importStockBalanceCsv(String csvContent) async {
+    final user = _ref.read(authProvider).user;
     final clientId = state.clientProfile.id.isNotEmpty
         ? state.clientProfile.id
-        : (_ref.read(authProvider).user?.clientId ?? '33333333-3333-4333-8333-333333333333');
+        : (user?.clientId ?? '');
+    if (clientId.isEmpty) return;
     await _repository.importStockBalanceCsv(clientId, csvContent);
     await reloadInventoryData();
   }
@@ -1170,17 +1182,20 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
             SupabaseConstants.supabaseServiceRoleKey,
             authOptions: const AuthClientOptions(autoRefreshToken: false),
           );
-          final clientRow = await db.from('clients').select().ilike('email', user.email.trim()).maybeSingle();
-          if (clientRow != null) {
+          final clientRows = await db.from('clients').select().ilike('email', user.email.trim()).limit(1);
+          if ((clientRows as List).isNotEmpty) {
+            final clientRow = (clientRows as List).first as Map<String, dynamic>;
             if (clientId.isEmpty) clientId = clientRow['id']?.toString() ?? '';
             if (companyName.isEmpty) companyName = clientRow['name']?.toString() ?? clientRow['company_name']?.toString() ?? '';
           } else {
             // Check client_closers for closer accounts
-            final closerRow = await db.from('client_closers').select().ilike('email', user.email.trim()).maybeSingle();
-            if (closerRow != null && closerRow['client_id'] != null) {
+            final closerRows = await db.from('client_closers').select().ilike('email', user.email.trim()).limit(1);
+            if ((closerRows as List).isNotEmpty && (closerRows as List).first['client_id'] != null) {
+              final closerRow = (closerRows as List).first as Map<String, dynamic>;
               clientId = closerRow['client_id'].toString();
-              final cRow = await db.from('clients').select('id, name, company_name').eq('id', clientId).maybeSingle();
-              if (cRow != null) {
+              final cRows = await db.from('clients').select('id, name, company_name').eq('id', clientId).limit(1);
+              if ((cRows as List).isNotEmpty) {
+                final cRow = (cRows as List).first as Map<String, dynamic>;
                 companyName = cRow['company_name']?.toString() ?? cRow['name']?.toString() ?? '';
               }
             }
@@ -1244,10 +1259,7 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
                 .or(filters.join(','))
                 .order('created_at', ascending: false);
           } else {
-            ordersRes = await db
-                .from('orders')
-                .select('*')
-                .order('created_at', ascending: false);
+            ordersRes = [];
           }
 
           if (ordersRes is List && ordersRes.isNotEmpty) {
@@ -1376,17 +1388,19 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         );
       }
 
-      // 5. Fetch Inventory suppliers, invoices, and balances
+      // 5. Fetch Inventory suppliers, invoices, and balances, plus closer payouts
       List<ClientSupplier> suppliers = [];
       List<ClientStockInvoice> stockInvoices = [];
       List<ClientStockBalance> stockBalances = [];
+      List<ClientCloserPayout> closerPayouts = [];
 
       try {
         suppliers = await _repository.getSuppliers(clientId);
         stockInvoices = await _repository.getStockInvoices(clientId);
         stockBalances = await _repository.getStockBalances(clientId);
+        closerPayouts = await _repository.getClientCloserPayouts(clientId);
       } catch (e) {
-        debugPrint('[CLIENT_PORTAL] ⚠️ Error loading inventory data: $e');
+        debugPrint('[CLIENT_PORTAL] ⚠️ Error loading inventory / closer payouts data: $e');
       }
 
       if (!mounted) return;
@@ -1398,6 +1412,7 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         closers: clientClosers,
         leads: clientLeads,
         settlements: clientSettlements,
+        closerPayouts: closerPayouts,
         assetCustodyData: custodyData,
         suppliers: suppliers,
         stockInvoices: stockInvoices,
@@ -1466,6 +1481,10 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
     String? avatarUrl,
     int dailyCallTarget = 50,
     double commissionRate = 500.0,
+    bool isCommissionEnabled = true,
+    String? bankName,
+    String? accountNumber,
+    String? accountName,
   }) async {
     state = state.copyWith(isLoading: true);
     try {
@@ -1493,6 +1512,10 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
           closerCode: closerCode,
           dailyCallTarget: dailyCallTarget,
           commissionRate: commissionRate,
+          isCommissionEnabled: isCommissionEnabled,
+          bankName: bankName,
+          accountNumber: accountNumber,
+          accountName: accountName,
         );
       } catch (dbErr) {
         if (dbErr.toString().contains('already exists') || dbErr.toString().contains('registered')) {
@@ -1513,6 +1536,10 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
           avatarUrl: avatarUrl,
           dailyCallTarget: dailyCallTarget,
           commissionRate: commissionRate,
+          isCommissionEnabled: isCommissionEnabled,
+          bankName: bankName ?? '',
+          accountNumber: accountNumber ?? '',
+          accountName: accountName ?? '',
           isActive: true,
           createdAt: DateTime.now(),
         );
@@ -1638,7 +1665,7 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
     }
   }
 
-  /// Update Closer / Employee Details (Name, Phone, Commission, Target)
+  /// Update Closer / Employee Details (Name, Phone, Commission, Target, Bank Account, Commission Enabled)
   Future<ClientCloser> updateCloserDetails({
     required String closerId,
     String? fullName,
@@ -1647,6 +1674,10 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
     double? commissionRate,
     int? dailyCallTarget,
     bool? isActive,
+    bool? isCommissionEnabled,
+    String? bankName,
+    String? accountNumber,
+    String? accountName,
   }) async {
     state = state.copyWith(isLoading: true);
     try {
@@ -1660,6 +1691,10 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
             commissionRate: commissionRate ?? c.commissionRate,
             dailyCallTarget: dailyCallTarget ?? c.dailyCallTarget,
             isActive: isActive ?? c.isActive,
+            isCommissionEnabled: isCommissionEnabled ?? c.isCommissionEnabled,
+            bankName: bankName ?? c.bankName,
+            accountNumber: accountNumber ?? c.accountNumber,
+            accountName: accountName ?? c.accountName,
             updatedAt: DateTime.now(),
           );
           return updatedCloser!;
@@ -1684,6 +1719,10 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
             commissionRate: commissionRate,
             dailyCallTarget: dailyCallTarget,
             isActive: isActive,
+            isCommissionEnabled: isCommissionEnabled,
+            bankName: bankName,
+            accountNumber: accountNumber,
+            accountName: accountName,
           );
           debugPrint('[CLIENT_PORTAL] ✅ Closer ${updatedCloser!.closerCode} updated successfully.');
         } catch (dbErr) {
@@ -1695,6 +1734,115 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
     } catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
       rethrow;
+    }
+  }
+
+  /// Load Closer Payouts for a specific closer
+  Future<List<ClientCloserPayout>> loadCloserPayouts(String closerId) async {
+    try {
+      final payouts = await _repository.getCloserPayouts(closerId);
+      return payouts;
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Disburse Commission Payout to a Closer with attached receipt document
+  Future<ClientCloserPayout> disburseCloserPayout({
+    required String closerId,
+    required double amount,
+    required String bankName,
+    required String accountNumber,
+    required String accountName,
+    String? disbursementRef,
+    String? proofOfPaymentUrl,
+    String? notes,
+  }) async {
+    state = state.copyWith(isLoading: true);
+    try {
+      final payout = await _repository.disburseCloserPayout(
+        closerId: closerId,
+        clientId: state.clientProfile.id,
+        amount: amount,
+        bankName: bankName,
+        accountNumber: accountNumber,
+        accountName: accountName,
+        disbursementRef: disbursementRef,
+        proofOfPaymentUrl: proofOfPaymentUrl,
+        notes: notes,
+      );
+
+      final updatedPayouts = [payout, ...state.closerPayouts.where((p) => p.id != payout.id)];
+      final updatedClosers = state.closers.map((c) {
+        if (c.id == closerId) {
+          return c.copyWith(
+            totalPaidCommission: c.totalPaidCommission + amount,
+            unpaidCommissionBalance: math.max(0.0, c.unpaidCommissionBalance - amount),
+          );
+        }
+        return c;
+      }).toList();
+
+      state = state.copyWith(
+        closerPayouts: updatedPayouts,
+        closers: updatedClosers,
+        isLoading: false,
+      );
+      return payout;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      rethrow;
+    }
+  }
+
+  /// Closer requests a payout of their commission
+  Future<ClientCloserPayout> requestCloserPayout({
+    required String closerId,
+    required double amount,
+    required String bankName,
+    required String accountNumber,
+    required String accountName,
+    String? notes,
+  }) async {
+    try {
+      final payout = await _repository.requestCloserPayout(
+        closerId: closerId,
+        clientId: state.clientProfile.id,
+        amount: amount,
+        bankName: bankName,
+        accountNumber: accountNumber,
+        accountName: accountName,
+        notes: notes,
+      );
+      final updatedPayouts = [payout, ...state.closerPayouts];
+      state = state.copyWith(closerPayouts: updatedPayouts);
+      return payout;
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] ❌ requestCloserPayout error: $e');
+      rethrow;
+    }
+  }
+
+  /// Closer confirms receipt of remitted commission payout
+  Future<void> confirmCloserPayout({
+    required String payoutId,
+    String? notes,
+  }) async {
+    try {
+      await _repository.confirmCloserPayout(payoutId: payoutId, notes: notes);
+      final updatedPayouts = state.closerPayouts.map((p) {
+        if (p.id == payoutId) {
+          return p.copyWith(
+            status: 'completed',
+            confirmedAt: DateTime.now(),
+            notes: notes ?? p.notes,
+          );
+        }
+        return p;
+      }).toList();
+      state = state.copyWith(closerPayouts: updatedPayouts);
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] ❌ confirmCloserPayout error: $e');
     }
   }
 
@@ -2221,8 +2369,9 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
             SupabaseConstants.supabaseServiceRoleKey,
             authOptions: const AuthClientOptions(autoRefreshToken: false),
           );
-          final clientRow = await db.from('clients').select().ilike('email', authUser.email.trim()).maybeSingle();
-          if (clientRow != null) {
+          final clientRows = await db.from('clients').select().ilike('email', authUser.email.trim()).limit(1);
+          if ((clientRows as List).isNotEmpty) {
+            final clientRow = (clientRows as List).first as Map<String, dynamic>;
             clientId = clientRow['id']?.toString() ?? clientId;
             clientCompany = clientRow['name']?.toString() ?? clientRow['company_name']?.toString() ?? clientCompany;
           }
@@ -2546,6 +2695,27 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
       },
     ];
     return importOrdersCsv(sampleBatch);
+  }
+
+  /// Approves a settlement batch and updates status to completed
+  Future<bool> approveSettlement(String settlementId, {String? notes}) async {
+    final clientId = state.clientProfile.id;
+    final success = await _repository.approveSettlement(
+      settlementId: settlementId,
+      clientId: clientId,
+      notes: notes,
+    );
+    if (success) {
+      final updatedSettlements = state.settlements.map((s) {
+        if (s.id == settlementId) {
+          return s.copyWith(status: 'completed');
+        }
+        return s;
+      }).toList();
+      state = state.copyWith(settlements: updatedSettlements);
+      await loadClientData();
+    }
+    return success;
   }
 
   static String _generateUuid() {

@@ -23,14 +23,125 @@ import '../../../pipeline_chat/presentation/widgets/order_pipeline_chat_sheet.da
 
 class DCOrderDetailModal extends ConsumerStatefulWidget {
   final OrderEntity order;
+  final VoidCallback? onClose;
+  final VoidCallback? onPreviousOrder;
+  final VoidCallback? onNextOrder;
+  final bool isEmbeddedPanel;
 
-  const DCOrderDetailModal({super.key, required this.order});
+  const DCOrderDetailModal({
+    super.key,
+    required this.order,
+    this.onClose,
+    this.onPreviousOrder,
+    this.onNextOrder,
+    this.isEmbeddedPanel = false,
+  });
+
+  static Future<void> show(BuildContext context, OrderEntity order) {
+    return showDialog(
+      context: context,
+      builder: (ctx) => DCOrderDetailModal(order: order),
+    );
+  }
 
   @override
   ConsumerState<DCOrderDetailModal> createState() => _DCOrderDetailModalState();
 }
 
 class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
+  String? _loadedRiderAvatar;
+  bool _hasAttemptedAvatarFetch = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fetchRiderAvatarIfNeeded();
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant DCOrderDetailModal oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.order.id != widget.order.id ||
+        oldWidget.order.deliveryAgentId != widget.order.deliveryAgentId) {
+      _hasAttemptedAvatarFetch = false;
+      _loadedRiderAvatar = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _fetchRiderAvatarIfNeeded();
+      });
+    }
+  }
+
+  Future<void> _fetchRiderAvatarIfNeeded() async {
+    if (_hasAttemptedAvatarFetch) return;
+    _hasAttemptedAvatarFetch = true;
+
+    final agentId = _currentOrder.deliveryAgentId;
+    final agentCode = _currentOrder.deliveryAgentCode;
+    if (agentId == null && agentCode == null) return;
+
+    try {
+      final client = Supabase.instance.client;
+      // 1. Try delivery_agents joined with users
+      if (agentId != null && agentId.isNotEmpty) {
+        final res = await client
+            .from('delivery_agents')
+            .select('avatar_url, users(avatar_url)')
+            .or('id.eq.$agentId,user_id.eq.$agentId')
+            .maybeSingle();
+        if (res != null) {
+          String? av = res['avatar_url']?.toString();
+          if ((av == null || av.isEmpty) && res['users'] is Map) {
+            av = (res['users'] as Map)['avatar_url']?.toString();
+          }
+          if (av != null && av.trim().isNotEmpty && mounted) {
+            setState(() {
+              _loadedRiderAvatar = av!.trim();
+            });
+            return;
+          }
+        }
+
+        // 2. Try users table directly
+        final userRes = await client
+            .from('users')
+            .select('avatar_url')
+            .eq('id', agentId)
+            .maybeSingle();
+        if (userRes != null && userRes['avatar_url'] != null && mounted) {
+          final av = userRes['avatar_url'].toString().trim();
+          if (av.isNotEmpty) {
+            setState(() {
+              _loadedRiderAvatar = av;
+            });
+            return;
+          }
+        }
+      }
+
+      // 3. Fallback: Lookup by agent_code
+      if (agentCode != null && agentCode.isNotEmpty) {
+        final codeRes = await client
+            .from('delivery_agents')
+            .select('avatar_url, users(avatar_url)')
+            .eq('agent_code', agentCode)
+            .maybeSingle();
+        if (codeRes != null) {
+          String? av = codeRes['avatar_url']?.toString();
+          if ((av == null || av.isEmpty) && codeRes['users'] is Map) {
+            av = (codeRes['users'] as Map)['avatar_url']?.toString();
+          }
+          if (av != null && av.trim().isNotEmpty && mounted) {
+            setState(() {
+              _loadedRiderAvatar = av!.trim();
+            });
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
   OrderEntity get _currentOrder {
     final ordersState = ref.watch(ordersProvider);
     return ordersState.orders.firstWhere(
@@ -47,6 +158,43 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
     } catch (_) {}
   }
 
+  void _openProductSwitchModal(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => OrderProductSwitchModal(
+        orderId: _currentOrder.id,
+        orderNumber: _currentOrder.orderNumber,
+        currentProductName: _currentOrder.productName,
+        currentPackageName: _currentOrder.packageDealName,
+        currentTotalAmount: _currentOrder.totalAmount,
+        currentClientId: _currentOrder.clientId ?? '',
+        currentClientName: _currentOrder.clientName,
+      ),
+    );
+  }
+
+  void _printWaybillManifest(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: const Color(0xFF2563EB),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        content: Row(
+          children: [
+            const Icon(Icons.print_rounded, color: Colors.white, size: 18),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                '🖨️ Dispatch Waybill & Manifest generated for Order #${_currentOrder.orderNumber}',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 12.5),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -54,7 +202,7 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
     final dcState = ref.watch(dcConsoleProvider);
     final stockState = ref.watch(stockProvider);
 
-    // Safely find linked warehouse stock item without generic covariance casting error
+    // Safely find linked warehouse stock item
     StockItemEntity? matchedStock;
     try {
       final lowerName = _currentOrder.productName.toLowerCase();
@@ -75,7 +223,10 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
     DCFleetDriver? assignedDriver;
     if (_currentOrder.deliveryAgentId != null && _currentOrder.deliveryAgentId!.isNotEmpty) {
       for (final d in dcState.drivers) {
-        if (d.id == _currentOrder.deliveryAgentId || d.driverCode == _currentOrder.deliveryAgentCode) {
+        if (d.id == _currentOrder.deliveryAgentId ||
+            (d.driverCode.isNotEmpty && d.driverCode.toLowerCase() == _currentOrder.deliveryAgentCode?.toLowerCase()) ||
+            (d.name.isNotEmpty && d.name.toLowerCase() == (_currentOrder.deliveryAgentName ?? '').toLowerCase()) ||
+            (d.phone.isNotEmpty && d.phone == _currentOrder.deliveryAgentPhone)) {
           assignedDriver = d;
           break;
         }
@@ -85,9 +236,9 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
         name: _currentOrder.deliveryAgentName ?? 'Assigned Rider',
         phone: _currentOrder.deliveryAgentPhone ?? '+234 800 000 0000',
         driverCode: _currentOrder.deliveryAgentCode ?? 'PDA',
-        avatarUrl: '',
+        avatarUrl: _loadedRiderAvatar ?? '',
         vehicleModel: 'Motorcycle',
-        vehiclePlate: 'ABJ-894-XA',
+        vehiclePlate: 'ABJ-894-XY',
         vehicleType: 'Motorcycle',
         status: 'active',
         assignedZone: _currentOrder.deliveryCity,
@@ -100,136 +251,119 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
       );
     }
 
-    return Dialog(
-      backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 960, maxHeight: 900),
-        child: Column(
-          children: [
-            // 1. Header Banner
-            _buildModalHeader(context, isDark),
+    final hasPodData = _currentOrder.isDelivered ||
+        _currentOrder.customerSignatureUrl != null ||
+        _currentOrder.photoProofUrl != null ||
+        _currentOrder.hasCoordinates ||
+        (_currentOrder.deliveryNotes != null &&
+            (_currentOrder.deliveryNotes!.contains('POD') ||
+                _currentOrder.deliveryNotes!.contains('Gate PIN') ||
+                _currentOrder.deliveryNotes!.contains('GPS Proof')));
 
-            // 2. Scrollable Body
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Failure Reason Alert (if failed/callback)
-                    if (_currentOrder.isFailed) ...[
-                      _buildFailureAlertBanner(isDark),
-                      const SizedBox(height: 14),
-                    ],
+    final content = Container(
+      color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+      child: Column(
+        children: [
+          // 1. Top Header Bar with Navigation Controls & Close Button
+          _buildModalHeader(context, isDark),
 
-                    // 2x2 or 1x4 Top Summary Cards (Status, Remittance, Stock, Value)
-                    _buildTopKpiRow(isDark),
-                    const SizedBox(height: 16),
-
-                    // Responsive Main Body: 2-Column on Desktop, 1-Column on Mobile
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        final isDesktop = constraints.maxWidth >= 680;
-                        final hasPodData = _currentOrder.isDelivered ||
-                            _currentOrder.customerSignatureUrl != null ||
-                            _currentOrder.photoProofUrl != null ||
-                            _currentOrder.hasCoordinates ||
-                            (_currentOrder.deliveryNotes != null &&
-                                (_currentOrder.deliveryNotes!.contains('POD') ||
-                                    _currentOrder.deliveryNotes!.contains('Gate PIN') ||
-                                    _currentOrder.deliveryNotes!.contains('GPS Proof')));
-
-                        if (isDesktop) {
-                          return Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Left Column: Customer & Delivery Info, Custody, Proof of Delivery
-                              Expanded(
-                                flex: 5,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    _buildCustomerSection(isDark),
-                                    const SizedBox(height: 16),
-                                    _buildHolderAndRiderSection(isDark, assignedDriver, dcState.drivers),
-                                    if (hasPodData) ...[
-                                      const SizedBox(height: 16),
-                                      _buildProofOfDeliverySection(isDark),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              // Right Column: Product & Warehouse Inventory, Financial Accounting
-                              Expanded(
-                                flex: 5,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    _buildStockAndProductSection(isDark, targetStock),
-                                    const SizedBox(height: 16),
-                                    _buildFinancialAndRemittanceSection(isDark, assignedDriver),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          );
-                        }
-
-                        // Mobile Single-Column Flow
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildCustomerSection(isDark),
-                            const SizedBox(height: 16),
-                            _buildStockAndProductSection(isDark, targetStock),
-                            const SizedBox(height: 16),
-                            _buildHolderAndRiderSection(isDark, assignedDriver, dcState.drivers),
-                            const SizedBox(height: 16),
-                            _buildFinancialAndRemittanceSection(isDark, assignedDriver),
-                            if (hasPodData) ...[
-                              const SizedBox(height: 16),
-                              _buildProofOfDeliverySection(isDark),
-                            ],
-                          ],
-                        );
-                      },
-                    ),
+          // 2. Scrollable Body
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Failure Reason Alert (if failed/callback)
+                  if (_currentOrder.isFailed) ...[
+                    _buildFailureAlertBanner(isDark),
+                    const SizedBox(height: 12),
                   ],
-                ),
+
+                  // 2 Top KPI Cards (Total Order Value, Remittance Status)
+                  _buildTopKpiRow(isDark),
+                  const SizedBox(height: 12),
+
+                  // Card 1: Customer & Destination
+                  _buildCustomerSection(isDark),
+                  const SizedBox(height: 12),
+
+                  // Card 2: Product & Warehouse Inventory Linkage
+                  _buildStockAndProductSection(isDark, targetStock),
+                  const SizedBox(height: 12),
+
+                  // Card 3: Custody Holder & Courier Allocation
+                  _buildHolderAndRiderSection(isDark, assignedDriver, dcState.drivers),
+                  const SizedBox(height: 12),
+
+                  // Card 4: Financial Accounting & Remittance Reconciliation
+                  _buildFinancialAndRemittanceSection(isDark, assignedDriver),
+
+                  // Proof of Delivery & Verification Audit (if applicable)
+                  if (hasPodData) ...[
+                    const SizedBox(height: 12),
+                    _buildProofOfDeliverySection(isDark),
+                  ],
+                ],
               ),
             ),
+          ),
 
-            // 3. Footer Action Bar
-            _buildFooterActions(context, isDark, assignedDriver, dcState.drivers),
-          ],
+          // 3. Sticky Bottom Action Bar
+          _buildFooterActions(context, isDark, assignedDriver, dcState.drivers),
+        ],
+      ),
+    );
+
+    if (widget.isEmbeddedPanel) {
+      return content;
+    }
+
+    // Standalone dialog mode for tests or direct modal invocation
+    return Dialog(
+      backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 580, maxHeight: 920),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: content,
         ),
       ),
     );
   }
 
+  // 1. Header Bar with Stitch aesthetics
   Widget _buildModalHeader(BuildContext context, bool isDark) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        border: Border(bottom: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        border: Border(
+          bottom: BorderSide(
+            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+            width: 1,
+          ),
+        ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          // Blue square document icon
           Container(
-            padding: const EdgeInsets.all(7),
+            width: 36,
+            height: 36,
+            alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: const Color(0xFF2563EB).withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(10),
+              color: const Color(0xFFEFF6FF),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFDBEAFE)),
             ),
             child: const Icon(Icons.receipt_long_rounded, color: Color(0xFF2563EB), size: 20),
           ),
           const SizedBox(width: 10),
+          // Order Number & Status Pill
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -242,7 +376,11 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
                   children: [
                     Text(
                       'Order ${_currentOrder.orderNumber}',
-                      style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 15.5),
+                      style: GoogleFonts.inter(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15.5,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
                     ),
                     _buildStatusPill(_currentOrder),
                   ],
@@ -258,20 +396,53 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
             ),
           ),
           const SizedBox(width: 6),
+          // Navigation controls (<, >, Print, Chat, Close)
+          if (widget.onPreviousOrder != null)
+            IconButton(
+              tooltip: 'Previous Order',
+              onPressed: widget.onPreviousOrder,
+              icon: const Icon(Icons.chevron_left_rounded, size: 20),
+              color: const Color(0xFF64748B),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+            ),
+          if (widget.onNextOrder != null)
+            IconButton(
+              tooltip: 'Next Order',
+              onPressed: widget.onNextOrder,
+              icon: const Icon(Icons.chevron_right_rounded, size: 20),
+              color: const Color(0xFF64748B),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+            ),
           IconButton(
-            tooltip: 'Order Pipeline Chat & Incident Audit',
-            onPressed: () => OrderPipelineChatSheet.showForOrder(context, _currentOrder),
-            icon: const Icon(Icons.chat_bubble_outline_rounded, size: 20, color: Color(0xFF0D9488)),
+            tooltip: 'Print Manifest / Waybill',
+            onPressed: () => _printWaybillManifest(context),
+            icon: const Icon(Icons.print_outlined, size: 18),
+            color: const Color(0xFF64748B),
             padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
           ),
-          const SizedBox(width: 4),
           IconButton(
-            onPressed: () => Navigator.of(context).pop(),
+            tooltip: 'Order Pipeline Chat',
+            onPressed: () => OrderPipelineChatSheet.showForOrder(context, _currentOrder),
+            icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18, color: Color(0xFF0D9488)),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+          ),
+          IconButton(
+            tooltip: 'Close Details',
+            onPressed: () {
+              if (widget.onClose != null) {
+                widget.onClose!();
+              } else {
+                Navigator.of(context).maybePop();
+              }
+            },
             icon: const Icon(Icons.close_rounded, size: 20),
             color: const Color(0xFF64748B),
             padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
           ),
         ],
       ),
@@ -289,9 +460,9 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: const Color(0xFF10B981).withValues(alpha: 0.15),
+              color: const Color(0xFFECFDF5),
               borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+              border: Border.all(color: const Color(0xFFA7F3D0)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -306,16 +477,22 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                color: const Color(0xFFF59E0B).withValues(alpha: 0.18),
+                color: const Color(0xFFFEF3C7),
                 borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.4)),
+                border: Border.all(color: const Color(0xFFFDE68A)),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Icon(Icons.payments_outlined, size: 11, color: Color(0xFFD97706)),
                   const SizedBox(width: 4),
-                  Text('CASH COLLECTED • AWAITING REMITTANCE', style: GoogleFonts.jetBrainsMono(fontSize: 9.5, fontWeight: FontWeight.w800, color: const Color(0xFFD97706))),
+                  Flexible(
+                    child: Text(
+                      'CASH COLLECTED • AWAITING REMITTANCE',
+                      style: GoogleFonts.jetBrainsMono(fontSize: 9.5, fontWeight: FontWeight.w800, color: const Color(0xFFD97706)),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -325,64 +502,424 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
-          color: const Color(0xFFEF4444).withValues(alpha: 0.15),
+          color: const Color(0xFFFEF2F2),
           borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFFFCA5A5)),
         ),
-        child: Text('FAILED / CALLBACK', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w800, color: const Color(0xFFDC2626))),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(width: 6, height: 6, decoration: const BoxDecoration(color: Color(0xFFEF4444), shape: BoxShape.circle)),
+            const SizedBox(width: 5),
+            Text('FAILED / CALLBACK', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w800, color: const Color(0xFFDC2626))),
+          ],
+        ),
       );
     } else if (order.isUnassigned) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
-          color: const Color(0xFF64748B).withValues(alpha: 0.15),
+          color: const Color(0xFFF1F5F9),
           borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFFCBD5E1)),
         ),
-        child: Text('UNASSIGNED', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w800, color: const Color(0xFF475569))),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(width: 6, height: 6, decoration: const BoxDecoration(color: Color(0xFF64748B), shape: BoxShape.circle)),
+            const SizedBox(width: 5),
+            Text('UNASSIGNED', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w800, color: const Color(0xFF475569))),
+          ],
+        ),
       );
     } else {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
-          color: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
+          color: const Color(0xFFEFF6FF),
           borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFFBFDBFE)),
         ),
-        child: Text('IN TRANSIT', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w800, color: const Color(0xFF7C3AED))),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(width: 6, height: 6, decoration: const BoxDecoration(color: Color(0xFF3B82F6), shape: BoxShape.circle)),
+            const SizedBox(width: 5),
+            Text('IN TRANSIT', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w800, color: const Color(0xFF2563EB))),
+          ],
+        ),
       );
     }
   }
 
-  Widget _buildFailureAlertBanner(bool isDark) {
-    final reason = _currentOrder.failureReason ?? _currentOrder.deliveryNotes ?? 'Customer phone unreachable / switched off';
+  // Top KPI Row: 2 Cards Side-by-Side (Total Order Value & Remittance Status)
+  Widget _buildTopKpiRow(bool isDark) {
+    final paymentTag = _currentOrder.isDirectTransfer
+        ? 'DIRECT TRANSFER'
+        : (_currentOrder.isCashPod ? 'PAY ON DELIVERY' : 'PREPAID');
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEF4444).withValues(alpha: isDark ? 0.18 : 0.08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.warning_amber_rounded, color: Color(0xFFEF4444), size: 22),
-          const SizedBox(width: 12),
-          Expanded(
+    final isDelivered = _currentOrder.isDelivered;
+    final isRemitted = _currentOrder.isRemitted;
+
+    final remittanceCardTitle = isDelivered
+        ? (_currentOrder.isDirectTransfer
+            ? '⚡ Direct Transfer'
+            : (isRemitted ? '🟢 Remitted & Cleared' : '🟡 Cash in Custody'))
+        : (_currentOrder.isFailed ? '⚠️ Failed Attempt' : '🕒 In Progress');
+
+    final remittanceSubtitle = isRemitted && _currentOrder.remittanceReference != null
+        ? 'Ref: ${_currentOrder.remittanceReference}'
+        : (_currentOrder.isUnremitted
+            ? 'Awaiting Remittance (${CurrencyFormatter.formatNaira(_currentOrder.totalAmount)})'
+            : 'Settlement pending');
+
+    return Row(
+      children: [
+        // Left KPI Card: Total Order Value
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E293B) : Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+              ),
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Delivery Failed / Rescheduled Ticket',
-                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFFDC2626)),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        'Total Order Value',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          color: const Color(0xFF64748B),
+                          fontWeight: FontWeight.w500,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF3C7),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        paymentTag,
+                        style: GoogleFonts.inter(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFFB45309),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 3),
+                const SizedBox(height: 6),
                 Text(
-                  'Logged Reason: $reason',
-                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? Colors.white : const Color(0xFF1E293B)),
+                  CurrencyFormatter.formatNaira(_currentOrder.totalAmount),
+                  style: GoogleFonts.inter(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        // Right KPI Card: Remittance Status
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E293B) : Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        'Remittance Status',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          color: const Color(0xFF64748B),
+                          fontWeight: FontWeight.w500,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: isRemitted ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  remittanceCardTitle,
+                  style: GoogleFonts.inter(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  remittanceSubtitle,
+                  style: GoogleFonts.inter(
+                    fontSize: 10,
+                    color: const Color(0xFF94A3B8),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Card 1: Customer & Destination
+  Widget _buildCustomerSection(bool isDark) {
+    return _buildSectionCard(
+      isDark: isDark,
+      title: '👤 Customer & Destination Information',
+      icon: Icons.person_outline_rounded,
+      headerTrailing: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+        decoration: BoxDecoration(
+          color: _currentOrder.isLocationVerified ? const Color(0xFFECFDF5) : const Color(0xFFFFFBEB),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: _currentOrder.isLocationVerified ? const Color(0xFFA7F3D0) : const Color(0xFFFDE68A),
+          ),
+        ),
+        child: Text(
+          _currentOrder.isLocationVerified ? 'Doorstep Verified ✓' : 'Address Pending Verification',
+          style: GoogleFonts.inter(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: _currentOrder.isLocationVerified ? const Color(0xFF059669) : const Color(0xFFD97706),
+          ),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Customer Name & Phone + 3 Quick Action Buttons
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _currentOrder.customerName,
+                      style: GoogleFonts.inter(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14.5,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Phone: ${_currentOrder.customerPhone}',
+                      style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                    ),
+                    if (_currentOrder.customerAltPhone != null && _currentOrder.customerAltPhone!.isNotEmpty) ...[
+                      const SizedBox(height: 1),
+                      Text(
+                        'Alt: ${_currentOrder.customerAltPhone}',
+                        style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Action buttons: Call, WhatsApp Pin, GPS Nav
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () => _launchUri(Uri.parse('tel:${_currentOrder.customerPhone}')),
+                    icon: const Icon(Icons.phone_outlined, size: 12, color: Color(0xFF10B981)),
+                    label: const Text(
+                      'Call',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF10B981), fontWeight: FontWeight.bold),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                      side: const BorderSide(color: Color(0xFF10B981)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () => _launchUri(_currentOrder.getWhatsAppLocationRequestUri(riderName: _currentOrder.deliveryAgentName)),
+                    icon: const Icon(Icons.chat_bubble_outline_rounded, size: 12, color: Color(0xFF059669)),
+                    label: const Text(
+                      'WhatsApp Pin',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF059669), fontWeight: FontWeight.bold),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      backgroundColor: const Color(0xFFECFDF5),
+                      side: const BorderSide(color: Color(0xFFA7F3D0)),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () => _launchUri(_currentOrder.googleMapsNavUri),
+                    icon: const Icon(Icons.navigation_outlined, size: 12, color: Color(0xFF2563EB)),
+                    label: const Text(
+                      'GPS Nav',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF2563EB), fontWeight: FontWeight.bold),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      backgroundColor: const Color(0xFFEFF6FF),
+                      side: const BorderSide(color: Color(0xFFBFDBFE)),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Divider(height: 1),
+          const SizedBox(height: 10),
+
+          // Address & Region 2-column layout
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Delivery Street Address:',
+                      style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _currentOrder.deliveryAddress,
+                      style: GoogleFonts.inter(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Region & State:',
+                      style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${_currentOrder.deliveryCity}, ${_currentOrder.deliveryState}',
+                      style: GoogleFonts.inter(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          if (_currentOrder.landmark != null && _currentOrder.landmark!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _buildInfoRow('🏛️ Nearby Landmark:', _currentOrder.landmark!, isDark),
+          ],
+          if (_currentOrder.readableDeliveryNotes.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            _buildInfoRow('📝 Delivery Notes:', _currentOrder.readableDeliveryNotes, isDark),
+          ] else ...[
+            const SizedBox(height: 6),
+            _buildInfoRow('📝 Delivery Notes:', 'Standard doorstep delivery (No special customer notes)', isDark),
+          ],
+
+          const SizedBox(height: 10),
+
+          // Verified Package Configuration blue dashed box
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEFF6FF).withValues(alpha: 0.7),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFF93C5FD), style: BorderStyle.solid),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.inventory_2_outlined, size: 14, color: Color(0xFF2563EB)),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Verified Package Configuration',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF2563EB),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Item remains securely allocated in the assigned rider\'s vehicle custody until returned to DC or redelivered.',
-                  style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                  _currentOrder.packageDealName != null && _currentOrder.packageDealName!.isNotEmpty
+                      ? 'Deal: ${_currentOrder.packageDealName!} • ${_currentOrder.totalPhysicalQuantity} Units Total (${_currentOrder.paidQuantity} Paid + ${_currentOrder.freeQuantity} Free Bonus) — Client Sealed Package, Do not tamper or break internal seal.'
+                      : 'Package Deal: ${_currentOrder.paidQuantity} Boxes + ${_currentOrder.freeQuantity} Free Promotional Bonus (${_currentOrder.totalPhysicalQuantity} Units Total) — Client Sealed Package, Do not tamper or break internal seal.',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFF475569),
+                    height: 1.35,
+                  ),
                 ),
               ],
             ),
@@ -392,343 +929,181 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
     );
   }
 
-  Widget _buildTopKpiRow(bool isDark) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isNarrow = constraints.maxWidth < 600;
-        final card1 = _buildTopKpiCard(
-          'Total Order Value',
-          CurrencyFormatter.formatNaira(_currentOrder.totalAmount),
-          _currentOrder.paymentType.replaceAll('_', ' ').toUpperCase(),
-          const Color(0xFF2563EB),
-          isDark,
-        );
-
-        final card2 = _buildTopKpiCard(
-          'Remittance Status',
-          _currentOrder.isDelivered
-              ? (_currentOrder.isDirectTransfer
-                  ? '⚡ Direct Transfer'
-                  : (_currentOrder.isRemitted ? '🟢 Remitted & Cleared' : '🟡 Cash in Custody'))
-              : (_currentOrder.isFailed ? '⚠️ Failed Attempt' : '🕒 In Progress'),
-          _currentOrder.isRemitted && _currentOrder.remittanceReference != null
-              ? 'Ref: ${_currentOrder.remittanceReference}'
-              : (_currentOrder.isUnremitted
-                  ? 'Awaiting Remittance (${CurrencyFormatter.formatNaira(_currentOrder.totalAmount)})'
-                  : 'Settlement pending'),
-          _currentOrder.isRemitted ? const Color(0xFF10B981) : (_currentOrder.isUnremitted ? const Color(0xFFD97706) : const Color(0xFF64748B)),
-          isDark,
-        );
-
-        final card3 = _buildTopKpiCard(
-          'Physical Product',
-          '${_currentOrder.totalPhysicalQuantity}x ${_currentOrder.productName}',
-          'Merchant: ${_currentOrder.clientName}',
-          const Color(0xFF8B5CF6),
-          isDark,
-        );
-
-        final card4 = _buildTopKpiCard(
-          'Custody Holder',
-          _currentOrder.deliveryAgentName != null && _currentOrder.deliveryAgentName!.isNotEmpty
-              ? '${_currentOrder.deliveryAgentName} (${_currentOrder.deliveryAgentCode ?? "PDA"})'
-              : '🏢 DC Warehouse Pool',
-          _currentOrder.deliveryAgentName != null ? 'In vehicle custody' : 'Awaiting assignment',
-          _currentOrder.deliveryAgentName != null ? const Color(0xFF0284C7) : const Color(0xFF64748B),
-          isDark,
-        );
-
-        if (isNarrow) {
-          return Column(
-            children: [
-              Row(children: [Expanded(child: card1), const SizedBox(width: 8), Expanded(child: card2)]),
-              const SizedBox(height: 8),
-              Row(children: [Expanded(child: card3), const SizedBox(width: 8), Expanded(child: card4)]),
-            ],
-          );
-        } else {
-          return Row(
-            children: [
-              Expanded(child: card1),
-              const SizedBox(width: 8),
-              Expanded(child: card2),
-              const SizedBox(width: 8),
-              Expanded(child: card3),
-              const SizedBox(width: 8),
-              Expanded(child: card4),
-            ],
-          );
-        }
-      },
-    );
-  }
-
-  Widget _buildTopKpiCard(String label, String value, String sub, Color color, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: isDark ? 0.12 : 0.06),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(label, style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF64748B)), maxLines: 1, overflow: TextOverflow.ellipsis),
-          const SizedBox(height: 3),
-          Text(
-            value,
-            style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: color),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 1),
-          Text(sub, style: GoogleFonts.inter(fontSize: 9, color: const Color(0xFF94A3B8)), maxLines: 1, overflow: TextOverflow.ellipsis),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCustomerSection(bool isDark) {
-    return _buildSectionContainer(
-      isDark: isDark,
-      title: '👤 Customer & Destination Information',
-      icon: Icons.person_pin_circle_rounded,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isNarrow = constraints.maxWidth < 420;
-              final custInfo = Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(_currentOrder.customerName, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14)),
-                  const SizedBox(height: 2),
-                  Text('Phone: ${_currentOrder.customerPhone}', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-                  if (_currentOrder.customerAltPhone != null && _currentOrder.customerAltPhone!.isNotEmpty) ...[
-                    const SizedBox(height: 1),
-                    Text('Alt Phone: ${_currentOrder.customerAltPhone}', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8))),
-                  ],
-                ],
-              );
-
-              final actionBtns = Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: () => _launchUri(Uri.parse('tel:${_currentOrder.customerPhone}')),
-                    icon: const Icon(Icons.call, size: 13, color: Color(0xFF10B981)),
-                    label: const Text('Call', style: TextStyle(fontSize: 11, color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      side: const BorderSide(color: Color(0xFF10B981)),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                  ),
-                  ElevatedButton.icon(
-                    onPressed: () => _launchUri(_currentOrder.getWhatsAppLocationRequestUri(riderName: _currentOrder.deliveryAgentName)),
-                    icon: const Icon(Icons.chat_bubble_outline_rounded, size: 13, color: Colors.white),
-                    label: const Text('WhatsApp Pin', style: TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF25D366),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                  ),
-                  ElevatedButton.icon(
-                    onPressed: () => _launchUri(_currentOrder.googleMapsNavUri),
-                    icon: const Icon(Icons.navigation_rounded, size: 13, color: Colors.white),
-                    label: const Text('GPS Nav', style: TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2563EB),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                  ),
-                ],
-              );
-
-              if (isNarrow) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    custInfo,
-                    const SizedBox(height: 10),
-                    actionBtns,
-                  ],
-                );
-              }
-
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: custInfo),
-                  const SizedBox(width: 8),
-                  actionBtns,
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: 12),
-          const Divider(height: 1),
-          const SizedBox(height: 12),
-          _buildInfoRow('📍 Delivery Address:', _currentOrder.deliveryAddress, isDark),
-          const SizedBox(height: 6),
-          _buildInfoRow('🏙️ City & State:', '${_currentOrder.deliveryCity}, ${_currentOrder.deliveryState}', isDark),
-          if (_currentOrder.landmark != null && _currentOrder.landmark!.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            _buildInfoRow('🏛️ Nearby Landmark:', _currentOrder.landmark!, isDark),
-          ],
-          const SizedBox(height: 6),
-          _buildInfoRow('🎯 Geocoding Status:', _currentOrder.confidenceDisplay, isDark, valueColor: _currentOrder.isLocationVerified ? const Color(0xFF10B981) : const Color(0xFF0284C7)),
-          if (_currentOrder.hasCoordinates || _currentOrder.loggedGpsProof != null) ...[
-            const SizedBox(height: 6),
-            _buildInfoRow(
-              '📍 GPS Presence Proof:',
-              '${_currentOrder.hasCoordinates ? "${_currentOrder.latitude!.toStringAsFixed(5)}°, ${_currentOrder.longitude!.toStringAsFixed(5)}°" : _currentOrder.loggedGpsProof} (${_currentOrder.isLocationVerified ? "Verified Doorstep ✓" : "Captured"})',
-              isDark,
-              valueColor: const Color(0xFF10B981),
-            ),
-          ],
-          if (_currentOrder.deliveryNotes != null && _currentOrder.deliveryNotes!.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            _buildInfoRow('📝 Delivery Notes:', _currentOrder.deliveryNotes!, isDark),
-          ],
-        ],
-      ),
-    );
-  }
-
+  // Card 2: Product & Warehouse Inventory Linkage
+  // With "Change Product / Package" button in between product name and package name!
   Widget _buildStockAndProductSection(bool isDark, StockItemEntity targetStock) {
-    return _buildSectionContainer(
+    return _buildSectionCard(
       isDark: isDark,
       title: '📦 Product & Warehouse Inventory Linkage',
-      icon: Icons.inventory_2_rounded,
+      icon: Icons.inventory_2_outlined,
+      headerTrailing: Text(
+        _currentOrder.clientName,
+        style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B), fontWeight: FontWeight.w500),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isNarrow = constraints.maxWidth < 440;
-              final titleCol = Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(_currentOrder.productName, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14)),
-                  Text(
-                    'SKU: ${_currentOrder.productSku ?? targetStock.sku} • Merchant: ${_currentOrder.clientName}',
-                    style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
-                  ),
-                ],
-              );
+          // Product Name + "Change Product / Package" button in between + Package badge!
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                _currentOrder.productName,
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14.5,
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                ),
+              ),
 
-              final pkgBadge = Container(
+              // IN-BETWEEN BUTTON: Change Product / Package
+              if (_currentOrder.status != 'delivered' && _currentOrder.status != 'cancelled')
+                InkWell(
+                  onTap: () => _openProductSwitchModal(context),
+                  borderRadius: BorderRadius.circular(6),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFF93C5FD)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.swap_horiz_rounded, size: 14, color: Color(0xFF2563EB)),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Change Product / Package',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF2563EB),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+              // Package Name / Units Badge
+              Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF2563EB).withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
+                  color: const Color(0xFFEEF2FF),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFFC7D2FE)),
                 ),
                 child: Text(
-                  '${_currentOrder.totalPhysicalQuantity} Units Package',
-                  style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
+                  _currentOrder.packageDealName?.isNotEmpty == true
+                      ? _currentOrder.packageDealName!
+                      : '${_currentOrder.totalPhysicalQuantity} Units Pack',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF4F46E5),
+                  ),
                 ),
-              );
-
-              final actionWidgets = Wrap(
-                spacing: 8,
-                runSpacing: 6,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  pkgBadge,
-                  if (_currentOrder.status != 'delivered' && _currentOrder.status != 'cancelled')
-                    OutlinedButton.icon(
-                      onPressed: () {
-                        showDialog(
-                          context: context,
-                          builder: (ctx) => OrderProductSwitchModal(
-                            orderId: _currentOrder.id,
-                            orderNumber: _currentOrder.orderNumber,
-                            currentProductName: _currentOrder.productName,
-                            currentPackageName: _currentOrder.packageDealName,
-                            currentTotalAmount: _currentOrder.totalAmount,
-                            currentClientId: _currentOrder.clientId ?? '',
-                            currentClientName: _currentOrder.clientName,
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.swap_horizontal_circle_outlined, size: 14, color: Color(0xFF6366F1)),
-                      label: Text(
-                        'Change Product / Package',
-                        style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF6366F1)),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        side: const BorderSide(color: Color(0xFF6366F1)),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                    ),
-                ],
-              );
-
-              if (isNarrow) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    titleCol,
-                    const SizedBox(height: 6),
-                    actionWidgets,
-                  ],
-                );
-              }
-
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: titleCol),
-                  const SizedBox(width: 8),
-                  actionWidgets,
-                ],
-              );
-            },
+              ),
+            ],
+          ),
+          const SizedBox(height: 3),
+          Text(
+            'SKU: ${_currentOrder.productSku ?? targetStock.sku}',
+            style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
           ),
           const SizedBox(height: 12),
-          const Divider(height: 1),
-          const SizedBox(height: 12),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isNarrow = constraints.maxWidth < 460;
-              final stat1 = _buildMiniStat('🏢 Storage Bin', _currentOrder.binLocation ?? targetStock.binLocation ?? 'BIN-A1-01', const Color(0xFF2563EB), isDark);
-              final stat2 = _buildMiniStat('🏷️ Batch / Lot', _currentOrder.batchNumber ?? targetStock.batchNumber ?? 'LOT-2026-08', const Color(0xFF8B5CF6), isDark);
-              final stat3 = _buildMiniStat('🏪 Shelf Stock', '${targetStock.availableCount} units', const Color(0xFF10B981), isDark);
 
-              if (isNarrow) {
-                return Column(
-                  children: [
-                    Row(children: [Expanded(child: stat1), const SizedBox(width: 8), Expanded(child: stat2)]),
-                    const SizedBox(height: 8),
-                    stat3,
-                  ],
-                );
-              }
-
-              return Row(
-                children: [
-                  Expanded(child: stat1),
-                  const SizedBox(width: 8),
-                  Expanded(child: stat2),
-                  const SizedBox(width: 8),
-                  Expanded(child: stat3),
-                ],
-              );
-            },
+          // 3 Metric chips: STORAGE BIN, BATCH / LOT, HUB SHELF STOCK
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'STORAGE BIN',
+                        style: GoogleFonts.jetBrainsMono(fontSize: 9, color: const Color(0xFF64748B), letterSpacing: 0.5),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _currentOrder.binLocation ?? targetStock.binLocation ?? 'BIN-A1-01',
+                        style: GoogleFonts.jetBrainsMono(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'BATCH / LOT',
+                        style: GoogleFonts.jetBrainsMono(fontSize: 9, color: const Color(0xFF64748B), letterSpacing: 0.5),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _currentOrder.batchNumber ?? targetStock.batchNumber ?? 'LOT-2026-08',
+                        style: GoogleFonts.jetBrainsMono(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFECFDF5),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFA7F3D0)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'HUB SHELF STOCK',
+                        style: GoogleFonts.jetBrainsMono(fontSize: 9, color: const Color(0xFF059669), letterSpacing: 0.5),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${targetStock.availableCount > 0 ? targetStock.availableCount : 950} Units',
+                        style: GoogleFonts.jetBrainsMono(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF059669)),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 10),
           _buildInfoRow(
@@ -741,171 +1116,140 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
     );
   }
 
+  // Card 3: Custody Holder & Courier Allocation
   Widget _buildHolderAndRiderSection(bool isDark, DCFleetDriver? assignedDriver, List<DCFleetDriver> allDrivers) {
     final hasRider = assignedDriver != null && _currentOrder.deliveryAgentId != null && _currentOrder.deliveryAgentId!.isNotEmpty;
+    final riderAvatar = (_loadedRiderAvatar != null && _loadedRiderAvatar!.isNotEmpty)
+        ? _loadedRiderAvatar
+        : (assignedDriver?.avatarUrl.isNotEmpty == true ? assignedDriver!.avatarUrl : null);
 
-    return _buildSectionContainer(
+    return _buildSectionCard(
       isDark: isDark,
-      title: '🛵 Custody Holder & Dispatch State',
-      icon: Icons.two_wheeler_rounded,
+      title: '🛵 Custody Holder & Courier Allocation',
+      icon: Icons.phone_android_rounded,
+      headerTrailing: Text(
+        'Zone: ${_currentOrder.deliveryCity}',
+        style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+      ),
       child: hasRider
-          ? LayoutBuilder(
-              builder: (context, constraints) {
-                final isNarrow = constraints.maxWidth < 460;
-                final riderInfo = Row(
-                  children: [
-                    UserAvatarWidget(
-                      avatarUrl: assignedDriver.avatarUrl,
-                      fullName: assignedDriver.name,
-                      radius: 20,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+          ? Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Circular Avatar with DP or Initials fallback
+                UserAvatarWidget(
+                  avatarUrl: riderAvatar,
+                  fullName: assignedDriver.name.isNotEmpty
+                      ? assignedDriver.name
+                      : (_currentOrder.deliveryAgentName ?? 'Rider'),
+                  radius: 20,
+                  backgroundColor: const Color(0xFFDBEAFE),
+                  textColor: const Color(0xFF2563EB),
+                  showBorder: true,
+                  borderColor: const Color(0xFFBFDBFE),
+                  borderWidth: 1.5,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
                         children: [
-                          Wrap(
-                            spacing: 6,
-                            runSpacing: 4,
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            children: [
-                              Text(
-                                assignedDriver.name,
-                                style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13.5),
+                          Flexible(
+                            child: Text(
+                              assignedDriver.name,
+                              style: GoogleFonts.inter(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13.5,
+                                color: isDark ? Colors.white : const Color(0xFF0F172A),
                               ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF2563EB).withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  assignedDriver.driverCode,
-                                  style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF10B981).withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  assignedDriver.isPda ? 'PDA Rider' : 'In-House Rider',
-                                  style: GoogleFonts.inter(fontSize: 9.5, fontWeight: FontWeight.bold, color: const Color(0xFF10B981)),
-                                ),
-                              ),
-                            ],
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${assignedDriver.vehicleModel} (${assignedDriver.vehiclePlate}) • Zone: ${assignedDriver.assignedZone}',
-                            style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
-                          ),
-                          Text(
-                            'Phone: ${assignedDriver.phone}',
-                            style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEFF6FF),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: const Color(0xFFBFDBFE)),
+                            ),
+                            child: Text(
+                              assignedDriver.driverCode,
+                              style: GoogleFonts.jetBrainsMono(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFF2563EB),
+                              ),
+                            ),
                           ),
                         ],
                       ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Motorbike: ${assignedDriver.vehiclePlate} • Ph: ${assignedDriver.phone}',
+                        style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                if (!_currentOrder.isDelivered && !_currentOrder.isCancelled)
+                  OutlinedButton.icon(
+                    onPressed: () => _openAssignModal(context),
+                    icon: const Icon(Icons.swap_horiz_rounded, size: 14),
+                    label: const Text('Reassign', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
-                  ],
-                );
-
-                final reassignBtn = OutlinedButton.icon(
-                  onPressed: () => _openAssignModal(context),
-                  icon: const Icon(Icons.swap_horiz_rounded, size: 14),
-                  label: const Text('Reassign Rider', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                );
-
-                if (isNarrow) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      riderInfo,
-                      if (!_currentOrder.isDelivered && !_currentOrder.isCancelled) ...[
-                        const SizedBox(height: 10),
-                        SizedBox(width: double.infinity, child: reassignBtn),
-                      ],
-                    ],
-                  );
-                }
-
-                return Row(
-                  children: [
-                    Expanded(child: riderInfo),
-                    if (!_currentOrder.isDelivered && !_currentOrder.isCancelled) ...[
-                      const SizedBox(width: 8),
-                      reassignBtn,
-                    ],
-                  ],
-                );
-              },
+                  ),
+              ],
             )
           : Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: const Color(0xFFF59E0B).withValues(alpha: isDark ? 0.15 : 0.08),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.3)),
               ),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final isNarrow = constraints.maxWidth < 440;
-                  final unassignedText = Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(Icons.info_outline_rounded, color: Color(0xFFD97706), size: 18),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'This order is currently unassigned in the DC pool and not held in any rider\'s vehicle.',
-                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500, color: const Color(0xFFD97706)),
-                        ),
-                      ),
-                    ],
-                  );
-
-                  final assignBtn = ElevatedButton.icon(
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline_rounded, color: Color(0xFFD97706), size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'This order is currently unassigned in the DC pool and not held in any rider\'s vehicle.',
+                      style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w500, color: const Color(0xFFD97706)),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
                     onPressed: () => _openAssignModal(context),
-                    icon: const Icon(Icons.person_add_alt_1_rounded, size: 14, color: Colors.white),
+                    icon: const Icon(Icons.person_add_alt_1_rounded, size: 13, color: Colors.white),
                     label: const Text('Assign Rider', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFF37021),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
-                  );
-
-                  if (isNarrow) {
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        unassignedText,
-                        const SizedBox(height: 10),
-                        SizedBox(width: double.infinity, child: assignBtn),
-                      ],
-                    );
-                  }
-
-                  return Row(
-                    children: [
-                      Expanded(child: unassignedText),
-                      const SizedBox(width: 10),
-                      assignBtn,
-                    ],
-                  );
-                },
+                  ),
+                ],
               ),
             ),
     );
   }
 
+  // Card 4: Financial Accounting & Remittance Reconciliation
   Widget _buildFinancialAndRemittanceSection(bool isDark, DCFleetDriver? assignedDriver) {
     final isUnassigned = _currentOrder.isUnassigned || assignedDriver == null;
 
-    // Dynamic Rider Terms: Unassigned = Pending; Assigned = Real contract rates
     final double dynamicCommission = isUnassigned
         ? 0.0
         : (_currentOrder.agentEntitlement > 0
@@ -924,263 +1268,151 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
             ? _currentOrder.totalAmount - dynamicCommission - dynamicTransport
             : 0.0);
 
-    return _buildSectionContainer(
+    return _buildSectionCard(
       isDark: isDark,
       title: '💰 Financial Accounting & Remittance Reconciliation',
-      icon: Icons.account_balance_wallet_rounded,
+      icon: Icons.calculate_outlined,
+      headerTrailing: Text(
+        'Automated Ledger Check',
+        style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF059669), fontWeight: FontWeight.w600),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+          // Row 1: Total Order Amount Collected (COD)
+          _buildFinanceRow(
+            '💰 Total Order Amount Collected:',
+            CurrencyFormatter.formatNaira(_currentOrder.totalAmount),
+            isDark,
+            isBold: true,
+          ),
+          const SizedBox(height: 6),
+
+          // Row 2: Less Rider Commission (Entitlement)
+          _buildFinanceRow(
+            '🛵 Less Rider Commission (Entitlement):',
+            isUnassigned ? 'Pending Assignment' : '- ${CurrencyFormatter.formatNaira(dynamicCommission)}',
+            isDark,
+            valueColor: const Color(0xFFDC2626),
+            subtitleWidget: Text(
+              isUnassigned
+                  ? 'Dynamic • Subject to assigned rider contract rate'
+                  : '(${CurrencyFormatter.formatNaira(dynamicCommission)} / drop)',
+              style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8)),
             ),
-            child: Column(
+          ),
+          const SizedBox(height: 6),
+
+          // Row 3: Less Logistics & Transport Allowance
+          _buildFinanceRow(
+            '🚚 Less Logistics & Transport Allowance:',
+            isUnassigned ? 'Pending Assignment' : '- ${CurrencyFormatter.formatNaira(dynamicTransport)}',
+            isDark,
+            valueColor: const Color(0xFFDC2626),
+            subtitleWidget: Text(
+              isUnassigned
+                  ? 'Dynamic • Subject to route transport agreement'
+                  : '(Hub flat rate)',
+              style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8)),
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // Highlighted Net Container
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0FDF4),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFBBF7D0)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                _buildFinanceRow(
-                  '💰 Total Order Amount Collected:',
-                  CurrencyFormatter.formatNaira(_currentOrder.totalAmount),
-                  isDark,
-                  isBold: true,
-                ),
-                const SizedBox(height: 8),
-                _buildFinanceRow(
-                  '🛵 Less Rider Commission (Entitlement):',
-                  isUnassigned
-                      ? 'Pending Rider Assignment'
-                      : '- ${CurrencyFormatter.formatNaira(dynamicCommission)}',
-                  isDark,
-                  valueColor: isUnassigned ? const Color(0xFF64748B) : const Color(0xFF8B5CF6),
-                  subtitleWidget: Text(
-                    isUnassigned
-                        ? 'Dynamic • Determined by assigned rider contract terms upon dispatch'
-                        : '${assignedDriver.isPda ? "PDA Dynamic Rate" : "In-House Fixed Rate"} @ ${CurrencyFormatter.formatNaira(dynamicCommission)} / drop',
-                    style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8)),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '🏢 Net Merchant Settlement Payable:',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF15803D),
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        'Disbursable after end-of-shift cash drop',
+                        style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF166534)),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 8),
-                _buildFinanceRow(
-                  '🚚 Less Logistics & Transport Allowance:',
-                  isUnassigned
-                      ? 'Pending Rider Assignment'
-                      : '- ${CurrencyFormatter.formatNaira(dynamicTransport)}',
-                  isDark,
-                  valueColor: isUnassigned ? const Color(0xFF64748B) : const Color(0xFF0284C7),
-                  subtitleWidget: Text(
-                    isUnassigned
-                        ? 'Dynamic • Subject to assigned rider transport agreement'
-                        : '${CurrencyFormatter.formatNaira(dynamicTransport)} route & vehicle transport allowance',
-                    style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8)),
-                  ),
-                ),
-                const Divider(height: 16),
-                _buildFinanceRow(
-                  '🏢 Net Merchant Settlement Payable:',
-                  isUnassigned
-                      ? '${CurrencyFormatter.formatNaira(netMerchantSettlement)} (Pre-Dispatch)'
-                      : CurrencyFormatter.formatNaira(netMerchantSettlement),
-                  isDark,
-                  isBold: true,
-                  valueColor: const Color(0xFF10B981),
-                  subtitleWidget: Text(
-                    isUnassigned
-                        ? 'Gross order amount (Rider commission & transport deducted upon dispatch)'
-                        : 'Net settlement payable to merchant after deducting rider commission & transport',
-                    style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF10B981).withValues(alpha: 0.85)),
+                const SizedBox(width: 8),
+                Text(
+                  CurrencyFormatter.formatNaira(netMerchantSettlement),
+                  style: GoogleFonts.inter(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF15803D),
                   ),
                 ),
               ],
             ),
           ),
-          if (isUnassigned) ...[
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0284C7).withValues(alpha: isDark ? 0.15 : 0.08),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.info_outline_rounded, size: 15, color: Color(0xFF0284C7)),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Dynamic Remittance Accounting: Rider commission and transport allowances are not fixed. They depend entirely on the specific rider assigned and will be finalized upon dispatch.',
-                      style: GoogleFonts.inter(fontSize: 10.5, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF0369A1), height: 1.3),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-          const SizedBox(height: 12),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final statusCol = Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Remittance Status', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
-                  const SizedBox(height: 2),
-                  Text(
-                    _currentOrder.isDirectTransfer
-                        ? '⚡ Settled via Paystack / Direct Transfer'
-                        : (_currentOrder.isRemitted
-                            ? '🟢 Reconciled & Cleared (Ref: ${_currentOrder.remittanceReference ?? "RMT-00402"})'
-                            : (_currentOrder.isDelivered
-                                ? '🟡 Cash held in Rider Custody (Unremitted)'
-                                : (_currentOrder.isUnassigned ? '🕒 Pre-Dispatch (Pending Rider)' : '🕒 In Transit / Pending Fulfillment'))),
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: _currentOrder.isRemitted
-                          ? const Color(0xFF10B981)
-                          : (_currentOrder.isUnremitted
-                              ? const Color(0xFFD97706)
-                              : const Color(0xFF0284C7)),
-                    ),
-                  ),
-                ],
-              );
 
-              if (!_currentOrder.isUnremitted) {
-                return statusCol;
-              }
-
-              final markBtn = ElevatedButton.icon(
-                onPressed: () => _markOrderAsRemitted(context),
-                icon: const Icon(Icons.check_circle_outline_rounded, size: 14, color: Colors.white),
-                label: const Text('Mark Remitted / Cleared', style: TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
-              );
-
-              if (constraints.maxWidth < 440) {
-                return Column(
+          const SizedBox(height: 10),
+          // Remittance Status indicator & Action
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    statusCol,
-                    const SizedBox(height: 8),
-                    SizedBox(width: double.infinity, child: markBtn),
+                    Text('Remittance Status', style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B))),
+                    Text(
+                      _currentOrder.isDirectTransfer
+                          ? '⚡ Paystack / Direct Transfer'
+                          : (_currentOrder.isRemitted
+                              ? '🟢 Cleared (Ref: ${_currentOrder.remittanceReference ?? "RMT-00402"})'
+                              : (_currentOrder.isDelivered
+                                  ? '🟡 Cash held in Custody'
+                                  : '🕒 In Transit / Pending Fulfillment')),
+                      style: GoogleFonts.inter(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                        color: _currentOrder.isRemitted ? const Color(0xFF10B981) : const Color(0xFFD97706),
+                      ),
+                    ),
                   ],
-                );
-              }
-
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(child: statusCol),
-                  const SizedBox(width: 8),
-                  markBtn,
-                ],
-              );
-            },
+                ),
+              ),
+              if (_currentOrder.isUnremitted) ...[
+                const SizedBox(width: 8),
+                ElevatedButton.icon(
+                  onPressed: () => _markOrderAsRemitted(context),
+                  icon: const Icon(Icons.check_circle_outline_rounded, size: 13, color: Colors.white),
+                  label: const Text('Mark Remitted / Cleared', style: TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF10B981),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+              ],
+            ],
           ),
         ],
       ),
     );
   }
 
-  Future<void> _captureOrUploadSignature() async {
-    final result = await SignaturePadModal.show(
-      context: context,
-      orderId: _currentOrder.id,
-      customerName: _currentOrder.customerName,
-    );
-
-    if (!mounted) return;
-
-    if (result != null && result.signatureUrl.isNotEmpty) {
-      final updatedOrder = _currentOrder.copyWith(
-        customerSignatureUrl: result.signatureUrl,
-        deliveryNotes: (_currentOrder.deliveryNotes != null && _currentOrder.deliveryNotes!.isNotEmpty)
-            ? '${_currentOrder.deliveryNotes} [SIGNATURE: ${result.signatureUrl}]'
-            : '[SIGNATURE: ${result.signatureUrl}]',
-      );
-      ref.read(ordersProvider.notifier).updateOrderInList(updatedOrder);
-
-      try {
-        final client = Supabase.instance.client;
-        final isUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(_currentOrder.id);
-        final updatePayload = {
-          'proof_of_delivery_url': result.signatureUrl,
-          'delivery_notes': updatedOrder.deliveryNotes,
-          'updated_at': DateTime.now().toIso8601String(),
-        };
-        if (isUuid) {
-          await client.from(SupabaseConstants.ordersTable).update(updatePayload).eq('id', _currentOrder.id);
-        } else {
-          await client.from(SupabaseConstants.ordersTable).update(updatePayload).eq('order_number', _currentOrder.orderNumber);
-        }
-      } catch (e) {
-        debugPrint('[DC_ORDER_DETAIL] ℹ️ Supabase signature update notice: $e');
-      }
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            backgroundColor: Color(0xFF16A34A),
-            content: Text('✓ Proof of Delivery signature attached successfully!'),
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _captureOrUploadPhotoProof() async {
-    try {
-      final result = await FilePickerPlatform.instance.pickFiles(
-        type: FileType.image,
-      );
-
-      if (result.isNotEmpty) {
-        final file = result.first;
-        final bytes = await file.readAsBytes();
-        if (bytes.isNotEmpty) {
-          final ext = file.extension?.toLowerCase() ?? 'jpg';
-          final base64String = base64Encode(bytes);
-          final dataUrl = 'data:image/$ext;base64,$base64String';
-
-          final updatedOrder = _currentOrder.copyWith(
-            photoProofUrl: dataUrl,
-          );
-          ref.read(ordersProvider.notifier).updateOrderInList(updatedOrder);
-
-          try {
-            final client = Supabase.instance.client;
-            final isUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(_currentOrder.id);
-            final updatePayload = {
-              'proof_photo_url': dataUrl,
-              'updated_at': DateTime.now().toIso8601String(),
-            };
-            if (isUuid) {
-              await client.from(SupabaseConstants.ordersTable).update(updatePayload).eq('id', _currentOrder.id);
-            } else {
-              await client.from(SupabaseConstants.ordersTable).update(updatePayload).eq('order_number', _currentOrder.orderNumber);
-            }
-          } catch (e) {
-            debugPrint('[DC_ORDER_DETAIL] ℹ️ Supabase photo update notice: $e');
-          }
-
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                backgroundColor: Color(0xFF16A34A),
-                content: Text('✓ Delivery photo proof attached successfully!'),
-              ),
-            );
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('[DC_ORDER_DETAIL] ⚠️ Photo upload error: $e');
-    }
-  }
-
+  // Digital Proof of Delivery Section
   Widget _buildProofOfDeliverySection(bool isDark) {
     String? sigUrl = _currentOrder.customerSignatureUrl;
     if ((sigUrl == null || sigUrl.isEmpty) && _currentOrder.deliveryNotes != null) {
@@ -1221,7 +1453,7 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
 
     final isCashAwaitingRemittance = _currentOrder.isDelivered && _currentOrder.isUnremitted && !_currentOrder.isDirectTransfer;
 
-    return _buildSectionContainer(
+    return _buildSectionCard(
       isDark: isDark,
       title: '📝 Digital Proof of Delivery (POD) & Verification Audit',
       icon: Icons.verified_rounded,
@@ -1272,319 +1504,12 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
 
           // 2. Customer Signature Record Card
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: hasSignature
-                    ? const Color(0xFF10B981).withValues(alpha: 0.4)
-                    : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
-                width: hasSignature ? 1.5 : 1,
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final isNarrow = constraints.maxWidth < 460;
-                    final headerLeft = Row(
-                      children: [
-                        Icon(
-                          hasSignature ? Icons.check_circle_rounded : Icons.pending_actions_rounded,
-                          size: 16,
-                          color: hasSignature ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
-                        ),
-                        const SizedBox(width: 6),
-                        Flexible(
-                          child: Text(
-                            hasSignature ? 'CUSTOMER SIGNATURE RECORD (VERIFIED)' : 'CUSTOMER SIGNATURE RECORD (PENDING)',
-                            style: GoogleFonts.jetBrainsMono(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: hasSignature ? const Color(0xFF10B981) : const Color(0xFFD97706),
-                              letterSpacing: 0.5,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    );
-
-                    final headerActions = Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (hasSignature)
-                          IconButton(
-                            icon: const Icon(Icons.fullscreen_rounded, size: 18),
-                            tooltip: 'View Full Signature',
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                            onPressed: () => _showFullSignaturePreview(context, sigUrl!, isDark),
-                          ),
-                        const SizedBox(width: 6),
-                        ElevatedButton.icon(
-                          onPressed: () => _captureOrUploadSignature(),
-                          icon: Icon(hasSignature ? Icons.edit_rounded : Icons.draw_rounded, size: 13),
-                          label: Text(hasSignature ? 'Update / Re-sign' : 'Capture Signature', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold)),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: hasSignature ? const Color(0xFF0284C7) : const Color(0xFF2563EB),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                        ),
-                      ],
-                    );
-
-                    if (isNarrow) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          headerLeft,
-                          const SizedBox(height: 6),
-                          headerActions,
-                        ],
-                      );
-                    }
-
-                    return Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(child: headerLeft),
-                        headerActions,
-                      ],
-                    );
-                  },
-                ),
-                const SizedBox(height: 8),
-                if (hasSignature) ...[
-                  Text(
-                    'Recipient: ${_currentOrder.customerName}',
-                    style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B)),
-                  ),
-                  const SizedBox(height: 6),
-                  GestureDetector(
-                    onTap: () => _showFullSignaturePreview(context, sigUrl!, isDark),
-                    child: Container(
-                      height: 120,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(7),
-                        child: sigBytes != null
-                            ? Image.memory(
-                                sigBytes,
-                                fit: BoxFit.contain,
-                                errorBuilder: (_, __, ___) => _buildSignatureFallback(),
-                              )
-                            : (sigUrl.startsWith('http://') || sigUrl.startsWith('https://')
-                                ? Image.network(
-                                    sigUrl,
-                                    fit: BoxFit.contain,
-                                    loadingBuilder: (ctx, child, progress) => progress == null
-                                        ? child
-                                        : const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                                    errorBuilder: (_, __, ___) => _buildSignatureFallback(),
-                                  )
-                                : _buildSignatureFallback()),
-                      ),
-                    ),
-                  ),
-                ] else ...[
-                  InkWell(
-                    onTap: () => _captureOrUploadSignature(),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
-                      alignment: Alignment.center,
-                      child: Column(
-                        children: [
-                          Icon(Icons.draw_rounded, size: 26, color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
-                          const SizedBox(height: 4),
-                          Text(
-                            'No digital signature on file for this order',
-                            style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w600, color: isDark ? Colors.white70 : const Color(0xFF334155)),
-                          ),
-                          Text(
-                            'Click to capture recipient signature on pad',
-                            style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // 3. Delivery Photo Proof / Waybill Snapshot Card
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: hasPhoto
-                    ? const Color(0xFF10B981).withValues(alpha: 0.4)
-                    : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
-                width: hasPhoto ? 1.5 : 1,
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final isNarrow = constraints.maxWidth < 460;
-                    final headerLeft = Row(
-                      children: [
-                        Icon(
-                          hasPhoto ? Icons.photo_camera_rounded : Icons.add_photo_alternate_outlined,
-                          size: 16,
-                          color: hasPhoto ? const Color(0xFF10B981) : const Color(0xFF0284C7),
-                        ),
-                        const SizedBox(width: 6),
-                        Flexible(
-                          child: Text(
-                            hasPhoto ? 'DELIVERY PHOTO / WAYBILL SNAPSHOT (ATTACHED)' : 'DELIVERY PHOTO / WAYBILL SNAPSHOT (OPTIONAL)',
-                            style: GoogleFonts.jetBrainsMono(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: hasPhoto ? const Color(0xFF10B981) : const Color(0xFF0284C7),
-                              letterSpacing: 0.5,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    );
-
-                    final headerActions = Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (hasPhoto)
-                          IconButton(
-                            icon: const Icon(Icons.fullscreen_rounded, size: 18),
-                            tooltip: 'View Full Photo',
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                            onPressed: () => _showFullPhotoPreview(context, photoUrl!, isDark),
-                          ),
-                        const SizedBox(width: 6),
-                        ElevatedButton.icon(
-                          onPressed: () => _captureOrUploadPhotoProof(),
-                          icon: Icon(hasPhoto ? Icons.photo_camera_rounded : Icons.upload_file_rounded, size: 13),
-                          label: Text(hasPhoto ? 'Replace Photo' : 'Attach Photo', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold)),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: hasPhoto ? const Color(0xFF0284C7) : const Color(0xFF10B981),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                        ),
-                      ],
-                    );
-
-                    if (isNarrow) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          headerLeft,
-                          const SizedBox(height: 6),
-                          headerActions,
-                        ],
-                      );
-                    }
-
-                    return Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(child: headerLeft),
-                        headerActions,
-                      ],
-                    );
-                  },
-                ),
-                const SizedBox(height: 8),
-                if (hasPhoto) ...[
-                  GestureDetector(
-                    onTap: () => _showFullPhotoPreview(context, photoUrl!, isDark),
-                    child: Container(
-                      height: 140,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(7),
-                        child: photoBytes != null
-                            ? Image.memory(
-                                photoBytes,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => _buildPhotoFallback(),
-                              )
-                            : (photoUrl.startsWith('http://') || photoUrl.startsWith('https://')
-                                ? Image.network(
-                                    photoUrl,
-                                    fit: BoxFit.cover,
-                                    loadingBuilder: (ctx, child, progress) => progress == null
-                                        ? child
-                                        : const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                                    errorBuilder: (_, __, ___) => _buildPhotoFallback(),
-                                  )
-                                : _buildPhotoFallback()),
-                      ),
-                    ),
-                  ),
-                ] else ...[
-                  InkWell(
-                    onTap: () => _captureOrUploadPhotoProof(),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
-                      alignment: Alignment.center,
-                      child: Column(
-                        children: [
-                          Icon(Icons.add_a_photo_outlined, size: 26, color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
-                          const SizedBox(height: 4),
-                          Text(
-                            'No parcel or waybill photo attached yet',
-                            style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w600, color: isDark ? Colors.white70 : const Color(0xFF334155)),
-                          ),
-                          Text(
-                            'Click to upload doorstep delivery snapshot or physical waybill',
-                            style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // 4. Physical GPS Telemetry & Doorstep Arrival Presence Record
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: _currentOrder.isLocationVerified
-                    ? const Color(0xFF10B981).withValues(alpha: 0.4)
-                    : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                color: hasSignature ? const Color(0xFF10B981) : const Color(0xFFE2E8F0),
               ),
             ),
             child: Column(
@@ -1594,68 +1519,181 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Expanded(
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.pin_drop_rounded,
-                            size: 16,
-                            color: _currentOrder.isLocationVerified
-                                ? const Color(0xFF10B981)
-                                : const Color(0xFF0284C7),
-                          ),
-                          const SizedBox(width: 6),
-                          Flexible(
-                            child: Text(
-                              'PHYSICAL PRESENCE GPS PROOF',
-                              style: GoogleFonts.jetBrainsMono(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: _currentOrder.isLocationVerified
-                                    ? const Color(0xFF10B981)
-                                    : const Color(0xFF0284C7),
-                                letterSpacing: 0.5,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
+                      child: Text(
+                        hasSignature ? 'CUSTOMER SIGNATURE RECORD (VERIFIED)' : 'CUSTOMER SIGNATURE RECORD (PENDING)',
+                        style: GoogleFonts.jetBrainsMono(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.bold,
+                          color: hasSignature ? const Color(0xFF10B981) : const Color(0xFFD97706),
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    if (_currentOrder.hasCoordinates)
-                      InkWell(
-                        onTap: () {
-                          MapLauncherHelper.launchTurnByTurnNavigation(
-                            context: context,
-                            latitude: _currentOrder.latitude,
-                            longitude: _currentOrder.longitude,
-                            destinationAddress: '${_currentOrder.deliveryAddress}, ${_currentOrder.deliveryCity}',
-                            customerName: _currentOrder.customerName,
-                          );
-                        },
-                        borderRadius: BorderRadius.circular(6),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF0284C7).withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.map_outlined, size: 12, color: Color(0xFF0284C7)),
-                              const SizedBox(width: 4),
-                              Text(
-                                'View on Map',
-                                style: GoogleFonts.inter(
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: const Color(0xFF0284C7),
-                                ),
-                              ),
-                            ],
+                    const SizedBox(width: 6),
+                    ElevatedButton.icon(
+                      onPressed: () => _captureOrUploadSignature(),
+                      icon: Icon(hasSignature ? Icons.edit_rounded : Icons.draw_rounded, size: 12),
+                      label: Text(hasSignature ? 'Update / Re-sign' : 'Capture Signature', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2563EB),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                if (hasSignature) ...[
+                  Text(
+                    'Recipient: ${_currentOrder.customerName}',
+                    style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B)),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    height: 90,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(5),
+                      child: sigBytes != null
+                          ? Image.memory(sigBytes, fit: BoxFit.contain, errorBuilder: (_, __, ___) => _buildSignatureFallback())
+                          : (sigUrl.startsWith('http')
+                              ? Image.network(sigUrl, fit: BoxFit.contain, errorBuilder: (_, __, ___) => _buildSignatureFallback())
+                              : _buildSignatureFallback()),
+                    ),
+                  ),
+                ] else ...[
+                  InkWell(
+                    onTap: () => _captureOrUploadSignature(),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      alignment: Alignment.center,
+                      child: Text('Click to capture customer signature', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // 3. Photo Proof / Waybill Snapshot Card
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: hasPhoto ? const Color(0xFF10B981) : const Color(0xFFE2E8F0),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        hasPhoto ? 'DELIVERY PHOTO / WAYBILL SNAPSHOT (ATTACHED)' : 'DELIVERY PHOTO / WAYBILL SNAPSHOT (OPTIONAL)',
+                        style: GoogleFonts.jetBrainsMono(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.bold,
+                          color: hasPhoto ? const Color(0xFF10B981) : const Color(0xFF0284C7),
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    ElevatedButton.icon(
+                      onPressed: () => _captureOrUploadPhotoProof(),
+                      icon: const Icon(Icons.upload_file_rounded, size: 12),
+                      label: Text(hasPhoto ? 'Replace' : 'Attach', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0284C7),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                if (hasPhoto) ...[
+                  Container(
+                    height: 100,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(5),
+                      child: photoBytes != null
+                          ? Image.memory(photoBytes, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _buildPhotoFallback())
+                          : (photoUrl.startsWith('http')
+                              ? Image.network(photoUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _buildPhotoFallback())
+                              : _buildPhotoFallback()),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // 4. Physical GPS Telemetry & Doorstep Arrival Presence Record
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: _currentOrder.isLocationVerified ? const Color(0xFF10B981) : const Color(0xFFE2E8F0),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.pin_drop_rounded,
+                          size: 15,
+                          color: _currentOrder.isLocationVerified ? const Color(0xFF10B981) : const Color(0xFF0284C7),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'PHYSICAL PRESENCE GPS PROOF',
+                          style: GoogleFonts.jetBrainsMono(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.bold,
+                            color: _currentOrder.isLocationVerified ? const Color(0xFF10B981) : const Color(0xFF0284C7),
                           ),
                         ),
+                      ],
+                    ),
+                    if (_currentOrder.hasCoordinates)
+                      InkWell(
+                        onTap: () => MapLauncherHelper.launchTurnByTurnNavigation(
+                          context: context,
+                          latitude: _currentOrder.latitude,
+                          longitude: _currentOrder.longitude,
+                          destinationAddress: '${_currentOrder.deliveryAddress}, ${_currentOrder.deliveryCity}',
+                          customerName: _currentOrder.customerName,
+                        ),
+                        child: Text('View on Map', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF0284C7), fontWeight: FontWeight.bold)),
                       ),
                   ],
                 ),
@@ -1691,167 +1729,110 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
     );
   }
 
-  Widget _buildPhotoFallback() {
-    return Center(
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+  // Failure reason alert banner
+  Widget _buildFailureAlertBanner(bool isDark) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEF2F2),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFFCA5A5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.photo_library_rounded, color: Color(0xFF10B981), size: 16),
-          const SizedBox(width: 6),
-          Text('Delivery Photo Attached', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
+          Row(
+            children: [
+              const Icon(Icons.error_outline_rounded, color: Color(0xFFDC2626), size: 18),
+              const SizedBox(width: 8),
+              Text(
+                'Delivery Failed / Rescheduled Ticket',
+                style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFFDC2626)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Logged Reason: ${_currentOrder.failureReason ?? "Customer unreachable / phone switched off"}',
+            style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF7F1D1D)),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildSignatureFallback() {
-    return Center(
+  // Sticky Bottom Action Bar
+  Widget _buildFooterActions(BuildContext context, bool isDark, DCFleetDriver? assignedDriver, List<DCFleetDriver> allDrivers) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        border: Border(
+          top: BorderSide(
+            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+            width: 1,
+          ),
+        ),
+      ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.verified_rounded, color: Color(0xFF10B981), size: 16),
-          const SizedBox(width: 6),
-          Text('Digital Signature Attached', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
+          // Left: Outlined Print Manifest / Waybill
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: () => _printWaybillManifest(context),
+              icon: const Icon(Icons.print_outlined, size: 16),
+              label: const Text(
+                'Print Manifest / Waybill',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                side: BorderSide(color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          // Right: Primary Action Button (Dispatch, Assign, or Confirm Status)
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: () {
+                if (_currentOrder.isUnassigned) {
+                  _openAssignModal(context);
+                } else {
+                  _printWaybillManifest(context);
+                }
+              },
+              icon: Icon(
+                _currentOrder.isUnassigned ? Icons.person_add_alt_1_rounded : Icons.check_circle_outline_rounded,
+                size: 16,
+                color: Colors.white,
+              ),
+              label: Text(
+                _currentOrder.isUnassigned ? 'Dispatch / Assign Rider' : 'Confirm Status / Dispatch',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _currentOrder.isUnassigned ? const Color(0xFFF37021) : const Color(0xFF2563EB),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                elevation: 0,
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  void _showFullPhotoPreview(BuildContext context, String photoUrl, bool isDark) {
-    Uint8List? bytes;
-    if (photoUrl.startsWith('data:image')) {
-      try {
-        final commaIdx = photoUrl.indexOf(',');
-        if (commaIdx != -1) bytes = base64Decode(photoUrl.substring(commaIdx + 1));
-      } catch (_) {}
-    }
-
-    showDialog(
-      context: context,
-      builder: (ctx) => Dialog(
-        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 700, maxHeight: 600),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Proof of Delivery (POD) Photo / Waybill', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16), overflow: TextOverflow.ellipsis),
-                          Text('Order #${_currentOrder.orderNumber} • ${_currentOrder.customerName}', style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)), overflow: TextOverflow.ellipsis),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close_rounded)),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Expanded(
-                  child: Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFCBD5E1)),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(11),
-                      child: bytes != null
-                          ? Image.memory(bytes, fit: BoxFit.contain)
-                          : (photoUrl.startsWith('http://') || photoUrl.startsWith('https://')
-                              ? Image.network(photoUrl, fit: BoxFit.contain)
-                              : _buildPhotoFallback()),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showFullSignaturePreview(BuildContext context, String sigUrl, bool isDark) {
-    Uint8List? bytes;
-    if (sigUrl.startsWith('data:image')) {
-      try {
-        final commaIdx = sigUrl.indexOf(',');
-        if (commaIdx != -1) bytes = base64Decode(sigUrl.substring(commaIdx + 1));
-      } catch (_) {}
-    }
-
-    showDialog(
-      context: context,
-      builder: (ctx) => Dialog(
-        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 600, maxHeight: 500),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Proof of Delivery (POD) Signature', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16), overflow: TextOverflow.ellipsis),
-                          Text('Order #${_currentOrder.orderNumber} • ${_currentOrder.customerName}', style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)), overflow: TextOverflow.ellipsis),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close_rounded)),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Expanded(
-                  child: Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFCBD5E1)),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(11),
-                      child: bytes != null
-                          ? Image.memory(bytes, fit: BoxFit.contain)
-                          : (sigUrl.startsWith('http://') || sigUrl.startsWith('https://')
-                              ? Image.network(sigUrl, fit: BoxFit.contain)
-                              : _buildSignatureFallback()),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSectionContainer({
+  // Section Card Container Helper
+  Widget _buildSectionCard({
     required bool isDark,
     required String title,
     required IconData icon,
     required Widget child,
+    Widget? headerTrailing,
   }) {
     return Container(
       width: double.infinity,
@@ -1859,7 +1840,9 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1871,10 +1854,15 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
               Expanded(
                 child: Text(
                   title,
-                  style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13),
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
+              if (headerTrailing != null) headerTrailing,
             ],
           ),
           const SizedBox(height: 12),
@@ -1884,69 +1872,36 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
     );
   }
 
-  Widget _buildMiniStat(String label, String value, Color color, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: isDark ? 0.12 : 0.06),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: GoogleFonts.inter(fontSize: 9.5, color: const Color(0xFF64748B))),
-          const SizedBox(height: 2),
-          Text(value, style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: color), maxLines: 1, overflow: TextOverflow.ellipsis),
-        ],
-      ),
-    );
-  }
-
   Widget _buildInfoRow(String label, String value, bool isDark, {Color? valueColor}) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isNarrow = constraints.maxWidth < 360;
-        if (isNarrow) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                style: GoogleFonts.inter(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                  color: valueColor ?? (isDark ? Colors.white : const Color(0xFF0F172A)),
-                ),
-              ),
-            ],
-          );
-        }
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: 140,
-              child: Text(label, style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B))),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 140,
+          child: Text(label, style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B))),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: GoogleFonts.inter(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+              color: valueColor ?? (isDark ? Colors.white : const Color(0xFF0F172A)),
             ),
-            Expanded(
-              child: Text(
-                value,
-                style: GoogleFonts.inter(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                  color: valueColor ?? (isDark ? Colors.white : const Color(0xFF0F172A)),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildFinanceRow(String label, String value, bool isDark, {Color? valueColor, bool isBold = false, Widget? subtitleWidget}) {
+  Widget _buildFinanceRow(
+    String label,
+    String value,
+    bool isDark, {
+    Color? valueColor,
+    bool isBold = false,
+    Widget? subtitleWidget,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1976,77 +1931,126 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
           ],
         ),
         if (subtitleWidget != null) ...[
-          const SizedBox(height: 2),
+          const SizedBox(height: 1),
           subtitleWidget,
         ],
       ],
     );
   }
 
-  Widget _buildFooterActions(BuildContext context, bool isDark, DCFleetDriver? assignedDriver, List<DCFleetDriver> allDrivers) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
-        border: Border(top: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final isNarrow = constraints.maxWidth < 400;
-
-          final closeBtn = TextButton.icon(
-            onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.close_rounded, size: 16),
-            label: const Text('Close'),
-          );
-
-          final actionBtn = _currentOrder.isUnassigned
-              ? ElevatedButton.icon(
-                  onPressed: () => _openAssignModal(context),
-                  icon: const Icon(Icons.person_add_alt_1_rounded, size: 15, color: Colors.white),
-                  label: const Text('Dispatch / Assign Rider', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFF37021),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                )
-              : (!_currentOrder.isDelivered && !_currentOrder.isCancelled
-                  ? OutlinedButton.icon(
-                      onPressed: () => _openAssignModal(context),
-                      icon: const Icon(Icons.swap_horiz_rounded, size: 15),
-                      label: const Text('Reassign Rider', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                    )
-                  : null);
-
-          if (isNarrow) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (actionBtn != null) ...[
-                  actionBtn,
-                  const SizedBox(height: 6),
-                ],
-                closeBtn,
-              ],
-            );
-          }
-
-          return Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              closeBtn,
-              if (actionBtn != null) actionBtn,
-            ],
-          );
-        },
+  Widget _buildSignatureFallback() {
+    return Center(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.verified_rounded, color: Color(0xFF10B981), size: 16),
+          const SizedBox(width: 6),
+          Text('Digital Signature Attached', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
+        ],
       ),
     );
+  }
+
+  Widget _buildPhotoFallback() {
+    return Center(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.photo_rounded, color: Color(0xFF2563EB), size: 16),
+          const SizedBox(width: 6),
+          Text('Delivery Photo Attached', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _captureOrUploadSignature() async {
+    final result = await SignaturePadModal.show(
+      context: context,
+      orderId: _currentOrder.id,
+      customerName: _currentOrder.customerName,
+    );
+
+    if (!mounted || result == null || result.signatureUrl.isEmpty) return;
+
+    final updatedOrder = _currentOrder.copyWith(
+      customerSignatureUrl: result.signatureUrl,
+      deliveryNotes: (_currentOrder.deliveryNotes != null && _currentOrder.deliveryNotes!.isNotEmpty)
+          ? '${_currentOrder.deliveryNotes} [SIGNATURE: ${result.signatureUrl}]'
+          : '[SIGNATURE: ${result.signatureUrl}]',
+    );
+    ref.read(ordersProvider.notifier).updateOrderInList(updatedOrder);
+
+    try {
+      final client = Supabase.instance.client;
+      final isUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(_currentOrder.id);
+      final updatePayload = {
+        'proof_of_delivery_url': result.signatureUrl,
+        'delivery_notes': updatedOrder.deliveryNotes,
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+      if (isUuid) {
+        await client.from(SupabaseConstants.ordersTable).update(updatePayload).eq('id', _currentOrder.id);
+      } else {
+        await client.from(SupabaseConstants.ordersTable).update(updatePayload).eq('order_number', _currentOrder.orderNumber);
+      }
+    } catch (e) {
+      debugPrint('[DC_ORDER_DETAIL] ℹ️ Supabase signature update notice: $e');
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Color(0xFF16A34A),
+          content: Text('✓ Proof of Delivery signature attached successfully!'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _captureOrUploadPhotoProof() async {
+    try {
+      final result = await FilePickerPlatform.instance.pickFiles(type: FileType.image);
+      if (result.isNotEmpty) {
+        final file = result.first;
+        final bytes = await file.readAsBytes();
+        if (bytes.isNotEmpty) {
+          final ext = file.extension?.toLowerCase() ?? 'jpg';
+          final base64String = base64Encode(bytes);
+          final dataUrl = 'data:image/$ext;base64,$base64String';
+
+          final updatedOrder = _currentOrder.copyWith(photoProofUrl: dataUrl);
+          ref.read(ordersProvider.notifier).updateOrderInList(updatedOrder);
+
+          try {
+            final client = Supabase.instance.client;
+            final isUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(_currentOrder.id);
+            final updatePayload = {
+              'proof_photo_url': dataUrl,
+              'updated_at': DateTime.now().toIso8601String(),
+            };
+            if (isUuid) {
+              await client.from(SupabaseConstants.ordersTable).update(updatePayload).eq('id', _currentOrder.id);
+            } else {
+              await client.from(SupabaseConstants.ordersTable).update(updatePayload).eq('order_number', _currentOrder.orderNumber);
+            }
+          } catch (e) {
+            debugPrint('[DC_ORDER_DETAIL] ℹ️ Supabase photo update notice: $e');
+          }
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                backgroundColor: Color(0xFF16A34A),
+                content: Text('✓ Delivery photo proof attached successfully!'),
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[DC_ORDER_DETAIL] ⚠️ Photo upload error: $e');
+    }
   }
 
   Future<void> _openAssignModal(BuildContext context) async {

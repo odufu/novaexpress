@@ -4,16 +4,19 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/theme_provider.dart';
+import '../../../../core/widgets/payout_receipt_preview_dialog.dart';
 import '../../../../core/widgets/product_image_widget.dart';
 import '../../../dc_console/presentation/providers/dc_console_provider.dart';
 import '../../../dc_console/presentation/providers/product_catalog_provider.dart';
 import 'client_order_tracking_modal.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../../domain/entities/client_closer.dart';
+import '../../domain/entities/client_closer_payout.dart';
 import '../../domain/entities/customer_lead.dart';
 import '../providers/client_portal_provider.dart';
 import 'client_closer_credentials_modal.dart';
 import 'client_convert_lead_modal.dart';
+import 'client_disburse_closer_payout_modal.dart';
 
 class ClientCloserDetailModal extends ConsumerStatefulWidget {
   final ClientCloser closer;
@@ -210,109 +213,259 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
     final emailCtrl = TextEditingController(text: _currentCloser.email);
     final commCtrl = TextEditingController(text: _currentCloser.commissionRate.toStringAsFixed(0));
     final targetCtrl = TextEditingController(text: _currentCloser.dailyCallTarget.toString());
+    final bankNameCtrl = TextEditingController(text: _currentCloser.bankName);
+    final accountNumCtrl = TextEditingController(text: _currentCloser.accountNumber);
+    final accountNameCtrl = TextEditingController(text: _currentCloser.accountName);
+    bool isCommissionEnabled = _currentCloser.isCommissionEnabled;
     final formKey = GlobalKey<FormState>();
+
+    final banks = ['OPay', 'Moniepoint', 'Kuda Bank', 'GTBank', 'Access Bank', 'Zenith Bank', 'First Bank'];
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Edit Employee Profile', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
-        content: Form(
-          key: formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: nameCtrl,
-                  decoration: const InputDecoration(labelText: 'Full Name', prefixIcon: Icon(Icons.person_outline_rounded, size: 18)),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Name is required' : null,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF37021).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: phoneCtrl,
-                  decoration: const InputDecoration(labelText: 'Phone Number', prefixIcon: Icon(Icons.phone_outlined, size: 18)),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Phone required' : null,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: emailCtrl,
-                  decoration: const InputDecoration(labelText: 'Email Address', prefixIcon: Icon(Icons.email_outlined, size: 18)),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Email required' : null,
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: commCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: 'Commission (₦/order)', prefixIcon: Icon(Icons.payments_outlined, size: 18)),
-                        validator: (v) => (v == null || double.tryParse(v) == null) ? 'Invalid amount' : null,
+                child: const Icon(Icons.badge_rounded, color: Color(0xFFF37021), size: 20),
+              ),
+              const SizedBox(width: 10),
+              Text('Edit Employee Profile', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
+            ],
+          ),
+          content: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextFormField(
+                    controller: nameCtrl,
+                    decoration: const InputDecoration(labelText: 'Full Legal Name', prefixIcon: Icon(Icons.person_outline_rounded, size: 18)),
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Name is required' : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: phoneCtrl,
+                    decoration: const InputDecoration(labelText: 'Phone Number', prefixIcon: Icon(Icons.phone_outlined, size: 18)),
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Phone required' : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: emailCtrl,
+                    decoration: const InputDecoration(labelText: 'Email Address', prefixIcon: Icon(Icons.email_outlined, size: 18)),
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Email required' : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: targetCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Daily Outbound Call Target', prefixIcon: Icon(Icons.phone_callback_rounded, size: 18)),
+                    validator: (v) => (v == null || int.tryParse(v) == null) ? 'Invalid target' : null,
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Commission & Payout Toggle Card
+                  Container(
+                    decoration: BoxDecoration(
+                      color: isCommissionEnabled
+                          ? const Color(0xFF10B981).withValues(alpha: 0.08)
+                          : const Color(0xFF64748B).withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isCommissionEnabled
+                            ? const Color(0xFF10B981).withValues(alpha: 0.3)
+                            : const Color(0xFF64748B).withValues(alpha: 0.2),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextFormField(
-                        controller: targetCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: 'Daily Call Target', prefixIcon: Icon(Icons.phone_callback_rounded, size: 18)),
-                        validator: (v) => (v == null || int.tryParse(v) == null) ? 'Invalid target' : null,
+                    child: SwitchListTile(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      value: isCommissionEnabled,
+                      activeColor: const Color(0xFF10B981),
+                      title: Text(
+                        'Enable Commission & Payouts',
+                        style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      subtitle: Text(
+                        isCommissionEnabled
+                            ? 'Closer earns per-order delivery commission and can request payouts.'
+                            : 'Closer is on fixed salary / exempt. Commissions and payout ledger hidden.',
+                        style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                      ),
+                      onChanged: (val) => setDialogState(() => isCommissionEnabled = val),
+                    ),
+                  ),
+
+                  if (isCommissionEnabled) ...[
+                    const SizedBox(height: 14),
+                    TextFormField(
+                      controller: commCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Commission per Delivered Order (₦)',
+                        prefixIcon: Icon(Icons.payments_outlined, size: 18),
+                      ),
+                      validator: (v) => (isCommissionEnabled && (v == null || double.tryParse(v) == null))
+                          ? 'Enter valid commission'
+                          : null,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'CLOSER BANK PAYOUT DETAILS',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFFF37021),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Quick Bank Chips
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: banks.map((bank) {
+                          final selected = bankNameCtrl.text.trim().toLowerCase() == bank.toLowerCase();
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: FilterChip(
+                              label: Text(bank, style: GoogleFonts.inter(fontSize: 11)),
+                              selected: selected,
+                              onSelected: (_) => setDialogState(() => bankNameCtrl.text = bank),
+                              selectedColor: const Color(0xFFF37021).withValues(alpha: 0.2),
+                              checkmarkColor: const Color(0xFFF37021),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+
+                    TextFormField(
+                      controller: bankNameCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Bank Name',
+                        prefixIcon: Icon(Icons.account_balance_outlined, size: 18),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: TextFormField(
+                            controller: accountNumCtrl,
+                            keyboardType: TextInputType.number,
+                            maxLength: 10,
+                            decoration: const InputDecoration(
+                              labelText: 'Account Number',
+                              counterText: '',
+                              prefixIcon: Icon(Icons.pin_outlined, size: 18),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          flex: 4,
+                          child: TextFormField(
+                            controller: accountNameCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Account Name',
+                              prefixIcon: Icon(Icons.badge_outlined, size: 18),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ] else ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF3B82F6).withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFF3B82F6).withValues(alpha: 0.2)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.info_outline_rounded, color: Color(0xFF3B82F6), size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'When commission is disabled, this closer will not see commissions on their mobile portal and cannot submit payout claims.',
+                              style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF475569)),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
-                ),
-              ],
+                ],
+              ),
             ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text('Cancel', style: GoogleFonts.inter(color: const Color(0xFF64748B))),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFF37021),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () async {
+                if (!formKey.currentState!.validate()) return;
+                final messenger = ScaffoldMessenger.of(context);
+                Navigator.of(ctx).pop();
+
+                try {
+                  final updated = await ref.read(clientPortalProvider.notifier).updateCloserDetails(
+                    closerId: _currentCloser.id,
+                    fullName: nameCtrl.text.trim(),
+                    phone: phoneCtrl.text.trim(),
+                    email: emailCtrl.text.trim(),
+                    commissionRate: isCommissionEnabled ? (double.tryParse(commCtrl.text.trim()) ?? _currentCloser.commissionRate) : 0.0,
+                    dailyCallTarget: int.tryParse(targetCtrl.text.trim()) ?? _currentCloser.dailyCallTarget,
+                    isCommissionEnabled: isCommissionEnabled,
+                    bankName: isCommissionEnabled ? (bankNameCtrl.text.trim().isNotEmpty ? bankNameCtrl.text.trim() : null) : null,
+                    accountNumber: isCommissionEnabled ? (accountNumCtrl.text.trim().isNotEmpty ? accountNumCtrl.text.trim() : null) : null,
+                    accountName: isCommissionEnabled ? (accountNameCtrl.text.trim().isNotEmpty ? accountNameCtrl.text.trim() : null) : null,
+                  );
+
+                  setState(() => _currentCloser = updated);
+
+                  if (mounted) {
+                    messenger.showSnackBar(
+                      SnackBar(
+                        backgroundColor: const Color(0xFF10B981),
+                        content: Text('Employee profile updated for ${updated.fullName}!'),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    messenger.showSnackBar(
+                      SnackBar(backgroundColor: const Color(0xFFEF4444), content: Text('Update failed: $e')),
+                    );
+                  }
+                }
+              },
+              child: Text('Save Changes', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text('Cancel', style: GoogleFonts.inter(color: const Color(0xFF64748B))),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFF37021),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            onPressed: () async {
-              if (!formKey.currentState!.validate()) return;
-              final messenger = ScaffoldMessenger.of(context);
-              Navigator.of(ctx).pop();
-
-              try {
-                final updated = await ref.read(clientPortalProvider.notifier).updateCloserDetails(
-                  closerId: _currentCloser.id,
-                  fullName: nameCtrl.text.trim(),
-                  phone: phoneCtrl.text.trim(),
-                  email: emailCtrl.text.trim(),
-                  commissionRate: double.tryParse(commCtrl.text.trim()) ?? _currentCloser.commissionRate,
-                  dailyCallTarget: int.tryParse(targetCtrl.text.trim()) ?? _currentCloser.dailyCallTarget,
-                );
-
-                setState(() => _currentCloser = updated);
-
-                if (mounted) {
-                  messenger.showSnackBar(
-                    SnackBar(
-                      backgroundColor: const Color(0xFF10B981),
-                      content: Text('Employee profile updated for ${updated.fullName}!'),
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  messenger.showSnackBar(
-                    SnackBar(backgroundColor: const Color(0xFFEF4444), content: Text('Update failed: $e')),
-                  );
-                }
-              }
-            },
-            child: Text('Save Changes', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
-          ),
-        ],
       ),
     );
   }
@@ -519,13 +672,13 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
                       ],
                     ),
                   ),
-                  const Tab(
+                  Tab(
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.analytics_outlined, size: 16),
-                        SizedBox(width: 6),
-                        Text('Commissions & Performance'),
+                        Icon(_currentCloser.isCommissionEnabled ? Icons.payments_outlined : Icons.analytics_outlined, size: 16),
+                        const SizedBox(width: 6),
+                        Text(_currentCloser.isCommissionEnabled ? 'Commissions & Payouts' : 'Performance & Delivery'),
                       ],
                     ),
                   ),
@@ -872,10 +1025,10 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
                 isDark: isDark,
               ),
               _buildKpiCard(
-                title: 'Commission Earned',
-                value: currencyFormatter.format(totalCommission),
-                icon: Icons.payments_outlined,
-                iconColor: const Color(0xFF8B5CF6),
+                title: _currentCloser.isCommissionEnabled ? 'Commission Earned' : 'Compensation',
+                value: _currentCloser.isCommissionEnabled ? currencyFormatter.format(totalCommission) : 'Salary / Exempt',
+                icon: _currentCloser.isCommissionEnabled ? Icons.payments_outlined : Icons.shield_outlined,
+                iconColor: _currentCloser.isCommissionEnabled ? const Color(0xFF8B5CF6) : const Color(0xFF64748B),
                 isDark: isDark,
               ),
               _buildKpiCard(
@@ -1473,7 +1626,35 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
                   isDark,
                 ),
                 _buildDivider(isDark),
-                _buildDetailRow('Commission per Converted Order', currencyFormatter.format(_currentCloser.commissionRate), isDark),
+                _buildDetailRow(
+                  'Compensation Model',
+                  _currentCloser.isCommissionEnabled
+                      ? 'Commission: ${currencyFormatter.format(_currentCloser.commissionRate)} per Delivery'
+                      : 'Fixed Salary / Non-Commission Agent',
+                  isDark,
+                ),
+                if (_currentCloser.isCommissionEnabled) ...[
+                  _buildDivider(isDark),
+                  _buildDetailRow(
+                    'Disbursement Bank',
+                    _currentCloser.hasBankDetails
+                        ? '${_currentCloser.bankName} • ${_currentCloser.accountNumber} (${_currentCloser.accountName})'
+                        : 'Not Configured (Cash/Internal)',
+                    isDark,
+                  ),
+                  _buildDivider(isDark),
+                  _buildDetailRow(
+                    'Unpaid Commission Balance',
+                    currencyFormatter.format(_currentCloser.unpaidCommissionBalance),
+                    isDark,
+                  ),
+                  _buildDivider(isDark),
+                  _buildDetailRow(
+                    'Total Paid Out',
+                    currencyFormatter.format(_currentCloser.totalPaidCommission),
+                    isDark,
+                  ),
+                ],
                 _buildDivider(isDark),
                 _buildDetailRow('Daily Outbound Call Target', '${_currentCloser.dailyCallTarget} Calls / Day', isDark),
                 _buildDivider(isDark),
@@ -1545,60 +1726,294 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
     final deliveredOrders = orders.where((o) => o.isDelivered).toList();
     final inTransitOrders = orders.where((o) => o.status.toLowerCase() == 'in_transit').toList();
     final pendingOrders = orders.where((o) => o.status.toLowerCase().contains('pending')).toList();
+    final List<ClientCloserPayout> closerPayouts = ref.watch(clientPortalProvider).closerPayouts.where((p) => p.closerId == _currentCloser.id).toList();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'COMMISSION EARNINGS & PAYOUT BREAKDOWN',
-            style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w800, color: const Color(0xFFF37021), letterSpacing: 0.5),
-          ),
-          const SizedBox(height: 12),
-
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: isDark ? [const Color(0xFF1E294A), const Color(0xFF0F172A)] : [const Color(0xFFEFF6FF), Colors.white],
+          if (!_currentCloser.isCommissionEnabled) ...[
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E294B) : const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFBFDBFE)),
               ),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFBFDBFE)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF10B981).withValues(alpha: 0.15),
-                    shape: BoxShape.circle,
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF3B82F6).withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.shield_outlined, color: Color(0xFF3B82F6), size: 28),
                   ),
-                  child: const Icon(Icons.paid_rounded, color: Color(0xFF10B981), size: 28),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Salary Employee (Non-Commission)',
+                          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF1E3A8A)),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Per-order commission tracking and payout requests are disabled for ${_currentCloser.fullName}. Delivery performance and sales conversion are tracked below for operational management.',
+                          style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+          ] else ...[
+            Text(
+              'COMMISSION EARNINGS & DISBURSEMENT LEDGER',
+              style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w800, color: const Color(0xFFF37021), letterSpacing: 0.5),
+            ),
+            const SizedBox(height: 12),
+
+            // Commission Summary Cards (Earned, Unpaid Balance, Settled)
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isWide = constraints.maxWidth >= 600;
+                final c1 = _buildStatusMetricCard(
+                  'Total Earned Commission',
+                  currencyFormatter.format(totalCommission),
+                  const Color(0xFF10B981),
+                  isDark,
+                );
+                final c2 = _buildStatusMetricCard(
+                  'Unpaid Balance Due',
+                  currencyFormatter.format(_currentCloser.unpaidCommissionBalance),
+                  const Color(0xFFF59E0B),
+                  isDark,
+                );
+                final c3 = _buildStatusMetricCard(
+                  'Total Settled Payouts',
+                  currencyFormatter.format(_currentCloser.totalPaidCommission),
+                  const Color(0xFF3B82F6),
+                  isDark,
+                );
+
+                if (isWide) {
+                  return Row(
                     children: [
-                      Text('Total Earned Commission', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-                      const SizedBox(height: 2),
+                      Expanded(child: c1),
+                      const SizedBox(width: 10),
+                      Expanded(child: c2),
+                      const SizedBox(width: 10),
+                      Expanded(child: c3),
+                    ],
+                  );
+                }
+                return Column(
+                  children: [
+                    c1,
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(child: c2),
+                        const SizedBox(width: 10),
+                        Expanded(child: c3),
+                      ],
+                    ),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Disburse Payout Action Button
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF10B981),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  elevation: 0,
+                ),
+                onPressed: () async {
+                  await ClientDisburseCloserPayoutModal.show(context, closer: _currentCloser);
+                  final updated = ref.read(clientPortalProvider).closers.firstWhere(
+                    (c) => c.id == _currentCloser.id,
+                    orElse: () => _currentCloser,
+                  );
+                  setState(() => _currentCloser = updated);
+                },
+                icon: const Icon(Icons.payments_rounded, size: 18),
+                label: Text(
+                  'Disburse Payout & Share Receipt Proof',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Closer Payouts History Ledger
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'PAYOUT SETTLEMENT HISTORY (${closerPayouts.length})',
+                  style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w800, color: const Color(0xFFF37021), letterSpacing: 0.5),
+                ),
+                if (_currentCloser.hasBankDetails)
+                  Text(
+                    '${_currentCloser.bankName} • ${_currentCloser.accountNumber}',
+                    style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B), fontWeight: FontWeight.w600),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+
+            if (closerPayouts.isEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0B1021) : const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
+                ),
+                child: Center(
+                  child: Column(
+                    children: [
+                      const Icon(Icons.receipt_long_outlined, size: 36, color: Color(0xFF94A3B8)),
+                      const SizedBox(height: 8),
                       Text(
-                        currencyFormatter.format(totalCommission),
-                        style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w800, color: const Color(0xFF10B981)),
+                        'No payout disbursements on record yet.',
+                        style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF64748B)),
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 4),
                       Text(
-                        '${deliveredOrders.length} Delivered Orders × ${currencyFormatter.format(_currentCloser.commissionRate)} Commission per Delivery',
+                        'Tap "Disburse Payout" above to record transfers and attach bank receipts.',
                         style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
                       ),
                     ],
                   ),
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
+              )
+            else
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: closerPayouts.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                itemBuilder: (context, index) {
+                  final p = closerPayouts[index];
+                  Color statusColor;
+                  String statusLabel;
+                  switch (p.status.toLowerCase()) {
+                    case 'confirmed':
+                      statusColor = const Color(0xFF10B981);
+                      statusLabel = 'CONFIRMED';
+                      break;
+                    case 'remitted':
+                      statusColor = const Color(0xFF2563EB);
+                      statusLabel = 'REMITTED';
+                      break;
+                    case 'rejected':
+                      statusColor = const Color(0xFFEF4444);
+                      statusLabel = 'REJECTED';
+                      break;
+                    default:
+                      statusColor = const Color(0xFFF59E0B);
+                      statusLabel = 'PENDING';
+                  }
+
+                  return Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF0B1021) : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: 0.12),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(Icons.account_balance_wallet_rounded, color: statusColor, size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    currencyFormatter.format(p.amount),
+                                    style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: statusColor.withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      statusLabel,
+                                      style: GoogleFonts.inter(fontSize: 9.5, fontWeight: FontWeight.w800, color: statusColor),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                'Ref: ${p.disbursementRef ?? p.payoutNumber} • ${DateFormat("MMM d, yyyy • h:mm a").format(p.createdAt)}',
+                                style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                              ),
+                              if (p.bankName.isNotEmpty && p.accountNumber.isNotEmpty) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Sent to: ${p.bankName} (${p.accountNumber})',
+                                  style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF94A3B8)),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        if (p.hasReceipt)
+                          OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF2563EB),
+                              side: const BorderSide(color: Color(0xFF2563EB)),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            onPressed: () {
+                              PayoutReceiptPreviewDialog.show(
+                                context,
+                                receiptUrl: p.proofOfPaymentUrl!,
+                                title: 'Closer Payout Receipt • ${p.payoutNumber}',
+                                subtitle: 'Settled to ${_currentCloser.fullName}',
+                                amountFormatted: currencyFormatter.format(p.amount),
+                              );
+                            },
+                            icon: const Icon(Icons.receipt_long_rounded, size: 14),
+                            label: Text('View Receipt', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700)),
+                          ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            const SizedBox(height: 24),
+          ],
 
           Text(
             'ORDER STATUS BREAKDOWN FOR THIS CLOSER',

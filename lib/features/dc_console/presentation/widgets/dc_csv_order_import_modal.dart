@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/helpers/formatters.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
+import '../../../client_portal/presentation/widgets/pangea_excel_data_table.dart';
 import '../providers/dc_console_provider.dart';
 
 class ParsedCsvOrderRow {
@@ -837,116 +838,225 @@ ORD-003,Engr. Tunde Bakare,08099887766,8 Adetokunbo Ademola,Wuse 2,FCT - Abuja,L
 
                       // Parsed Orders Table View
                       Expanded(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.vertical,
-                              child: SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                child: DataTable(
-                                  headingRowColor: WidgetStateProperty.all(isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
-                                  columnSpacing: 18,
-                                  dataRowMaxHeight: 48,
-                                  columns: [
-                                    const DataColumn(label: Text('#', style: TextStyle(fontWeight: FontWeight.bold))),
-                                    const DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.bold))),
-                                    const DataColumn(label: Text('Order Number', style: TextStyle(fontWeight: FontWeight.bold))),
-                                    const DataColumn(label: Text('Customer & Phone', style: TextStyle(fontWeight: FontWeight.bold))),
-                                    const DataColumn(label: Text('Destination', style: TextStyle(fontWeight: FontWeight.bold))),
-                                    const DataColumn(label: Text('Product & Qty', style: TextStyle(fontWeight: FontWeight.bold))),
-                                    const DataColumn(label: Text('Amount (₦)', style: TextStyle(fontWeight: FontWeight.bold))),
-                                    const DataColumn(label: Text('Payment', style: TextStyle(fontWeight: FontWeight.bold))),
-                                    const DataColumn(label: Text('Client', style: TextStyle(fontWeight: FontWeight.bold))),
-                                  ],
-                                  rows: _parsedRows.map((row) {
-                                    return DataRow(
-                                      color: WidgetStateProperty.resolveWith<Color?>((states) {
-                                        if (!row.isValid) {
-                                          return const Color(0xFFFEF2F2);
-                                        }
-                                        return null;
-                                      }),
-                                      cells: [
-                                        DataCell(Text('${row.rowNumber}', style: GoogleFonts.jetBrainsMono(fontSize: 11.5))),
-                                        DataCell(
-                                          row.isValid
-                                              ? Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                  decoration: BoxDecoration(
-                                                    color: const Color(0xFFDCFCE7),
-                                                    borderRadius: BorderRadius.circular(4),
-                                                  ),
-                                                  child: Text(
-                                                    'VALID',
-                                                    style: GoogleFonts.jetBrainsMono(fontSize: 9.5, fontWeight: FontWeight.bold, color: const Color(0xFF16A34A)),
-                                                  ),
-                                                )
-                                              : Tooltip(
-                                                  message: row.validationError ?? 'Invalid row',
-                                                  child: Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                    decoration: BoxDecoration(
-                                                      color: const Color(0xFFFEE2E2),
-                                                      borderRadius: BorderRadius.circular(4),
-                                                    ),
-                                                    child: Text(
-                                                      row.validationError ?? 'ERROR',
-                                                      style: GoogleFonts.jetBrainsMono(fontSize: 9.5, fontWeight: FontWeight.bold, color: const Color(0xFFDC2626)),
-                                                    ),
-                                                  ),
-                                                ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: PangeaExcelDataTable<ParsedCsvOrderRow>(
+                            items: _parsedRows,
+                            brandPrimary: const Color(0xFF2563EB),
+                            enablePagination: true,
+                            initialPageSize: 25,
+                            rowHeight: 46,
+                            columns: [
+                              ExcelColumnDef<ParsedCsvOrderRow>(
+                                key: 'rowNumber',
+                                group: 'Record',
+                                label: '#',
+                                defaultWidth: 60,
+                                minWidth: 50,
+                                searchString: (row) => '${row.rowNumber}',
+                                sortValue: (row) => row.rowNumber,
+                                cellBuilder: (context, row, idx, isDark, brand) => Text(
+                                  '${row.rowNumber}',
+                                  style: GoogleFonts.jetBrainsMono(
+                                    fontSize: 11.5,
+                                    color: isDark ? Colors.white70 : const Color(0xFF475569),
+                                  ),
+                                ),
+                              ),
+                              ExcelColumnDef<ParsedCsvOrderRow>(
+                                key: 'status',
+                                group: 'Validation',
+                                label: 'STATUS',
+                                defaultWidth: 100,
+                                minWidth: 85,
+                                searchString: (row) => row.isValid ? 'VALID' : (row.validationError ?? 'ERROR'),
+                                sortValue: (row) => row.isValid ? 1 : 0,
+                                cellBuilder: (context, row, idx, isDark, brand) => row.isValid
+                                    ? Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFDCFCE7),
+                                          borderRadius: BorderRadius.circular(4),
                                         ),
-                                        DataCell(Text(row.orderNumber, style: GoogleFonts.jetBrainsMono(fontSize: 11.5, fontWeight: FontWeight.bold))),
-                                        DataCell(
-                                          Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            mainAxisAlignment: MainAxisAlignment.center,
-                                            children: [
-                                              Text(row.customerName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                                              Text(row.customerPhone, style: GoogleFonts.jetBrainsMono(fontSize: 10.5, color: const Color(0xFF64748B))),
-                                            ],
+                                        child: Text(
+                                          'VALID',
+                                          style: GoogleFonts.jetBrainsMono(
+                                            fontSize: 9.5,
+                                            fontWeight: FontWeight.bold,
+                                            color: const Color(0xFF16A34A),
                                           ),
                                         ),
-                                        DataCell(
-                                          Text(
-                                            '${row.deliveryAddress}, ${row.deliveryCity}',
-                                            style: const TextStyle(fontSize: 11.5),
+                                      )
+                                    : Tooltip(
+                                        message: row.validationError ?? 'Invalid row',
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFFEE2E2),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            row.validationError ?? 'ERROR',
+                                            style: GoogleFonts.jetBrainsMono(
+                                              fontSize: 9.5,
+                                              fontWeight: FontWeight.bold,
+                                              color: const Color(0xFFDC2626),
+                                            ),
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                           ),
                                         ),
-                                        DataCell(Text('${row.productName} (x${row.quantity})', style: const TextStyle(fontSize: 11.5))),
-                                        DataCell(Text(CurrencyFormatter.formatNaira(row.totalAmount), style: GoogleFonts.jetBrainsMono(fontSize: 11.5, fontWeight: FontWeight.bold))),
-                                        DataCell(
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: row.paymentType == 'prepaid' ? const Color(0xFFE0E7FF) : const Color(0xFFFEF3C7),
-                                              borderRadius: BorderRadius.circular(4),
-                                            ),
-                                            child: Text(
-                                              row.paymentType == 'prepaid' ? 'PREPAID' : 'POD CASH',
-                                              style: GoogleFonts.jetBrainsMono(
-                                                fontSize: 9.5,
-                                                fontWeight: FontWeight.bold,
-                                                color: row.paymentType == 'prepaid' ? const Color(0xFF4338CA) : const Color(0xFFB45309),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                        DataCell(Text(row.clientName, style: const TextStyle(fontSize: 11.5))),
-                                      ],
-                                    );
-                                  }).toList(),
+                                      ),
+                              ),
+                              ExcelColumnDef<ParsedCsvOrderRow>(
+                                key: 'orderNumber',
+                                group: 'Order Info',
+                                label: 'ORDER NUMBER',
+                                defaultWidth: 150,
+                                minWidth: 120,
+                                searchString: (row) => row.orderNumber,
+                                sortValue: (row) => row.orderNumber,
+                                cellBuilder: (context, row, idx, isDark, brand) => Text(
+                                  row.orderNumber,
+                                  style: GoogleFonts.jetBrainsMono(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                  ),
                                 ),
                               ),
-                            ),
+                              ExcelColumnDef<ParsedCsvOrderRow>(
+                                key: 'customer',
+                                group: 'Customer',
+                                label: 'CUSTOMER & PHONE',
+                                defaultWidth: 190,
+                                minWidth: 150,
+                                searchString: (row) => '${row.customerName} ${row.customerPhone}',
+                                sortValue: (row) => row.customerName,
+                                cellBuilder: (context, row, idx, isDark, brand) => Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      row.customerName,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    Text(
+                                      row.customerPhone,
+                                      style: GoogleFonts.jetBrainsMono(
+                                        fontSize: 10.5,
+                                        color: const Color(0xFF64748B),
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              ExcelColumnDef<ParsedCsvOrderRow>(
+                                key: 'destination',
+                                group: 'Logistics',
+                                label: 'DESTINATION',
+                                defaultWidth: 190,
+                                minWidth: 140,
+                                searchString: (row) => '${row.deliveryAddress}, ${row.deliveryCity}',
+                                sortValue: (row) => row.deliveryCity,
+                                cellBuilder: (context, row, idx, isDark, brand) => Text(
+                                  '${row.deliveryAddress}, ${row.deliveryCity}',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: isDark ? Colors.white70 : const Color(0xFF334155),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              ExcelColumnDef<ParsedCsvOrderRow>(
+                                key: 'product',
+                                group: 'Order Info',
+                                label: 'PRODUCT & QTY',
+                                defaultWidth: 170,
+                                minWidth: 130,
+                                searchString: (row) => '${row.productName} (x${row.quantity})',
+                                sortValue: (row) => row.productName,
+                                cellBuilder: (context, row, idx, isDark, brand) => Text(
+                                  '${row.productName} (x${row.quantity})',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: isDark ? Colors.white : const Color(0xFF1E293B),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              ExcelColumnDef<ParsedCsvOrderRow>(
+                                key: 'amount',
+                                group: 'Financial',
+                                label: 'AMOUNT (₦)',
+                                defaultWidth: 135,
+                                minWidth: 110,
+                                searchString: (row) => '${row.totalAmount}',
+                                sortValue: (row) => row.totalAmount,
+                                cellBuilder: (context, row, idx, isDark, brand) => Text(
+                                  CurrencyFormatter.formatNaira(row.totalAmount),
+                                  style: GoogleFonts.jetBrainsMono(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                  ),
+                                ),
+                              ),
+                              ExcelColumnDef<ParsedCsvOrderRow>(
+                                key: 'payment',
+                                group: 'Financial',
+                                label: 'PAYMENT',
+                                defaultWidth: 115,
+                                minWidth: 95,
+                                searchString: (row) => row.paymentType == 'prepaid' ? 'PREPAID' : 'POD CASH',
+                                sortValue: (row) => row.paymentType,
+                                cellBuilder: (context, row, idx, isDark, brand) => Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: row.paymentType == 'prepaid'
+                                        ? (isDark ? const Color(0xFF312E81) : const Color(0xFFE0E7FF))
+                                        : (isDark ? const Color(0xFF78350F) : const Color(0xFFFEF3C7)),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    row.paymentType == 'prepaid' ? 'PREPAID' : 'POD CASH',
+                                    style: GoogleFonts.jetBrainsMono(
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: row.paymentType == 'prepaid' ? const Color(0xFF6366F1) : const Color(0xFFF59E0B),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              ExcelColumnDef<ParsedCsvOrderRow>(
+                                key: 'client',
+                                group: 'Merchant',
+                                label: 'CLIENT',
+                                defaultWidth: 140,
+                                minWidth: 100,
+                                searchString: (row) => row.clientName,
+                                sortValue: (row) => row.clientName,
+                                cellBuilder: (context, row, idx, isDark, brand) => Text(
+                                  row.clientName,
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: isDark ? Colors.white70 : const Color(0xFF334155),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),

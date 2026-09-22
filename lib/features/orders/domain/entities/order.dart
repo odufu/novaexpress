@@ -284,6 +284,21 @@ class OrderEntity {
     return null;
   }
 
+  /// Returns cleaned human-readable delivery notes without internal technical metadata/audit tags
+  String get readableDeliveryNotes {
+    if (deliveryNotes == null) return '';
+    String raw = deliveryNotes!;
+    // Remove technical tags like [PACKAGE_DEAL: {...}], [Audit ...], [Gate PIN: ...], [GPS Proof: ...]
+    raw = raw.replaceAll(RegExp(r'\[PACKAGE_DEAL:\s*\{.*?\}\]', caseSensitive: false), '');
+    raw = raw.replaceAll(RegExp(r'\[(?:Audit\s+)?(?:SIGNATURE|PHOTO|IMAGE|WAYBILL):\s*[^\]]+\]', caseSensitive: false), '');
+    raw = raw.replaceAll(RegExp(r'\[(?:Audit\s+)?Gate\s+PIN:\s*[^\]]+\]', caseSensitive: false), '');
+    raw = raw.replaceAll(RegExp(r'\[(?:Audit\s+)?GPS(?:\s+Proof)?:\s*[^\]]+\]', caseSensitive: false), '');
+    raw = raw.replaceAll(RegExp(r'\[POD\s+Collected[^\]]*\]', caseSensitive: false), '');
+    raw = raw.replaceAll(RegExp(r'\[(?:Audit\s+)?REMITTED[^\]]*\]', caseSensitive: false), '');
+    raw = raw.replaceAll(RegExp(r'\s{2,}', caseSensitive: false), ' ');
+    return raw.trim();
+  }
+
   String get presenceProofSummary {
     if (hasCoordinates) {
       return 'GPS: ${latitude!.toStringAsFixed(5)}°, ${longitude!.toStringAsFixed(5)}° (Presence Verified)';

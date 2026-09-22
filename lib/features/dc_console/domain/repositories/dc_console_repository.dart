@@ -62,6 +62,7 @@ abstract class DCConsoleRepository {
     required double amount,
     required String driverId,
     String? disbursementRef,
+    String? proofOfPaymentUrl,
   });
 
   /// Rejects a rider's payout claim with an explanatory reason
@@ -120,6 +121,20 @@ abstract class DCConsoleRepository {
     required DateTime periodEnd,
     Map<String, dynamic>? customDeductions,
     List<String>? orderIds,
+    String? proofOfPaymentUrl,
+    String? payoutReference,
+    String? notes,
+    double? grossCollections,
+    double? logisticsFeesDeducted,
+    double? platformFeesDeducted,
+    double? gatewayFeesDeducted,
+    double? failedAttemptFeesDeducted,
+    double? otherChargesDeducted,
+    double? netPayoutAmount,
+    String? destinationBankName,
+    String? destinationAccountNumber,
+    String? destinationAccountName,
+    Map<String, dynamic>? chargesBreakdown,
   });
 
   /// Fetches client settlement history for the DC

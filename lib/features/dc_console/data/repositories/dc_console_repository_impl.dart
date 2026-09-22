@@ -169,12 +169,14 @@ class DCConsoleRepositoryImpl implements DCConsoleRepository {
     required double amount,
     required String driverId,
     String? disbursementRef,
+    String? proofOfPaymentUrl,
   }) async {
     await _remoteDataSource.approvePayoutClaim(
       claimId: claimId,
       amount: amount,
       driverId: driverId,
       disbursementRef: disbursementRef,
+      proofOfPaymentUrl: proofOfPaymentUrl,
     );
   }
 
@@ -283,6 +285,20 @@ class DCConsoleRepositoryImpl implements DCConsoleRepository {
     required DateTime periodEnd,
     Map<String, dynamic>? customDeductions,
     List<String>? orderIds,
+    String? proofOfPaymentUrl,
+    String? payoutReference,
+    String? notes,
+    double? grossCollections,
+    double? logisticsFeesDeducted,
+    double? platformFeesDeducted,
+    double? gatewayFeesDeducted,
+    double? failedAttemptFeesDeducted,
+    double? otherChargesDeducted,
+    double? netPayoutAmount,
+    String? destinationBankName,
+    String? destinationAccountNumber,
+    String? destinationAccountName,
+    Map<String, dynamic>? chargesBreakdown,
   }) async {
     return await _remoteDataSource.generateDailyMerchantSettlement(
       clientId: clientId,
@@ -291,6 +307,20 @@ class DCConsoleRepositoryImpl implements DCConsoleRepository {
       periodEnd: periodEnd,
       customDeductions: customDeductions,
       orderIds: orderIds,
+      proofOfPaymentUrl: proofOfPaymentUrl,
+      payoutReference: payoutReference,
+      notes: notes,
+      grossCollections: grossCollections,
+      logisticsFeesDeducted: logisticsFeesDeducted,
+      platformFeesDeducted: platformFeesDeducted,
+      gatewayFeesDeducted: gatewayFeesDeducted,
+      failedAttemptFeesDeducted: failedAttemptFeesDeducted,
+      otherChargesDeducted: otherChargesDeducted,
+      netPayoutAmount: netPayoutAmount,
+      destinationBankName: destinationBankName,
+      destinationAccountNumber: destinationAccountNumber,
+      destinationAccountName: destinationAccountName,
+      chargesBreakdown: chargesBreakdown,
     );
   }
 

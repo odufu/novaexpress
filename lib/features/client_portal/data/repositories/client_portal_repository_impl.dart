@@ -1,4 +1,5 @@
 import '../../domain/entities/client_closer.dart';
+import '../../domain/entities/client_closer_payout.dart';
 import '../../domain/entities/client_profile.dart';
 import '../../domain/entities/client_settlement.dart';
 import '../../domain/entities/customer_lead.dart';
@@ -25,6 +26,10 @@ class ClientPortalRepositoryImpl implements ClientPortalRepository {
     String? closerCode,
     int dailyCallTarget = 50,
     double commissionRate = 500.0,
+    bool isCommissionEnabled = true,
+    String? bankName,
+    String? accountNumber,
+    String? accountName,
   }) async {
     return await _remoteDataSource.createCloser(
       clientId: clientId,
@@ -36,6 +41,10 @@ class ClientPortalRepositoryImpl implements ClientPortalRepository {
       closerCode: closerCode,
       dailyCallTarget: dailyCallTarget,
       commissionRate: commissionRate,
+      isCommissionEnabled: isCommissionEnabled,
+      bankName: bankName,
+      accountNumber: accountNumber,
+      accountName: accountName,
     );
   }
 
@@ -78,6 +87,10 @@ class ClientPortalRepositoryImpl implements ClientPortalRepository {
     double? commissionRate,
     int? dailyCallTarget,
     bool? isActive,
+    bool? isCommissionEnabled,
+    String? bankName,
+    String? accountNumber,
+    String? accountName,
   }) async {
     await _remoteDataSource.updateCloserDetails(
       closerId: closerId,
@@ -87,6 +100,77 @@ class ClientPortalRepositoryImpl implements ClientPortalRepository {
       commissionRate: commissionRate,
       dailyCallTarget: dailyCallTarget,
       isActive: isActive,
+      isCommissionEnabled: isCommissionEnabled,
+      bankName: bankName,
+      accountNumber: accountNumber,
+      accountName: accountName,
+    );
+  }
+
+  @override
+  Future<List<ClientCloserPayout>> getCloserPayouts(String closerId) async {
+    return await _remoteDataSource.fetchCloserPayouts(closerId);
+  }
+
+  @override
+  Future<List<ClientCloserPayout>> getClientCloserPayouts(String clientId) async {
+    return await _remoteDataSource.fetchClientCloserPayouts(clientId);
+  }
+
+  @override
+  Future<ClientCloserPayout> disburseCloserPayout({
+    required String closerId,
+    required String clientId,
+    required double amount,
+    required String bankName,
+    required String accountNumber,
+    required String accountName,
+    String? disbursementRef,
+    String? proofOfPaymentUrl,
+    String? notes,
+  }) async {
+    return await _remoteDataSource.disburseCloserPayout(
+      closerId: closerId,
+      clientId: clientId,
+      amount: amount,
+      bankName: bankName,
+      accountNumber: accountNumber,
+      accountName: accountName,
+      disbursementRef: disbursementRef,
+      proofOfPaymentUrl: proofOfPaymentUrl,
+      notes: notes,
+    );
+  }
+
+  @override
+  Future<ClientCloserPayout> requestCloserPayout({
+    required String closerId,
+    required String clientId,
+    required double amount,
+    required String bankName,
+    required String accountNumber,
+    required String accountName,
+    String? notes,
+  }) async {
+    return await _remoteDataSource.requestCloserPayout(
+      closerId: closerId,
+      clientId: clientId,
+      amount: amount,
+      bankName: bankName,
+      accountNumber: accountNumber,
+      accountName: accountName,
+      notes: notes,
+    );
+  }
+
+  @override
+  Future<void> confirmCloserPayout({
+    required String payoutId,
+    String? notes,
+  }) async {
+    await _remoteDataSource.confirmCloserPayout(
+      payoutId: payoutId,
+      notes: notes,
     );
   }
 
@@ -158,6 +242,23 @@ class ClientPortalRepositoryImpl implements ClientPortalRepository {
       return await _remoteDataSource.fetchMerchantAssetCustody(clientId);
     } catch (_) {
       return {};
+    }
+  }
+
+  @override
+  Future<bool> approveSettlement({
+    required String settlementId,
+    required String clientId,
+    String? notes,
+  }) async {
+    try {
+      return await _remoteDataSource.approveSettlement(
+        settlementId: settlementId,
+        clientId: clientId,
+        notes: notes,
+      );
+    } catch (_) {
+      return false;
     }
   }
 

@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/helpers/formatters.dart';
 import '../../domain/entities/dc_transaction_record.dart';
 import '../providers/dc_console_provider.dart';
+import '../../../client_portal/presentation/widgets/pangea_excel_data_table.dart';
 
 class DCTransactionsPage extends ConsumerStatefulWidget {
   const DCTransactionsPage({super.key});
@@ -374,190 +375,248 @@ class _DCTransactionsPageState extends ConsumerState<DCTransactionsPage> {
   }
 
   Widget _buildDesktopTable(BuildContext context, List<DCTransactionRecord> list, bool isDark) {
-    return Table(
-      columnWidths: const {
-        0: FlexColumnWidth(1.6), // Ref & Type
-        1: FlexColumnWidth(2.0), // Order & Customer
-        2: FlexColumnWidth(1.8), // Rider Info
-        3: FlexColumnWidth(1.6), // Amount & Entitlement
-        4: FlexColumnWidth(1.5), // Channel & Gateway
-        5: FlexColumnWidth(1.4), // Status (shows Partial vs Complete Remittance)
-        6: FlexColumnWidth(0.8), // Actions
-      },
-      children: [
-        // Header
-        TableRow(
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: PangeaExcelDataTable<DCTransactionRecord>(
+        items: list,
+        enablePagination: true,
+        initialPageSize: 25,
+        rowHeight: 66.0,
+        brandPrimary: const Color(0xFF00A2D3),
+        onRowTap: (txn) => _openTransactionAuditModal(context, txn, isDark),
+        columns: [
+          ExcelColumnDef<DCTransactionRecord>(
+            key: 'ref_type',
+            group: 'Audit Identity',
+            label: 'REF & TYPE',
+            defaultWidth: 170,
+            minWidth: 130,
+            searchString: (t) => '${t.transactionCode} ${t.categoryDisplay} ${t.channel}',
+            sortValue: (t) => t.createdAt,
+            cellBuilder: (context, txn, row, isDark, brand) {
+              final isPstk = txn.isPaystack;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isPstk ? Icons.bolt_rounded : (txn.isCashPod ? Icons.payments_rounded : Icons.receipt_rounded),
+                        size: 14,
+                        color: isPstk ? const Color(0xFF00A2D3) : const Color(0xFF10B981),
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          txn.transactionCode,
+                          style: GoogleFonts.jetBrainsMono(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF00A2D3),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    txn.categoryDisplay,
+                    style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B)),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    DateFormat('dd MMM yyyy • hh:mm a').format(txn.createdAt),
+                    style: GoogleFonts.inter(fontSize: 9, color: const Color(0xFF94A3B8)),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              );
+            },
           ),
-          children: [
-            _buildTableHeader('REF & TYPE'),
-            _buildTableHeader('ORDER & CUSTOMER'),
-            _buildTableHeader('RIDER & HUB'),
-            _buildTableHeader('AMOUNT & SPLIT'),
-            _buildTableHeader('CHANNEL'),
-            _buildTableHeader('STATUS'),
-            _buildTableHeader('ACTIONS'),
-          ],
-        ),
-        // Rows
-        ...list.map((txn) {
-          final isPstk = txn.isPaystack;
-
-          return TableRow(
-            decoration: BoxDecoration(
-              border: Border(bottom: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9))),
-            ),
-            children: [
-              // 0. Ref & Type
-              InkWell(
-                onTap: () => _openTransactionAuditModal(context, txn, isDark),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+          ExcelColumnDef<DCTransactionRecord>(
+            key: 'order_customer',
+            group: 'Order & Customer',
+            label: 'ORDER & CUSTOMER',
+            defaultWidth: 200,
+            minWidth: 140,
+            searchString: (t) => '${t.orderNumber ?? ""} ${t.customerName ?? ""} ${t.customerPhone ?? ""} ${t.productName ?? ""}',
+            sortValue: (t) => t.orderNumber ?? '',
+            cellBuilder: (context, txn, row, isDark, brand) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    txn.orderNumber != null ? '#${txn.orderNumber}' : 'Direct Gateway',
+                    style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    txn.customerName != null ? '${txn.customerName} (${txn.customerPhone ?? ""})' : txn.productName ?? 'General Logistics',
+                    style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (txn.deliveryLocation != null && txn.deliveryLocation!.isNotEmpty)
+                    Text(
+                      txn.deliveryLocation!,
+                      style: GoogleFonts.inter(fontSize: 9.5, color: const Color(0xFF94A3B8)),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
+              );
+            },
+          ),
+          ExcelColumnDef<DCTransactionRecord>(
+            key: 'rider_hub',
+            group: 'Logistics Assignment',
+            label: 'RIDER & HUB',
+            defaultWidth: 170,
+            minWidth: 130,
+            searchString: (t) => '${t.riderName} ${t.riderCode}',
+            sortValue: (t) => t.riderName,
+            cellBuilder: (context, txn, row, isDark, brand) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    txn.riderName,
+                    style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Row(
-                        children: [
-                          Icon(
-                            isPstk ? Icons.bolt_rounded : (txn.isCashPod ? Icons.payments_rounded : Icons.receipt_rounded),
-                            size: 14,
-                            color: isPstk ? const Color(0xFF00A2D3) : const Color(0xFF10B981),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF37021).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          txn.riderCode,
+                          style: GoogleFonts.jetBrainsMono(
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFFF37021),
                           ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              txn.transactionCode,
-                              style: GoogleFonts.jetBrainsMono(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color(0xFF00A2D3)),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
-                      const SizedBox(height: 2),
-                      Text(txn.categoryDisplay, style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B)), overflow: TextOverflow.ellipsis),
-                      Text(DateFormat('dd MMM yyyy • hh:mm a').format(txn.createdAt), style: GoogleFonts.inter(fontSize: 9, color: const Color(0xFF94A3B8)), overflow: TextOverflow.ellipsis),
-                    ],
-                  ),
-                ),
-              ),
-
-              // 1. Order & Customer
-              InkWell(
-                onTap: () => _openTransactionAuditModal(context, txn, isDark),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        txn.orderNumber != null ? '#${txn.orderNumber}' : 'Direct Gateway',
-                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(
-                        txn.customerName != null ? '${txn.customerName} (${txn.customerPhone ?? ""})' : txn.productName ?? 'General Logistics',
-                        style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      if (txn.deliveryLocation != null && txn.deliveryLocation!.isNotEmpty)
-                        Text(txn.deliveryLocation!, style: GoogleFonts.inter(fontSize: 9.5, color: const Color(0xFF94A3B8)), overflow: TextOverflow.ellipsis),
-                    ],
-                  ),
-                ),
-              ),
-
-              // 2. Rider Info
-              InkWell(
-                onTap: () => _openTransactionAuditModal(context, txn, isDark),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(txn.riderName, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis),
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                            decoration: BoxDecoration(color: const Color(0xFFF37021).withValues(alpha: 0.15), borderRadius: BorderRadius.circular(4)),
-                            child: Text(txn.riderCode, style: GoogleFonts.jetBrainsMono(fontSize: 9, fontWeight: FontWeight.bold, color: const Color(0xFFF37021))),
-                          ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text('• Wuse Hub', style: GoogleFonts.inter(fontSize: 9.5, color: const Color(0xFF64748B)), overflow: TextOverflow.ellipsis),
-                          ),
-                        ],
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          '• Central Hub',
+                          style: GoogleFonts.inter(fontSize: 9.5, color: const Color(0xFF64748B)),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ],
                   ),
-                ),
-              ),
-
-              // 3. Amount & Split
-              InkWell(
-                onTap: () => _openTransactionAuditModal(context, txn, isDark),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        CurrencyFormatter.formatNaira(txn.amount),
-                        style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w900, color: txn.isCredit ? const Color(0xFF10B981) : const Color(0xFF2563EB)),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text('Rider: ${CurrencyFormatter.formatNaira(txn.totalRiderEntitlement)}', style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B)), overflow: TextOverflow.ellipsis),
-                    ],
+                ],
+              );
+            },
+          ),
+          ExcelColumnDef<DCTransactionRecord>(
+            key: 'amount_split',
+            group: 'Financial Settlement',
+            label: 'AMOUNT & SPLIT',
+            defaultWidth: 160,
+            minWidth: 120,
+            align: TextAlign.right,
+            searchString: (t) => '${t.amount} ${t.totalRiderEntitlement}',
+            sortValue: (t) => t.amount,
+            cellBuilder: (context, txn, row, isDark, brand) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    CurrencyFormatter.formatNaira(txn.amount),
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      color: txn.isCredit ? const Color(0xFF10B981) : const Color(0xFF2563EB),
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              ),
-
-              // 4. Channel & Gateway
-              InkWell(
-                onTap: () => _openTransactionAuditModal(context, txn, isDark),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(txn.channel, style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w600)),
-                      if (txn.gatewayReference != null)
-                        Text(txn.gatewayReference!, style: GoogleFonts.jetBrainsMono(fontSize: 9.5, color: const Color(0xFF94A3B8))),
-                    ],
+                  Text(
+                    'Rider: ${CurrencyFormatter.formatNaira(txn.totalRiderEntitlement)}',
+                    style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B)),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              ),
-
-              // 5. Status Badge (shows Partial vs Complete Remittance clearly)
-              InkWell(
-                onTap: () => _openTransactionAuditModal(context, txn, isDark),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: _buildStatusBadge(txn),
+                ],
+              );
+            },
+          ),
+          ExcelColumnDef<DCTransactionRecord>(
+            key: 'channel',
+            group: 'Payment Method',
+            label: 'CHANNEL & GATEWAY',
+            defaultWidth: 160,
+            minWidth: 120,
+            searchString: (t) => '${t.channel} ${t.gatewayReference ?? ""}',
+            sortValue: (t) => t.channel,
+            cellBuilder: (context, txn, row, isDark, brand) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    txn.channel,
+                    style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w600),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              ),
-
-              // 6. Action Button
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                  if (txn.gatewayReference != null)
+                    Text(
+                      txn.gatewayReference!,
+                      style: GoogleFonts.jetBrainsMono(fontSize: 9.5, color: const Color(0xFF94A3B8)),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
+              );
+            },
+          ),
+          ExcelColumnDef<DCTransactionRecord>(
+            key: 'status',
+            group: 'Audit Verification',
+            label: 'STATUS',
+            defaultWidth: 140,
+            minWidth: 110,
+            searchString: (t) => t.status,
+            sortValue: (t) => t.status,
+            cellBuilder: (context, txn, row, isDark, brand) {
+              return Align(
+                alignment: Alignment.centerLeft,
+                child: _buildStatusBadge(txn),
+              );
+            },
+          ),
+          ExcelColumnDef<DCTransactionRecord>(
+            key: 'actions',
+            group: 'Action',
+            label: 'ACTIONS',
+            defaultWidth: 90,
+            minWidth: 70,
+            cellBuilder: (context, txn, row, isDark, brand) {
+              return Center(
                 child: IconButton(
                   icon: const Icon(Icons.visibility_outlined, size: 18, color: Color(0xFF00A2D3)),
                   tooltip: 'View Forensic Audit Receipt',
                   onPressed: () => _openTransactionAuditModal(context, txn, isDark),
                 ),
-              ),
-            ],
-          );
-        }),
-      ],
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
+
 
   Widget _buildMobileCardList(BuildContext context, List<DCTransactionRecord> list, bool isDark) {
     return ListView.separated(
@@ -756,16 +815,6 @@ class _DCTransactionsPageState extends ConsumerState<DCTransactionsPage> {
           fontWeight: FontWeight.w900,
           color: const Color(0xFF2563EB),
         ),
-      ),
-    );
-  }
-
-  Widget _buildTableHeader(String label) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      child: Text(
-        label,
-        style: GoogleFonts.jetBrainsMono(fontSize: 10, fontWeight: FontWeight.w800, color: const Color(0xFF64748B), letterSpacing: 0.8),
       ),
     );
   }

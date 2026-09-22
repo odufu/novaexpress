@@ -12,6 +12,7 @@ class DCPayoutClaim {
   final DateTime requestedAt;
   final String status; // 'pending', 'pending_review', 'disbursed', 'approved', 'completed', 'confirmed', 'rejected'
   final String? disbursementRef;
+  final String? proofOfPaymentUrl;
   final String? dcNotes;
   final DateTime? riderConfirmedAt;
 
@@ -29,6 +30,7 @@ class DCPayoutClaim {
     required this.requestedAt,
     this.status = 'pending',
     this.disbursementRef,
+    this.proofOfPaymentUrl,
     this.dcNotes,
     this.riderConfirmedAt,
   });
@@ -38,6 +40,7 @@ class DCPayoutClaim {
   bool get isDisbursed => status == 'disbursed';
   bool get isConfirmed => status == 'completed' || status == 'confirmed';
   bool get isRejected => status == 'rejected';
+  bool get hasReceipt => proofOfPaymentUrl != null && proofOfPaymentUrl!.trim().isNotEmpty;
 
   DCPayoutClaim copyWith({
     String? id,
@@ -53,6 +56,7 @@ class DCPayoutClaim {
     DateTime? requestedAt,
     String? status,
     String? disbursementRef,
+    String? proofOfPaymentUrl,
     String? dcNotes,
     DateTime? riderConfirmedAt,
   }) {
@@ -70,6 +74,7 @@ class DCPayoutClaim {
       requestedAt: requestedAt ?? this.requestedAt,
       status: status ?? this.status,
       disbursementRef: disbursementRef ?? this.disbursementRef,
+      proofOfPaymentUrl: proofOfPaymentUrl ?? this.proofOfPaymentUrl,
       dcNotes: dcNotes ?? this.dcNotes,
       riderConfirmedAt: riderConfirmedAt ?? this.riderConfirmedAt,
     );
@@ -110,41 +115,34 @@ class DCPayoutClaim {
       requestedAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
           : (json['requestedAt'] != null ? DateTime.tryParse(json['requestedAt'].toString()) ?? DateTime.now() : DateTime.now()),
-      status: json['status']?.toString() ?? 'pending',
-      disbursementRef: json['disbursement_ref']?.toString() ?? json['disbursementRef'],
-      dcNotes: json['dc_notes']?.toString() ?? json['dcNotes'],
+      status: (json['status'] ?? 'pending').toString(),
+      disbursementRef: json['disbursement_ref']?.toString() ?? json['disbursementRef']?.toString(),
+      proofOfPaymentUrl: json['proof_of_payment_url']?.toString() ?? json['proofOfPaymentUrl']?.toString(),
+      dcNotes: json['dc_notes']?.toString() ?? json['dcNotes']?.toString(),
       riderConfirmedAt: json['rider_confirmed_at'] != null
           ? DateTime.tryParse(json['rider_confirmed_at'].toString())
-          : null,
+          : (json['riderConfirmedAt'] != null ? DateTime.tryParse(json['riderConfirmedAt'].toString()) : null),
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'payout_number': claimNumber,
       'claimNumber': claimNumber,
-      'delivery_agent_id': riderId,
-      'rider_name': riderName,
-      'rider_code': riderCode,
-      'amount': requestedAmount,
+      'riderId': riderId,
+      'riderName': riderName,
+      'riderCode': riderCode,
       'requestedAmount': requestedAmount,
-      'current_balance': currentBalance,
       'currentBalance': currentBalance,
-      'bank_name': bankName,
       'bankName': bankName,
-      'account_number': accountNumber,
       'accountNumber': accountNumber,
-      'account_name': accountName,
       'accountName': accountName,
-      'created_at': requestedAt.toIso8601String(),
       'requestedAt': requestedAt.toIso8601String(),
       'status': status,
-      'disbursement_ref': disbursementRef,
       'disbursementRef': disbursementRef,
-      'dc_notes': dcNotes,
+      'proof_of_payment_url': proofOfPaymentUrl,
       'dcNotes': dcNotes,
-      'rider_confirmed_at': riderConfirmedAt?.toIso8601String(),
+      'riderConfirmedAt': riderConfirmedAt?.toIso8601String(),
     };
   }
 }

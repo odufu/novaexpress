@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/theme_provider.dart';
+import '../../../../core/widgets/client_logo_widget.dart';
 import '../../../../core/widgets/user_avatar_widget.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/client_portal_provider.dart';
@@ -16,6 +17,7 @@ import 'client_orders_page.dart';
 import 'client_products_page.dart';
 import 'closer_mobile_portal_page.dart';
 import '../../../pipeline_chat/presentation/widgets/pipeline_chat_floating_action_button.dart';
+import '../../../pipeline_chat/presentation/providers/pipeline_chat_fab_provider.dart';
 import '../../../users/presentation/widgets/edit_profile_modal.dart';
 
 final clientActiveTabProvider = StateProvider<String>((ref) {
@@ -62,6 +64,7 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
     return Scaffold(
       key: _scaffoldKey,
       floatingActionButton: const PipelineChatFloatingActionButton(),
+      floatingActionButtonLocation: ref.watch(pipelineChatFabLocationProvider),
       backgroundColor: isDark ? const Color(0xFF0B1120) : const Color(0xFFF8FAFC),
       drawer: isDesktop
           ? null
@@ -178,42 +181,14 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
             child: Row(
               mainAxisAlignment: isCollapsed ? MainAxisAlignment.center : MainAxisAlignment.spaceBetween,
               children: [
-                if (brandLogo != null && brandLogo.trim().isNotEmpty)
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: brandPrimary, width: 1.5),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: Image.network(
-                      brandLogo.trim(),
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => Container(
-                        color: brandPrimary,
-                        child: Icon(
-                          isCloser ? Icons.headset_mic_rounded : Icons.storefront_rounded,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
-                    ),
-                  )
-                else
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: brandPrimary,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(
-                      isCloser ? Icons.headset_mic_rounded : Icons.storefront_rounded,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                  ),
+                ClientLogoWidget(
+                  logoUrl: brandLogo,
+                  companyName: state.clientProfile.companyName,
+                  size: 36,
+                  borderRadius: 10,
+                  brandColor: brandPrimary,
+                  isCloser: isCloser,
+                ),
                 if (!isCollapsed) ...[
                   const SizedBox(width: 10),
                   Expanded(
@@ -390,7 +365,9 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
                           }
                         },
                         child: UserAvatarWidget(
-                          avatarUrl: authUser?.avatarUrl,
+                          avatarUrl: (authUser?.avatarUrl != null && authUser!.avatarUrl!.trim().isNotEmpty)
+                              ? authUser?.avatarUrl
+                              : state.clientProfile.logoUrl,
                           fullName: isCloser ? (authUser?.fullName ?? 'Amaka Chioma') : state.clientProfile.companyName,
                           radius: 18,
                           showBorder: true,

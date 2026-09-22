@@ -4,12 +4,15 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/theme_provider.dart';
+import '../../../../core/widgets/client_logo_widget.dart';
+import '../../../../core/widgets/payout_receipt_preview_dialog.dart';
 import '../../../../core/widgets/product_image_widget.dart';
 import '../../../../core/widgets/user_avatar_widget.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../../../users/presentation/widgets/edit_profile_modal.dart';
 import '../../domain/entities/client_closer.dart';
+import '../../domain/entities/client_closer_payout.dart';
 import '../providers/client_portal_provider.dart';
 import '../widgets/client_convert_lead_modal.dart';
 import '../widgets/client_create_order_modal.dart';
@@ -19,6 +22,7 @@ import '../../../dc_console/domain/entities/product_package.dart';
 import '../../../dc_console/presentation/providers/product_catalog_provider.dart';
 import '../../../pipeline_chat/presentation/widgets/order_pipeline_chat_sheet.dart';
 import '../../../pipeline_chat/presentation/widgets/pipeline_chat_floating_action_button.dart';
+import '../../../pipeline_chat/presentation/providers/pipeline_chat_fab_provider.dart';
 
 final closerActiveTabProvider = StateProvider.autoDispose<int>((ref) => 0);
 final closerOrderStatusFilterProvider = StateProvider.autoDispose<String>((ref) => 'all');
@@ -225,6 +229,7 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
     if (isWideScreen) {
       return Scaffold(
         floatingActionButton: const PipelineChatFloatingActionButton(),
+        floatingActionButtonLocation: ref.watch(pipelineChatFabLocationProvider),
         backgroundColor: isDark ? const Color(0xFF0B1120) : const Color(0xFFF8FAFC),
         body: SafeArea(
           child: Row(
@@ -251,6 +256,7 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
 
     return Scaffold(
       floatingActionButton: const PipelineChatFloatingActionButton(),
+      floatingActionButtonLocation: ref.watch(pipelineChatFabLocationProvider),
       backgroundColor: isDark ? const Color(0xFF0B1120) : const Color(0xFFF8FAFC),
       appBar: _buildCloserAppBar(context, currentCloser, user, isDark),
       body: IndexedStack(
@@ -412,15 +418,14 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: Image.network(
-                      brandLogo.trim(),
-                      width: 16,
-                      height: 16,
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => Icon(Icons.storefront_rounded, size: 14, color: brandPrimary),
-                    ),
+                  ClientLogoWidget(
+                    logoUrl: brandLogo,
+                    companyName: companyName,
+                    size: 18,
+                    borderRadius: 4,
+                    borderWidth: 1.0,
+                    brandColor: brandPrimary,
+                    isCloser: true,
                   ),
                   const SizedBox(width: 6),
                   ConstrainedBox(
@@ -513,34 +518,14 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
               child: Row(
                 mainAxisAlignment: isCollapsed ? MainAxisAlignment.center : MainAxisAlignment.spaceBetween,
                 children: [
-                  if (brandLogo != null && brandLogo.trim().isNotEmpty)
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: brandPrimary, width: 1.5),
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: Image.network(
-                        brandLogo.trim(),
-                        fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => Container(
-                          color: brandPrimary,
-                          child: const Icon(Icons.headset_mic_rounded, color: Colors.white, size: 20),
-                        ),
-                      ),
-                    )
-                  else
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: brandPrimary,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(Icons.headset_mic_rounded, color: Colors.white, size: 20),
-                    ),
+                  ClientLogoWidget(
+                    logoUrl: brandLogo,
+                    companyName: companyName,
+                    size: 36,
+                    borderRadius: 10,
+                    brandColor: brandPrimary,
+                    isCloser: true,
+                  ),
                   if (!isCollapsed) ...[
                     const SizedBox(width: 10),
                     Expanded(
@@ -881,7 +866,9 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
     switch (activeTab) {
       case 0:
         sectionTitle = 'Telesales Dashboard';
-        sectionSubtitle = 'Real-time sales closing, commissions & dispatch pipeline';
+        sectionSubtitle = closer.isCommissionEnabled
+            ? 'Real-time sales closing, commissions & dispatch pipeline'
+            : 'Real-time sales closing & dispatch pipeline';
         break;
       case 1:
         sectionTitle = 'Orders & Dispatch Monitor';
@@ -1242,14 +1229,24 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                       color: const Color(0xFF6366F1),
                       isDark: isDark,
                     ),
-                    _buildKpiCard(
-                      title: 'Commissions',
-                      value: currencyFormatter.format(earnedCommission),
-                      subtitle: '₦${closer.commissionRate.toStringAsFixed(0)}/order',
-                      icon: Icons.account_balance_wallet_rounded,
-                      color: const Color(0xFF10B981),
-                      isDark: isDark,
-                    ),
+                    if (closer.isCommissionEnabled)
+                      _buildKpiCard(
+                        title: 'Commissions',
+                        value: currencyFormatter.format(earnedCommission),
+                        subtitle: '₦${closer.commissionRate.toStringAsFixed(0)}/order',
+                        icon: Icons.account_balance_wallet_rounded,
+                        color: const Color(0xFF10B981),
+                        isDark: isDark,
+                      )
+                    else
+                      _buildKpiCard(
+                        title: 'Conversion Rate',
+                        value: '${successRate.toStringAsFixed(1)}%',
+                        subtitle: 'Booked to delivered',
+                        icon: Icons.trending_up_rounded,
+                        color: const Color(0xFF10B981),
+                        isDark: isDark,
+                      ),
                     _buildKpiCard(
                       title: 'Daily Call Target',
                       value: '${closer.dailyCallTarget}',
@@ -1262,7 +1259,12 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                 );
               },
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
+
+            if (closer.isCommissionEnabled) ...[
+              _buildCloserCommissionBalanceCard(context, closer, currencyFormatter, isDark),
+              const SizedBox(height: 20),
+            ],
 
             // Live In-Transit Orders Stream
             Row(
@@ -2401,7 +2403,19 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                         }
                       },
                     ),
-                    Divider(height: 1, color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFF1F5F9)),
+                    if (closer.isCommissionEnabled) ...[
+                      ListTile(
+                        leading: const Icon(Icons.account_balance_wallet_rounded, color: Color(0xFF10B981)),
+                        title: Text('Commissions & Payouts', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+                        subtitle: Text(
+                          '${NumberFormat.currency(symbol: "₦", decimalDigits: 0).format(closer.unpaidCommissionBalance)} unpaid • Payout ledger & receipts',
+                          style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)),
+                        ),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: () => _showCloserPayoutHistorySheet(context, closer),
+                      ),
+                      Divider(height: 1, color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFF1F5F9)),
+                    ],
                     ListTile(
                       leading: const Icon(Icons.lock_reset_rounded, color: Color(0xFF3B82F6)),
                       title: Text('Change Password', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
@@ -2551,6 +2565,685 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                 : const Color(0xFF94A3B8),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildCloserCommissionBalanceCard(
+    BuildContext context,
+    ClientCloser closer,
+    NumberFormat currencyFormatter,
+    bool isDark,
+  ) {
+    final closerPayouts = ref.watch(clientPortalProvider).closerPayouts.where((p) => p.closerId == closer.id).toList();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isDark
+              ? [const Color(0xFF1E294A), const Color(0xFF0F172A)]
+              : [const Color(0xFFF0FDF4), Colors.white],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFBBF7D0),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.account_balance_wallet_rounded, color: Color(0xFF10B981), size: 20),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'WITHDRAWABLE COMMISSION BALANCE',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.6,
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '₦${closer.commissionRate.toStringAsFixed(0)}/dlvd',
+                  style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w700, color: const Color(0xFF10B981)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            currencyFormatter.format(closer.unpaidCommissionBalance),
+            style: GoogleFonts.inter(
+              fontSize: 28,
+              fontWeight: FontWeight.w900,
+              color: const Color(0xFF10B981),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Total Earned: ${currencyFormatter.format(closer.totalPaidCommission + closer.unpaidCommissionBalance)} • Settled: ${currencyFormatter.format(closer.totalPaidCommission)}',
+            style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
+          ),
+          const SizedBox(height: 12),
+
+          // Payout Bank on File
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF0B1021) : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.account_balance_outlined, size: 16, color: Color(0xFF3B82F6)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    closer.hasBankDetails
+                        ? 'Bank Account: ${closer.bankName} • ${closer.accountNumber} (${closer.accountName})'
+                        : 'No bank details configured. Update in Profile or enter on payout request.',
+                    style: GoogleFonts.inter(fontSize: 11, color: isDark ? Colors.white70 : const Color(0xFF475569)),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Action Buttons
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF10B981),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    elevation: 0,
+                  ),
+                  onPressed: () => _showRequestCloserPayoutModal(context, closer),
+                  icon: const Icon(Icons.payments_rounded, size: 16),
+                  label: Text(
+                    'Request Payout',
+                    style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: isDark ? Colors.white : const Color(0xFF334155),
+                    side: BorderSide(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFCBD5E1)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () => _showCloserPayoutHistorySheet(context, closer),
+                  icon: const Icon(Icons.receipt_long_rounded, size: 16, color: Color(0xFF2563EB)),
+                  label: Text(
+                    'History (${closerPayouts.length})',
+                    style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showRequestCloserPayoutModal(BuildContext context, ClientCloser closer) {
+    if (closer.unpaidCommissionBalance <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Color(0xFFF59E0B),
+          content: Text('⚠️ You currently have ₦0 withdrawable commission balance. Book and deliver more orders to accumulate commissions.'),
+        ),
+      );
+      return;
+    }
+
+    final amountCtrl = TextEditingController(text: closer.unpaidCommissionBalance.toStringAsFixed(0));
+    final bankCtrl = TextEditingController(text: closer.bankName);
+    final accountNumCtrl = TextEditingController(text: closer.accountNumber);
+    final accountNameCtrl = TextEditingController(text: closer.accountName);
+    final notesCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    bool isSubmitting = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 20),
+              ),
+              const SizedBox(width: 10),
+              Text('Request Commission Payout', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
+            ],
+          ),
+          content: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981).withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.2)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Available Balance:', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF475569))),
+                        Text(
+                          NumberFormat.currency(symbol: '₦', decimalDigits: 0).format(closer.unpaidCommissionBalance),
+                          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: const Color(0xFF10B981)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  TextFormField(
+                    controller: amountCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Requested Amount (₦)',
+                      prefixIcon: Icon(Icons.currency_pound, size: 18),
+                    ),
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return 'Amount is required';
+                      final amt = double.tryParse(v.trim());
+                      if (amt == null || amt <= 0) return 'Enter a valid amount';
+                      if (amt > closer.unpaidCommissionBalance) return 'Cannot exceed available balance';
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 12),
+
+                  TextFormField(
+                    controller: bankCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Bank Name',
+                      prefixIcon: Icon(Icons.account_balance_outlined, size: 18),
+                    ),
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Bank name is required' : null,
+                  ),
+                  const SizedBox(height: 12),
+
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: TextFormField(
+                          controller: accountNumCtrl,
+                          keyboardType: TextInputType.number,
+                          maxLength: 10,
+                          decoration: const InputDecoration(
+                            labelText: 'Account Number',
+                            counterText: '',
+                            prefixIcon: Icon(Icons.pin_outlined, size: 18),
+                          ),
+                          validator: (v) => (v == null || v.trim().length != 10) ? '10 digits required' : null,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        flex: 4,
+                        child: TextFormField(
+                          controller: accountNameCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Account Name',
+                            prefixIcon: Icon(Icons.badge_outlined, size: 18),
+                          ),
+                          validator: (v) => (v == null || v.trim().isEmpty) ? 'Account name required' : null,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  TextFormField(
+                    controller: notesCtrl,
+                    maxLines: 2,
+                    decoration: const InputDecoration(
+                      labelText: 'Notes for Merchant (Optional)',
+                      hintText: 'e.g. Weekly closing payout',
+                      prefixIcon: Icon(Icons.note_alt_outlined, size: 18),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isSubmitting ? null : () => Navigator.of(ctx).pop(),
+              child: Text('Cancel', style: GoogleFonts.inter(color: const Color(0xFF64748B))),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF10B981),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: isSubmitting
+                  ? null
+                  : () async {
+                      if (!formKey.currentState!.validate()) return;
+                      setDialogState(() => isSubmitting = true);
+                      final messenger = ScaffoldMessenger.of(context);
+                      final reqAmount = double.parse(amountCtrl.text.trim());
+
+                      try {
+                        await ref.read(clientPortalProvider.notifier).requestCloserPayout(
+                          closerId: closer.id,
+                          amount: reqAmount,
+                          bankName: bankCtrl.text.trim(),
+                          accountNumber: accountNumCtrl.text.trim(),
+                          accountName: accountNameCtrl.text.trim(),
+                          notes: notesCtrl.text.trim().isNotEmpty ? notesCtrl.text.trim() : null,
+                        );
+
+                        if (context.mounted) Navigator.of(ctx).pop();
+
+                        if (mounted) {
+                          messenger.showSnackBar(
+                            SnackBar(
+                              backgroundColor: const Color(0xFF10B981),
+                              content: Text('✅ Payout request for ₦${reqAmount.toStringAsFixed(0)} submitted to merchant!'),
+                            ),
+                          );
+                        } else if (mounted) {
+                          messenger.showSnackBar(
+                            const SnackBar(
+                              backgroundColor: Color(0xFFEF4444),
+                              content: Text('⚠️ Could not submit payout request. Please try again.'),
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          messenger.showSnackBar(
+                            SnackBar(backgroundColor: const Color(0xFFEF4444), content: Text('Error: $e')),
+                          );
+                        }
+                      } finally {
+                        if (context.mounted) setDialogState(() => isSubmitting = false);
+                      }
+                    },
+              child: isSubmitting
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : Text('Submit Request', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showCloserPayoutHistorySheet(BuildContext context, ClientCloser closer) {
+    final currencyFormatter = NumberFormat.currency(symbol: '₦', decimalDigits: 0);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Consumer(
+        builder: (context, ref, _) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          final state = ref.watch(clientPortalProvider);
+          final myPayouts = state.closerPayouts.where((p) => p.closerId == closer.id).toList();
+
+          return Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.85,
+            ),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF151D36) : Colors.white,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: Column(
+              children: [
+                // Top Handle & Header
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 16, 12),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.receipt_long_rounded, color: Color(0xFF10B981), size: 20),
+                          ),
+                          const SizedBox(width: 10),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Payout History & Receipts',
+                                style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16),
+                              ),
+                              Text(
+                                '${myPayouts.length} total payout transactions',
+                                style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+
+                // Payouts List
+                Expanded(
+                  child: myPayouts.isEmpty
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(32),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.account_balance_wallet_outlined, size: 48, color: Color(0xFF94A3B8)),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'No payout records yet',
+                                  style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'When you request payouts and the merchant disburses them, receipts and payment proofs will be listed here.',
+                                  style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : ListView.separated(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: myPayouts.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 12),
+                          itemBuilder: (context, index) {
+                            final p = myPayouts[index];
+                            Color statusColor;
+                            String statusLabel;
+                            switch (p.status.toLowerCase()) {
+                              case 'completed':
+                              case 'confirmed':
+                                statusColor = const Color(0xFF10B981);
+                                statusLabel = 'CONFIRMED';
+                                break;
+                              case 'remitted':
+                                statusColor = const Color(0xFF2563EB);
+                                statusLabel = 'REMITTED';
+                                break;
+                              case 'rejected':
+                                statusColor = const Color(0xFFEF4444);
+                                statusLabel = 'REJECTED';
+                                break;
+                              default:
+                                statusColor = const Color(0xFFF59E0B);
+                                statusLabel = 'PENDING';
+                            }
+
+                            return Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF0B1021) : const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0),
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        currencyFormatter.format(p.amount),
+                                        style: GoogleFonts.inter(
+                                          fontSize: 17,
+                                          fontWeight: FontWeight.w900,
+                                          color: const Color(0xFF10B981),
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: statusColor.withValues(alpha: 0.12),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          statusLabel,
+                                          style: GoogleFonts.inter(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w800,
+                                            color: statusColor,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Payout ID: ${p.payoutNumber} • ${DateFormat("MMM d, yyyy • h:mm a").format(p.createdAt)}',
+                                    style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                                  ),
+                                  if (p.disbursementRef != null) ...[
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Bank Ref: ${p.disbursementRef}',
+                                      style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF2563EB)),
+                                    ),
+                                  ],
+                                  if (p.bankName.isNotEmpty) ...[
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Sent to: ${p.bankName} • ${p.accountNumber} (${p.accountName})',
+                                      style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
+                                    ),
+                                  ],
+                                  const SizedBox(height: 10),
+
+                                  // Actions: View Receipt & Confirm
+                                  Row(
+                                    children: [
+                                      if (p.hasReceipt)
+                                        Expanded(
+                                          child: OutlinedButton.icon(
+                                            style: OutlinedButton.styleFrom(
+                                              foregroundColor: const Color(0xFF2563EB),
+                                              side: const BorderSide(color: Color(0xFF2563EB)),
+                                              padding: const EdgeInsets.symmetric(vertical: 8),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                            ),
+                                            onPressed: () {
+                                              PayoutReceiptPreviewDialog.show(
+                                                context,
+                                                receiptUrl: p.proofOfPaymentUrl!,
+                                                title: 'Transfer Receipt • ${p.payoutNumber}',
+                                                subtitle: 'Disbursed by Merchant',
+                                                amountFormatted: currencyFormatter.format(p.amount),
+                                              );
+                                            },
+                                            icon: const Icon(Icons.receipt_long_rounded, size: 14),
+                                            label: Text('View Receipt Proof', style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                                          ),
+                                        ),
+                                      if (p.hasReceipt && p.isRemitted) const SizedBox(width: 8),
+                                      if (p.isRemitted)
+                                        Expanded(
+                                          child: ElevatedButton.icon(
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: const Color(0xFF10B981),
+                                              foregroundColor: Colors.white,
+                                              padding: const EdgeInsets.symmetric(vertical: 8),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                              elevation: 0,
+                                            ),
+                                            onPressed: () => _showConfirmCloserPayoutModal(context, p),
+                                            icon: const Icon(Icons.check_circle_rounded, size: 14),
+                                            label: Text('Confirm Funds', style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showConfirmCloserPayoutModal(BuildContext context, ClientCloserPayout payout) {
+    final currencyFormatter = NumberFormat.currency(symbol: '₦', decimalDigits: 0);
+    final notesController = TextEditingController(text: 'Received in bank account. All balanced.');
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 22),
+            const SizedBox(width: 8),
+            Text('Confirm Receipt of Funds', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Payout: ${payout.payoutNumber}', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 6),
+            Text(
+              currencyFormatter.format(payout.amount),
+              style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w900, color: const Color(0xFF10B981)),
+            ),
+            const SizedBox(height: 6),
+            Text('Bank: ${payout.bankName} • ${payout.accountNumber}', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+            if (payout.disbursementRef != null) ...[
+              const SizedBox(height: 4),
+              Text('Bank Ref: ${payout.disbursementRef}', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB))),
+            ],
+            const SizedBox(height: 14),
+            TextField(
+              controller: notesController,
+              decoration: const InputDecoration(
+                labelText: 'Confirmation Notes',
+                hintText: 'e.g. Funds verified',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel', style: GoogleFonts.inter(color: const Color(0xFF64748B))),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF10B981),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final messenger = ScaffoldMessenger.of(context);
+              try {
+                await ref.read(clientPortalProvider.notifier).confirmCloserPayout(
+                  payoutId: payout.id,
+                  notes: notesController.text.trim(),
+                );
+                if (mounted) {
+                  messenger.showSnackBar(
+                    SnackBar(
+                      backgroundColor: const Color(0xFF10B981),
+                      content: Text('✅ Receipt confirmed for ${currencyFormatter.format(payout.amount)}! Payout marked completed.'),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  messenger.showSnackBar(
+                    SnackBar(backgroundColor: const Color(0xFFEF4444), content: Text('Error confirming payout: $e')),
+                  );
+                }
+              }
+            },
+            child: Text('Confirm Receipt', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+          ),
+        ],
       ),
     );
   }

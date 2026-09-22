@@ -43,6 +43,39 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
   Timer? _searchDebounceTimer;
   int _masterCurrentPage = 0;
   int _masterPageSize = 25;
+  OrderEntity? _selectedOrder;
+
+  void _openOrderDetail(OrderEntity order) {
+    setState(() {
+      _selectedOrder = order;
+    });
+  }
+
+  void _closeOrderDetail() {
+    setState(() {
+      _selectedOrder = null;
+    });
+  }
+
+  void _selectPreviousOrder(List<OrderEntity> currentList) {
+    if (_selectedOrder == null || currentList.isEmpty) return;
+    final idx = currentList.indexWhere((o) => o.id == _selectedOrder!.id || o.orderNumber == _selectedOrder!.orderNumber);
+    if (idx > 0) {
+      setState(() {
+        _selectedOrder = currentList[idx - 1];
+      });
+    }
+  }
+
+  void _selectNextOrder(List<OrderEntity> currentList) {
+    if (_selectedOrder == null || currentList.isEmpty) return;
+    final idx = currentList.indexWhere((o) => o.id == _selectedOrder!.id || o.orderNumber == _selectedOrder!.orderNumber);
+    if (idx != -1 && idx < currentList.length - 1) {
+      setState(() {
+        _selectedOrder = currentList[idx + 1];
+      });
+    }
+  }
 
   void _onDebouncedSearch(void Function() action) {
     _searchDebounceTimer?.cancel();
@@ -165,18 +198,114 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
     final deliveredOrders = dateFilteredOrders.where((o) => o.status == 'delivered').toList();
     final failedOrders = dateFilteredOrders.where((o) => o.status == 'cancelled' || o.status == 'failed' || o.status == 'call_back' || o.status == 'returned').toList();
 
+    OrderEntity? liveSelectedOrder;
+    if (_selectedOrder != null) {
+      liveSelectedOrder = ordersState.orders.firstWhere(
+        (o) => o.id == _selectedOrder!.id || o.orderNumber == _selectedOrder!.orderNumber,
+        orElse: () => _selectedOrder!,
+      );
+    }
+
     return SafeArea(
       child: Material(
         color: Colors.transparent,
-        child: _buildAllOrdersView(
-          isDark,
-          dateFilteredOrders,
-          dcState,
-          ordersState,
-          unassignedOrders.length,
-          inTransitOrders.length,
-          deliveredOrders.length,
-          failedOrders.length,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isDesktop = constraints.maxWidth >= 960;
+            final isPanelOpen = liveSelectedOrder != null;
+
+            final mainView = _buildAllOrdersView(
+              isDark,
+              dateFilteredOrders,
+              dcState,
+              ordersState,
+              unassignedOrders.length,
+              inTransitOrders.length,
+              deliveredOrders.length,
+              failedOrders.length,
+            );
+
+            if (!isPanelOpen) {
+              return mainView;
+            }
+
+            // Desktop layout: Orders Queue on left, Details Panel docked on right WITHOUT dark overlay!
+            if (isDesktop) {
+              final panelWidth = (constraints.maxWidth * 0.44).clamp(460.0, 560.0);
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: mainView,
+                  ),
+                  Container(
+                    width: panelWidth,
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                      border: Border(
+                        left: BorderSide(
+                          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                          width: 1.5,
+                        ),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.08),
+                          blurRadius: 16,
+                          offset: const Offset(-4, 0),
+                        ),
+                      ],
+                    ),
+                    child: DCOrderDetailModal(
+                      order: liveSelectedOrder,
+                      onClose: _closeOrderDetail,
+                      onPreviousOrder: () => _selectPreviousOrder(dateFilteredOrders),
+                      onNextOrder: () => _selectNextOrder(dateFilteredOrders),
+                      isEmbeddedPanel: true,
+                    ),
+                  ),
+                ],
+              );
+            }
+
+            // Mobile / Tablet layout: Slide-over right panel without blocking dark scrim
+            return Stack(
+              children: [
+                mainView,
+                Positioned(
+                  top: 0,
+                  bottom: 0,
+                  right: 0,
+                  width: constraints.maxWidth > 520 ? 500 : constraints.maxWidth,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                      border: Border(
+                        left: BorderSide(
+                          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                          width: 1.5,
+                        ),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.15),
+                          blurRadius: 20,
+                          offset: const Offset(-5, 0),
+                        ),
+                      ],
+                    ),
+                    child: DCOrderDetailModal(
+                      order: liveSelectedOrder,
+                      onClose: _closeOrderDetail,
+                      onPreviousOrder: () => _selectPreviousOrder(dateFilteredOrders),
+                      onNextOrder: () => _selectNextOrder(dateFilteredOrders),
+                      isEmbeddedPanel: true,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -1382,10 +1511,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
               enablePagination: false,
               rowHeight: 74.0,
               brandPrimary: const Color(0xFF2563EB),
-              onRowTap: (order) => showDialog(
-                context: context,
-                builder: (ctx) => DCOrderDetailModal(order: order),
-              ),
+              onRowTap: (order) => _openOrderDetail(order),
               columns: [
                 // 1. Order # & Date
                 ExcelColumnDef<OrderEntity>(
@@ -1718,12 +1844,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
                           constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
                           icon: const Icon(Icons.visibility_outlined, size: 16, color: Color(0xFF2563EB)),
                           tooltip: 'View Order Details & Audit Trail',
-                          onPressed: () {
-                            showDialog(
-                              context: context,
-                              builder: (ctx) => DCOrderDetailModal(order: order),
-                            );
-                          },
+                          onPressed: () => _openOrderDetail(order),
                         ),
                       ],
                     );
@@ -1823,12 +1944,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
           final isFailed = order.status == 'cancelled' || order.status == 'failed' || order.status == 'call_back';
 
           return InkWell(
-            onTap: () {
-              showDialog(
-                context: context,
-                builder: (ctx) => DCOrderDetailModal(order: order),
-              );
-            },
+            onTap: () => _openOrderDetail(order),
             borderRadius: BorderRadius.circular(14),
             child: Container(
               padding: const EdgeInsets.all(14),
@@ -1911,7 +2027,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
                             ),
                           ),
                           OutlinedButton(
-                            onPressed: () => showDialog(context: context, builder: (ctx) => DCOrderDetailModal(order: order)),
+                            onPressed: () => _openOrderDetail(order),
                             style: OutlinedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),

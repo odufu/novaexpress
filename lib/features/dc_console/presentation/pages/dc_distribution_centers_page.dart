@@ -8,6 +8,7 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/entities/distribution_center.dart';
 import '../providers/dc_console_provider.dart';
 import 'dc_detail_page.dart';
+import '../../../client_portal/presentation/widgets/pangea_excel_data_table.dart';
 
 class DCDistributionCentersPage extends ConsumerStatefulWidget {
   const DCDistributionCentersPage({super.key});
@@ -594,330 +595,366 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
     DCConsoleState dcState,
     DCConsoleNotifier notifier,
   ) {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: DataTable(
-            showCheckboxColumn: false,
-            headingRowColor: WidgetStateProperty.all(
-              isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-            ),
-            headingTextStyle: GoogleFonts.inter(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-              letterSpacing: 0.2,
-            ),
-            dataRowMinHeight: 68,
-            dataRowMaxHeight: 74,
-            columns: const [
-              DataColumn(label: Text('DISTRIBUTION CENTER')),
-              DataColumn(label: Text('LOCATION')),
-              DataColumn(label: Text('COVERAGE ZONES')),
-              DataColumn(label: Text('STORAGE VOLUME')),
-              DataColumn(label: Text('RIDERS & FLEET')),
-              DataColumn(label: Text('MANAGER & CONTACT')),
-              DataColumn(label: Text('STATUS')),
-              DataColumn(label: Text('ACTIONS')),
-            ],
-            rows: dcs.map((dc) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: PangeaExcelDataTable<DistributionCenter>(
+        items: dcs,
+        enablePagination: true,
+        initialPageSize: 20,
+        rowHeight: 70.0,
+        brandPrimary: const Color(0xFF2563EB),
+        onRowTap: (dc) => setState(() => _selectedDcForDetail = dc),
+        columns: [
+          ExcelColumnDef<DistributionCenter>(
+            key: 'dc_name',
+            group: 'Facility Identification',
+            label: 'DISTRIBUTION CENTER',
+            defaultWidth: 260,
+            minWidth: 200,
+            searchString: (dc) => '${dc.name} ${dc.code} ${dc.isHub ? "Hub" : "Depot"}',
+            sortValue: (dc) => dc.name,
+            cellBuilder: (context, dc, row, isDark, brand) {
               final isCurrentActiveHub = dc.id == dcState.activeHubId || dc.code == dcState.activeHubCode;
-              return DataRow(
-                onSelectChanged: (_) {
-                  setState(() => _selectedDcForDetail = dc);
-                },
-                cells: [
-                  // DC Name & Code
-                  DataCell(
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: dc.isHub
-                                ? const Color(0xFFF37021).withValues(alpha: 0.12)
-                                : const Color(0xFF2563EB).withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(
-                            dc.isHub ? Icons.warehouse_rounded : Icons.apartment_rounded,
-                            color: dc.isHub ? const Color(0xFFF37021) : const Color(0xFF2563EB),
-                            size: 20,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Row(
-                              children: [
-                                Text(
-                                  dc.name,
-                                  style: GoogleFonts.inter(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                    color: isDark ? Colors.white : const Color(0xFF0F172A),
-                                  ),
-                                ),
-                                if (isCurrentActiveHub) ...[
-                                  const SizedBox(width: 6),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFF37021),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: const Text(
-                                      'ACTIVE',
-                                      style: TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                            const SizedBox(height: 3),
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                                  decoration: BoxDecoration(
-                                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    dc.code,
-                                    style: GoogleFonts.firaCode(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                      color: const Color(0xFF2563EB),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  dc.isHub ? 'Regional Hub' : 'Satellite Depot',
-                                  style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ],
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: dc.isHub
+                          ? const Color(0xFFF37021).withValues(alpha: 0.12)
+                          : const Color(0xFF2563EB).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      dc.isHub ? Icons.warehouse_rounded : Icons.apartment_rounded,
+                      color: dc.isHub ? const Color(0xFFF37021) : const Color(0xFF2563EB),
+                      size: 20,
                     ),
                   ),
-
-                  // Location
-                  DataCell(
-                    Column(
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(
-                          dc.fullLocation,
-                          style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          dc.address,
-                          style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Coverage Zones
-                  DataCell(
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          '${dc.operatingZones.length} Covered LGAs',
-                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
-                        ),
-                        const SizedBox(height: 4),
                         Row(
                           children: [
-                            ...dc.operatingZones.take(2).map((z) => Container(
-                              margin: const EdgeInsets.only(right: 4),
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            Expanded(
+                              child: Text(
+                                dc.name,
+                                style: GoogleFonts.inter(
+                                   fontSize: 13,
+                                   fontWeight: FontWeight.bold,
+                                   color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                 ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (isCurrentActiveHub) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF37021),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Text(
+                                  'ACTIVE',
+                                  style: TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                               decoration: BoxDecoration(
                                 color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
                                 borderRadius: BorderRadius.circular(4),
-                                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                               ),
-                              child: Text(z, style: const TextStyle(fontSize: 10)),
-                            )),
-                            if (dc.operatingZones.length > 2)
-                              Text('+${dc.operatingZones.length - 2} more', style: const TextStyle(fontSize: 10, color: Color(0xFF64748B))),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Storage Volume
-                  DataCell(
-                    Text(
-                      dc.displayCapacity,
-                      style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600),
-                    ),
-                  ),
-
-                  // Riders & Fleet
-                  DataCell(
-                    Row(
-                      children: [
-                        const Icon(Icons.two_wheeler_rounded, size: 16, color: Color(0xFF10B981)),
-                        const SizedBox(width: 6),
-                        Text(
-                          '${dc.totalAssignedRiders} Riders',
-                          style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Manager & Contact
-                  DataCell(
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          dc.managerName ?? 'Unassigned Manager',
-                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600),
-                        ),
-                        if (dc.contactPhone != null && dc.contactPhone!.isNotEmpty)
-                          Text(
-                            dc.contactPhone!,
-                            style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
-                          ),
-                      ],
-                    ),
-                  ),
-
-                  // Status
-                  DataCell(
-                    InkWell(
-                      onTap: () => notifier.toggleDistributionCenterStatus(dc.id, !dc.isActive),
-                      borderRadius: BorderRadius.circular(20),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: dc.isActive
-                              ? const Color(0xFF10B981).withValues(alpha: 0.15)
-                              : const Color(0xFF94A3B8).withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: dc.isActive
-                                ? const Color(0xFF10B981).withValues(alpha: 0.3)
-                                : const Color(0xFF94A3B8).withValues(alpha: 0.3),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 6,
-                              height: 6,
-                              decoration: BoxDecoration(
-                                color: dc.isActive ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
-                                shape: BoxShape.circle,
+                              child: Text(
+                                dc.code,
+                                style: GoogleFonts.firaCode(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: const Color(0xFF2563EB),
+                                ),
                               ),
                             ),
-                            const SizedBox(width: 5),
-                            Text(
-                              dc.isActive ? 'ONLINE' : 'OFFLINE',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: dc.isActive ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                dc.isHub ? 'Regional Hub' : 'Satellite Depot',
+                                style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // Actions
-                  DataCell(
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Tooltip(
-                          message: 'Open DC Hub Console & Operations',
-                          child: ElevatedButton.icon(
-                            onPressed: () {
-                              setState(() => _selectedDcForDetail = dc);
-                            },
-                            icon: const Icon(Icons.arrow_forward_rounded, size: 14, color: Colors.white),
-                            label: const Text('Open Console', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF2563EB),
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        OutlinedButton.icon(
-                          onPressed: () => _showCreateOrEditDCDialog(context, isDark, existingDc: dc),
-                          icon: const Icon(Icons.edit_note_rounded, size: 15),
-                          label: const Text('Edit Details', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                          ),
-                        ),
-                        IconButton(
-                          icon: Icon(
-                            isCurrentActiveHub ? Icons.check_circle_rounded : Icons.swap_horiz_rounded,
-                            size: 20,
-                            color: isCurrentActiveHub ? const Color(0xFF10B981) : const Color(0xFFF37021),
-                          ),
-                          tooltip: isCurrentActiveHub ? 'Currently Active DC' : 'Switch Active Hub',
-                          onPressed: isCurrentActiveHub ? null : () {
-                            notifier.switchActiveHub(dc);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Active Hub switched to ${dc.name} (${dc.code})'),
-                                backgroundColor: const Color(0xFF10B981),
-                                duration: const Duration(seconds: 2),
-                              ),
-                            );
-                          },
                         ),
                       ],
                     ),
                   ),
                 ],
               );
-            }).toList(),
+            },
           ),
-        ),
+          ExcelColumnDef<DistributionCenter>(
+            key: 'location',
+            group: 'Geographic Region',
+            label: 'LOCATION',
+            defaultWidth: 190,
+            minWidth: 140,
+            searchString: (dc) => '${dc.fullLocation} ${dc.address}',
+            sortValue: (dc) => dc.fullLocation,
+            cellBuilder: (context, dc, row, isDark, brand) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    dc.fullLocation,
+                    style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    dc.address,
+                    style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              );
+            },
+          ),
+          ExcelColumnDef<DistributionCenter>(
+            key: 'zones',
+            group: 'Geographic Region',
+            label: 'COVERAGE ZONES',
+            defaultWidth: 230,
+            minWidth: 170,
+            searchString: (dc) => dc.operatingZones.join(' '),
+            sortValue: (dc) => dc.operatingZones.length,
+            cellBuilder: (context, dc, row, isDark, brand) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    '${dc.operatingZones.length} Covered LGAs',
+                    style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ...dc.operatingZones.take(2).map((z) => Container(
+                          margin: const EdgeInsets.only(right: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                          ),
+                          child: Text(z, style: const TextStyle(fontSize: 10)),
+                        )),
+                        if (dc.operatingZones.length > 2)
+                          Text('+${dc.operatingZones.length - 2} more', style: const TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+          ExcelColumnDef<DistributionCenter>(
+            key: 'storage',
+            group: 'Operational Capacity',
+            label: 'STORAGE VOLUME',
+            defaultWidth: 150,
+            minWidth: 110,
+            searchString: (dc) => dc.displayCapacity,
+            sortValue: (dc) => dc.storageCapacityUnits,
+            cellBuilder: (context, dc, row, isDark, brand) {
+              return Text(
+                dc.displayCapacity,
+                style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600),
+                overflow: TextOverflow.ellipsis,
+              );
+            },
+          ),
+          ExcelColumnDef<DistributionCenter>(
+            key: 'riders',
+            group: 'Operational Capacity',
+            label: 'RIDERS & FLEET',
+            defaultWidth: 140,
+            minWidth: 110,
+            searchString: (dc) => '${dc.totalAssignedRiders}',
+            sortValue: (dc) => dc.totalAssignedRiders,
+            cellBuilder: (context, dc, row, isDark, brand) {
+              return Row(
+                children: [
+                  const Icon(Icons.two_wheeler_rounded, size: 16, color: Color(0xFF10B981)),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${dc.totalAssignedRiders} Riders',
+                    style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              );
+            },
+          ),
+          ExcelColumnDef<DistributionCenter>(
+            key: 'manager',
+            group: 'Management & Contact',
+            label: 'MANAGER & CONTACT',
+            defaultWidth: 180,
+            minWidth: 130,
+            searchString: (dc) => '${dc.managerName ?? ""} ${dc.contactPhone ?? ""}',
+            sortValue: (dc) => dc.managerName ?? '',
+            cellBuilder: (context, dc, row, isDark, brand) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    dc.managerName ?? 'Unassigned Manager',
+                    style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (dc.contactPhone != null && dc.contactPhone!.isNotEmpty)
+                    Text(
+                      dc.contactPhone!,
+                      style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
+              );
+            },
+          ),
+          ExcelColumnDef<DistributionCenter>(
+            key: 'status',
+            group: 'Operational Status',
+            label: 'STATUS',
+            defaultWidth: 120,
+            minWidth: 100,
+            sortValue: (dc) => dc.isActive ? 1 : 0,
+            cellBuilder: (context, dc, row, isDark, brand) {
+              return Align(
+                alignment: Alignment.centerLeft,
+                child: InkWell(
+                  onTap: () => notifier.toggleDistributionCenterStatus(dc.id, !dc.isActive),
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: dc.isActive
+                          ? const Color(0xFF10B981).withValues(alpha: 0.15)
+                          : const Color(0xFF94A3B8).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: dc.isActive
+                            ? const Color(0xFF10B981).withValues(alpha: 0.3)
+                            : const Color(0xFF94A3B8).withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: dc.isActive ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          dc.isActive ? 'ONLINE' : 'OFFLINE',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: dc.isActive ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+          ExcelColumnDef<DistributionCenter>(
+            key: 'actions',
+            group: 'Actions',
+            label: 'ACTIONS',
+            defaultWidth: 290,
+            minWidth: 250,
+            cellBuilder: (context, dc, row, isDark, brand) {
+              final isCurrentActiveHub = dc.id == dcState.activeHubId || dc.code == dcState.activeHubCode;
+              return SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Tooltip(
+                      message: 'Open DC Hub Console & Operations',
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          setState(() => _selectedDcForDetail = dc);
+                        },
+                        icon: const Icon(Icons.arrow_forward_rounded, size: 14, color: Colors.white),
+                        label: const Text('Open Console', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2563EB),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    OutlinedButton.icon(
+                      onPressed: () => _showCreateOrEditDCDialog(context, isDark, existingDc: dc),
+                      icon: const Icon(Icons.edit_note_rounded, size: 15),
+                      label: const Text('Edit Details', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    IconButton(
+                      icon: Icon(
+                        isCurrentActiveHub ? Icons.check_circle_rounded : Icons.swap_horiz_rounded,
+                        size: 20,
+                        color: isCurrentActiveHub ? const Color(0xFF10B981) : const Color(0xFFF37021),
+                      ),
+                      tooltip: isCurrentActiveHub ? 'Currently Active DC' : 'Switch Active Hub',
+                      onPressed: isCurrentActiveHub ? null : () {
+                        notifier.switchActiveHub(dc);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Active Hub switched to ${dc.name} (${dc.code})'),
+                            backgroundColor: const Color(0xFF10B981),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }

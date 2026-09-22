@@ -15,6 +15,7 @@ import '../../domain/entities/dc_finance_settings.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
 import '../../domain/entities/dc_transaction_record.dart';
 import '../providers/dc_console_provider.dart';
+import '../../../client_portal/presentation/widgets/pangea_excel_data_table.dart';
 
 final riderOrdersSearchProvider = StateProvider.autoDispose<String>((ref) => '');
 final riderOrdersFilterProvider = StateProvider.autoDispose<String>((ref) => 'all');
@@ -686,118 +687,145 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
             );
           }
 
-          return SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minWidth: constraints.maxWidth),
-              child: DataTable(
-                columnSpacing: 20,
-                horizontalMargin: 16,
-                headingRowHeight: 40,
-                headingRowColor: WidgetStateProperty.all(
-                  isDark ? const Color(0xFF0F172A).withValues(alpha: 0.6) : const Color(0xFFF8FAFC),
-                ),
-                headingTextStyle: GoogleFonts.inter(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  color: const Color(0xFF64748B),
-                  letterSpacing: 0.5,
-                ),
-                columns: const [
-                  DataColumn(label: Text('ORDER #')),
-                  DataColumn(label: Text('CUSTOMER & DESTINATION')),
-                  DataColumn(label: Text('PRODUCT & QTY')),
-                  DataColumn(label: Text('CHANNEL')),
-                  DataColumn(label: Text('AMOUNT')),
-                  DataColumn(label: Text('STATUS')),
-                ],
-                rows: orders.map((order) {
-                  return DataRow(
-                    cells: [
-                      // Order Number
-                      DataCell(
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.local_shipping_outlined, size: 15, color: Color(0xFF2563EB)),
-                            const SizedBox(width: 6),
-                            Text(
-                              order.orderNumber,
-                              style: GoogleFonts.firaCode(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // Customer & Destination
-                      DataCell(
-                        Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              order.customerName,
-                              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            Text(
-                              '${order.customerPhone} • ${order.deliveryAddress}',
-                              style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // Product & Qty
-                      DataCell(
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: PangeaExcelDataTable<OrderEntity>(
+              items: orders,
+              brandPrimary: const Color(0xFF2563EB),
+              rowHeight: 48,
+              enablePagination: true,
+              initialPageSize: 10,
+              columns: [
+                ExcelColumnDef<OrderEntity>(
+                  key: 'orderNum',
+                  label: 'ORDER #',
+                  defaultWidth: 150,
+                  minWidth: 120,
+                  sortValue: (o) => o.orderNumber,
+                  searchString: (o) => o.orderNumber,
+                  cellBuilder: (context, order, row, isDark, brand) {
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.local_shipping_outlined, size: 15, color: Color(0xFF2563EB)),
+                        const SizedBox(width: 6),
                         Text(
-                          '${order.quantity}x ${order.productName}',
-                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500),
+                          order.orderNumber,
+                          style: GoogleFonts.firaCode(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB),
+                          ),
                         ),
-                      ),
-
-                      // Channel
-                      DataCell(
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              order.isDirectTransfer ? Icons.bolt_rounded : Icons.payments_rounded,
-                              size: 14,
-                              color: order.isDirectTransfer ? const Color(0xFF2563EB) : const Color(0xFF10B981),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              order.isDirectTransfer ? 'Paystack' : 'Cash POD',
-                              style: GoogleFonts.inter(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: order.isDirectTransfer ? const Color(0xFF2563EB) : const Color(0xFF10B981),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // Amount
-                      DataCell(
+                      ],
+                    );
+                  },
+                ),
+                ExcelColumnDef<OrderEntity>(
+                  key: 'customer',
+                  label: 'CUSTOMER & DESTINATION',
+                  defaultWidth: 230,
+                  minWidth: 180,
+                  sortValue: (o) => o.customerName,
+                  searchString: (o) => '${o.customerName} ${o.customerPhone} ${o.deliveryAddress}',
+                  cellBuilder: (context, order, row, isDark, brand) {
+                    return Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Text(
-                          CurrencyFormatter.formatNaira(order.totalAmount),
+                          order.customerName,
                           style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
+                          overflow: TextOverflow.ellipsis,
                         ),
+                        Text(
+                          '${order.customerPhone} • ${order.deliveryAddress}',
+                          style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    );
+                  },
+                ),
+                ExcelColumnDef<OrderEntity>(
+                  key: 'product',
+                  label: 'PRODUCT & QTY',
+                  defaultWidth: 180,
+                  minWidth: 140,
+                  sortValue: (o) => o.productName,
+                  searchString: (o) => '${o.quantity}x ${o.productName}',
+                  cellBuilder: (context, order, row, isDark, brand) {
+                    return Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        '${order.quantity}x ${order.productName}',
+                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500),
+                        overflow: TextOverflow.ellipsis,
                       ),
-
-                      // Status
-                      DataCell(_buildOrderStatusPill(order.status)),
-                    ],
-                  );
-                }).toList(),
-              ),
+                    );
+                  },
+                ),
+                ExcelColumnDef<OrderEntity>(
+                  key: 'channel',
+                  label: 'CHANNEL',
+                  defaultWidth: 140,
+                  minWidth: 110,
+                  sortValue: (o) => o.paymentMethod,
+                  searchString: (o) => o.isDirectTransfer ? 'Paystack' : 'Cash POD',
+                  cellBuilder: (context, order, row, isDark, brand) {
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          order.isDirectTransfer ? Icons.bolt_rounded : Icons.payments_rounded,
+                          size: 14,
+                          color: order.isDirectTransfer ? const Color(0xFF2563EB) : const Color(0xFF10B981),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          order.isDirectTransfer ? 'Paystack' : 'Cash POD',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: order.isDirectTransfer ? const Color(0xFF2563EB) : const Color(0xFF10B981),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+                ExcelColumnDef<OrderEntity>(
+                  key: 'amount',
+                  label: 'AMOUNT',
+                  defaultWidth: 130,
+                  minWidth: 100,
+                  sortValue: (o) => o.totalAmount,
+                  searchString: (o) => '${o.totalAmount}',
+                  cellBuilder: (context, order, row, isDark, brand) {
+                    return Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        CurrencyFormatter.formatNaira(order.totalAmount),
+                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                    );
+                  },
+                ),
+                ExcelColumnDef<OrderEntity>(
+                  key: 'status',
+                  label: 'STATUS',
+                  defaultWidth: 130,
+                  minWidth: 100,
+                  sortValue: (o) => o.status,
+                  searchString: (o) => o.status,
+                  cellBuilder: (context, order, row, isDark, brand) {
+                    return Align(
+                      alignment: Alignment.centerLeft,
+                      child: _buildOrderStatusPill(order.status),
+                    );
+                  },
+                ),
+              ],
             ),
           );
         },
@@ -1056,132 +1084,180 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
             );
           }
 
-          return SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minWidth: constraints.maxWidth),
-              child: DataTable(
-                columnSpacing: 18,
-                horizontalMargin: 16,
-                headingRowHeight: 40,
-                headingRowColor: WidgetStateProperty.all(
-                  isDark ? const Color(0xFF0F172A).withValues(alpha: 0.6) : const Color(0xFFF8FAFC),
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: PangeaExcelDataTable<DCTransactionRecord>(
+              items: txns,
+              brandPrimary: const Color(0xFF2563EB),
+              rowHeight: 48,
+              enablePagination: true,
+              initialPageSize: 10,
+              columns: [
+                ExcelColumnDef<DCTransactionRecord>(
+                  key: 'txCode',
+                  label: 'TX / REF CODE',
+                  defaultWidth: 160,
+                  minWidth: 130,
+                  sortValue: (t) => t.transactionCode,
+                  searchString: (t) => t.transactionCode,
+                  cellBuilder: (context, txn, row, isDark, brand) {
+                    return Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        txn.transactionCode,
+                        style: GoogleFonts.firaCode(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB),
+                        ),
+                      ),
+                    );
+                  },
                 ),
-                headingTextStyle: GoogleFonts.inter(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  color: const Color(0xFF64748B),
-                  letterSpacing: 0.5,
+                ExcelColumnDef<DCTransactionRecord>(
+                  key: 'orderRef',
+                  label: 'ORDER REF',
+                  defaultWidth: 140,
+                  minWidth: 110,
+                  sortValue: (t) => t.orderNumber ?? '',
+                  searchString: (t) => t.orderNumber ?? 'Direct Remit',
+                  cellBuilder: (context, txn, row, isDark, brand) {
+                    return Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        txn.orderNumber ?? 'Direct Remit',
+                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                    );
+                  },
                 ),
-                columns: const [
-                  DataColumn(label: Text('TX / REF CODE')),
-                  DataColumn(label: Text('ORDER REF')),
-                  DataColumn(label: Text('PAYMENT CHANNEL')),
-                  DataColumn(label: Text('COLLECTED AMOUNT')),
-                  DataColumn(label: Text('TRANSACTION FEE')),
-                  DataColumn(label: Text('COMMISSION')),
-                  DataColumn(label: Text('STATUS')),
-                  DataColumn(label: Text('DATE & TIME')),
-                ],
-                rows: txns.map((txn) {
-                  final fee = txn.transactionFee > 0
-                      ? txn.transactionFee
-                      : (txn.isPaystack
-                          ? settings.computePaystackFee(txn.amount)
-                          : (txn.isRemittance || txn.isCashPod ? settings.computePosFee(txn.amount) : 0.0));
-                  final feeType = txn.effectiveFeeType;
-
-                  return DataRow(
-                    cells: [
-                      // Tx Code
-                      DataCell(
+                ExcelColumnDef<DCTransactionRecord>(
+                  key: 'channel',
+                  label: 'PAYMENT CHANNEL',
+                  defaultWidth: 160,
+                  minWidth: 120,
+                  sortValue: (t) => t.channel,
+                  searchString: (t) => t.channel,
+                  cellBuilder: (context, txn, row, isDark, brand) {
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          txn.isPaystack ? Icons.bolt_rounded : Icons.account_balance_rounded,
+                          size: 14,
+                          color: txn.isPaystack ? const Color(0xFF2563EB) : const Color(0xFF10B981),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(txn.channel, style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w500)),
+                      ],
+                    );
+                  },
+                ),
+                ExcelColumnDef<DCTransactionRecord>(
+                  key: 'amount',
+                  label: 'COLLECTED AMOUNT',
+                  defaultWidth: 150,
+                  minWidth: 120,
+                  sortValue: (t) => t.amount,
+                  searchString: (t) => '${t.amount}',
+                  cellBuilder: (context, txn, row, isDark, brand) {
+                    return Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        CurrencyFormatter.formatNaira(txn.amount),
+                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                    );
+                  },
+                ),
+                ExcelColumnDef<DCTransactionRecord>(
+                  key: 'fee',
+                  label: 'TRANSACTION FEE',
+                  defaultWidth: 140,
+                  minWidth: 110,
+                  sortValue: (t) => t.transactionFee > 0
+                      ? t.transactionFee
+                      : (t.isPaystack
+                          ? settings.computePaystackFee(t.amount)
+                          : (t.isRemittance || t.isCashPod ? settings.computePosFee(t.amount) : 0.0)),
+                  searchString: (t) => '${t.transactionFee}',
+                  cellBuilder: (context, txn, row, isDark, brand) {
+                    final fee = txn.transactionFee > 0
+                        ? txn.transactionFee
+                        : (txn.isPaystack
+                            ? settings.computePaystackFee(txn.amount)
+                            : (txn.isRemittance || txn.isCashPod ? settings.computePosFee(txn.amount) : 0.0));
+                    final feeType = txn.effectiveFeeType;
+                    return Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Text(
-                          txn.transactionCode,
-                          style: GoogleFonts.firaCode(
-                            fontSize: 12,
+                          fee > 0 ? CurrencyFormatter.formatNaira(fee) : '₦0.00',
+                          style: GoogleFonts.inter(
+                            fontSize: 11.5,
                             fontWeight: FontWeight.bold,
-                            color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB),
+                            color: fee > 0 ? (isDark ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626)) : const Color(0xFF64748B),
                           ),
                         ),
+                        if (fee > 0)
+                          Text(
+                            feeType,
+                            style: GoogleFonts.inter(fontSize: 9.5, color: const Color(0xFF64748B)),
+                          ),
+                      ],
+                    );
+                  },
+                ),
+                ExcelColumnDef<DCTransactionRecord>(
+                  key: 'commission',
+                  label: 'COMMISSION',
+                  defaultWidth: 130,
+                  minWidth: 100,
+                  sortValue: (t) => driver.totalPerDeliveryEntitlement,
+                  searchString: (t) => '${driver.totalPerDeliveryEntitlement}',
+                  cellBuilder: (context, txn, row, isDark, brand) {
+                    return Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        CurrencyFormatter.formatNaira(driver.totalPerDeliveryEntitlement),
+                        style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color(0xFF059669)),
                       ),
-
-                      // Order Ref
-                      DataCell(
-                        Text(
-                          txn.orderNumber ?? 'Direct Remit',
-                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600),
-                        ),
+                    );
+                  },
+                ),
+                ExcelColumnDef<DCTransactionRecord>(
+                  key: 'status',
+                  label: 'STATUS',
+                  defaultWidth: 130,
+                  minWidth: 100,
+                  sortValue: (t) => t.paystackStatusDisplay,
+                  searchString: (t) => t.paystackStatusDisplay,
+                  cellBuilder: (context, txn, row, isDark, brand) {
+                    return Align(
+                      alignment: Alignment.centerLeft,
+                      child: _buildTxnStatusPill(txn.paystackStatusDisplay),
+                    );
+                  },
+                ),
+                ExcelColumnDef<DCTransactionRecord>(
+                  key: 'date',
+                  label: 'DATE & TIME',
+                  defaultWidth: 140,
+                  minWidth: 110,
+                  sortValue: (t) => t.createdAt,
+                  searchString: (t) => '${t.createdAt}',
+                  cellBuilder: (context, txn, row, isDark, brand) {
+                    return Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        '${txn.createdAt.day}/${txn.createdAt.month}/${txn.createdAt.year} ${txn.createdAt.hour.toString().padLeft(2, '0')}:${txn.createdAt.minute.toString().padLeft(2, '0')}',
+                        style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
                       ),
-
-                      // Channel
-                      DataCell(
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              txn.isPaystack ? Icons.bolt_rounded : Icons.account_balance_rounded,
-                              size: 14,
-                              color: txn.isPaystack ? const Color(0xFF2563EB) : const Color(0xFF10B981),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(txn.channel, style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w500)),
-                          ],
-                        ),
-                      ),
-
-                      // Collected Amount
-                      DataCell(
-                        Text(
-                          CurrencyFormatter.formatNaira(txn.amount),
-                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-
-                      // Transaction Fee (Paystack or POS Transfer Agent)
-                      DataCell(
-                        Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              fee > 0 ? CurrencyFormatter.formatNaira(fee) : '₦0.00',
-                              style: GoogleFonts.inter(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.bold,
-                                color: fee > 0 ? (isDark ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626)) : const Color(0xFF64748B),
-                              ),
-                            ),
-                            if (fee > 0)
-                              Text(
-                                feeType,
-                                style: GoogleFonts.inter(fontSize: 9.5, color: const Color(0xFF64748B)),
-                              ),
-                          ],
-                        ),
-                      ),
-
-                      // Commission (Transport + Commission)
-                      DataCell(
-                        Text(
-                          CurrencyFormatter.formatNaira(driver.totalPerDeliveryEntitlement),
-                          style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color(0xFF059669)),
-                        ),
-                      ),
-
-                      // Status (REMITTED, SETTLED, PENDING, PARTIAL)
-                      DataCell(_buildTxnStatusPill(txn.paystackStatusDisplay)),
-
-                      // Date & Time
-                      DataCell(
-                        Text(
-                          '${txn.createdAt.day}/${txn.createdAt.month}/${txn.createdAt.year} ${txn.createdAt.hour.toString().padLeft(2, '0')}:${txn.createdAt.minute.toString().padLeft(2, '0')}',
-                          style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
-                        ),
-                      ),
-                    ],
-                  );
-                }).toList(),
-              ),
+                    );
+                  },
+                ),
+              ],
             ),
           );
         },
@@ -1443,177 +1519,230 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
             );
           }
 
-          return SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minWidth: constraints.maxWidth),
-              child: DataTable(
-                columnSpacing: 18,
-                horizontalMargin: 16,
-                headingRowHeight: 40,
-                headingRowColor: WidgetStateProperty.all(
-                  isDark ? const Color(0xFF0F172A).withValues(alpha: 0.6) : const Color(0xFFF8FAFC),
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: PangeaExcelDataTable<_DriverCustodyStockItem>(
+              items: items,
+              brandPrimary: const Color(0xFF2563EB),
+              rowHeight: 48,
+              enablePagination: true,
+              initialPageSize: 10,
+              columns: [
+                ExcelColumnDef<_DriverCustodyStockItem>(
+                  key: 'sku',
+                  label: 'SKU / CODE',
+                  defaultWidth: 140,
+                  minWidth: 110,
+                  sortValue: (item) => item.sku,
+                  searchString: (item) => item.sku,
+                  cellBuilder: (context, item, row, isDark, brand) {
+                    return Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        item.sku,
+                        style: GoogleFonts.firaCode(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB),
+                        ),
+                      ),
+                    );
+                  },
                 ),
-                headingTextStyle: GoogleFonts.inter(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  color: const Color(0xFF64748B),
-                  letterSpacing: 0.5,
-                ),
-                columns: const [
-                  DataColumn(label: Text('SKU / CODE')),
-                  DataColumn(label: Text('PRODUCT & CLIENT')),
-                  DataColumn(label: Text('FULFILLMENT TYPE')),
-                  DataColumn(label: Text('ASSIGNED')),
-                  DataColumn(label: Text('DELIVERED')),
-                  DataColumn(label: Text('IN CUSTODY')),
-                  DataColumn(label: Text('STATUS')),
-                  DataColumn(label: Text('EST. VALUE')),
-                  DataColumn(label: Text('ACTIONS')),
-                ],
-                rows: items.map((item) {
-                  final totalValue = item.inCustodyUnits * item.unitPrice;
-                  return DataRow(
-                    cells: [
-                      // SKU
-                      DataCell(
+                ExcelColumnDef<_DriverCustodyStockItem>(
+                  key: 'product',
+                  label: 'PRODUCT & CLIENT',
+                  defaultWidth: 230,
+                  minWidth: 180,
+                  sortValue: (item) => item.productName,
+                  searchString: (item) => '${item.productName} ${item.clientName}',
+                  cellBuilder: (context, item, row, isDark, brand) {
+                    return Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Text(
-                          item.sku,
-                          style: GoogleFonts.firaCode(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB),
-                          ),
-                        ),
-                      ),
-
-                      // Product & Client
-                      DataCell(
-                        Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              item.productName,
-                              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            Text(
-                              'Client: ${item.clientName}',
-                              style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // Fulfillment Type
-                      DataCell(
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: item.fulfillmentType == 'distributed_inventory'
-                                ? const Color(0xFF10B981).withValues(alpha: 0.12)
-                                : const Color(0xFF8B5CF6).withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            item.fulfillmentType == 'distributed_inventory' ? '🏢 Shelf Stock' : '📦 Client Package',
-                            style: GoogleFonts.inter(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.bold,
-                              color: item.fulfillmentType == 'distributed_inventory'
-                                  ? const Color(0xFF059669)
-                                  : const Color(0xFF7C3AED),
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      // Assigned Units
-                      DataCell(Text('${item.assignedUnits}', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600))),
-
-                      // Delivered Units
-                      DataCell(
-                        Text(
-                          '${item.deliveredUnits}',
-                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF059669)),
-                        ),
-                      ),
-
-                      // In Custody Units
-                      DataCell(
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: item.isLowStock
-                                ? const Color(0xFFF59E0B).withValues(alpha: 0.15)
-                                : const Color(0xFF2563EB).withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            '${item.inCustodyUnits} units',
-                            style: GoogleFonts.inter(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.bold,
-                              color: item.isLowStock ? const Color(0xFFD97706) : const Color(0xFF2563EB),
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      // Status Badge
-                      DataCell(
-                        item.isLowStock
-                            ? Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  '⚠️ LOW STOCK',
-                                  style: GoogleFonts.inter(fontSize: 9.5, fontWeight: FontWeight.w800, color: const Color(0xFFD97706)),
-                                ),
-                              )
-                            : Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF10B981).withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  'IN CUSTODY',
-                                  style: GoogleFonts.inter(fontSize: 9.5, fontWeight: FontWeight.w800, color: const Color(0xFF059669)),
-                                ),
-                              ),
-                      ),
-
-                      // Estimated Value
-                      DataCell(
-                        Text(
-                          CurrencyFormatter.formatNaira(totalValue),
+                          item.productName,
                           style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-
-                      // Actions: Increase Stock
-                      DataCell(
-                        ElevatedButton.icon(
-                          onPressed: () => _showTopUpRiderStockDialog(context, isDark, driver, item),
-                          icon: const Icon(Icons.add_circle_outline_rounded, size: 14, color: Colors.white),
-                          label: const Text('Top Up', style: TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF10B981),
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            minimumSize: Size.zero,
+                        Text(
+                          'Client: ${item.clientName}',
+                          style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    );
+                  },
+                ),
+                ExcelColumnDef<_DriverCustodyStockItem>(
+                  key: 'fulfillment',
+                  label: 'FULFILLMENT TYPE',
+                  defaultWidth: 160,
+                  minWidth: 130,
+                  sortValue: (item) => item.fulfillmentType,
+                  searchString: (item) => item.fulfillmentType,
+                  cellBuilder: (context, item, row, isDark, brand) {
+                    return Align(
+                      alignment: Alignment.centerLeft,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: item.fulfillmentType == 'distributed_inventory'
+                              ? const Color(0xFF10B981).withValues(alpha: 0.12)
+                              : const Color(0xFF8B5CF6).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          item.fulfillmentType == 'distributed_inventory' ? '🏢 Shelf Stock' : '📦 Client Package',
+                          style: GoogleFonts.inter(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.bold,
+                            color: item.fulfillmentType == 'distributed_inventory'
+                                ? const Color(0xFF059669)
+                                : const Color(0xFF7C3AED),
                           ),
                         ),
                       ),
-                    ],
-                  );
-                }).toList(),
-              ),
+                    );
+                  },
+                ),
+                ExcelColumnDef<_DriverCustodyStockItem>(
+                  key: 'assigned',
+                  label: 'ASSIGNED',
+                  defaultWidth: 110,
+                  minWidth: 90,
+                  sortValue: (item) => item.assignedUnits,
+                  searchString: (item) => '${item.assignedUnits}',
+                  cellBuilder: (context, item, row, isDark, brand) {
+                    return Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text('${item.assignedUnits}', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
+                    );
+                  },
+                ),
+                ExcelColumnDef<_DriverCustodyStockItem>(
+                  key: 'delivered',
+                  label: 'DELIVERED',
+                  defaultWidth: 110,
+                  minWidth: 90,
+                  sortValue: (item) => item.deliveredUnits,
+                  searchString: (item) => '${item.deliveredUnits}',
+                  cellBuilder: (context, item, row, isDark, brand) {
+                    return Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        '${item.deliveredUnits}',
+                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF059669)),
+                      ),
+                    );
+                  },
+                ),
+                ExcelColumnDef<_DriverCustodyStockItem>(
+                  key: 'inCustody',
+                  label: 'IN CUSTODY',
+                  defaultWidth: 130,
+                  minWidth: 100,
+                  sortValue: (item) => item.inCustodyUnits,
+                  searchString: (item) => '${item.inCustodyUnits}',
+                  cellBuilder: (context, item, row, isDark, brand) {
+                    return Align(
+                      alignment: Alignment.centerLeft,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: item.isLowStock
+                              ? const Color(0xFFF59E0B).withValues(alpha: 0.15)
+                              : const Color(0xFF2563EB).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '${item.inCustodyUnits} units',
+                          style: GoogleFonts.inter(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.bold,
+                            color: item.isLowStock ? const Color(0xFFD97706) : const Color(0xFF2563EB),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                ExcelColumnDef<_DriverCustodyStockItem>(
+                  key: 'status',
+                  label: 'STATUS',
+                  defaultWidth: 130,
+                  minWidth: 100,
+                  sortValue: (item) => item.isLowStock ? 0 : 1,
+                  searchString: (item) => item.isLowStock ? 'LOW STOCK' : 'IN CUSTODY',
+                  cellBuilder: (context, item, row, isDark, brand) {
+                    return Align(
+                      alignment: Alignment.centerLeft,
+                      child: item.isLowStock
+                          ? Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                '⚠️ LOW STOCK',
+                                style: GoogleFonts.inter(fontSize: 9.5, fontWeight: FontWeight.w800, color: const Color(0xFFD97706)),
+                              ),
+                            )
+                          : Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'IN CUSTODY',
+                                style: GoogleFonts.inter(fontSize: 9.5, fontWeight: FontWeight.w800, color: const Color(0xFF059669)),
+                              ),
+                            ),
+                    );
+                  },
+                ),
+                ExcelColumnDef<_DriverCustodyStockItem>(
+                  key: 'value',
+                  label: 'EST. VALUE',
+                  defaultWidth: 140,
+                  minWidth: 110,
+                  sortValue: (item) => item.inCustodyUnits * item.unitPrice,
+                  searchString: (item) => '${item.inCustodyUnits * item.unitPrice}',
+                  cellBuilder: (context, item, row, isDark, brand) {
+                    final totalValue = item.inCustodyUnits * item.unitPrice;
+                    return Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        CurrencyFormatter.formatNaira(totalValue),
+                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                    );
+                  },
+                ),
+                ExcelColumnDef<_DriverCustodyStockItem>(
+                  key: 'actions',
+                  label: 'ACTIONS',
+                  defaultWidth: 120,
+                  minWidth: 100,
+                  cellBuilder: (context, item, row, isDark, brand) {
+                    return Center(
+                      child: ElevatedButton.icon(
+                        onPressed: () => _showTopUpRiderStockDialog(context, isDark, driver, item),
+                        icon: const Icon(Icons.add_circle_outline_rounded, size: 14, color: Colors.white),
+                        label: const Text('Top Up', style: TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          minimumSize: Size.zero,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
             ),
           );
         },

@@ -260,6 +260,25 @@ class _PangeaExcelDataTableState<T> extends State<PangeaExcelDataTable<T>> {
     super.dispose();
   }
 
+  List<DropdownMenuItem<int>> _buildPageSizeDropdownItems() {
+    final pageOptions = <int>{10, 20, 25, 50, 100, -1};
+    if (_pageSize > 0 || _pageSize == -1) {
+      pageOptions.add(_pageSize);
+    }
+    final sortedOptions = pageOptions.toList()
+      ..sort((a, b) {
+        if (a == -1) return 1;
+        if (b == -1) return -1;
+        return a.compareTo(b);
+      });
+    return sortedOptions.map((opt) {
+      return DropdownMenuItem<int>(
+        value: opt,
+        child: Text(opt == -1 ? 'All' : '$opt', style: const TextStyle(fontSize: 11.5)),
+      );
+    }).toList();
+  }
+
   double _getColWidth(String key) {
     final def = widget.columns.firstWhere((c) => c.key == key);
     return _colWidths[key] ?? def.defaultWidth;
@@ -889,16 +908,12 @@ class _PangeaExcelDataTableState<T> extends State<PangeaExcelDataTable<T>> {
               const SizedBox(width: 6),
               DropdownButtonHideUnderline(
                 child: DropdownButton<int>(
-                  value: const [10, 25, 50, 100, -1].contains(_pageSize) ? _pageSize : 25,
+                  value: _buildPageSizeDropdownItems().any((i) => i.value == _pageSize)
+                      ? _pageSize
+                      : _buildPageSizeDropdownItems().first.value,
                   isDense: true,
                   dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-                  items: const [
-                    DropdownMenuItem(value: 10, child: Text('10', style: TextStyle(fontSize: 11.5))),
-                    DropdownMenuItem(value: 25, child: Text('25', style: TextStyle(fontSize: 11.5))),
-                    DropdownMenuItem(value: 50, child: Text('50', style: TextStyle(fontSize: 11.5))),
-                    DropdownMenuItem(value: 100, child: Text('100', style: TextStyle(fontSize: 11.5))),
-                    DropdownMenuItem(value: -1, child: Text('All', style: TextStyle(fontSize: 11.5))),
-                  ],
+                  items: _buildPageSizeDropdownItems(),
                   onChanged: (val) {
                     if (val != null) {
                       setState(() {
@@ -1090,16 +1105,12 @@ class _PangeaExcelDataTableState<T> extends State<PangeaExcelDataTable<T>> {
               const SizedBox(width: 6),
               DropdownButtonHideUnderline(
                 child: DropdownButton<int>(
-                  value: _pageSize,
+                  value: _buildPageSizeDropdownItems().any((i) => i.value == _pageSize)
+                      ? _pageSize
+                      : _buildPageSizeDropdownItems().first.value,
                   isDense: true,
                   dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-                  items: const [
-                    DropdownMenuItem(value: 10, child: Text('10', style: TextStyle(fontSize: 11.5))),
-                    DropdownMenuItem(value: 25, child: Text('25', style: TextStyle(fontSize: 11.5))),
-                    DropdownMenuItem(value: 50, child: Text('50', style: TextStyle(fontSize: 11.5))),
-                    DropdownMenuItem(value: 100, child: Text('100', style: TextStyle(fontSize: 11.5))),
-                    DropdownMenuItem(value: -1, child: Text('All', style: TextStyle(fontSize: 11.5))),
-                  ],
+                  items: _buildPageSizeDropdownItems(),
                   onChanged: (val) {
                     if (val != null) {
                       setState(() {
@@ -1333,12 +1344,14 @@ class _PangeaExcelDataRowState<T> extends State<_PangeaExcelDataRow<T>> {
                       ? Border(right: BorderSide(color: widget.borderColor, width: 0.8))
                       : null,
                 ),
-                child: col.cellBuilder(
-                  context,
-                  widget.item,
-                  widget.rowNumber,
-                  widget.isDark,
-                  widget.brandPrimary,
+                child: ClipRect(
+                  child: col.cellBuilder(
+                    context,
+                    widget.item,
+                    widget.rowNumber,
+                    widget.isDark,
+                    widget.brandPrimary,
+                  ),
                 ),
               );
             }).toList(),

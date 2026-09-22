@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -9,8 +8,9 @@ import '../../../dc_console/domain/entities/product_package.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../../domain/entities/client_settlement.dart';
 import '../providers/client_portal_provider.dart';
-import '../widgets/client_order_tracking_modal.dart';
 import '../widgets/client_daily_accumulator_modal.dart';
+import '../widgets/client_order_tracking_modal.dart';
+import '../widgets/client_settlement_detail_modal.dart';
 import '../widgets/pangea_excel_data_table.dart';
 
 class ClientFinancePage extends ConsumerStatefulWidget {
@@ -1658,6 +1658,7 @@ class _ClientFinancePageState extends ConsumerState<ClientFinancePage> {
 
   Widget _buildDailySettlementsTable(BuildContext context, List<ClientSettlement> settlements, bool isDark) {
     final currency = NumberFormat.currency(locale: 'en_NG', symbol: '₦', decimalDigits: 2);
+    final profile = ref.watch(clientPortalProvider).clientProfile;
 
     if (settlements.isEmpty) {
       return Container(
@@ -1710,16 +1711,74 @@ class _ClientFinancePageState extends ConsumerState<ClientFinancePage> {
             separatorBuilder: (_, __) => const Divider(height: 1),
             itemBuilder: (context, idx) {
               final s = settlements[idx];
+              final isRemitted = s.isRemitted;
+              final isCompleted = s.isCompleted;
+
               return ExpansionTile(
                 leading: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0D9488).withValues(alpha: 0.1),
+                    color: isRemitted
+                        ? const Color(0xFFF59E0B).withValues(alpha: 0.12)
+                        : (isCompleted
+                            ? const Color(0xFF10B981).withValues(alpha: 0.12)
+                            : const Color(0xFF0D9488).withValues(alpha: 0.1)),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.check_circle_rounded, color: Color(0xFF0D9488), size: 20),
+                  child: Icon(
+                    isRemitted
+                        ? Icons.pending_actions_rounded
+                        : (isCompleted ? Icons.check_circle_rounded : Icons.receipt_long_rounded),
+                    color: isRemitted
+                        ? const Color(0xFFF59E0B)
+                        : (isCompleted ? const Color(0xFF10B981) : const Color(0xFF0D9488)),
+                    size: 20,
+                  ),
                 ),
-                title: Text(s.settlementNumber, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14)),
+                title: Row(
+                  children: [
+                    Text(s.settlementNumber, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14)),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: isRemitted
+                            ? const Color(0xFFF59E0B).withValues(alpha: 0.15)
+                            : const Color(0xFF10B981).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        isRemitted ? 'Pending Your Approval' : 'Approved & Settled',
+                        style: GoogleFonts.inter(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: isRemitted ? const Color(0xFFD97706) : const Color(0xFF059669),
+                        ),
+                      ),
+                    ),
+                    if (s.hasReceipt) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0D9488).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.attach_file_rounded, size: 11, color: Color(0xFF0D9488)),
+                            const SizedBox(width: 2),
+                            Text(
+                              'Receipt Attached',
+                              style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: const Color(0xFF0D9488)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
                 subtitle: Text(
                   'Settled: ${DateFormat('MMM dd, yyyy - hh:mm a').format(s.settledAt)} | ${s.totalOrdersCount} Orders',
                   style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
@@ -1748,41 +1807,47 @@ class _ClientFinancePageState extends ConsumerState<ClientFinancePage> {
                           _buildSettlementDetailRow('Auxiliary Charges', '- ${currency.format(s.otherChargesDeducted)}', isNegative: true),
                         const Divider(height: 16),
                         _buildSettlementDetailRow('Net Disbursed to Bank', currency.format(s.netPayoutAmount), isBold: true),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 12),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            OutlinedButton.icon(
-                              onPressed: () => _showSettlementReceiptModal(context, s, isDark, currency),
-                              icon: const Icon(Icons.receipt_long_rounded, size: 14, color: Color(0xFF0D9488)),
-                              label: Text(
-                                'View Statement / Receipt',
-                                style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF0D9488)),
+                            ElevatedButton.icon(
+                              onPressed: () => ClientSettlementDetailModal.show(
+                                context: context,
+                                settlement: s,
+                                clientName: profile.companyName,
+                                clientLogo: profile.logoUrl,
                               ),
-                              style: OutlinedButton.styleFrom(
-                                side: const BorderSide(color: Color(0xFF0D9488)),
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              icon: const Icon(Icons.receipt_long_rounded, size: 15, color: Colors.white),
+                              label: Text(
+                                s.hasReceipt ? 'View Details & Transfer Receipt' : 'View Settlement Breakdown',
+                                style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w700, color: Colors.white),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF0D9488),
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               ),
                             ),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (s.payoutReference != null && s.payoutReference!.isNotEmpty)
-                                  Text('Bank Ref: ${s.payoutReference}  |  ', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF10B981).withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    'Cleared & Reconciled',
-                                    style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF10B981)),
-                                  ),
+                            if (isRemitted)
+                              ElevatedButton.icon(
+                                onPressed: () => ClientSettlementDetailModal.show(
+                                  context: context,
+                                  settlement: s,
+                                  clientName: profile.companyName,
+                                  clientLogo: profile.logoUrl,
                                 ),
-                              ],
-                            ),
+                                icon: const Icon(Icons.check_circle_outline_rounded, size: 15, color: Colors.white),
+                                label: Text(
+                                  'Approve Payout',
+                                  style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w700, color: Colors.white),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF10B981),
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                              ),
                           ],
                         ),
                       ],
@@ -1797,160 +1862,6 @@ class _ClientFinancePageState extends ConsumerState<ClientFinancePage> {
     );
   }
 
-  void _showSettlementReceiptModal(BuildContext context, ClientSettlement s, bool isDark, NumberFormat currency) {
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        final formattedDate = DateFormat('MMMM dd, yyyy - hh:mm a').format(s.settledAt);
-        final receiptText = '''
-======================================================
-NOVEXPS LOGISTICS & E-COMMERCE CLEARINGHOUSE
-MERCHANT DAILY DISBURSEMENT STATEMENT
-======================================================
-Settlement Reference : ${s.settlementNumber}
-Bank Disbursement Ref: ${s.payoutReference ?? "DISB-AUTOCLEAR"}
-Status               : Cleared & Reconciled
-Period End (Cutoff)  : ${DateFormat('yyyy-MM-dd 22:00').format(s.periodEnd)}
-Cleared Timestamp    : $formattedDate
-Total Orders Settled : ${s.totalOrdersCount}
-
-DESTINATION BANK ACCOUNT:
-Bank Name            : ${s.destinationBankName.isNotEmpty ? s.destinationBankName : "Registered Merchant Bank"}
-Account Number       : ${s.destinationAccountNumber.isNotEmpty ? s.destinationAccountNumber : "NUBAN on file"}
-
-ITEMIZED CLEARINGHOUSE BREAKDOWN:
-+ Gross Collections   : ${currency.format(s.grossCollections)}
-- Logistics Fees      : ${currency.format(s.logisticsFeesDeducted)}
-- Platform Commission : ${currency.format(s.platformFeesDeducted)}
-- Paystack Gateway Fee: ${currency.format(s.gatewayFeesDeducted)}
-- Failed Order Charge : ${currency.format(s.failedAttemptFeesDeducted)}
-- Auxiliary Charges   : ${currency.format(s.otherChargesDeducted)}
-------------------------------------------------------
-NET DISBURSED TO BANK: ${currency.format(s.netPayoutAmount)}
-======================================================
-''';
-
-        return AlertDialog(
-          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0D9488).withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.receipt_long_rounded, color: Color(0xFF0D9488), size: 22),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Disbursement Statement Voucher',
-                      style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800),
-                    ),
-                    Text(
-                      s.settlementNumber,
-                      style: GoogleFonts.jetBrainsMono(fontSize: 12, color: const Color(0xFF0D9488), fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          content: SizedBox(
-            width: 520,
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('NET DISBURSED AMOUNT', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF64748B))),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF10B981).withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text('Cleared ⚡', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF10B981))),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          currency.format(s.netPayoutAmount),
-                          style: GoogleFonts.inter(fontSize: 26, fontWeight: FontWeight.w900, color: const Color(0xFF0D9488)),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Credited to ${s.destinationBankName.isNotEmpty ? s.destinationBankName : "Bank"} • Ref: ${s.payoutReference ?? "Direct Clearing"}',
-                          style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text('CLEARINGHOUSE DEDUCTION SUMMARY', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w800, color: const Color(0xFF64748B))),
-                  const SizedBox(height: 8),
-                  _buildSettlementDetailRow('Gross Customer Collections', currency.format(s.grossCollections)),
-                  _buildSettlementDetailRow('Logistics Delivery Fees', '- ${currency.format(s.logisticsFeesDeducted)}', isNegative: true),
-                  _buildSettlementDetailRow('Platform Commission Fees', '- ${currency.format(s.platformFeesDeducted)}', isNegative: true),
-                  _buildSettlementDetailRow('Paystack Gateway Charges', '- ${currency.format(s.gatewayFeesDeducted)}', isNegative: true),
-                  if (s.failedAttemptFeesDeducted > 0)
-                    _buildSettlementDetailRow('Failed Delivery Attempt Charges', '- ${currency.format(s.failedAttemptFeesDeducted)}', isNegative: true),
-                  if (s.otherChargesDeducted > 0)
-                    _buildSettlementDetailRow('Auxiliary Charges', '- ${currency.format(s.otherChargesDeducted)}', isNegative: true),
-                  const Divider(height: 16),
-                  _buildSettlementDetailRow('Total Cleared Orders', '${s.totalOrdersCount} Completed Deliveries'),
-                  _buildSettlementDetailRow('Settlement Cutoff Time', DateFormat('MMM dd, yyyy - hh:mm a').format(s.periodEnd)),
-                  _buildSettlementDetailRow('Cleared At', formattedDate),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            OutlinedButton.icon(
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: receiptText));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    backgroundColor: Color(0xFF10B981),
-                    content: Text('Disbursement statement copied to clipboard! Ready to export/print.'),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.copy_rounded, size: 16),
-              label: const Text('Copy Statement'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0D9488),
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Close'),
-            ),
-          ],
-        );
-      },
-    );
-  }
 
   Widget _buildSettlementDetailRow(String label, String value, {bool isNegative = false, bool isBold = false}) {
     return Padding(

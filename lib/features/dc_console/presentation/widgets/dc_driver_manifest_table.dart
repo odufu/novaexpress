@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -8,6 +7,7 @@ import '../../../../core/widgets/user_avatar_widget.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
+import '../../../client_portal/presentation/widgets/pangea_excel_data_table.dart';
 
 final manifestSearchProvider = StateProvider.autoDispose<String>((ref) => '');
 final manifestFilterProvider = StateProvider.autoDispose<String>((ref) => 'all');
@@ -335,319 +335,344 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
                 return _buildMobileCardList(filteredDrivers, allOrders, isDark, getDriverOrders);
               }
 
-              return SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(minWidth: math.max(constraints.maxWidth, 1180.0)),
-                  child: DataTable(
-                    columnSpacing: 14,
-                    horizontalMargin: 14,
-                    dataRowMinHeight: 64,
-                    dataRowMaxHeight: 74,
-                    headingRowHeight: 46,
-                    headingRowColor: WidgetStateProperty.all(
-                      isDark ? const Color(0xFF0B1021).withValues(alpha: 0.5) : const Color(0xFFF8FAFC),
-                    ),
-                    headingTextStyle: GoogleFonts.inter(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.5,
-                      color: const Color(0xFF64748B),
-                    ),
-                    dataTextStyle: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: isDark ? Colors.white : const Color(0xFF031632),
-                    ),
-                    columns: const [
-                      DataColumn(label: Text('AGENT CODE')),
-                      DataColumn(label: Text('RIDER / AGENT')),
-                      DataColumn(label: Text('MODEL')),
-                      DataColumn(label: Text('AGREEMENT')),
-                      DataColumn(label: Text('ZONE & VEHICLE')),
-                      DataColumn(label: Text('STATUS')),
-                      DataColumn(label: Text('SHIFT PROGRESS')),
-                      DataColumn(label: Text('LIVE COD')),
-                      DataColumn(label: Text('STOCK')),
-                      DataColumn(label: Text('ACTION')),
-                    ],
-                    rows: filteredDrivers.map((driver) {
-                      // Live performance calculations based on matched orders
-                      final driverOrders = getDriverOrders(driver);
-
-                      final totalOrders = driverOrders.isNotEmpty ? driverOrders.length : driver.totalAssignedOrders;
-                      final completedOrders = driverOrders.isNotEmpty
-                          ? driverOrders.where((o) => o.isDelivered || o.status.toLowerCase() == 'delivered').length
-                          : driver.completedOrders;
-
-                      final double progressRatio = totalOrders > 0
-                          ? (completedOrders / totalOrders).clamp(0.0, 1.0)
-                          : (driver.routeProgressPercent / 100.0).clamp(0.0, 1.0);
-                      final int progressPercent = (progressRatio * 100).toInt();
-
-                      return DataRow(
-                        onSelectChanged: (_) => widget.onDriverTap?.call(driver),
-                        cells: [
-                          // Agent Code
-                          DataCell(
-                            onTap: () => widget.onDriverTap?.call(driver),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.badge_outlined, size: 14, color: Color(0xFF2563EB)),
-                                const SizedBox(width: 6),
-                                Text(
-                                  driver.driverCode,
-                                  style: GoogleFonts.firaCode(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          // Rider Name & Contact
-                          DataCell(
-                            onTap: () => widget.onDriverTap?.call(driver),
-                            SizedBox(
-                              width: 140,
-                              child: Row(
-                                children: [
-                                  UserAvatarWidget(
-                                    avatarUrl: driver.avatarUrl,
-                                    fullName: driver.name,
-                                    radius: 14,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          driver.name,
-                                          style: GoogleFonts.inter(
-                                            fontSize: 12.5,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        Text(
-                                          driver.phone,
-                                          style: GoogleFonts.inter(
-                                            fontSize: 11,
-                                            color: const Color(0xFF64748B),
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
+              return ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: PangeaExcelDataTable<DCFleetDriver>(
+                  items: filteredDrivers,
+                  enablePagination: true,
+                  initialPageSize: 20,
+                  rowHeight: 68.0,
+                  brandPrimary: const Color(0xFF2563EB),
+                  onRowTap: (driver) => widget.onDriverTap?.call(driver),
+                  columns: [
+                    ExcelColumnDef<DCFleetDriver>(
+                      key: 'code',
+                      group: 'Agent Identity',
+                      label: 'AGENT CODE',
+                      defaultWidth: 140,
+                      minWidth: 100,
+                      searchString: (d) => d.driverCode,
+                      sortValue: (d) => d.driverCode,
+                      cellBuilder: (context, driver, row, isDark, brand) {
+                        return Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.badge_outlined, size: 14, color: Color(0xFF2563EB)),
+                            const SizedBox(width: 6),
+                            Text(
+                              driver.driverCode,
+                              style: GoogleFonts.firaCode(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB),
                               ),
                             ),
-                          ),
-
-                          // Operating Model
-                          DataCell(
-                            onTap: () => widget.onDriverTap?.call(driver),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: driver.isPda
-                                    ? const Color(0xFF2563EB).withValues(alpha: 0.12)
-                                    : const Color(0xFF10B981).withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    driver.isPda ? Icons.phone_android_rounded : Icons.two_wheeler_rounded,
-                                    size: 12,
-                                    color: driver.isPda ? const Color(0xFF2563EB) : const Color(0xFF059669),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    driver.isPda ? 'PDA Agent' : 'In-House Fleet',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      color: driver.isPda ? const Color(0xFF2563EB) : const Color(0xFF059669),
-                                    ),
-                                  ),
-                                ],
-                              ),
+                          ],
+                        );
+                      },
+                    ),
+                    ExcelColumnDef<DCFleetDriver>(
+                      key: 'rider',
+                      group: 'Agent Identity',
+                      label: 'RIDER / AGENT',
+                      defaultWidth: 180,
+                      minWidth: 140,
+                      searchString: (d) => '${d.name} ${d.phone}',
+                      sortValue: (d) => d.name,
+                      cellBuilder: (context, driver, row, isDark, brand) {
+                        return Row(
+                          children: [
+                            UserAvatarWidget(
+                              avatarUrl: driver.avatarUrl,
+                              fullName: driver.name,
+                              radius: 14,
                             ),
-                          ),
-
-                          // Agreement Structure
-                          DataCell(
-                            onTap: () => widget.onDriverTap?.call(driver),
-                            Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '₦${driver.commissionRate.toInt()} + ₦${driver.transportAllowance.toInt()}',
-                                  style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold),
-                                ),
-                                Text(
-                                  driver.isPda ? 'Comm + Transport' : 'Base + Drop Rate',
-                                  style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B)),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          // Zone & Vehicle
-                          DataCell(
-                            onTap: () => widget.onDriverTap?.call(driver),
-                            SizedBox(
-                              width: 150,
+                            const SizedBox(width: 8),
+                            Expanded(
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.location_on_outlined, size: 12, color: Color(0xFF64748B)),
-                                      const SizedBox(width: 2),
-                                      Expanded(
-                                        child: Text(
-                                          driver.assignedZone,
-                                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
+                                  Text(
+                                    driver.name,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                   Text(
-                                    '${driver.vehicleModel} • ${driver.vehiclePlate}',
-                                    style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
+                                    driver.phone,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      color: const Color(0xFF64748B),
+                                    ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ],
                               ),
                             ),
+                          ],
+                        );
+                      },
+                    ),
+                    ExcelColumnDef<DCFleetDriver>(
+                      key: 'model',
+                      group: 'Employment & Contract',
+                      label: 'MODEL',
+                      defaultWidth: 140,
+                      minWidth: 110,
+                      searchString: (d) => d.isPda ? 'PDA Agent' : 'In-House Fleet',
+                      sortValue: (d) => d.isPda ? 'PDA' : 'InHouse',
+                      cellBuilder: (context, driver, row, isDark, brand) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: driver.isPda
+                                ? const Color(0xFF2563EB).withValues(alpha: 0.12)
+                                : const Color(0xFF10B981).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
                           ),
-
-                          // Shift Status
-                          DataCell(
-                            onTap: () => widget.onDriverTap?.call(driver),
-                            _buildStatusPill(driver.status),
-                          ),
-
-                          // Shift Performance & Progress Bar (Delivery over Total Orders)
-                          DataCell(
-                            onTap: () => widget.onDriverTap?.call(driver),
-                            SizedBox(
-                              width: 110,
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        '$completedOrders/$totalOrders',
-                                        style: GoogleFonts.inter(
-                                          fontSize: 11.5,
-                                          fontWeight: FontWeight.bold,
-                                          color: isDark ? Colors.white70 : const Color(0xFF334155),
-                                        ),
-                                      ),
-                                      Text(
-                                        '$progressPercent%',
-                                        style: GoogleFonts.jetBrainsMono(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w800,
-                                          color: totalOrders == 0
-                                              ? const Color(0xFF94A3B8)
-                                              : (progressPercent == 100
-                                                  ? const Color(0xFF10B981)
-                                                  : (driver.isDelayed
-                                                      ? const Color(0xFFEF4444)
-                                                      : const Color(0xFFF37021))),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 5),
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(4),
-                                    child: LinearProgressIndicator(
-                                      value: totalOrders > 0 ? progressRatio : 0.0,
-                                      minHeight: 5,
-                                      backgroundColor: isDark ? const Color(0xFF1E294A) : const Color(0xFFE2E8F0),
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        totalOrders == 0
-                                            ? const Color(0xFF94A3B8).withValues(alpha: 0.3)
-                                            : (progressPercent == 100
-                                                ? const Color(0xFF10B981)
-                                                : (driver.isDelayed
-                                                    ? const Color(0xFFEF4444)
-                                                    : const Color(0xFFF37021))),
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                driver.isPda ? Icons.phone_android_rounded : Icons.two_wheeler_rounded,
+                                size: 12,
+                                color: driver.isPda ? const Color(0xFF2563EB) : const Color(0xFF059669),
                               ),
-                            ),
-                          ),
-
-                          // Live Cash in Hand (COD)
-                          DataCell(
-                            onTap: () => widget.onDriverTap?.call(driver),
-                            Text(
-                              CurrencyFormatter.formatNaira(driver.cashInCustody),
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: const Color(0xFF10B981),
-                              ),
-                            ),
-                          ),
-
-                          // Stock in Custody
-                          DataCell(
-                            onTap: () => widget.onDriverTap?.call(driver),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF8B5CF6).withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                '${driver.itemsInCustody} pkgs',
+                              const SizedBox(width: 4),
+                              Text(
+                                driver.isPda ? 'PDA Agent' : 'In-House Fleet',
                                 style: GoogleFonts.inter(
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
-                                  color: const Color(0xFF8B5CF6),
+                                  color: driver.isPda ? const Color(0xFF2563EB) : const Color(0xFF059669),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                    ExcelColumnDef<DCFleetDriver>(
+                      key: 'agreement',
+                      group: 'Employment & Contract',
+                      label: 'AGREEMENT',
+                      defaultWidth: 160,
+                      minWidth: 120,
+                      searchString: (d) => '₦${d.commissionRate.toInt()} + ₦${d.transportAllowance.toInt()}',
+                      sortValue: (d) => d.commissionRate + d.transportAllowance,
+                      cellBuilder: (context, driver, row, isDark, brand) {
+                        return Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '₦${driver.commissionRate.toInt()} + ₦${driver.transportAllowance.toInt()}',
+                              style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold),
+                            ),
+                            Text(
+                              driver.isPda ? 'Comm + Transport' : 'Base + Drop Rate',
+                              style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B)),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                    ExcelColumnDef<DCFleetDriver>(
+                      key: 'zone_vehicle',
+                      group: 'Field Assignment',
+                      label: 'ZONE & VEHICLE',
+                      defaultWidth: 180,
+                      minWidth: 130,
+                      searchString: (d) => '${d.assignedZone} ${d.vehicleModel} ${d.vehiclePlate}',
+                      sortValue: (d) => d.assignedZone,
+                      cellBuilder: (context, driver, row, isDark, brand) {
+                        return Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.location_on_outlined, size: 12, color: Color(0xFF64748B)),
+                                const SizedBox(width: 2),
+                                Expanded(
+                                  child: Text(
+                                    driver.assignedZone,
+                                    style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Text(
+                              '${driver.vehicleModel} • ${driver.vehiclePlate}',
+                              style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                    ExcelColumnDef<DCFleetDriver>(
+                      key: 'status',
+                      group: 'Field Assignment',
+                      label: 'STATUS',
+                      defaultWidth: 130,
+                      minWidth: 100,
+                      searchString: (d) => d.status,
+                      sortValue: (d) => d.status,
+                      cellBuilder: (context, driver, row, isDark, brand) {
+                        return _buildStatusPill(driver.status);
+                      },
+                    ),
+                    ExcelColumnDef<DCFleetDriver>(
+                      key: 'progress',
+                      group: 'Shift Performance',
+                      label: 'SHIFT PROGRESS',
+                      defaultWidth: 150,
+                      minWidth: 120,
+                      sortValue: (driver) {
+                        final driverOrders = getDriverOrders(driver);
+                        final totalOrders = driverOrders.isNotEmpty ? driverOrders.length : driver.totalAssignedOrders;
+                        final completedOrders = driverOrders.isNotEmpty
+                            ? driverOrders.where((o) => o.isDelivered || o.status.toLowerCase() == 'delivered').length
+                            : driver.completedOrders;
+                        return totalOrders > 0 ? (completedOrders / totalOrders) : 0.0;
+                      },
+                      cellBuilder: (context, driver, row, isDark, brand) {
+                        final driverOrders = getDriverOrders(driver);
+                        final totalOrders = driverOrders.isNotEmpty ? driverOrders.length : driver.totalAssignedOrders;
+                        final completedOrders = driverOrders.isNotEmpty
+                            ? driverOrders.where((o) => o.isDelivered || o.status.toLowerCase() == 'delivered').length
+                            : driver.completedOrders;
+
+                        final double progressRatio = totalOrders > 0
+                            ? (completedOrders / totalOrders).clamp(0.0, 1.0)
+                            : (driver.routeProgressPercent / 100.0).clamp(0.0, 1.0);
+                        final int progressPercent = (progressRatio * 100).toInt();
+
+                        return Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  '$completedOrders/$totalOrders',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: isDark ? Colors.white70 : const Color(0xFF334155),
+                                  ),
+                                ),
+                                Text(
+                                  '$progressPercent%',
+                                  style: GoogleFonts.jetBrainsMono(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    color: totalOrders == 0
+                                        ? const Color(0xFF94A3B8)
+                                        : (progressPercent == 100
+                                            ? const Color(0xFF10B981)
+                                            : (driver.isDelayed
+                                                ? const Color(0xFFEF4444)
+                                                : const Color(0xFFF37021))),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 5),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value: totalOrders > 0 ? progressRatio : 0.0,
+                                minHeight: 5,
+                                backgroundColor: isDark ? const Color(0xFF1E294A) : const Color(0xFFE2E8F0),
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  totalOrders == 0
+                                      ? const Color(0xFF94A3B8).withValues(alpha: 0.3)
+                                      : (progressPercent == 100
+                                          ? const Color(0xFF10B981)
+                                          : (driver.isDelayed
+                                              ? const Color(0xFFEF4444)
+                                              : const Color(0xFFF37021))),
                                 ),
                               ),
                             ),
+                          ],
+                        );
+                      },
+                    ),
+                    ExcelColumnDef<DCFleetDriver>(
+                      key: 'live_cod',
+                      group: 'Shift Performance',
+                      label: 'LIVE COD',
+                      defaultWidth: 130,
+                      minWidth: 100,
+                      align: TextAlign.right,
+                      searchString: (d) => '${d.cashInCustody}',
+                      sortValue: (d) => d.cashInCustody,
+                      cellBuilder: (context, driver, row, isDark, brand) {
+                        return Text(
+                          CurrencyFormatter.formatNaira(driver.cashInCustody),
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF10B981),
                           ),
-
-                          // Action View Details
-                          DataCell(
-                            IconButton(
-                              icon: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF64748B)),
-                              tooltip: 'Open Rider Financials & Order Breakdown',
-                              onPressed: () => widget.onDriverTap?.call(driver),
+                        );
+                      },
+                    ),
+                    ExcelColumnDef<DCFleetDriver>(
+                      key: 'stock',
+                      group: 'Shift Performance',
+                      label: 'STOCK',
+                      defaultWidth: 110,
+                      minWidth: 90,
+                      searchString: (d) => '${d.itemsInCustody}',
+                      sortValue: (d) => d.itemsInCustody,
+                      cellBuilder: (context, driver, row, isDark, brand) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF8B5CF6).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '${driver.itemsInCustody} pkgs',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFF8B5CF6),
                             ),
                           ),
-                        ],
-                      );
-                    }).toList(),
-                  ),
+                        );
+                      },
+                    ),
+                    ExcelColumnDef<DCFleetDriver>(
+                      key: 'action',
+                      group: 'Action',
+                      label: 'ACTION',
+                      defaultWidth: 70,
+                      minWidth: 60,
+                      cellBuilder: (context, driver, row, isDark, brand) {
+                        return Center(
+                          child: IconButton(
+                            icon: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF64748B)),
+                            tooltip: 'Open Rider Financials & Order Breakdown',
+                            onPressed: () => widget.onDriverTap?.call(driver),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                 ),
               );
             },

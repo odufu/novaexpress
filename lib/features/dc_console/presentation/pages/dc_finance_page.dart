@@ -9,8 +9,11 @@ import '../../../finance/domain/entities/remittance.dart';
 import '../../../finance/presentation/providers/finance_provider.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
+import '../../../client_portal/domain/entities/client_settlement.dart';
+import '../../../client_portal/presentation/widgets/client_settlement_detail_modal.dart';
 import '../providers/dc_console_provider.dart';
 import '../widgets/dc_daily_merchant_settlement_modal.dart';
+import '../../../client_portal/presentation/widgets/pangea_excel_data_table.dart';
 
 final dcFinanceFilterProvider = StateProvider.autoDispose<String>((ref) => 'all');
 final dcFinanceSearchProvider = StateProvider.autoDispose<String>((ref) => '');
@@ -158,20 +161,38 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
                 ),
               ),
               const SizedBox(width: 12),
-              ElevatedButton.icon(
-                onPressed: () => _openMerchantSettlementPicker(context, ref, dcState, ordersState.orders),
-                icon: const Icon(Icons.account_balance_wallet_rounded, size: 16, color: Colors.white),
-                label: Text(
-                  'Client Settlement',
-                  style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700, color: Colors.white),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0284C7),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  elevation: 0,
-                ),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () => _showDcSettlementHistoryModal(context, ref, dcState.activeDcId),
+                    icon: const Icon(Icons.receipt_long_rounded, size: 16),
+                    label: Text(
+                      'Settlement History',
+                      style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: () => _openMerchantSettlementPicker(context, ref, dcState, ordersState.orders),
+                    icon: const Icon(Icons.account_balance_wallet_rounded, size: 16, color: Colors.white),
+                    label: Text(
+                      'Client Settlement',
+                      style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700, color: Colors.white),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0284C7),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      elevation: 0,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -520,9 +541,191 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
           ),
         ),
         actions: [
+            OutlinedButton.icon(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _showDcSettlementHistoryModal(context, ref, dcState.activeDcId);
+              },
+              icon: const Icon(Icons.receipt_long_rounded, size: 16),
+              label: const Text('Settlement History & Receipts'),
+            ),
             TextButton(
               onPressed: () => Navigator.pop(ctx),
               child: const Text('Cancel'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showDcSettlementHistoryModal(BuildContext context, WidgetRef ref, String dcId) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0284C7).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.history_rounded, color: Color(0xFF0284C7), size: 22),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Client Settlement Ledger',
+                      style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800),
+                    ),
+                    Text(
+                      'All manual remittances, itemized deductions & attached receipts',
+                      style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 620, maxHeight: 480),
+            child: SizedBox(
+              width: double.maxFinite,
+              child: FutureBuilder<List<ClientSettlement>>(
+                future: ref.read(dcConsoleProvider.notifier).fetchDcClientSettlements(),
+                builder: (fCtx, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  final settlements = snapshot.data ?? [];
+                  if (settlements.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.receipt_long_outlined, size: 40, color: Color(0xFF94A3B8)),
+                          const SizedBox(height: 8),
+                          Text('No Client Settlements Found', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold)),
+                          Text('Fulfill client settlements from the action button above.', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: settlements.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (lCtx, idx) {
+                      final s = settlements[idx];
+                      final isRemitted = s.isRemitted;
+                      final isCompleted = s.isCompleted;
+
+                      return ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: (isCompleted
+                                  ? const Color(0xFF10B981)
+                                  : (isRemitted ? const Color(0xFFF59E0B) : const Color(0xFF0284C7)))
+                              .withValues(alpha: 0.12),
+                          child: Icon(
+                            isCompleted
+                                ? Icons.check_circle_rounded
+                                : (isRemitted ? Icons.pending_actions_rounded : Icons.receipt_rounded),
+                            color: isCompleted
+                                ? const Color(0xFF10B981)
+                                : (isRemitted ? const Color(0xFFF59E0B) : const Color(0xFF0284C7)),
+                            size: 20,
+                          ),
+                        ),
+                        title: Row(
+                          children: [
+                            Text(s.settlementNumber, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: (isCompleted
+                                        ? const Color(0xFF10B981)
+                                        : (isRemitted ? const Color(0xFFF59E0B) : const Color(0xFF64748B)))
+                                    .withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                isCompleted ? 'Completed' : (isRemitted ? 'Remitted' : s.status),
+                                style: GoogleFonts.inter(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: isCompleted
+                                      ? const Color(0xFF059669)
+                                      : (isRemitted ? const Color(0xFFD97706) : const Color(0xFF475569)),
+                                ),
+                              ),
+                            ),
+                            if (s.hasReceipt) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0D9488).withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.attach_file_rounded, size: 10, color: Color(0xFF0D9488)),
+                                    SizedBox(width: 2),
+                                    Text('Receipt', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF0D9488))),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        subtitle: Text(
+                          '${s.destinationBankName} - ${s.destinationAccountNumber} • ${DateFormat('MMM dd, yyyy').format(s.settledAt)}',
+                          style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                        ),
+                        trailing: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              CurrencyFormatter.formatNaira(s.netPayoutAmount),
+                              style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 13.5, color: const Color(0xFF0D9488)),
+                            ),
+                            const Text('View Details →', style: TextStyle(fontSize: 10, color: Color(0xFF0284C7))),
+                          ],
+                        ),
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          final clientObj = ref.read(dcConsoleProvider).clients.where((c) => c.id == s.clientId).firstOrNull;
+                          ClientSettlementDetailModal.show(
+                            context: context,
+                            settlement: s,
+                            isDcView: true,
+                            clientName: clientObj?.companyName,
+                            clientLogo: clientObj?.logoUrl,
+                          );
+                        },
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Close'),
             ),
           ],
         );
@@ -599,276 +802,294 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
   }
 
   Widget _buildRemittancesTable(BuildContext context, List<RemittanceEntity> list, bool isDark, List<dynamic> drivers) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minWidth: 1050),
-        child: Table(
-          defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-          columnWidths: const {
-            0: FlexColumnWidth(2.2), // Ref & Method
-            1: FlexColumnWidth(1.8), // Rider & Code
-            2: FlexColumnWidth(1.4), // Hub / DC
-            3: FlexColumnWidth(1.6), // Amount Remitted
-            4: FlexColumnWidth(1.8), // Status (Generous width to eliminate overflow)
-            5: FlexColumnWidth(1.8), // Date & Time
-            6: FlexColumnWidth(0.8), // Action
-          },
-          children: [
-            // Header Row
-            TableRow(
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-              ),
-              children: [
-                _buildTableHeader('REFERENCE & CHANNEL'),
-                _buildTableHeader('RIDER & FLEET CODE'),
-                _buildTableHeader('DISTRIBUTION CENTER'),
-                _buildTableHeader('AMOUNT REMITTED'),
-                _buildTableHeader('STATUS'),
-                _buildTableHeader('DATE & TIME'),
-                _buildTableHeader('ACTION'),
-              ],
-            ),
-            // Data Rows
-            ...list.map((rem) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: PangeaExcelDataTable<RemittanceEntity>(
+        items: list,
+        enablePagination: true,
+        initialPageSize: 25,
+        rowHeight: 64.0,
+        brandPrimary: const Color(0xFF0D9488),
+        onRowTap: (rem) {
+          final driver = drivers.where((d) => d.id == rem.deliveryAgentId || d.driverCode == rem.deliveryAgentId).firstOrNull;
+          final riderName = driver != null ? driver.name : (rem.payerName?.isNotEmpty == true ? rem.payerName! : 'Unassigned Rider');
+          final riderCode = driver != null ? driver.driverCode : 'N/A';
+          _openRemittanceDetailsModal(context, isDark, rem, riderName, riderCode);
+        },
+        columns: [
+          ExcelColumnDef<RemittanceEntity>(
+            key: 'ref_channel',
+            group: 'Payment Reference',
+            label: 'REFERENCE & CHANNEL',
+            defaultWidth: 190,
+            minWidth: 140,
+            searchString: (rem) {
+              final refCode = rem.referenceNumber.isNotEmpty
+                  ? rem.referenceNumber
+                  : 'REM-${rem.id.length >= 6 ? rem.id.substring(0, 6).toUpperCase() : "892102"}';
+              return '$refCode ${rem.paymentMethod}';
+            },
+            sortValue: (rem) => rem.createdAt,
+            cellBuilder: (context, rem, row, isDark, brand) {
               final refCode = rem.referenceNumber.isNotEmpty
                   ? rem.referenceNumber
                   : 'REM-${rem.id.length >= 6 ? rem.id.substring(0, 6).toUpperCase() : "892102"}';
               final isPaystack = rem.paymentMethod.toLowerCase().contains('paystack') || refCode.startsWith('PSTK');
-              final driver = drivers.where((d) => d.id == rem.deliveryAgentId || d.driverCode == rem.deliveryAgentId).firstOrNull;
-              final riderName = driver != null ? driver.name : (rem.payerName?.isNotEmpty == true ? rem.payerName! : 'Unassigned Rider');
-              final riderCode = driver != null ? driver.driverCode : 'N/A';
-
-              return TableRow(
-                decoration: BoxDecoration(
-                  border: Border(bottom: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9))),
-                ),
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // 0. Reference & Channel
-                  InkWell(
-                    onTap: () => _openRemittanceDetailsModal(context, isDark, rem, riderName, riderCode),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                isPaystack ? Icons.bolt_rounded : Icons.receipt_rounded,
-                                size: 14,
-                                color: isPaystack ? const Color(0xFF00A2D3) : const Color(0xFF10B981),
-                              ),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: Text(
-                                  refCode,
-                                  style: GoogleFonts.jetBrainsMono(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color(0xFF00A2D3)),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isPaystack ? Icons.bolt_rounded : Icons.receipt_rounded,
+                        size: 14,
+                        color: isPaystack ? const Color(0xFF00A2D3) : const Color(0xFF10B981),
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          refCode,
+                          style: GoogleFonts.jetBrainsMono(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF00A2D3),
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            isPaystack ? 'Titan Trust / Paystack' : rem.paymentMethod.toUpperCase(),
-                            style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B)),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
+                    ],
                   ),
-
-                  // 1. Rider & Code
-                  InkWell(
-                    onTap: () => _openRemittanceDetailsModal(context, isDark, rem, riderName, riderCode),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(riderName, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF37021).withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  riderCode,
-                                  style: GoogleFonts.jetBrainsMono(fontSize: 9, fontWeight: FontWeight.bold, color: const Color(0xFFF37021)),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // 2. Distribution Center
-                  InkWell(
-                    onTap: () => _openRemittanceDetailsModal(context, isDark, rem, riderName, riderCode),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                      child: Text(
-                        'Wuse DC Hub',
-                        style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B)),
-                      ),
-                    ),
-                  ),
-
-                  // 3. Amount Remitted
-                  InkWell(
-                    onTap: () => _openRemittanceDetailsModal(context, isDark, rem, riderName, riderCode),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            CurrencyFormatter.formatNaira(rem.amount),
-                            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w900, color: const Color(0xFF10B981)),
-                          ),
-                          if (rem.grossCollections > 0)
-                            Text('Gross: ${CurrencyFormatter.formatNaira(rem.grossCollections)}', style: GoogleFonts.inter(fontSize: 9.5, color: const Color(0xFF94A3B8))),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // 4. Status
-                  InkWell(
-                    onTap: () => _openRemittanceDetailsModal(context, isDark, rem, riderName, riderCode),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerLeft,
-                        child: rem.isPending
-                            ? Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFFF7ED),
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: const Color(0xFFFDBA74)),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(Icons.hourglass_top_rounded, size: 10, color: Color(0xFFEA580C)),
-                                    const SizedBox(width: 3.5),
-                                    Text(
-                                      'PENDING AUDIT ⏳',
-                                      style: GoogleFonts.jetBrainsMono(fontSize: 8.5, fontWeight: FontWeight.w900, color: const Color(0xFFEA580C)),
-                                    ),
-                                  ],
-                                ),
-                              )
-                            : (rem.isPartialRemittance
-                                ? Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFFFF7ED),
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: const Color(0xFFFDBA74)),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(Icons.published_with_changes_rounded, size: 10, color: Color(0xFFEA580C)),
-                                        const SizedBox(width: 3.5),
-                                        Text(
-                                          'PARTIAL ⚠️',
-                                          style: GoogleFonts.jetBrainsMono(fontSize: 8.5, fontWeight: FontWeight.w900, color: const Color(0xFFEA580C)),
-                                        ),
-                                      ],
-                                    ),
-                                  )
-                                : (rem.isRejected
-                                    ? Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFFEE2E2),
-                                          borderRadius: BorderRadius.circular(6),
-                                          border: Border.all(color: const Color(0xFFFCA5A5)),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            const Icon(Icons.cancel_rounded, size: 10, color: Color(0xFFDC2626)),
-                                            const SizedBox(width: 3.5),
-                                            Text(
-                                              'REJECTED ❌',
-                                              style: GoogleFonts.jetBrainsMono(fontSize: 9, fontWeight: FontWeight.w900, color: const Color(0xFFDC2626)),
-                                            ),
-                                          ],
-                                        ),
-                                      )
-                                    : Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFDCFCE7),
-                                          borderRadius: BorderRadius.circular(6),
-                                          border: Border.all(color: const Color(0xFF86EFAC)),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            const Icon(Icons.check_circle_rounded, size: 10, color: Color(0xFF16A34A)),
-                                            const SizedBox(width: 3.5),
-                                            Text(
-                                              'COMPLETE ⚡',
-                                              style: GoogleFonts.jetBrainsMono(fontSize: 9, fontWeight: FontWeight.w900, color: const Color(0xFF15803D)),
-                                            ),
-                                          ],
-                                        ),
-                                      ))),
-                      ),
-                    ),
-                  ),
-
-                  // 5. Date & Time
-                  InkWell(
-                    onTap: () => _openRemittanceDetailsModal(context, isDark, rem, riderName, riderCode),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                      child: Text(
-                        DateFormat('dd MMM yyyy • hh:mm a').format(rem.createdAt),
-                        style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
-                      ),
-                    ),
-                  ),
-
-                  // 6. Action (Details Modal)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-                    child: IconButton(
-                      icon: const Icon(Icons.remove_red_eye_outlined, size: 16, color: Color(0xFF00A2D3)),
-                      tooltip: 'View Settlement Details',
-                      onPressed: () => _openRemittanceDetailsModal(context, isDark, rem, riderName, riderCode),
-                    ),
+                  const SizedBox(height: 2),
+                  Text(
+                    isPaystack ? 'Titan Trust / Paystack' : rem.paymentMethod.toUpperCase(),
+                    style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B)),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               );
-            }),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTableHeader(String label) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-      child: Text(
-        label,
-        style: GoogleFonts.jetBrainsMono(fontSize: 9.5, fontWeight: FontWeight.w800, color: const Color(0xFF64748B)),
+            },
+          ),
+          ExcelColumnDef<RemittanceEntity>(
+            key: 'rider',
+            group: 'Logistics Field Agent',
+            label: 'RIDER & FLEET CODE',
+            defaultWidth: 180,
+            minWidth: 130,
+            searchString: (rem) {
+              final driver = drivers.where((d) => d.id == rem.deliveryAgentId || d.driverCode == rem.deliveryAgentId).firstOrNull;
+              final riderName = driver != null ? driver.name : (rem.payerName?.isNotEmpty == true ? rem.payerName! : 'Unassigned Rider');
+              final riderCode = driver != null ? driver.driverCode : 'N/A';
+              return '$riderName $riderCode';
+            },
+            sortValue: (rem) {
+              final driver = drivers.where((d) => d.id == rem.deliveryAgentId || d.driverCode == rem.deliveryAgentId).firstOrNull;
+              return driver != null ? driver.name : (rem.payerName ?? '');
+            },
+            cellBuilder: (context, rem, row, isDark, brand) {
+              final driver = drivers.where((d) => d.id == rem.deliveryAgentId || d.driverCode == rem.deliveryAgentId).firstOrNull;
+              final riderName = driver != null ? driver.name : (rem.payerName?.isNotEmpty == true ? rem.payerName! : 'Unassigned Rider');
+              final riderCode = driver != null ? driver.driverCode : 'N/A';
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(riderName, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 2),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF37021).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          riderCode,
+                          style: GoogleFonts.jetBrainsMono(fontSize: 9, fontWeight: FontWeight.bold, color: const Color(0xFFF37021)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              );
+            },
+          ),
+          ExcelColumnDef<RemittanceEntity>(
+            key: 'dc',
+            group: 'Hub Location',
+            label: 'DISTRIBUTION CENTER',
+            defaultWidth: 160,
+            minWidth: 120,
+            cellBuilder: (context, rem, row, isDark, brand) {
+              return Text(
+                'Wuse DC Hub',
+                style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B)),
+                overflow: TextOverflow.ellipsis,
+              );
+            },
+          ),
+          ExcelColumnDef<RemittanceEntity>(
+            key: 'amount',
+            group: 'Financial Settlement',
+            label: 'AMOUNT REMITTED',
+            defaultWidth: 160,
+            minWidth: 120,
+            align: TextAlign.right,
+            searchString: (rem) => '${rem.amount} ${rem.grossCollections}',
+            sortValue: (rem) => rem.amount,
+            cellBuilder: (context, rem, row, isDark, brand) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    CurrencyFormatter.formatNaira(rem.amount),
+                    style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w900, color: const Color(0xFF10B981)),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (rem.grossCollections > 0)
+                    Text(
+                      'Gross: ${CurrencyFormatter.formatNaira(rem.grossCollections)}',
+                      style: GoogleFonts.inter(fontSize: 9.5, color: const Color(0xFF94A3B8)),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
+              );
+            },
+          ),
+          ExcelColumnDef<RemittanceEntity>(
+            key: 'status',
+            group: 'Audit Status',
+            label: 'STATUS',
+            defaultWidth: 155,
+            minWidth: 120,
+            searchString: (rem) => rem.status,
+            sortValue: (rem) => rem.status,
+            cellBuilder: (context, rem, row, isDark, brand) {
+              if (rem.isPending) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF7ED),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: const Color(0xFFFDBA74)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.hourglass_top_rounded, size: 10, color: Color(0xFFEA580C)),
+                      const SizedBox(width: 3.5),
+                      Text(
+                        'PENDING AUDIT ⏳',
+                        style: GoogleFonts.jetBrainsMono(fontSize: 8.5, fontWeight: FontWeight.w900, color: const Color(0xFFEA580C)),
+                      ),
+                    ],
+                  ),
+                );
+              } else if (rem.isPartialRemittance) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF7ED),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: const Color(0xFFFDBA74)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.published_with_changes_rounded, size: 10, color: Color(0xFFEA580C)),
+                      const SizedBox(width: 3.5),
+                      Text(
+                        'PARTIAL ⚠️',
+                        style: GoogleFonts.jetBrainsMono(fontSize: 8.5, fontWeight: FontWeight.w900, color: const Color(0xFFEA580C)),
+                      ),
+                    ],
+                  ),
+                );
+              } else if (rem.isRejected) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEE2E2),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: const Color(0xFFFCA5A5)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.cancel_rounded, size: 10, color: Color(0xFFDC2626)),
+                      const SizedBox(width: 3.5),
+                      Text(
+                        'REJECTED ❌',
+                        style: GoogleFonts.jetBrainsMono(fontSize: 9, fontWeight: FontWeight.w900, color: const Color(0xFFDC2626)),
+                      ),
+                    ],
+                  ),
+                );
+              } else {
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDCFCE7),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: const Color(0xFF86EFAC)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.check_circle_rounded, size: 10, color: Color(0xFF16A34A)),
+                      const SizedBox(width: 3.5),
+                      Text(
+                        'COMPLETE ⚡',
+                        style: GoogleFonts.jetBrainsMono(fontSize: 9, fontWeight: FontWeight.w900, color: const Color(0xFF15803D)),
+                      ),
+                    ],
+                  ),
+                );
+              }
+            },
+          ),
+          ExcelColumnDef<RemittanceEntity>(
+            key: 'date',
+            group: 'Audit Timestamp',
+            label: 'DATE & TIME',
+            defaultWidth: 160,
+            minWidth: 120,
+            searchString: (rem) => DateFormat('dd MMM yyyy • hh:mm a').format(rem.createdAt),
+            sortValue: (rem) => rem.createdAt,
+            cellBuilder: (context, rem, row, isDark, brand) {
+              return Text(
+                DateFormat('dd MMM yyyy • hh:mm a').format(rem.createdAt),
+                style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
+                overflow: TextOverflow.ellipsis,
+              );
+            },
+          ),
+          ExcelColumnDef<RemittanceEntity>(
+            key: 'action',
+            group: 'Action',
+            label: 'ACTION',
+            defaultWidth: 80,
+            minWidth: 60,
+            cellBuilder: (context, rem, row, isDark, brand) {
+              return Center(
+                child: IconButton(
+                  icon: const Icon(Icons.remove_red_eye_outlined, size: 16, color: Color(0xFF00A2D3)),
+                  tooltip: 'View Settlement Details',
+                  onPressed: () {
+                    final driver = drivers.where((d) => d.id == rem.deliveryAgentId || d.driverCode == rem.deliveryAgentId).firstOrNull;
+                    final riderName = driver != null ? driver.name : (rem.payerName?.isNotEmpty == true ? rem.payerName! : 'Unassigned Rider');
+                    final riderCode = driver != null ? driver.driverCode : 'N/A';
+                    _openRemittanceDetailsModal(context, isDark, rem, riderName, riderCode);
+                  },
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }

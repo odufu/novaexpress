@@ -5,9 +5,12 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:novexps/features/dc_console/domain/entities/dc_fleet_driver.dart';
 import 'package:novexps/features/dc_console/presentation/providers/dc_console_provider.dart';
 import 'package:novexps/features/dc_console/presentation/widgets/dc_order_detail_modal.dart';
+import 'package:novexps/features/dc_console/presentation/widgets/dc_remittance_detail_modal.dart';
 import 'package:novexps/features/orders/data/models/order_model.dart';
 import 'package:novexps/features/orders/domain/entities/order.dart';
 import 'package:novexps/features/orders/presentation/providers/orders_provider.dart';
+import 'package:novexps/features/auth/presentation/providers/auth_provider.dart';
+import 'package:novexps/features/finance/presentation/providers/finance_provider.dart';
 import 'package:novexps/features/stock/domain/entities/stock_item.dart';
 import 'package:novexps/features/stock/presentation/providers/stock_provider.dart';
 
@@ -51,6 +54,20 @@ class _MockDCConsoleNotifier extends StateNotifier<DCConsoleState> implements DC
             ),
           ],
         ));
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _MockFinanceNotifier extends StateNotifier<FinanceState> implements FinanceNotifier {
+  _MockFinanceNotifier() : super(FinanceState());
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _MockAuthNotifier extends StateNotifier<AuthState> implements AuthNotifier {
+  _MockAuthNotifier() : super(const AuthState());
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -543,6 +560,132 @@ void main() {
       expect(find.text('🏢 Net Merchant Settlement Payable:'), findsOneWidget);
       expect(find.text('₦51,000.00'), findsOneWidget);
       expect(find.text('Mark Remitted / Cleared'), findsOneWidget);
+    });
+  });
+
+  group('DCRemittanceLifecycleItem & DCRemittanceDetailModal Tests', () {
+    test('Correctly identifies pending vs verified vs awaiting remittance states', () {
+      final pendingItem = DCRemittanceLifecycleItem(
+        id: 'rem-101',
+        referenceNumber: 'BNK-RMT-PDA7000-1111',
+        riderId: 'drv-1',
+        riderName: 'Emeka Okafor',
+        riderCode: 'PDA-7000',
+        type: 'cash_pod',
+        status: 'pending_audit',
+        openingDate: DateTime(2026, 8, 29),
+        grossAmount: 50000,
+        netAmount: 47000,
+        orders: [],
+        paymentMethod: 'bank_transfer',
+        depositReceiptUrl: 'https://example.com/receipt.jpg',
+      );
+
+      expect(pendingItem.isPendingApproval, isTrue);
+      expect(pendingItem.isVerified, isFalse);
+      expect(pendingItem.isAwaitingRemittance, isTrue);
+
+      final verifiedItem = DCRemittanceLifecycleItem(
+        id: 'rem-102',
+        referenceNumber: 'PSTK-RMT-PDA7000-2222',
+        riderId: 'drv-1',
+        riderName: 'Emeka Okafor',
+        riderCode: 'PDA-7000',
+        type: 'cash_pod',
+        status: 'verified',
+        openingDate: DateTime(2026, 8, 29),
+        grossAmount: 85000,
+        netAmount: 80000,
+        orders: [],
+        paymentMethod: 'paystack',
+      );
+
+      expect(verifiedItem.isPendingApproval, isFalse);
+      expect(verifiedItem.isVerified, isTrue);
+      expect(verifiedItem.isAwaitingRemittance, isFalse);
+    });
+
+    testWidgets('DCRemittanceDetailModal renders pending bank remittance with deposit receipt and approval button', (tester) async {
+      tester.view.physicalSize = const Size(1280, 960);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      final order1 = OrderModel(
+        id: 'ord-101',
+        orderNumber: 'NOV-2026-4723',
+        customerName: 'Amina Bello',
+        customerPhone: '+234 809 123 4567',
+        deliveryState: 'Abuja (FCT)',
+        deliveryCity: 'Garki',
+        deliveryAddress: 'Plot 42, Garki 2, Abuja',
+        totalAmount: 25000.0,
+        basePrice: 25000.0,
+        upsellAmount: 0.0,
+        quantity: 1,
+        status: 'delivered',
+        paymentType: 'pod_cash',
+        paymentStatus: 'paid',
+        remittanceStatus: 'remitted',
+        financialSettlementStatus: 'remitted',
+        createdAt: DateTime(2026, 8, 29, 10, 0),
+      );
+
+      final remittance = DCRemittanceLifecycleItem(
+        id: 'rem-101',
+        referenceNumber: 'BNK-RMT-PDA7000-1111',
+        riderId: 'drv-1',
+        riderName: 'Emeka Okafor',
+        riderCode: 'PDA-7000',
+        riderPhone: '08031112222',
+        type: 'cash_pod',
+        status: 'pending_audit',
+        openingDate: DateTime(2026, 8, 29, 9, 0),
+        closingDate: DateTime(2026, 8, 29, 14, 0),
+        grossAmount: 25000.0,
+        commissionAmount: 1000.0,
+        transportAllowance: 500.0,
+        posFee: 250.0,
+        netAmount: 23250.0,
+        orders: [order1],
+        paymentMethod: 'bank_transfer',
+        depositReceiptUrl: 'https://example.com/receipt.jpg',
+      );
+
+      final container = ProviderContainer(
+        overrides: [
+          ordersProvider.overrideWith((ref) => _MockOrdersNotifier([order1])),
+          stockProvider.overrideWith((ref) => _MockStockNotifier([])),
+          dcConsoleProvider.overrideWith((ref) => _MockDCConsoleNotifier()),
+          financeProvider.overrideWith((ref) => _MockFinanceNotifier()),
+          authProvider.overrideWith((ref) => _MockAuthNotifier()),
+        ],
+      );
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            home: Scaffold(
+              body: DCRemittanceDetailModal(remittance: remittance),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Header & Status
+      expect(find.textContaining('BNK-RMT-PDA7000-1111'), findsOneWidget);
+      expect(find.textContaining('AWAITING DC APPROVAL'), findsOneWidget);
+
+      // Deposit Receipt Proof section
+      expect(find.text('Uploaded Bank Transfer Slip / Proof of Payment'), findsOneWidget);
+      expect(find.text('Zoom Slip'), findsOneWidget);
+
+      // Orders
+      expect(find.text('NOV-2026-4723'), findsOneWidget);
+
+      // Verify and Clear Remittance action button
+      expect(find.textContaining('Verify & Clear'), findsOneWidget);
     });
   });
 }

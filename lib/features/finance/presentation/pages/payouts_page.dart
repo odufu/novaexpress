@@ -9,6 +9,9 @@ import '../../../orders/presentation/providers/orders_provider.dart';
 import '../../domain/entities/financial_summary.dart';
 import '../providers/finance_provider.dart';
 
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 class PayoutRequestItem {
   final String id;
   final double amount;
@@ -19,6 +22,7 @@ class PayoutRequestItem {
   final String accountName;
   final String? disbursementRef;
   final String? dcNotes;
+  final String? proofOfPaymentUrl;
   final DateTime? riderConfirmedAt;
   final String? riderConfirmationNotes;
 
@@ -32,15 +36,34 @@ class PayoutRequestItem {
     required this.accountName,
     this.disbursementRef,
     this.dcNotes,
+    this.proofOfPaymentUrl,
     this.riderConfirmedAt,
     this.riderConfirmationNotes,
   });
+
+  factory PayoutRequestItem.fromJson(Map<String, dynamic> map) {
+    return PayoutRequestItem(
+      id: map['id']?.toString() ?? 'PAY-0001',
+      amount: (map['amount'] as num?)?.toDouble() ?? 0.0,
+      status: map['status']?.toString() ?? 'pending',
+      date: map['created_at'] != null ? DateTime.tryParse(map['created_at'].toString()) ?? DateTime.now() : DateTime.now(),
+      bankName: map['bank_name']?.toString() ?? 'Bank',
+      accountNumber: map['account_number']?.toString() ?? '0000000000',
+      accountName: map['account_name']?.toString() ?? 'Rider Account',
+      disbursementRef: map['disbursement_ref']?.toString() ?? map['disbursement_reference']?.toString(),
+      dcNotes: map['dc_notes']?.toString() ?? map['notes']?.toString(),
+      proofOfPaymentUrl: map['proof_of_payment_url']?.toString() ?? map['proofOfPaymentUrl']?.toString(),
+      riderConfirmedAt: map['rider_confirmed_at'] != null ? DateTime.tryParse(map['rider_confirmed_at'].toString()) : null,
+      riderConfirmationNotes: map['rider_confirmation_notes']?.toString(),
+    );
+  }
 
   bool get isPending => status == 'pending';
   bool get isConfirmed => status == 'completed' || status == 'confirmed' || riderConfirmedAt != null;
   bool get isDisbursed => (status == 'disbursed' || status == 'approved') && !isConfirmed;
   bool get isApproved => status == 'approved' || status == 'disbursed' || isConfirmed;
   bool get isRejected => status == 'rejected';
+  bool get hasReceipt => proofOfPaymentUrl != null && proofOfPaymentUrl!.trim().isNotEmpty;
 
   PayoutRequestItem copyWith({
     String? id,
@@ -52,6 +75,7 @@ class PayoutRequestItem {
     String? accountName,
     String? disbursementRef,
     String? dcNotes,
+    String? proofOfPaymentUrl,
     DateTime? riderConfirmedAt,
     String? riderConfirmationNotes,
   }) {
@@ -65,6 +89,7 @@ class PayoutRequestItem {
       accountName: accountName ?? this.accountName,
       disbursementRef: disbursementRef ?? this.disbursementRef,
       dcNotes: dcNotes ?? this.dcNotes,
+      proofOfPaymentUrl: proofOfPaymentUrl ?? this.proofOfPaymentUrl,
       riderConfirmedAt: riderConfirmedAt ?? this.riderConfirmedAt,
       riderConfirmationNotes: riderConfirmationNotes ?? this.riderConfirmationNotes,
     );
@@ -121,21 +146,7 @@ class _PayoutsPageState extends ConsumerState<PayoutsPage> {
 
     final raw = await ref.read(financeProvider.notifier).loadPayoutRequests(agentId);
     if (mounted && raw.isNotEmpty) {
-      final items = raw.map((map) {
-        return PayoutRequestItem(
-          id: map['id']?.toString() ?? 'PAY-0001',
-          amount: (map['amount'] as num?)?.toDouble() ?? 0.0,
-          status: map['status']?.toString() ?? 'pending',
-          date: map['created_at'] != null ? DateTime.tryParse(map['created_at'].toString()) ?? DateTime.now() : DateTime.now(),
-          bankName: map['bank_name']?.toString() ?? 'Bank',
-          accountNumber: map['account_number']?.toString() ?? '0000000000',
-          accountName: map['account_name']?.toString() ?? 'Rider Account',
-          disbursementRef: map['disbursement_ref']?.toString() ?? map['disbursement_reference']?.toString(),
-          dcNotes: map['dc_notes']?.toString() ?? map['notes']?.toString(),
-          riderConfirmedAt: map['rider_confirmed_at'] != null ? DateTime.tryParse(map['rider_confirmed_at'].toString()) : null,
-          riderConfirmationNotes: map['rider_confirmation_notes']?.toString(),
-        );
-      }).toList();
+      final items = raw.map((map) => PayoutRequestItem.fromJson(map)).toList();
       ref.read(payoutsListProvider.notifier).setPayouts(items);
     }
   }
@@ -393,6 +404,52 @@ class _PayoutsPageState extends ConsumerState<PayoutsPage> {
               _buildModalRow('Confirmed At', '${item.riderConfirmedAt!.day}/${item.riderConfirmedAt!.month}/${item.riderConfirmedAt!.year} ${item.riderConfirmedAt!.hour}:${item.riderConfirmedAt!.minute.toString().padLeft(2, '0')}'),
             if (item.riderConfirmationNotes != null && item.riderConfirmationNotes!.isNotEmpty)
               _buildModalRow('Rider Notes', item.riderConfirmationNotes!),
+            if (item.hasReceipt) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF0FDF4),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.receipt_long_rounded, color: Color(0xFF10B981), size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Bank Transfer Receipt Attached', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF10B981))),
+                          Text('DC attached official payment proof document.', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
+                        ],
+                      ),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: () => _showReceiptPreviewDialog(context, item.proofOfPaymentUrl!, 'Payout ${item.id} Proof'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF10B981),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      icon: const Icon(Icons.visibility_rounded, size: 14),
+                      label: const Text('View Proof', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
             if (item.isDisbursed) ...[
               SizedBox(
@@ -651,30 +708,61 @@ class _PayoutsPageState extends ConsumerState<PayoutsPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(p.id, style: GoogleFonts.jetBrainsMono(fontSize: 13, fontWeight: FontWeight.bold)),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: p.isConfirmed
-                        ? const Color(0xFFDCFCE7)
-                        : (p.isDisbursed
-                            ? const Color(0xFFDBEAFE)
-                            : (p.isPending ? const Color(0xFFFFF7ED) : const Color(0xFFFFE4E6))),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    p.isConfirmed
-                        ? 'CONFIRMED'
-                        : (p.isDisbursed ? 'DISBURSED' : p.status.toUpperCase()),
-                    style: GoogleFonts.jetBrainsMono(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: p.isConfirmed
-                          ? const Color(0xFF16A34A)
-                          : (p.isDisbursed
-                              ? const Color(0xFF2563EB)
-                              : (p.isPending ? const Color(0xFFEA580C) : const Color(0xFFE11D48))),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (p.hasReceipt) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        margin: const EdgeInsets.only(right: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.attachment_rounded, size: 10, color: Color(0xFF10B981)),
+                            const SizedBox(width: 3),
+                            Text(
+                              'Proof',
+                              style: GoogleFonts.jetBrainsMono(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFF10B981),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: p.isConfirmed
+                            ? const Color(0xFFDCFCE7)
+                            : (p.isDisbursed
+                                ? const Color(0xFFDBEAFE)
+                                : (p.isPending ? const Color(0xFFFFF7ED) : const Color(0xFFFFE4E6))),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        p.isConfirmed
+                            ? 'CONFIRMED'
+                            : (p.isDisbursed ? 'DISBURSED' : p.status.toUpperCase()),
+                        style: GoogleFonts.jetBrainsMono(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: p.isConfirmed
+                              ? const Color(0xFF16A34A)
+                              : (p.isDisbursed
+                                  ? const Color(0xFF2563EB)
+                                  : (p.isPending ? const Color(0xFFEA580C) : const Color(0xFFE11D48))),
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ],
             ),
@@ -860,6 +948,145 @@ class _PayoutsPageState extends ConsumerState<PayoutsPage> {
           ),
         ],
       ),
+    );
+  }
+
+  void _showReceiptPreviewDialog(BuildContext context, String url, String title) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return Dialog(
+          backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          insetPadding: const EdgeInsets.all(16),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 800, maxHeight: 750),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.receipt_long_rounded, color: Color(0xFF2563EB), size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            title,
+                            style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14),
+                          ),
+                        ],
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                Flexible(
+                  child: InteractiveViewer(
+                    panEnabled: true,
+                    boundaryMargin: const EdgeInsets.all(20),
+                    minScale: 0.8,
+                    maxScale: 4.0,
+                    child: Center(
+                      child: url.startsWith('data:image')
+                          ? Image.memory(
+                              Uri.parse(url).data!.contentAsBytes(),
+                              fit: BoxFit.contain,
+                            )
+                          : Image.network(
+                              url,
+                              fit: BoxFit.contain,
+                              loadingBuilder: (context, child, progress) {
+                                if (progress == null) return child;
+                                return const Center(child: CircularProgressIndicator(color: Color(0xFF2563EB)));
+                              },
+                              errorBuilder: (context, error, stackTrace) => Padding(
+                                padding: const EdgeInsets.all(32),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFFEF4444), size: 56),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      'PDF Document Attached',
+                                      style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 15),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      'Tap Open Document to view or download this transfer receipt.',
+                                      style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    ElevatedButton.icon(
+                                      onPressed: () {
+                                        final uri = Uri.tryParse(url);
+                                        if (uri != null) {
+                                          launchUrl(uri, mode: LaunchMode.externalApplication);
+                                        }
+                                      },
+                                      icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                                      label: const Text('Open Document in Viewer'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF2563EB),
+                                        foregroundColor: Colors.white,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                    ),
+                  ),
+                ),
+                const Divider(height: 1),
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      TextButton.icon(
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: url));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              backgroundColor: Color(0xFF10B981),
+                              content: Text('Receipt document URL copied to clipboard!'),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.copy_rounded, size: 14),
+                        label: const Text('Copy URL', style: TextStyle(fontSize: 12)),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          final uri = Uri.tryParse(url);
+                          if (uri != null) {
+                            launchUrl(uri, mode: LaunchMode.externalApplication);
+                          }
+                        },
+                        icon: const Icon(Icons.open_in_new_rounded, size: 14),
+                        label: const Text('Open External', style: TextStyle(fontSize: 12)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2563EB),
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

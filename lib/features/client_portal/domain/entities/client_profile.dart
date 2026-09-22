@@ -135,7 +135,7 @@ class ClientProfile {
       closerLimit: (json['closer_limit'] as num?)?.toInt() ?? (isEnt ? 250 : 0),
       isEnterprise: isEnt,
       totalClosersCount: closersCount,
-      isActive: json['is_active'] == true || json['is_active'] == 1,
+      isActive: json['is_active'] == null ? true : (json['is_active'] == true || json['is_active'] == 1 || json['is_active'] == 'true'),
       bankName: json['bank_name']?.toString() ?? '',
       accountNumber: json['account_number']?.toString() ?? '',
       accountName: json['account_name']?.toString() ?? resolvedCompany,
