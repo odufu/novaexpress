@@ -224,99 +224,116 @@ class _ClientInventoryPageState extends ConsumerState<ClientInventoryPage> with 
   // Header Hero
   // ===========================================================================
   Widget _buildHeroHeader(BuildContext context, ClientPortalState state, bool isDark, bool isCompact) {
-    return Row(
+    final titleBlock = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0D9488).withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      'PANGEA SUITE COMPATIBLE',
-                      style: GoogleFonts.inter(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        color: const Color(0xFF0D9488),
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Multi-Warehouse Logistics',
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF64748B),
-                    ),
-                  ),
-                ],
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0D9488).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(6),
               ),
-              const SizedBox(height: 4),
-              Text(
-                'Inventory & Stock',
+              child: Text(
+                'PANGEA SUITE COMPATIBLE',
                 style: GoogleFonts.inter(
-                  fontSize: isCompact ? 20 : 24,
-                  fontWeight: FontWeight.w900,
-                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF0D9488),
+                  letterSpacing: 0.5,
                 ),
               ),
-              const SizedBox(height: 2),
-              Text(
-                'Physical Hub Custody, Goods Receipt Ledger & Unit Economics',
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Multi-Warehouse Logistics',
                 style: GoogleFonts.inter(
                   fontSize: 12,
+                  fontWeight: FontWeight.w600,
                   color: const Color(0xFF64748B),
                 ),
-              ),
-            ],
-          ),
-        ),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            OutlinedButton.icon(
-              onPressed: () => ClientImportStockBalanceModal.show(context),
-              icon: const Icon(Icons.upload_file_rounded, size: 16),
-              label: Text('Import CSV', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600)),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-            ),
-            OutlinedButton.icon(
-              onPressed: _exportCsv,
-              icon: const Icon(Icons.download_rounded, size: 16),
-              label: Text('Export CSV', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600)),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-            ),
-            ElevatedButton.icon(
-              onPressed: () => ClientRaiseStockInvoiceModal.show(context),
-              icon: const Icon(Icons.add_rounded, size: 18),
-              label: Text(
-                '+ Raise Stock Invoice',
-                style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0D9488),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
         ),
+        const SizedBox(height: 6),
+        Text(
+          'Inventory & Stock',
+          style: GoogleFonts.inter(
+            fontSize: isCompact ? 22 : 24,
+            fontWeight: FontWeight.w900,
+            color: isDark ? Colors.white : const Color(0xFF0F172A),
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          'Physical Hub Custody, Goods Receipt Ledger & Unit Economics',
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            color: const Color(0xFF64748B),
+          ),
+        ),
+      ],
+    );
+
+    final actionButtons = Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        OutlinedButton.icon(
+          onPressed: () => ClientImportStockBalanceModal.show(context),
+          icon: const Icon(Icons.upload_file_rounded, size: 15),
+          label: Text('Import CSV', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        ),
+        OutlinedButton.icon(
+          onPressed: _exportCsv,
+          icon: const Icon(Icons.download_rounded, size: 15),
+          label: Text('Export CSV', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        ),
+        ElevatedButton.icon(
+          onPressed: () => ClientRaiseStockInvoiceModal.show(context),
+          icon: const Icon(Icons.add_rounded, size: 16),
+          label: Text(
+            '+ Raise Stock Invoice',
+            style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF0D9488),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        ),
+      ],
+    );
+
+    if (isCompact) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          titleBlock,
+          const SizedBox(height: 14),
+          actionButtons,
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(child: titleBlock),
+        const SizedBox(width: 16),
+        actionButtons,
       ],
     );
   }
@@ -518,35 +535,47 @@ class _ClientInventoryPageState extends ConsumerState<ClientInventoryPage> with 
   Widget _buildPangeaHeader(ClientPortalState state, int count, bool isDark) {
     return Row(
       children: [
-        Text(
-          'Stock Balance',
-          style: GoogleFonts.inter(
-            fontSize: 20,
-            fontWeight: FontWeight.w800,
-            color: isDark ? Colors.white : const Color(0xFF0F172A),
+        Flexible(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  'Stock Balance',
+                  style: GoogleFonts.inter(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0D9488).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '$count positions',
+                  style: GoogleFonts.inter(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF0D9488),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
-        const SizedBox(width: 10),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          decoration: BoxDecoration(
-            color: const Color(0xFF0D9488).withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Text(
-            '$count positions',
-            style: GoogleFonts.inter(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: const Color(0xFF0D9488),
-            ),
-          ),
-        ),
-        const Spacer(),
+        const SizedBox(width: 8),
         IconButton(
           onPressed: () => ref.read(clientPortalProvider.notifier).reloadInventoryData(),
           tooltip: 'Refresh stock balances',
-          icon: const Icon(Icons.sync_rounded, size: 20),
+          icon: const Icon(Icons.sync_rounded, size: 18),
+          padding: const EdgeInsets.all(8),
+          constraints: const BoxConstraints(),
           style: IconButton.styleFrom(
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
@@ -554,10 +583,12 @@ class _ClientInventoryPageState extends ConsumerState<ClientInventoryPage> with 
             ),
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 6),
         PopupMenuButton<String>(
           tooltip: 'More actions',
-          icon: const Icon(Icons.more_horiz_rounded, size: 20),
+          icon: const Icon(Icons.more_horiz_rounded, size: 18),
+          padding: const EdgeInsets.all(8),
+          constraints: const BoxConstraints(),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           onSelected: (action) {
             if (action == 'reset_cols') {
@@ -1491,19 +1522,11 @@ class _ClientInventoryPageState extends ConsumerState<ClientInventoryPage> with 
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Top Action & Search Bar
-          Row(
-            children: [
-              Text(
-                'Intake Invoices',
-                style: GoogleFonts.inter(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: isDark ? Colors.white : const Color(0xFF0F172A),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 650;
+              final summaryBadge = Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: const Color(0xFF0D9488).withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(6),
@@ -1516,32 +1539,80 @@ class _ClientInventoryPageState extends ConsumerState<ClientInventoryPage> with 
                     color: const Color(0xFF0D9488),
                   ),
                 ),
-              ),
-              const Spacer(),
-              IconButton(
-                onPressed: () => ref.read(clientPortalProvider.notifier).reloadInventoryData(),
-                tooltip: 'Refresh intake bills',
-                icon: const Icon(Icons.sync_rounded, size: 20),
-                style: IconButton.styleFrom(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+              );
+
+              final rightActions = Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    onPressed: () => ref.read(clientPortalProvider.notifier).reloadInventoryData(),
+                    tooltip: 'Refresh intake bills',
+                    icon: const Icon(Icons.sync_rounded, size: 18),
+                    padding: const EdgeInsets.all(8),
+                    constraints: const BoxConstraints(),
+                    style: IconButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              ElevatedButton.icon(
-                onPressed: () => ClientRaiseStockInvoiceModal.show(context),
-                icon: const Icon(Icons.add_rounded, size: 16),
-                label: Text('+ New Intake Bill', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0D9488),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-              ),
-            ],
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    onPressed: () => ClientRaiseStockInvoiceModal.show(context),
+                    icon: const Icon(Icons.add_rounded, size: 16),
+                    label: Text('+ New Intake Bill', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0D9488),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ],
+              );
+
+              if (isNarrow) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Intake Invoices',
+                          style: GoogleFonts.inter(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          ),
+                        ),
+                        rightActions,
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    summaryBadge,
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  Text(
+                    'Intake Invoices',
+                    style: GoogleFonts.inter(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  summaryBadge,
+                  const Spacer(),
+                  rightActions,
+                ],
+              );
+            },
           ),
           const SizedBox(height: 14),
 

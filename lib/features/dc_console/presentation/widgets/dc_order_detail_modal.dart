@@ -1785,6 +1785,8 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
               label: const Text(
                 'Print Manifest / Waybill',
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 12),
@@ -1812,6 +1814,8 @@ class _DCOrderDetailModalState extends ConsumerState<DCOrderDetailModal> {
               label: Text(
                 _currentOrder.isUnassigned ? 'Dispatch / Assign Rider' : 'Confirm Status / Dispatch',
                 style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: _currentOrder.isUnassigned ? const Color(0xFFF37021) : const Color(0xFF2563EB),

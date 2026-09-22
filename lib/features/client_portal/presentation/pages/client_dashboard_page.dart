@@ -290,7 +290,7 @@ class ClientDashboardPage extends ConsumerWidget {
     final extraCount = lowProducts.length > 1 ? ' (+${lowProducts.length - 1} more)' : '';
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF450A0A).withValues(alpha: 0.6) : const Color(0xFFFEF2F2),
         borderRadius: BorderRadius.circular(14),
@@ -298,70 +298,19 @@ class ClientDashboardPage extends ConsumerWidget {
           color: isDark ? const Color(0xFF991B1B) : const Color(0xFFFCA5A5),
         ),
       ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: const Color(0xFFDC2626).withValues(alpha: 0.15),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      'CRITICAL REORDER ALERT',
-                      style: GoogleFonts.inter(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w800,
-                        color: const Color(0xFFDC2626),
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFDC2626),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        '$lowQty units left',
-                        style: GoogleFonts.jetBrainsMono(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '$lowName$extraCount has dropped to or below safe threshold ($threshold units). Immediate replenishment recommended to prevent regional stock-outs.',
-                  style: GoogleFonts.inter(
-                    fontSize: 11.5,
-                    color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Wrap(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isNarrow = constraints.maxWidth < 650;
+
+          final actionButtons = Wrap(
             spacing: 8,
+            runSpacing: 8,
             children: [
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFDC2626),
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   elevation: 0,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
@@ -375,7 +324,7 @@ class ClientDashboardPage extends ConsumerWidget {
                 icon: const Icon(Icons.receipt_long_rounded, size: 14),
                 label: Text(
                   state.clientProfile.hasInventoryManagement ? 'Raise Stock Intake' : 'Supply Stock',
-                  style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700),
+                  style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w700),
                 ),
               ),
               if (onNavigateToInventory != null)
@@ -383,18 +332,144 @@ class ClientDashboardPage extends ConsumerWidget {
                   style: OutlinedButton.styleFrom(
                     foregroundColor: isDark ? Colors.white : const Color(0xFF334155),
                     side: BorderSide(color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                   onPressed: onNavigateToInventory,
                   child: Text(
                     'View Ledger',
-                    style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700),
+                    style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w700),
                   ),
                 ),
             ],
-          ),
-        ],
+          );
+
+          if (isNarrow) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDC2626).withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 18),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              'CRITICAL REORDER ALERT',
+                              style: GoogleFonts.inter(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w800,
+                                color: const Color(0xFFDC2626),
+                                letterSpacing: 0.5,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDC2626),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              '$lowQty units left',
+                              style: GoogleFonts.jetBrainsMono(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '$lowName$extraCount has dropped to or below safe threshold ($threshold units). Immediate replenishment recommended to prevent regional stock-outs.',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                actionButtons,
+              ],
+            );
+          }
+
+          // Desktop wide layout
+          return Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDC2626).withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'CRITICAL REORDER ALERT',
+                          style: GoogleFonts.inter(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w800,
+                            color: const Color(0xFFDC2626),
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFDC2626),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '$lowQty units left',
+                            style: GoogleFonts.jetBrainsMono(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '$lowName$extraCount has dropped to or below safe threshold ($threshold units). Immediate replenishment recommended to prevent regional stock-outs.',
+                      style: GoogleFonts.inter(
+                        fontSize: 11.5,
+                        color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              actionButtons,
+            ],
+          );
+        },
       ),
     );
   }
@@ -575,43 +650,11 @@ class ClientDashboardPage extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEC4899).withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(Icons.sell_rounded, color: Color(0xFFEC4899), size: 18),
-                  ),
-                  const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Commercial Package Deals & Bundle Velocity',
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: isDark ? Colors.white : const Color(0xFF0F172A),
-                        ),
-                      ),
-                      Text(
-                        'Volume bundling matrix with promotional pricing and physical unit depletion',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          color: const Color(0xFF64748B),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              ElevatedButton.icon(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 560;
+
+              final createButton = ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFEC4899),
                   foregroundColor: Colors.white,
@@ -623,8 +666,100 @@ class ClientDashboardPage extends ConsumerWidget {
                 onPressed: () => ClientAddPackageModal.show(context),
                 icon: const Icon(Icons.add_rounded, size: 14),
                 label: Text('+ Create Bundle', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700)),
-              ),
-            ],
+              );
+
+              if (isNarrow) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEC4899).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.sell_rounded, color: Color(0xFFEC4899), size: 18),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Commercial Package Deals & Bundle Velocity',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Volume bundling matrix with promotional pricing and physical unit depletion',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  color: const Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    createButton,
+                  ],
+                );
+              }
+
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEC4899).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.sell_rounded, color: Color(0xFFEC4899), size: 18),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Commercial Package Deals & Bundle Velocity',
+                                style: GoogleFonts.inter(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                ),
+                              ),
+                              Text(
+                                'Volume bundling matrix with promotional pricing and physical unit depletion',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  color: const Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  createButton,
+                ],
+              );
+            },
           ),
           const SizedBox(height: 14),
           SizedBox(
@@ -1125,33 +1260,47 @@ class ClientDashboardPage extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Real-Time Shipments & Dispatch Pipeline',
-                      style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
-                      overflow: TextOverflow.ellipsis,
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 550;
+
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isNarrow ? 'Real-Time Shipments' : 'Real-Time Shipments & Dispatch Pipeline',
+                          style: GoogleFonts.inter(
+                            fontSize: isNarrow ? 15 : 16,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          isNarrow ? 'Live orders & dispatches across DCs' : 'Track orders dispatched to Distribution Centers and PDA Riders across Nigeria',
+                          style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                     ),
-                    Text(
-                      'Track orders dispatched to Distribution Centers and PDA Riders across Nigeria',
-                      style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
-                      overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(width: 8),
+                  TextButton.icon(
+                    onPressed: onNavigateToOrders,
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.symmetric(horizontal: isNarrow ? 8 : 12, vertical: 6),
+                      minimumSize: Size.zero,
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              TextButton.icon(
-                onPressed: onNavigateToOrders,
-                icon: const Icon(Icons.arrow_forward_rounded, size: 16),
-                label: const Text('See All Shipments'),
-              ),
-            ],
+                    icon: const Icon(Icons.arrow_forward_rounded, size: 15),
+                    label: Text(isNarrow ? 'See All' : 'See All Shipments', style: TextStyle(fontSize: isNarrow ? 12 : 13)),
+                  ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 16),
 

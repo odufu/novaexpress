@@ -36,9 +36,7 @@ class PipelineChatFabPositionNotifier extends StateNotifier<Offset?> {
     final current = state ??
         Offset(
           screenSize.width - fabSize - margin,
-          screenSize.width >= 960
-              ? screenSize.height - fabSize - 84.0
-              : screenSize.height - fabSize - margin,
+          screenSize.height - fabSize - 88.0,
         );
 
     final maxW = screenSize.width;
@@ -108,9 +106,9 @@ class PipelineChatDraggableFabLocation extends FloatingActionButtonLocation {
     }
 
     // Default positioning:
-    // On desktop / wide screens (width >= 960), float at 84px from bottom
-    // so it naturally sits comfortably above sticky action bars, bottom buttons, and modals!
-    final double bottomMargin = maxW >= 960 ? 84.0 : margin;
+    // Float at 88px from bottom on all screens so it naturally sits comfortably
+    // above sticky action bars, bottom buttons, and modals!
+    const double bottomMargin = 88.0;
     final double defaultX = maxW - fabWidth - margin;
     final double defaultY = (scaffoldGeometry.contentBottom - fabHeight - bottomMargin)
         .clamp(margin, maxH - fabHeight - margin);
