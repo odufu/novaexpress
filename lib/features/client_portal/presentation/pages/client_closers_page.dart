@@ -398,6 +398,24 @@ class ClientClosersPage extends ConsumerWidget {
                       ),
                       const SizedBox(width: 6),
                       Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: (closer.assignedProductNames.isEmpty ? const Color(0xFF10B981) : const Color(0xFF6366F1)).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          closer.assignedProductNames.isEmpty
+                              ? 'All Products'
+                              : '${closer.assignedProductNames.length} Products',
+                          style: GoogleFonts.inter(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: closer.assignedProductNames.isEmpty ? const Color(0xFF10B981) : const Color(0xFF6366F1),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
                         width: 7,
                         height: 7,
                         decoration: BoxDecoration(
@@ -638,16 +656,39 @@ class ClientClosersPage extends ConsumerWidget {
                     ),
                   ],
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF37021).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    closer.closerCode,
-                    style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: const Color(0xFFF37021)),
-                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: (closer.assignedProductNames.isEmpty ? const Color(0xFF10B981) : const Color(0xFF6366F1)).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        closer.assignedProductNames.isEmpty
+                            ? 'All Products'
+                            : '${closer.assignedProductNames.length} Products',
+                        style: GoogleFonts.inter(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: closer.assignedProductNames.isEmpty ? const Color(0xFF10B981) : const Color(0xFF6366F1),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF37021).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        closer.closerCode,
+                        style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: const Color(0xFFF37021)),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

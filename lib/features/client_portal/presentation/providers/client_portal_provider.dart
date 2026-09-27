@@ -29,6 +29,8 @@ import '../../domain/entities/client_stock_invoice.dart';
 import '../../domain/entities/client_stock_balance.dart';
 import '../../domain/entities/client_unit_economics.dart';
 import '../../domain/entities/stock_holder_custody.dart';
+import '../../domain/entities/client_marketer.dart';
+import '../../domain/entities/lead_form.dart';
 
 /// Financial metrics summary per product or aggregate
 class ClientProductFinanceSummary {
@@ -193,6 +195,8 @@ class ClientPortalState {
   final List<ClientStockBalance> stockBalances;
   final List<StockHolderCustodyEntity> stockHolders;
   final List<ClientCloserPayout> closerPayouts;
+  final List<ClientMarketer> marketers;
+  final List<LeadForm> leadForms;
   final String selectedInventoryWarehouseFilter; // 'all' or specific warehouse
   final String selectedInventoryItemFilter; // 'all' or specific item
   final bool isInventoryLoading;
@@ -208,6 +212,8 @@ class ClientPortalState {
     this.leads = const [],
     this.settlements = const [],
     this.closerPayouts = const [],
+    this.marketers = const [],
+    this.leadForms = const [],
     this.assetCustodyData = const {},
     this.isLoading = false,
     this.errorMessage,
@@ -238,6 +244,8 @@ class ClientPortalState {
     List<CustomerLead>? leads,
     List<ClientSettlement>? settlements,
     List<ClientCloserPayout>? closerPayouts,
+    List<ClientMarketer>? marketers,
+    List<LeadForm>? leadForms,
     Map<String, dynamic>? assetCustodyData,
     bool? isLoading,
     String? errorMessage,
@@ -267,6 +275,8 @@ class ClientPortalState {
       leads: leads ?? this.leads,
       settlements: settlements ?? this.settlements,
       closerPayouts: closerPayouts ?? this.closerPayouts,
+      marketers: marketers ?? this.marketers,
+      leadForms: leadForms ?? this.leadForms,
       assetCustodyData: assetCustodyData ?? this.assetCustodyData,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: errorMessage,
@@ -594,11 +604,26 @@ class ClientPortalState {
       final oCloserName = o.closerName?.trim().toLowerCase();
       final oNotes = o.deliveryNotes?.toLowerCase();
 
-      if (oCloserId != null && idSet.contains(oCloserId)) return true;
-      if (oCloserCode != null && idSet.contains(oCloserCode)) return true;
-      if (oCloserName != null && (nameSet.contains(oCloserName) || idSet.contains(oCloserName))) return true;
-      if (closerCode != null && oNotes != null && oNotes.contains(closerCode)) return true;
-      return false;
+      final matchesCloser = (oCloserId != null && idSet.contains(oCloserId)) ||
+          (oCloserCode != null && idSet.contains(oCloserCode)) ||
+          (oCloserName != null && (nameSet.contains(oCloserName) || idSet.contains(oCloserName))) ||
+          (closerCode != null && oNotes != null && oNotes.contains(closerCode));
+
+      if (!matchesCloser) return false;
+
+      // Product Attachment Governance: Closer strictly manages orders for assigned products
+      if (closer != null && (closer.assignedProductIds.isNotEmpty || closer.assignedProductNames.isNotEmpty)) {
+        final matchesProdId = o.productId != null &&
+            closer.assignedProductIds.any((pId) => pId.toLowerCase() == o.productId!.toLowerCase());
+        final matchesProdName = closer.assignedProductNames.any((pName) =>
+            o.productName.toLowerCase().contains(pName.toLowerCase()) ||
+            pName.toLowerCase().contains(o.productName.toLowerCase()));
+        if (!matchesProdId && !matchesProdName) {
+          return false;
+        }
+      }
+
+      return true;
     }).toList();
   }
 
@@ -949,6 +974,7 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         ) {
     loadClientData();
     _subscribeToRealtimeInvoices();
+    _subscribeToRealtimeMarketingAndOrders();
 
     // 1. Reactive listener to auth changes (when client merchant logs in or profile hydrates)
     _ref.listen<AuthState>(authProvider, (previous, next) {
@@ -1460,6 +1486,9 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
       List<ClientCloserPayout> closerPayouts = [];
       List<StockHolderCustodyEntity> stockHolders = [];
 
+      List<ClientMarketer> clientMarketers = [];
+      List<LeadForm> clientForms = [];
+
       try {
         suppliers = await _repository.getSuppliers(clientId);
         stockInvoices = await _repository.getStockInvoices(clientId);
@@ -1468,6 +1497,13 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         stockHolders = await _repository.getProductHoldersCustody(clientId);
       } catch (e) {
         debugPrint('[CLIENT_PORTAL] ⚠️ Error loading inventory / custody / closer payouts data: $e');
+      }
+
+      try {
+        clientMarketers = await _repository.getMarketers(clientId);
+        clientForms = await _repository.getLeadForms(clientId);
+      } catch (mktErr) {
+        debugPrint('[CLIENT_PORTAL] ℹ️ Marketers/forms sync notice: $mktErr');
       }
 
       if (!mounted) return;
@@ -1480,6 +1516,8 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         leads: clientLeads,
         settlements: clientSettlements,
         closerPayouts: closerPayouts,
+        marketers: clientMarketers,
+        leadForms: clientForms,
         assetCustodyData: custodyData,
         suppliers: suppliers,
         stockInvoices: stockInvoices,
@@ -1553,6 +1591,8 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
     String? bankName,
     String? accountNumber,
     String? accountName,
+    List<String> assignedProductIds = const [],
+    List<String> assignedProductNames = const [],
   }) async {
     state = state.copyWith(isLoading: true);
     try {
@@ -1584,6 +1624,8 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
           bankName: bankName,
           accountNumber: accountNumber,
           accountName: accountName,
+          assignedProductIds: assignedProductIds,
+          assignedProductNames: assignedProductNames,
         );
       } catch (dbErr) {
         if (dbErr.toString().contains('already exists') || dbErr.toString().contains('registered')) {
@@ -1608,6 +1650,8 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
           bankName: bankName ?? '',
           accountNumber: accountNumber ?? '',
           accountName: accountName ?? '',
+          assignedProductIds: assignedProductIds,
+          assignedProductNames: assignedProductNames,
           isActive: true,
           createdAt: DateTime.now(),
         );
@@ -1655,6 +1699,242 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
       }
       state = state.copyWith(isLoading: false, errorMessage: err);
       throw Exception(err);
+    }
+  }
+
+  /// Update closer's assigned product licenses
+  Future<void> updateCloserProducts({
+    required String closerId,
+    required List<String> productIds,
+    required List<String> productNames,
+  }) async {
+    state = state.copyWith(isLoading: true);
+    try {
+      await _repository.updateCloserDetails(
+        closerId: closerId,
+        assignedProductIds: productIds,
+        assignedProductNames: productNames,
+      );
+      final updatedClosers = state.closers.map((c) {
+        if (c.id == closerId) {
+          return c.copyWith(
+            assignedProductIds: productIds,
+            assignedProductNames: productNames,
+          );
+        }
+        return c;
+      }).toList();
+      state = state.copyWith(closers: updatedClosers, isLoading: false);
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] ⚠️ Error updating closer products: $e');
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      rethrow;
+    }
+  }
+
+  /// Onboard a new Digital Marketer
+  Future<ClientMarketer> createMarketer({
+    required String fullName,
+    required String email,
+    required String phone,
+    String? password,
+    String? marketerCode,
+    double dailyAdSpendBudget = 0.0,
+    double commissionRate = 0.0,
+    bool isCommissionEnabled = false,
+    String? bankName,
+    String? accountNumber,
+    String? accountName,
+  }) async {
+    state = state.copyWith(isLoading: true);
+    try {
+      final newMarketer = await _repository.createMarketer(
+        clientId: state.clientProfile.id,
+        fullName: fullName.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        password: password,
+        marketerCode: marketerCode,
+        dailyAdSpendBudget: dailyAdSpendBudget,
+        commissionRate: commissionRate,
+        isCommissionEnabled: isCommissionEnabled,
+        bankName: bankName,
+        accountNumber: accountNumber,
+        accountName: accountName,
+      );
+
+      final updatedMarketers = [newMarketer, ...state.marketers];
+      state = state.copyWith(marketers: updatedMarketers, isLoading: false);
+      return newMarketer;
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] ❌ Error creating marketer: $e');
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      rethrow;
+    }
+  }
+
+  /// Toggle marketer active status
+  Future<void> toggleMarketerStatus({
+    required String marketerId,
+    required bool isActive,
+  }) async {
+    try {
+      await _repository.toggleMarketerStatus(marketerId: marketerId, isActive: isActive);
+      final updated = state.marketers.map((m) => m.id == marketerId ? m.copyWith(isActive: isActive) : m).toList();
+      state = state.copyWith(marketers: updated);
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] ⚠️ Error toggling marketer status: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateMarketerStatus(String marketerId, bool isActive) =>
+      toggleMarketerStatus(marketerId: marketerId, isActive: isActive);
+
+  /// Create a Lead Form for a product
+  Future<LeadForm> createLeadForm({
+    String? marketerId,
+    required String productId,
+    required String productName,
+    String formTitle = '',
+    String? title,
+    String? formSlug,
+    String? description,
+    List<Map<String, dynamic>> packages = const [],
+    String redirectUrl = '',
+    String pixelId = '',
+    String capiToken = '',
+    String testEventCode = '',
+    String? buttonText,
+    Map<String, dynamic>? fieldOptions,
+    Map<String, dynamic>? appearance,
+  }) async {
+    state = state.copyWith(isLoading: true);
+    final resolvedTitle = (title != null && title.isNotEmpty) ? title : formTitle;
+    final Map<String, dynamic> resolvedAppearance = {
+      ...?appearance,
+      if (buttonText != null && buttonText.isNotEmpty) 'button_text': buttonText,
+    };
+
+    try {
+      final newForm = await _repository.createLeadForm(
+        clientId: state.clientProfile.id,
+        marketerId: marketerId,
+        productId: productId,
+        productName: productName,
+        formTitle: resolvedTitle,
+        formSlug: formSlug,
+        description: description,
+        packages: packages,
+        redirectUrl: redirectUrl,
+        pixelId: pixelId,
+        capiToken: capiToken,
+        testEventCode: testEventCode,
+        fieldOptions: fieldOptions,
+        appearance: resolvedAppearance,
+      );
+
+      final updatedForms = [newForm, ...state.leadForms];
+      state = state.copyWith(leadForms: updatedForms, isLoading: false);
+      return newForm;
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] ❌ Error creating lead form: $e');
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      rethrow;
+    }
+  }
+
+  /// Update an existing Lead Form
+  Future<LeadForm> updateLeadForm({
+    required String formId,
+    String? formTitle,
+    String? title,
+    String? formSlug,
+    String? description,
+    String? productId,
+    String? productName,
+    List<Map<String, dynamic>>? packages,
+    String? redirectUrl,
+    String? pixelId,
+    String? capiToken,
+    String? testEventCode,
+    String? buttonText,
+    Map<String, dynamic>? fieldOptions,
+    Map<String, dynamic>? appearance,
+    bool? isActive,
+  }) async {
+    state = state.copyWith(isLoading: true);
+    final resolvedTitle = title ?? formTitle;
+    final Map<String, dynamic>? resolvedAppearance = (appearance != null || (buttonText != null && buttonText.isNotEmpty))
+        ? {
+            ...?appearance,
+            if (buttonText != null && buttonText.isNotEmpty) 'button_text': buttonText,
+          }
+        : null;
+
+    try {
+      final updatedForm = await _repository.updateLeadForm(
+        formId: formId,
+        formTitle: resolvedTitle,
+        formSlug: formSlug,
+        description: description,
+        productId: productId,
+        productName: productName,
+        packages: packages,
+        redirectUrl: redirectUrl,
+        pixelId: pixelId,
+        capiToken: capiToken,
+        testEventCode: testEventCode,
+        fieldOptions: fieldOptions,
+        appearance: resolvedAppearance,
+        isActive: isActive,
+      );
+
+      final updatedForms = state.leadForms.map((f) => f.id == formId ? updatedForm : f).toList();
+      state = state.copyWith(leadForms: updatedForms, isLoading: false);
+      return updatedForm;
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] ❌ Error updating lead form: $e');
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      rethrow;
+    }
+  }
+
+  /// Submit order via marketing lead form ingestion
+  Future<Map<String, dynamic>> submitMarketingLeadOrder(Map<String, dynamic> payload) async {
+    try {
+      final result = await _repository.submitMarketingLeadOrder(payload);
+      await loadClientData();
+      return result;
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] ❌ Error submitting marketing lead order: $e');
+      rethrow;
+    }
+  }
+
+  /// Confirm closer order and trigger real-time State/LGA DC & Rider matching
+  Future<Map<String, dynamic>> confirmCloserOrder({
+    required String orderId,
+    required String closerId,
+    String? deliveryAddress,
+    String? deliveryState,
+    String? deliveryLga,
+    String? notes,
+  }) async {
+    try {
+      final result = await _repository.confirmCloserOrder(
+        orderId: orderId,
+        closerId: closerId,
+        deliveryAddress: deliveryAddress,
+        deliveryState: deliveryState,
+        deliveryLga: deliveryLga,
+        notes: notes,
+      );
+      await loadClientData();
+      return result;
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] ❌ Error confirming closer order: $e');
+      rethrow;
     }
   }
 
@@ -2800,8 +3080,10 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
   }
 
   RealtimeChannel? _invoicesRealtimeChannel;
+  RealtimeChannel? _marketingRealtimeChannel;
 
   void _subscribeToRealtimeInvoices() {
+    if (_isTestEnvironment) return;
     try {
       final client = Supabase.instance.client;
       _invoicesRealtimeChannel = client.channel('public:client_stock_invoices_channel')
@@ -2830,9 +3112,58 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
     }
   }
 
+  void _subscribeToRealtimeMarketingAndOrders() {
+    if (_isTestEnvironment) return;
+    try {
+      final client = Supabase.instance.client;
+      _marketingRealtimeChannel = client.channel('public:client_marketing_orders_channel')
+        ..onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'orders',
+          callback: (payload) {
+            debugPrint('[CLIENT_PORTAL] ⚡ Realtime event on orders table (${payload.eventType}). Syncing marketing/closer orders...');
+            loadClientData();
+          },
+        )
+        ..onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'customer_leads',
+          callback: (payload) {
+            debugPrint('[CLIENT_PORTAL] ⚡ Realtime event on customer_leads (${payload.eventType}). Reloading leads...');
+            loadClientData();
+          },
+        )
+        ..onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'lead_forms',
+          callback: (payload) {
+            debugPrint('[CLIENT_PORTAL] ⚡ Realtime event on lead_forms (${payload.eventType}). Refreshing form stats...');
+            loadClientData();
+          },
+        )
+        ..onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'client_closers',
+          callback: (payload) {
+            debugPrint('[CLIENT_PORTAL] ⚡ Realtime event on client_closers (${payload.eventType}). Updating closer stats...');
+            loadClientData();
+          },
+        )
+        ..subscribe();
+      debugPrint('[CLIENT_PORTAL] 📡 Realtime stream active for orders, customer_leads, lead_forms & client_closers.');
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] ℹ️ Realtime marketing & orders subscription notice: $e');
+    }
+  }
+
   @override
   void dispose() {
     _invoicesRealtimeChannel?.unsubscribe();
+    _marketingRealtimeChannel?.unsubscribe();
     super.dispose();
   }
 }

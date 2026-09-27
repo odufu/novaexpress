@@ -29,6 +29,8 @@ import '../../features/users/presentation/pages/user_profile_page.dart';
 import '../../features/dc_console/presentation/pages/dc_console_layout.dart';
 import '../../features/client_portal/presentation/pages/client_portal_layout.dart';
 import '../../features/client_portal/presentation/pages/closer_mobile_portal_page.dart';
+import '../../features/client_portal/presentation/pages/marketer_mobile_portal_page.dart';
+import '../../features/client_portal/presentation/pages/public_lead_form_page.dart';
 import '../../presentation/presentation_root.dart';
 
 class RouterRefreshNotifier extends ChangeNotifier {
@@ -45,6 +47,7 @@ class RouterRefreshNotifier extends ChangeNotifier {
             previous?.user?.isClient != next.user?.isClient ||
             previous?.user?.isDcManager != next.user?.isDcManager ||
             previous?.user?.isCloser != next.user?.isCloser ||
+            previous?.user?.isMarketer != next.user?.isMarketer ||
             previous?.user?.isClientAdmin != next.user?.isClientAdmin) {
           notifyListeners();
         }
@@ -67,11 +70,12 @@ String? appRouteRedirect({
   final isAuthenticated = isAuthFromState || hasSupabaseSession;
   final isSplash = matchedLocation == '/splash';
   final isPresentation = matchedLocation == '/presentation';
+  final isPublicForm = matchedLocation.startsWith('/f/') || matchedLocation.startsWith('/lead-form/');
   final isLoggingIn = matchedLocation == '/login' || matchedLocation == '/forgot-password';
 
   debugPrint('[AUTH_ROUTER] 🚦 Route check: location="$matchedLocation", isAuthenticated=$isAuthenticated (riverpod=$isAuthFromState, supabase=$hasSupabaseSession)');
 
-  if (isSplash || isPresentation) {
+  if (isSplash || isPresentation || isPublicForm) {
     return null;
   }
   if (!isAuthenticated && !isLoggingIn) {
@@ -91,6 +95,7 @@ String? appRouteRedirect({
 
     final isDc = user.isDcManager;
     final isCloser = user.isCloser;
+    final isMarketer = user.isMarketer;
     final isClientAdmin = user.isClientAdmin;
     final isRider = user.isRider;
 
@@ -123,6 +128,14 @@ String? appRouteRedirect({
     if (matchedLocation.startsWith('/closer')) {
       if (!isCloser) {
         debugPrint('[AUTH_ROUTER] 🛑 Access Denied: User role "${user.role}" cannot access Closer Portal -> Redirecting to $homePath');
+        return homePath;
+      }
+    }
+
+    // 5. Strict Console Isolation: Digital Marketer Portal (/marketer/**)
+    if (matchedLocation.startsWith('/marketer')) {
+      if (!isMarketer) {
+        debugPrint('[AUTH_ROUTER] 🛑 Access Denied: User role "${user.role}" cannot access Marketer Portal -> Redirecting to $homePath');
         return homePath;
       }
     }
@@ -188,6 +201,24 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/closer',
         builder: (context, state) => const CloserMobilePortalPage(),
+      ),
+      GoRoute(
+        path: '/marketer',
+        builder: (context, state) => const MarketerMobilePortalPage(),
+      ),
+      GoRoute(
+        path: '/f/:formId',
+        builder: (context, state) {
+          final formId = state.pathParameters['formId'] ?? '';
+          return PublicLeadFormPage(formId: formId);
+        },
+      ),
+      GoRoute(
+        path: '/lead-form/:formId',
+        builder: (context, state) {
+          final formId = state.pathParameters['formId'] ?? '';
+          return PublicLeadFormPage(formId: formId);
+        },
       ),
       GoRoute(
         path: '/client',

@@ -63,6 +63,8 @@ class OrderEntity {
   final String? closerCode;
   final String? closerAvatarUrl;
   final String? leadId;
+  final String? marketerId;
+  final String? formId;
   final DateTime createdAt;
 
   const OrderEntity({
@@ -130,6 +132,8 @@ class OrderEntity {
     this.closerCode,
     this.closerAvatarUrl,
     this.leadId,
+    this.marketerId,
+    this.formId,
     required this.createdAt,
   });
 
@@ -483,6 +487,8 @@ Kindly tap the "📎" attach button below and share your *Current Location / Liv
     String? closerCode,
     String? closerAvatarUrl,
     String? leadId,
+    String? marketerId,
+    String? formId,
     DateTime? createdAt,
   }) {
     return OrderEntity(
@@ -550,6 +556,8 @@ Kindly tap the "📎" attach button below and share your *Current Location / Liv
       closerCode: closerCode ?? this.closerCode,
       closerAvatarUrl: closerAvatarUrl ?? this.closerAvatarUrl,
       leadId: leadId ?? this.leadId,
+      marketerId: marketerId ?? this.marketerId,
+      formId: formId ?? this.formId,
       createdAt: createdAt ?? this.createdAt,
     );
   }

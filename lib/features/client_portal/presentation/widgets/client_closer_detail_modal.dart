@@ -59,6 +59,169 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
     super.dispose();
   }
 
+  void _showProductAssignmentDialog() {
+    final catalog = ref.read(productCatalogProvider);
+    final clientProfile = ref.read(clientPortalProvider).clientProfile;
+    final products = catalog.products.where((p) =>
+        p.clientId == clientProfile.id ||
+        p.clientName.toLowerCase() == clientProfile.name.toLowerCase() ||
+        p.clientName.toLowerCase() == clientProfile.companyName.toLowerCase() ||
+        clientProfile.name.isEmpty).toList();
+
+    final availableProducts = products.isNotEmpty ? products : catalog.products;
+    final Set<String> tempSelected = Set<String>.from(_currentCloser.assignedProductIds);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF6366F1).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.inventory_2_rounded, color: Color(0xFF6366F1), size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Assign Products to Closer',
+                      style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    Text(
+                      _currentCloser.fullName,
+                      style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480, maxHeight: 400),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Select the products this closer manages. When digital marketing lead forms generate orders for these products, they will automatically be distributed to attached closers in a balanced split.',
+                    style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF475569)),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        tempSelected.isEmpty
+                            ? 'Status: All Products (Unrestricted)'
+                            : 'Dedicated: ${tempSelected.length} product(s) selected',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: tempSelected.isEmpty ? const Color(0xFF64748B) : const Color(0xFF6366F1),
+                        ),
+                      ),
+                      if (tempSelected.isNotEmpty)
+                        TextButton(
+                          onPressed: () => setDialogState(() => tempSelected.clear()),
+                          style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
+                          child: Text('Reset to All', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFFEF4444))),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  if (availableProducts.isEmpty)
+                    Text('No products found in catalog.', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)))
+                  else
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: availableProducts.map((p) {
+                        final isSel = tempSelected.contains(p.id);
+                        return FilterChip(
+                          label: Text(p.name, style: GoogleFonts.inter(fontSize: 11, fontWeight: isSel ? FontWeight.w700 : FontWeight.w500)),
+                          selected: isSel,
+                          onSelected: (val) {
+                            setDialogState(() {
+                              if (val) {
+                                tempSelected.add(p.id);
+                              } else {
+                                tempSelected.remove(p.id);
+                              }
+                            });
+                          },
+                          selectedColor: const Color(0xFF6366F1).withValues(alpha: 0.18),
+                          checkmarkColor: const Color(0xFF6366F1),
+                        );
+                      }).toList(),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text('Cancel', style: GoogleFonts.inter(color: const Color(0xFF64748B))),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF6366F1),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () async {
+                final messenger = ScaffoldMessenger.of(context);
+                Navigator.of(ctx).pop();
+
+                final selectedProds = availableProducts.where((p) => tempSelected.contains(p.id)).toList();
+                final pIds = selectedProds.map((p) => p.id).toList();
+                final pNames = selectedProds.map((p) => p.name).toList();
+
+                try {
+                  await ref.read(clientPortalProvider.notifier).updateCloserProducts(
+                    closerId: _currentCloser.id,
+                    productIds: pIds,
+                    productNames: pNames,
+                  );
+                  setState(() {
+                    _currentCloser = _currentCloser.copyWith(
+                      assignedProductIds: pIds,
+                      assignedProductNames: pNames,
+                    );
+                  });
+                  if (mounted) {
+                    messenger.showSnackBar(
+                      SnackBar(
+                        backgroundColor: const Color(0xFF10B981),
+                        content: Text('Product assignments updated for ${_currentCloser.fullName}!'),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    messenger.showSnackBar(
+                      SnackBar(backgroundColor: const Color(0xFFEF4444), content: Text('Failed to update products: $e')),
+                    );
+                  }
+                }
+              },
+              child: Text('Save Assignments', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showPasswordResetDialog() {
     final passwordCtrl = TextEditingController();
     final confirmCtrl = TextEditingController();
@@ -831,6 +994,23 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
                             ),
                           ),
                         ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: (_currentCloser.assignedProductNames.isEmpty ? const Color(0xFF10B981) : const Color(0xFF6366F1)).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            _currentCloser.assignedProductNames.isEmpty
+                                ? 'ALL PRODUCTS'
+                                : '${_currentCloser.assignedProductNames.length} PRODUCT${_currentCloser.assignedProductNames.length == 1 ? "" : "S"}',
+                            style: GoogleFonts.inter(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: _currentCloser.assignedProductNames.isEmpty ? const Color(0xFF10B981) : const Color(0xFF6366F1),
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 3),
@@ -854,6 +1034,17 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
             runSpacing: 8,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
+              // Assign Products
+              IconButton(
+                tooltip: 'Assign Catalog Products',
+                style: IconButton.styleFrom(
+                  backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                  side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                ),
+                icon: const Icon(Icons.inventory_2_outlined, size: 18, color: Color(0xFF6366F1)),
+                onPressed: _showProductAssignmentDialog,
+              ),
+
               // Edit Profile
               IconButton(
                 tooltip: 'Edit Employee Profile',
@@ -1711,6 +1902,124 @@ class _ClientCloserDetailModalState extends ConsumerState<ClientCloserDetailModa
                   'Orders converted by ${_currentCloser.fullName} are automatically scoped to matching State LGAs and auto-dispatched to the nearest DC & available Rider fleet.',
                   style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)),
                 ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'ASSIGNED CATALOG PRODUCTS & LEAD ROUTING',
+                style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w800, color: const Color(0xFFF37021), letterSpacing: 0.5),
+              ),
+              TextButton.icon(
+                onPressed: _showProductAssignmentDialog,
+                icon: const Icon(Icons.edit_note_rounded, size: 16, color: Color(0xFF6366F1)),
+                label: Text('Edit Assignments', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: const Color(0xFF6366F1))),
+                style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF0B1021) : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_currentCloser.assignedProductNames.isEmpty) ...[
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.public_rounded, color: Color(0xFF10B981), size: 18),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Unrestricted Access (All Products)',
+                              style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                            ),
+                            Text(
+                              'This closer receives and manages incoming leads and orders across all products in your store catalog.',
+                              style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ] else ...[
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF6366F1).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.lock_person_rounded, color: Color(0xFF6366F1), size: 18),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Dedicated to ${_currentCloser.assignedProductNames.length} Product(s)',
+                              style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                            ),
+                            Text(
+                              'Orders and leads generated for these products are automatically routed to this closer via balanced split.',
+                              style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _currentCloser.assignedProductNames.map((name) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF6366F1).withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.25)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.inventory_2_outlined, size: 14, color: Color(0xFF6366F1)),
+                            const SizedBox(width: 6),
+                            Text(
+                              name,
+                              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF6366F1)),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
               ],
             ),
           ),

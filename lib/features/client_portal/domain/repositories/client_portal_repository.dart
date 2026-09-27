@@ -7,6 +7,8 @@ import '../entities/client_supplier.dart';
 import '../entities/client_stock_invoice.dart';
 import '../entities/client_stock_balance.dart';
 import '../entities/stock_holder_custody.dart';
+import '../entities/client_marketer.dart';
+import '../entities/lead_form.dart';
 
 abstract class ClientPortalRepository {
   /// Onboards a new Closer for an Enterprise Client
@@ -24,6 +26,8 @@ abstract class ClientPortalRepository {
     String? bankName,
     String? accountNumber,
     String? accountName,
+    List<String> assignedProductIds = const [],
+    List<String> assignedProductNames = const [],
   });
 
   /// Fetches all closers for a client
@@ -55,6 +59,72 @@ abstract class ClientPortalRepository {
     String? bankName,
     String? accountNumber,
     String? accountName,
+    List<String>? assignedProductIds,
+    List<String>? assignedProductNames,
+  });
+
+  /// Digital Marketer & Lead Form Operations
+  Future<List<ClientMarketer>> getMarketers(String clientId);
+  Future<ClientMarketer> createMarketer({
+    required String clientId,
+    required String fullName,
+    required String email,
+    required String phone,
+    String? password,
+    String? marketerCode,
+    double dailyAdSpendBudget = 0.0,
+    double commissionRate = 0.0,
+    bool isCommissionEnabled = false,
+    String? bankName,
+    String? accountNumber,
+    String? accountName,
+  });
+  Future<void> toggleMarketerStatus({
+    required String marketerId,
+    required bool isActive,
+  });
+
+  Future<List<LeadForm>> getLeadForms(String clientId, {String? marketerId});
+  Future<LeadForm> createLeadForm({
+    required String clientId,
+    String? marketerId,
+    required String productId,
+    required String productName,
+    required String formTitle,
+    String? formSlug,
+    String? description,
+    List<Map<String, dynamic>> packages = const [],
+    String redirectUrl = '',
+    String pixelId = '',
+    String capiToken = '',
+    String testEventCode = '',
+    Map<String, dynamic>? fieldOptions,
+    Map<String, dynamic>? appearance,
+  });
+  Future<LeadForm> updateLeadForm({
+    required String formId,
+    String? formTitle,
+    String? formSlug,
+    String? description,
+    String? productId,
+    String? productName,
+    List<Map<String, dynamic>>? packages,
+    String? redirectUrl,
+    String? pixelId,
+    String? capiToken,
+    String? testEventCode,
+    Map<String, dynamic>? fieldOptions,
+    Map<String, dynamic>? appearance,
+    bool? isActive,
+  });
+  Future<Map<String, dynamic>> submitMarketingLeadOrder(Map<String, dynamic> payload);
+  Future<Map<String, dynamic>> confirmCloserOrder({
+    required String orderId,
+    required String closerId,
+    String? deliveryAddress,
+    String? deliveryState,
+    String? deliveryLga,
+    String? notes,
   });
 
   /// Closer Payout Management

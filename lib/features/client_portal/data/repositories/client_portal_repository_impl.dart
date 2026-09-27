@@ -7,6 +7,8 @@ import '../../domain/entities/client_supplier.dart';
 import '../../domain/entities/client_stock_invoice.dart';
 import '../../domain/entities/client_stock_balance.dart';
 import '../../domain/entities/stock_holder_custody.dart';
+import '../../domain/entities/client_marketer.dart';
+import '../../domain/entities/lead_form.dart';
 import '../../domain/repositories/client_portal_repository.dart';
 import '../datasources/client_portal_remote_datasource.dart';
 
@@ -31,6 +33,8 @@ class ClientPortalRepositoryImpl implements ClientPortalRepository {
     String? bankName,
     String? accountNumber,
     String? accountName,
+    List<String> assignedProductIds = const [],
+    List<String> assignedProductNames = const [],
   }) async {
     return await _remoteDataSource.createCloser(
       clientId: clientId,
@@ -46,6 +50,8 @@ class ClientPortalRepositoryImpl implements ClientPortalRepository {
       bankName: bankName,
       accountNumber: accountNumber,
       accountName: accountName,
+      assignedProductIds: assignedProductIds,
+      assignedProductNames: assignedProductNames,
     );
   }
 
@@ -92,6 +98,8 @@ class ClientPortalRepositoryImpl implements ClientPortalRepository {
     String? bankName,
     String? accountNumber,
     String? accountName,
+    List<String>? assignedProductIds,
+    List<String>? assignedProductNames,
   }) async {
     await _remoteDataSource.updateCloserDetails(
       closerId: closerId,
@@ -105,6 +113,159 @@ class ClientPortalRepositoryImpl implements ClientPortalRepository {
       bankName: bankName,
       accountNumber: accountNumber,
       accountName: accountName,
+      assignedProductIds: assignedProductIds,
+      assignedProductNames: assignedProductNames,
+    );
+  }
+
+  @override
+  Future<List<ClientMarketer>> getMarketers(String clientId) async {
+    try {
+      return await _remoteDataSource.fetchMarketers(clientId);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  @override
+  Future<ClientMarketer> createMarketer({
+    required String clientId,
+    required String fullName,
+    required String email,
+    required String phone,
+    String? password,
+    String? marketerCode,
+    double dailyAdSpendBudget = 0.0,
+    double commissionRate = 0.0,
+    bool isCommissionEnabled = false,
+    String? bankName,
+    String? accountNumber,
+    String? accountName,
+  }) async {
+    return await _remoteDataSource.createMarketer(
+      clientId: clientId,
+      fullName: fullName,
+      email: email,
+      phone: phone,
+      password: password,
+      marketerCode: marketerCode,
+      dailyAdSpendBudget: dailyAdSpendBudget,
+      commissionRate: commissionRate,
+      isCommissionEnabled: isCommissionEnabled,
+      bankName: bankName,
+      accountNumber: accountNumber,
+      accountName: accountName,
+    );
+  }
+
+  @override
+  Future<void> toggleMarketerStatus({
+    required String marketerId,
+    required bool isActive,
+  }) async {
+    await _remoteDataSource.updateMarketerStatus(marketerId: marketerId, isActive: isActive);
+  }
+
+  @override
+  Future<List<LeadForm>> getLeadForms(String clientId, {String? marketerId}) async {
+    try {
+      return await _remoteDataSource.fetchLeadForms(clientId, marketerId: marketerId);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  @override
+  Future<LeadForm> createLeadForm({
+    required String clientId,
+    String? marketerId,
+    required String productId,
+    required String productName,
+    required String formTitle,
+    String? formSlug,
+    String? description,
+    List<Map<String, dynamic>> packages = const [],
+    String redirectUrl = '',
+    String pixelId = '',
+    String capiToken = '',
+    String testEventCode = '',
+    Map<String, dynamic>? fieldOptions,
+    Map<String, dynamic>? appearance,
+  }) async {
+    return await _remoteDataSource.createLeadForm(
+      clientId: clientId,
+      marketerId: marketerId,
+      productId: productId,
+      productName: productName,
+      formTitle: formTitle,
+      formSlug: formSlug,
+      description: description,
+      packages: packages,
+      redirectUrl: redirectUrl,
+      pixelId: pixelId,
+      capiToken: capiToken,
+      testEventCode: testEventCode,
+      fieldOptions: fieldOptions,
+      appearance: appearance,
+    );
+  }
+
+  @override
+  Future<LeadForm> updateLeadForm({
+    required String formId,
+    String? formTitle,
+    String? formSlug,
+    String? description,
+    String? productId,
+    String? productName,
+    List<Map<String, dynamic>>? packages,
+    String? redirectUrl,
+    String? pixelId,
+    String? capiToken,
+    String? testEventCode,
+    Map<String, dynamic>? fieldOptions,
+    Map<String, dynamic>? appearance,
+    bool? isActive,
+  }) async {
+    return await _remoteDataSource.updateLeadForm(
+      formId: formId,
+      formTitle: formTitle,
+      formSlug: formSlug,
+      description: description,
+      productId: productId,
+      productName: productName,
+      packages: packages,
+      redirectUrl: redirectUrl,
+      pixelId: pixelId,
+      capiToken: capiToken,
+      testEventCode: testEventCode,
+      fieldOptions: fieldOptions,
+      appearance: appearance,
+      isActive: isActive,
+    );
+  }
+
+  @override
+  Future<Map<String, dynamic>> submitMarketingLeadOrder(Map<String, dynamic> payload) async {
+    return await _remoteDataSource.submitMarketingLeadOrder(payload);
+  }
+
+  @override
+  Future<Map<String, dynamic>> confirmCloserOrder({
+    required String orderId,
+    required String closerId,
+    String? deliveryAddress,
+    String? deliveryState,
+    String? deliveryLga,
+    String? notes,
+  }) async {
+    return await _remoteDataSource.confirmCloserOrder(
+      orderId: orderId,
+      closerId: closerId,
+      deliveryAddress: deliveryAddress,
+      deliveryState: deliveryState,
+      deliveryLga: deliveryLga,
+      notes: notes,
     );
   }
 

@@ -1382,6 +1382,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       }
       if (rawRole.isEmpty) {
         try {
+          final isMarketerRow = await dbClient.from('client_marketers').select('id').ilike('email', cleanEmail).maybeSingle();
+          if (isMarketerRow != null) rawRole = 'marketer';
+        } catch (_) {}
+      }
+      if (rawRole.isEmpty) {
+        try {
           final isClientRow = await dbClient.from('clients').select('id').ilike('email', cleanEmail).maybeSingle();
           if (isClientRow != null) rawRole = 'client';
         } catch (_) {}
@@ -1391,6 +1397,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           rawRole = 'client';
         } else if (cleanEmail.contains('closer')) {
           rawRole = 'closer';
+        } else if (cleanEmail.contains('marketer') || cleanEmail.contains('media') || cleanEmail.contains('growth')) {
+          rawRole = 'marketer';
         } else if (cleanEmail.contains('supervisor') || cleanEmail.contains('manager')) {
           rawRole = 'dc_manager';
         } else {
@@ -1399,6 +1407,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       }
 
       final isCloser = rawRole == 'closer' || rawRole == 'client_closer';
+      final isMarketer = rawRole == 'marketer' || rawRole == 'digital_marketer';
       final isClientAdmin = rawRole == 'client' || rawRole == 'merchant' || rawRole == 'seller';
       final isDcStaff = rawRole == 'dc_manager' || rawRole == 'dc_supervisor' || rawRole == 'super_admin';
 
@@ -1449,6 +1458,41 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           }
         } catch (e) {
           debugPrint('[AUTH_DATASOURCE] ℹ️ Closer profile query notice ($e)');
+        }
+      } else if (isMarketer) {
+        merged['role'] = 'marketer';
+        merged['delivery_agent_id'] = null;
+
+        try {
+          final marketerRes = await dbClient
+              .from('client_marketers')
+              .select()
+              .or('email.ilike.$cleanEmail,id.eq.$userId,user_id.eq.$userId')
+              .maybeSingle();
+          if (marketerRes != null) {
+            merged['marketer_id'] = marketerRes['id'];
+            merged['marketer_code'] = marketerRes['marketer_code'];
+            merged['phone'] = marketerRes['phone'] ?? merged['phone'] ?? merged['phone_number'];
+            if (marketerRes['avatar_url'] != null && marketerRes['avatar_url'].toString().isNotEmpty) {
+              merged['avatar_url'] = marketerRes['avatar_url'];
+            }
+            if (marketerRes['full_name'] != null) {
+              final parts = marketerRes['full_name'].toString().trim().split(' ');
+              merged['first_name'] = parts.first;
+              merged['last_name'] = parts.length > 1 ? parts.sublist(1).join(' ') : '';
+            }
+            final clientId = marketerRes['client_id'] ?? userRes?['client_id'];
+            if (clientId != null) {
+              final clientRes = await dbClient.from('clients').select('id, name').eq('id', clientId).maybeSingle();
+              if (clientRes != null) {
+                merged['client_id'] = clientRes['id'];
+                merged['client_company_name'] = clientRes['name'];
+                merged['company_name'] = clientRes['name'];
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('[AUTH_DATASOURCE] ℹ️ Marketer profile query notice ($e)');
         }
       } else if (isClientAdmin) {
         merged['role'] = 'client';

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../providers/client_portal_provider.dart';
+import '../../../dc_console/presentation/providers/product_catalog_provider.dart';
 import 'client_closer_credentials_modal.dart';
 
 final onboardCloserSubmittingProvider = StateProvider.autoDispose<bool>((ref) => false);
@@ -24,6 +25,7 @@ class _ClientOnboardCloserModalState extends ConsumerState<ClientOnboardCloserMo
   final _bankNameController = TextEditingController();
   final _accountNumberController = TextEditingController();
   final _accountNameController = TextEditingController();
+  final Set<String> _selectedProductIds = {};
   bool _isCommissionEnabled = true;
   bool _obscurePassword = true;
 
@@ -86,6 +88,11 @@ class _ClientOnboardCloserModalState extends ConsumerState<ClientOnboardCloserMo
 
     ref.read(onboardCloserSubmittingProvider.notifier).state = true;
 
+    final catalogProducts = ref.read(productCatalogProvider).products;
+    final selectedProducts = catalogProducts.where((p) => _selectedProductIds.contains(p.id)).toList();
+    final assignedProductIds = selectedProducts.map((p) => p.id).toList();
+    final assignedProductNames = selectedProducts.map((p) => p.name).toList();
+
     try {
       final closer = await ref.read(clientPortalProvider.notifier).createCloser(
         fullName: name,
@@ -98,6 +105,8 @@ class _ClientOnboardCloserModalState extends ConsumerState<ClientOnboardCloserMo
         bankName: bankName,
         accountNumber: accountNumber,
         accountName: accountName,
+        assignedProductIds: assignedProductIds,
+        assignedProductNames: assignedProductNames,
       );
 
       if (mounted) {
@@ -513,6 +522,114 @@ class _ClientOnboardCloserModalState extends ConsumerState<ClientOnboardCloserMo
                     ),
                   ),
                 ],
+                const SizedBox(height: 16),
+
+                // Assigned Catalog Products
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Assigned Products (Order Routing)',
+                          style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF334155)),
+                        ),
+                        if (_selectedProductIds.isNotEmpty)
+                          TextButton(
+                            onPressed: () => setState(() => _selectedProductIds.clear()),
+                            style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
+                            child: Text('Reset to All', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFFEF4444))),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _selectedProductIds.isEmpty
+                          ? '🌟 Unrestricted (Receives orders across ALL products in merchant catalog)'
+                          : '🎯 Dedicated Closer (${_selectedProductIds.length} product(s) selected). Marketing orders for these products will be split evenly across attached closers.',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        color: _selectedProductIds.isEmpty ? const Color(0xFF64748B) : const Color(0xFF6366F1),
+                        fontWeight: _selectedProductIds.isEmpty ? FontWeight.normal : FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Consumer(
+                      builder: (context, ref, _) {
+                        final catalog = ref.watch(productCatalogProvider);
+                        final clientProfile = ref.watch(clientPortalProvider).clientProfile;
+                        final products = catalog.products.where((p) =>
+                            p.clientId == clientProfile.id ||
+                            p.clientName.toLowerCase() == clientProfile.name.toLowerCase() ||
+                            p.clientName.toLowerCase() == clientProfile.companyName.toLowerCase() ||
+                            clientProfile.name.isEmpty).toList();
+
+                        final displayProducts = products.isNotEmpty ? products : catalog.products;
+
+                        if (displayProducts.isEmpty) {
+                          return Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
+                            child: Text(
+                              'No products created in catalog yet. Closer will automatically receive all general orders.',
+                              style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
+                            ),
+                          );
+                        }
+
+                        return Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: displayProducts.map((prod) {
+                              final isSelected = _selectedProductIds.contains(prod.id);
+                              return FilterChip(
+                                label: Text(
+                                  prod.name,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11,
+                                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                    color: isSelected ? const Color(0xFF6366F1) : const Color(0xFF334155),
+                                  ),
+                                ),
+                                selected: isSelected,
+                                onSelected: (selected) {
+                                  setState(() {
+                                    if (selected) {
+                                      _selectedProductIds.add(prod.id);
+                                    } else {
+                                      _selectedProductIds.remove(prod.id);
+                                    }
+                                  });
+                                },
+                                backgroundColor: Colors.white,
+                                selectedColor: const Color(0xFF6366F1).withValues(alpha: 0.15),
+                                checkmarkColor: const Color(0xFF6366F1),
+                                side: BorderSide(
+                                  color: isSelected ? const Color(0xFF6366F1) : const Color(0xFFCBD5E1),
+                                ),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              );
+                            }).toList(),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 16),
 
                 // Closer Login Password

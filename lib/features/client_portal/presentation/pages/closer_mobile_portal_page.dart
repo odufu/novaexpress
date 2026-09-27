@@ -14,6 +14,7 @@ import '../../../users/presentation/widgets/edit_profile_modal.dart';
 import '../../domain/entities/client_closer.dart';
 import '../../domain/entities/client_closer_payout.dart';
 import '../providers/client_portal_provider.dart';
+import '../widgets/client_confirm_order_modal.dart';
 import '../widgets/client_convert_lead_modal.dart';
 import '../widgets/client_create_order_modal.dart';
 import '../widgets/client_order_tracking_modal.dart';
@@ -1372,9 +1373,10 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
 
     final filtered = baseOrders.where((o) {
       if (statusFilter != 'all') {
+        if (statusFilter == 'new_leads' && !(o.status.toLowerCase() == 'new' || o.status.toLowerCase() == 'unconfirmed' || o.status.toLowerCase() == 'contacting')) return false;
         if (statusFilter == 'in_transit' && !o.isAssignedInTransit) return false;
         if (statusFilter == 'delivered' && !o.isDelivered) return false;
-        if (statusFilter == 'pending' && (o.isDelivered || o.isFailed || o.isAssignedInTransit)) return false;
+        if (statusFilter == 'pending' && (o.isDelivered || o.isFailed || o.isAssignedInTransit || o.status.toLowerCase() == 'new')) return false;
         if (statusFilter == 'failed' && !o.isFailed) return false;
       }
       if (searchQuery.isNotEmpty) {
@@ -1453,6 +1455,8 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                   child: Row(
                     children: [
                       _buildFilterChip('all', 'All (${baseOrders.length})', statusFilter, isDark),
+                      const SizedBox(width: 8),
+                      _buildFilterChip('new_leads', 'New Leads (${baseOrders.where((o) => o.status.toLowerCase() == 'new' || o.status.toLowerCase() == 'unconfirmed' || o.status.toLowerCase() == 'contacting').length})', statusFilter, isDark),
                       const SizedBox(width: 8),
                       _buildFilterChip('in_transit', 'In Transit (${baseOrders.where((o) => o.isAssignedInTransit).length})', statusFilter, isDark),
                       const SizedBox(width: 8),
@@ -1533,6 +1537,8 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                     children: [
                       _buildFilterChip('all', 'All (${baseOrders.length})', statusFilter, isDark),
                       const SizedBox(width: 8),
+                      _buildFilterChip('new_leads', 'New Leads (${baseOrders.where((o) => o.status.toLowerCase() == 'new' || o.status.toLowerCase() == 'unconfirmed' || o.status.toLowerCase() == 'contacting').length})', statusFilter, isDark),
+                      const SizedBox(width: 8),
                       _buildFilterChip('in_transit', 'In Transit (${baseOrders.where((o) => o.isAssignedInTransit).length})', statusFilter, isDark),
                       const SizedBox(width: 8),
                       _buildFilterChip('delivered', 'Delivered (${baseOrders.where((o) => o.isDelivered).length})', statusFilter, isDark),
@@ -1606,6 +1612,10 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
     Color statusColor;
     String statusLabel;
 
+    final isNewLead = order.status.toLowerCase() == 'new' ||
+        order.status.toLowerCase() == 'unconfirmed' ||
+        order.status.toLowerCase() == 'contacting';
+
     if (order.isDelivered) {
       statusColor = const Color(0xFF10B981);
       statusLabel = 'DELIVERED';
@@ -1615,6 +1625,9 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
     } else if (order.isFailed) {
       statusColor = const Color(0xFFEF4444);
       statusLabel = 'FAILED / RETURN';
+    } else if (isNewLead) {
+      statusColor = const Color(0xFFF97316);
+      statusLabel = 'NEW LEAD (UNCONFIRMED)';
     } else {
       statusColor = const Color(0xFFF59E0B);
       statusLabel = 'PENDING DISPATCH';
@@ -1829,24 +1842,58 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
             ),
             child: Row(
               children: [
-                // 1. One-Tap Call Customer
-                Expanded(
-                  child: ElevatedButton.icon(
+                if (isNewLead) ...[
+                  // 1. One-Tap Dialer Icon Button
+                  IconButton(
+                    tooltip: 'Call Customer (${order.customerPhone})',
                     onPressed: () => _makePhoneCall(context, order.customerPhone, 'Customer (${order.customerName})'),
-                    icon: const Icon(Icons.phone_in_talk_rounded, size: 14, color: Colors.white),
-                    label: Text(
-                      'Call Customer',
-                      style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF10B981),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
+                    icon: const Icon(Icons.phone_in_talk_rounded, size: 16, color: Colors.white),
+                    style: IconButton.styleFrom(
+                      backgroundColor: const Color(0xFF3B82F6),
+                      padding: const EdgeInsets.all(9),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      elevation: 0,
                     ),
                   ),
-                ),
-                const SizedBox(width: 6),
+                  const SizedBox(width: 6),
+
+                  // 2. Confirm & Auto-Dispatch Button
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => ClientConfirmOrderModal.show(context, order),
+                      icon: const Icon(Icons.verified_rounded, size: 14, color: Colors.white),
+                      label: Text(
+                        'Confirm & Dispatch',
+                        style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF10B981),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        elevation: 0,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                ] else ...[
+                  // 1. One-Tap Call Customer
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => _makePhoneCall(context, order.customerPhone, 'Customer (${order.customerName})'),
+                      icon: const Icon(Icons.phone_in_talk_rounded, size: 14, color: Colors.white),
+                      label: Text(
+                        'Call Customer',
+                        style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF10B981),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        elevation: 0,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                ],
 
                 // 2. Order Chat & Live Followup (Strict Closer Scoping)
                 Builder(

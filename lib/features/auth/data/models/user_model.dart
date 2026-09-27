@@ -35,6 +35,8 @@ class UserModel extends UserEntity {
     super.clientCompanyName,
     super.closerId,
     super.closerCode,
+    super.marketerId,
+    super.marketerCode,
     super.avatarUrl,
   });
 
@@ -81,6 +83,8 @@ class UserModel extends UserEntity {
       clientCompanyName: resolvedClientName,
       closerId: json['closer_id'] ?? (json['role'] == 'closer' ? json['id'] : null),
       closerCode: json['closer_code'] ?? (json['role'] == 'closer' ? 'CLS-001' : null),
+      marketerId: json['marketer_id'] ?? (json['role'] == 'marketer' ? json['id'] : null),
+      marketerCode: json['marketer_code'] ?? (json['role'] == 'marketer' ? 'MKT-001' : null),
       avatarUrl: json['avatar_url']?.toString() ??
           json['photo_url']?.toString() ??
           json['profile_photo_url']?.toString() ??
@@ -124,6 +128,8 @@ class UserModel extends UserEntity {
       'client_company_name': clientCompanyName,
       'closer_id': closerId,
       'closer_code': closerCode,
+      'marketer_id': marketerId,
+      'marketer_code': marketerCode,
       'avatar_url': avatarUrl,
     };
   }

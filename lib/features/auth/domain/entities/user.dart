@@ -32,6 +32,8 @@ class UserEntity {
   final String? clientCompanyName;
   final String? closerId;
   final String? closerCode;
+  final String? marketerId;
+  final String? marketerCode;
   final String? avatarUrl;
 
   const UserEntity({
@@ -68,6 +70,8 @@ class UserEntity {
     this.clientCompanyName,
     this.closerId,
     this.closerCode,
+    this.marketerId,
+    this.marketerCode,
     this.avatarUrl,
   });
 
@@ -78,12 +82,14 @@ class UserEntity {
   bool get isInHouseRider => isRider && personnelType == 'in_house_rider';
   bool get isDcManager => role == 'dc_manager' || role == 'dc_supervisor' || role == 'super_admin';
   bool get isCloser => role == 'closer' || role == 'client_closer';
+  bool get isMarketer => role == 'marketer' || role == 'digital_marketer';
   bool get isClientAdmin => role == 'client' || role == 'merchant' || role == 'seller';
-  bool get isClient => isClientAdmin || isCloser;
+  bool get isClient => isClientAdmin || isCloser || isMarketer;
 
   String get roleDescription {
     if (isDcManager) return 'DC Operations Supervisor';
     if (isCloser) return 'Telesales Closer';
+    if (isMarketer) return 'Digital Marketer';
     if (isClientAdmin) return 'E-Commerce Merchant Admin';
     if (isRider) return 'Field Delivery Agent (PDA)';
     return 'User';
@@ -93,6 +99,7 @@ class UserEntity {
   String get homeConsoleRoute {
     if (isDcManager) return '/dc';
     if (isCloser) return '/closer';
+    if (isMarketer) return '/marketer';
     if (isClientAdmin) return '/client';
     if (isRider) return '/';
     return '/login';

@@ -15,6 +15,7 @@ import 'client_finance_page.dart';
 import 'client_inventory_page.dart';
 import 'client_orders_page.dart';
 import 'client_products_page.dart';
+import 'client_marketing_suite_page.dart';
 import 'closer_mobile_portal_page.dart';
 import '../../../pipeline_chat/presentation/widgets/pipeline_chat_floating_action_button.dart';
 import '../../../pipeline_chat/presentation/providers/pipeline_chat_fab_provider.dart';
@@ -139,6 +140,8 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
         return const ClientFinancePage();
       case 'products':
         return const ClientProductsPage();
+      case 'marketing':
+        return const ClientMarketingSuitePage();
       case 'dashboard':
       default:
         if (isCloser) {
@@ -335,6 +338,15 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
                       isCollapsed: isCollapsed,
                       isDrawer: isDrawer,
                     ),
+                  _buildNavItem(
+                    key: 'marketing',
+                    title: 'Digital Marketing',
+                    icon: Icons.campaign_rounded,
+                    badge: state.leadForms.isNotEmpty ? '${state.leadForms.length}' : null,
+                    isSelected: activeTab == 'marketing',
+                    isCollapsed: isCollapsed,
+                    isDrawer: isDrawer,
+                  ),
                 ],
               ],
             ),
@@ -519,6 +531,8 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
         return 'Inventory & Stock';
       case 'products':
         return 'Product Catalog & Deals';
+      case 'marketing':
+        return 'Digital Marketing & Lead Ingestion Suite';
       case 'dashboard':
       default:
         return isCloser ? 'My Leads & Telesales Dialer' : 'Merchant Dashboard';

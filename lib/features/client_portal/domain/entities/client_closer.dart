@@ -19,6 +19,8 @@ class ClientCloser {
   final String accountName;
   final double unpaidCommissionBalance;
   final double totalPaidCommission;
+  final List<String> assignedProductIds;
+  final List<String> assignedProductNames;
   final String? avatarUrl;
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -44,6 +46,8 @@ class ClientCloser {
     this.accountName = '',
     this.unpaidCommissionBalance = 0.0,
     this.totalPaidCommission = 0.0,
+    this.assignedProductIds = const [],
+    this.assignedProductNames = const [],
     this.avatarUrl,
     this.createdAt,
     this.updatedAt,
@@ -88,6 +92,8 @@ class ClientCloser {
       accountName: json['account_name']?.toString() ?? '',
       unpaidCommissionBalance: (json['unpaid_commission_balance'] as num?)?.toDouble() ?? 0.0,
       totalPaidCommission: (json['total_paid_commission'] as num?)?.toDouble() ?? 0.0,
+      assignedProductIds: (json['assigned_product_ids'] as List?)?.map((e) => e.toString()).toList() ?? const [],
+      assignedProductNames: (json['assigned_product_names'] as List?)?.map((e) => e.toString()).toList() ?? const [],
       avatarUrl: json['avatar_url']?.toString(),
       createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'].toString()) : null,
       updatedAt: json['updated_at'] != null ? DateTime.tryParse(json['updated_at'].toString()) : null,
@@ -116,6 +122,8 @@ class ClientCloser {
       'account_name': accountName,
       'unpaid_commission_balance': unpaidCommissionBalance,
       'total_paid_commission': totalPaidCommission,
+      'assigned_product_ids': assignedProductIds,
+      'assigned_product_names': assignedProductNames,
       'avatar_url': avatarUrl,
       'created_at': createdAt?.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
@@ -143,6 +151,8 @@ class ClientCloser {
     String? accountName,
     double? unpaidCommissionBalance,
     double? totalPaidCommission,
+    List<String>? assignedProductIds,
+    List<String>? assignedProductNames,
     String? avatarUrl,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -168,6 +178,8 @@ class ClientCloser {
       accountName: accountName ?? this.accountName,
       unpaidCommissionBalance: unpaidCommissionBalance ?? this.unpaidCommissionBalance,
       totalPaidCommission: totalPaidCommission ?? this.totalPaidCommission,
+      assignedProductIds: assignedProductIds ?? this.assignedProductIds,
+      assignedProductNames: assignedProductNames ?? this.assignedProductNames,
       avatarUrl: avatarUrl != null ? (avatarUrl.isEmpty ? null : avatarUrl) : this.avatarUrl,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,

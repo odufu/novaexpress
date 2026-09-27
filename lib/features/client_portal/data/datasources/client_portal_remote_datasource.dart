@@ -12,6 +12,8 @@ import '../../domain/entities/client_supplier.dart';
 import '../../domain/entities/client_stock_invoice.dart';
 import '../../domain/entities/client_stock_balance.dart';
 import '../../domain/entities/stock_holder_custody.dart';
+import '../../domain/entities/client_marketer.dart';
+import '../../domain/entities/lead_form.dart';
 import '../../../../core/helpers/uuid_helper.dart';
 
 abstract class ClientPortalRemoteDataSource {
@@ -29,6 +31,8 @@ abstract class ClientPortalRemoteDataSource {
     String? bankName,
     String? accountNumber,
     String? accountName,
+    List<String> assignedProductIds = const [],
+    List<String> assignedProductNames = const [],
   });
 
   Future<List<ClientCloser>> fetchClosers(String clientId);
@@ -46,6 +50,68 @@ abstract class ClientPortalRemoteDataSource {
     String? bankName,
     String? accountNumber,
     String? accountName,
+    List<String>? assignedProductIds,
+    List<String>? assignedProductNames,
+  });
+
+  /// Digital Marketers & Lead Forms
+  Future<List<ClientMarketer>> fetchMarketers(String clientId);
+  Future<ClientMarketer> createMarketer({
+    required String clientId,
+    required String fullName,
+    required String email,
+    required String phone,
+    String? password,
+    String? marketerCode,
+    double dailyAdSpendBudget = 0.0,
+    double commissionRate = 0.0,
+    bool isCommissionEnabled = false,
+    String? bankName,
+    String? accountNumber,
+    String? accountName,
+  });
+  Future<void> updateMarketerStatus({required String marketerId, required bool isActive});
+  Future<List<LeadForm>> fetchLeadForms(String clientId, {String? marketerId});
+  Future<LeadForm> createLeadForm({
+    required String clientId,
+    String? marketerId,
+    required String productId,
+    required String productName,
+    required String formTitle,
+    String? formSlug,
+    String? description,
+    List<Map<String, dynamic>> packages = const [],
+    String redirectUrl = '',
+    String pixelId = '',
+    String capiToken = '',
+    String testEventCode = '',
+    Map<String, dynamic>? fieldOptions,
+    Map<String, dynamic>? appearance,
+  });
+  Future<LeadForm> updateLeadForm({
+    required String formId,
+    String? formTitle,
+    String? formSlug,
+    String? description,
+    String? productId,
+    String? productName,
+    List<Map<String, dynamic>>? packages,
+    String? redirectUrl,
+    String? pixelId,
+    String? capiToken,
+    String? testEventCode,
+    Map<String, dynamic>? fieldOptions,
+    Map<String, dynamic>? appearance,
+    bool? isActive,
+  });
+  Future<Map<String, dynamic>> submitMarketingLeadOrder(Map<String, dynamic> payload);
+  Future<Map<String, dynamic>> confirmCloserOrder({
+    required String orderId,
+    required String closerId,
+    String? deliveryAddress,
+    String? deliveryState,
+    String? deliveryLga,
+    String? notes,
   });
   Future<List<ClientCloserPayout>> fetchCloserPayouts(String closerId);
   Future<List<ClientCloserPayout>> fetchClientCloserPayouts(String clientId);
@@ -173,6 +239,8 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
     String? bankName,
     String? accountNumber,
     String? accountName,
+    List<String> assignedProductIds = const [],
+    List<String> assignedProductNames = const [],
   }) async {
     final cleanEmail = email.trim().toLowerCase();
     final cleanPhone = phone.replaceAll(RegExp(r'[\s\-\(\)]'), '').trim();
@@ -348,6 +416,8 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
       bankName: bankName ?? '',
       accountNumber: accountNumber ?? '',
       accountName: accountName ?? '',
+      assignedProductIds: assignedProductIds,
+      assignedProductNames: assignedProductNames,
       isActive: true,
       createdAt: DateTime.now(),
     );
@@ -548,6 +618,8 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
     String? bankName,
     String? accountNumber,
     String? accountName,
+    List<String>? assignedProductIds,
+    List<String>? assignedProductNames,
   }) async {
     final adminDb = _getAdminClient();
     try {
@@ -562,6 +634,8 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
         if (bankName != null) 'bank_name': bankName,
         if (accountNumber != null) 'account_number': accountNumber,
         if (accountName != null) 'account_name': accountName,
+        if (assignedProductIds != null) 'assigned_product_ids': assignedProductIds,
+        if (assignedProductNames != null) 'assigned_product_names': assignedProductNames,
         'updated_at': DateTime.now().toIso8601String(),
       }).eq('id', closerId);
     } catch (e) {
@@ -1501,5 +1575,251 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
       debugPrint('[CLIENT_PORTAL] ⚠️ Error generating dynamic custody list: $e');
       return [];
     }
+  }
+
+  @override
+  Future<List<ClientMarketer>> fetchMarketers(String clientId) async {
+    final client = _getClient();
+    final response = await client
+        .from('client_marketers')
+        .select('*')
+        .eq('client_id', clientId)
+        .order('created_at', ascending: false);
+
+    final List<ClientMarketer> list = [];
+    for (final item in response as List) {
+      try {
+        list.add(ClientMarketer.fromJson(item as Map<String, dynamic>));
+      } catch (_) {}
+    }
+    return list;
+  }
+
+  @override
+  Future<ClientMarketer> createMarketer({
+    required String clientId,
+    required String fullName,
+    required String email,
+    required String phone,
+    String? password,
+    String? marketerCode,
+    double dailyAdSpendBudget = 0.0,
+    double commissionRate = 0.0,
+    bool isCommissionEnabled = false,
+    String? bankName,
+    String? accountNumber,
+    String? accountName,
+  }) async {
+    final cleanEmail = email.trim().toLowerCase();
+    final cleanPhone = phone.replaceAll(RegExp(r'[\s\-\(\)]'), '').trim();
+    final rawPassword = (password != null && password.trim().isNotEmpty) ? password.trim() : 'Marketer123!';
+    final adminDb = _getAdminClient();
+
+    final marketerId = _generateUuid();
+    final authUserId = _generateUuid();
+    final effectiveCode = marketerCode ?? 'MKT-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+
+    final newMarketer = ClientMarketer(
+      id: marketerId,
+      clientId: clientId,
+      userId: authUserId,
+      marketerCode: effectiveCode,
+      fullName: fullName.trim(),
+      email: cleanEmail,
+      phone: cleanPhone,
+      dailyAdSpendBudget: dailyAdSpendBudget,
+      commissionRate: commissionRate,
+      isCommissionEnabled: isCommissionEnabled,
+      bankName: bankName ?? '',
+      accountNumber: accountNumber ?? '',
+      accountName: accountName ?? '',
+      isActive: true,
+      createdAt: DateTime.now(),
+    );
+
+    await adminDb.from('client_marketers').insert(newMarketer.toJson());
+
+    final nameParts = fullName.trim().split(' ');
+    final fName = nameParts.isNotEmpty ? nameParts.first : 'Marketer';
+    final lName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+
+    await adminDb.from('users').upsert({
+      'id': authUserId,
+      'company_id': '11111111-1111-4111-8111-111111111111',
+      'client_id': clientId,
+      'email': cleanEmail,
+      'phone_number': cleanPhone,
+      'first_name': fName,
+      'last_name': lName,
+      'role': 'marketer',
+      'is_active': true,
+      'marketer_id': marketerId,
+      'marketer_code': effectiveCode,
+    });
+
+    try {
+      AuthRemoteDataSourceImpl.registerUserInMemory(
+        UserModel(
+          id: authUserId,
+          email: cleanEmail,
+          firstName: fName,
+          lastName: lName,
+          phone: cleanPhone,
+          role: 'marketer',
+          companyId: '11111111-1111-4111-8111-111111111111',
+          clientId: clientId,
+          marketerId: marketerId,
+          marketerCode: effectiveCode,
+        ),
+        rawPassword,
+      );
+    } catch (_) {}
+
+    return newMarketer;
+  }
+
+  @override
+  Future<void> updateMarketerStatus({required String marketerId, required bool isActive}) async {
+    final adminDb = _getAdminClient();
+    await adminDb.from('client_marketers').update({
+      'is_active': isActive,
+      'updated_at': DateTime.now().toIso8601String(),
+    }).eq('id', marketerId);
+  }
+
+  @override
+  Future<List<LeadForm>> fetchLeadForms(String clientId, {String? marketerId}) async {
+    final client = _getClient();
+    var query = client
+        .from('lead_forms')
+        .select('*')
+        .eq('client_id', clientId);
+    if (marketerId != null && marketerId.isNotEmpty) {
+      query = query.eq('marketer_id', marketerId);
+    }
+    final response = await query.order('created_at', ascending: false);
+
+    final List<LeadForm> list = [];
+    for (final item in response as List) {
+      try {
+        list.add(LeadForm.fromJson(item as Map<String, dynamic>));
+      } catch (_) {}
+    }
+    return list;
+  }
+
+  @override
+  Future<LeadForm> createLeadForm({
+    required String clientId,
+    String? marketerId,
+    required String productId,
+    required String productName,
+    required String formTitle,
+    String? formSlug,
+    String? description,
+    List<Map<String, dynamic>> packages = const [],
+    String redirectUrl = '',
+    String pixelId = '',
+    String capiToken = '',
+    String testEventCode = '',
+    Map<String, dynamic>? fieldOptions,
+    Map<String, dynamic>? appearance,
+  }) async {
+    final client = _getAdminClient();
+    final slug = formSlug != null && formSlug.trim().isNotEmpty
+        ? formSlug.trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9\-]'), '-')
+        : 'form-${DateTime.now().millisecondsSinceEpoch}';
+
+    final payload = {
+      'client_id': clientId,
+      if (marketerId != null && marketerId.isNotEmpty) 'marketer_id': marketerId,
+      'product_id': productId,
+      'product_name': productName,
+      'form_title': formTitle,
+      'form_slug': slug,
+      'description': description ?? '',
+      'packages': packages,
+      'redirect_url': redirectUrl,
+      'pixel_id': pixelId,
+      'capi_token': capiToken,
+      'test_event_code': testEventCode,
+      'field_options': fieldOptions ?? {'require_email': false, 'require_alt_phone': false, 'require_city': false, 'require_notes': false},
+      'appearance': appearance ?? {'primary_color': '#F37021', 'button_text': 'Complete Order Now', 'badge_text': 'Pay On Delivery + Free Delivery'},
+      'is_active': true,
+      'total_views': 0,
+      'total_submissions': 0,
+    };
+
+    final res = await client.from('lead_forms').insert(payload).select().single();
+    return LeadForm.fromJson(res);
+  }
+
+  @override
+  Future<LeadForm> updateLeadForm({
+    required String formId,
+    String? formTitle,
+    String? formSlug,
+    String? description,
+    String? productId,
+    String? productName,
+    List<Map<String, dynamic>>? packages,
+    String? redirectUrl,
+    String? pixelId,
+    String? capiToken,
+    String? testEventCode,
+    Map<String, dynamic>? fieldOptions,
+    Map<String, dynamic>? appearance,
+    bool? isActive,
+  }) async {
+    final client = _getAdminClient();
+    final updateData = <String, dynamic>{
+      if (formTitle != null) 'form_title': formTitle,
+      if (formSlug != null) 'form_slug': formSlug,
+      if (description != null) 'description': description,
+      if (productId != null) 'product_id': productId,
+      if (productName != null) 'product_name': productName,
+      if (packages != null) 'packages': packages,
+      if (redirectUrl != null) 'redirect_url': redirectUrl,
+      if (pixelId != null) 'pixel_id': pixelId,
+      if (capiToken != null) 'capi_token': capiToken,
+      if (testEventCode != null) 'test_event_code': testEventCode,
+      if (fieldOptions != null) 'field_options': fieldOptions,
+      if (appearance != null) 'appearance': appearance,
+      if (isActive != null) 'is_active': isActive,
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+
+    final res = await client.from('lead_forms').update(updateData).eq('id', formId).select().single();
+    return LeadForm.fromJson(res);
+  }
+
+  @override
+  Future<Map<String, dynamic>> submitMarketingLeadOrder(Map<String, dynamic> payload) async {
+    final client = _getClient();
+    final response = await client.rpc('fn_submit_marketing_lead_order', params: {
+      'p_payload': payload,
+    });
+    return Map<String, dynamic>.from(response as Map);
+  }
+
+  @override
+  Future<Map<String, dynamic>> confirmCloserOrder({
+    required String orderId,
+    required String closerId,
+    String? deliveryAddress,
+    String? deliveryState,
+    String? deliveryLga,
+    String? notes,
+  }) async {
+    final client = _getClient();
+    final response = await client.rpc('fn_confirm_closer_order', params: {
+      'p_order_id': orderId,
+      'p_closer_id': closerId,
+      if (deliveryAddress != null) 'p_delivery_address': deliveryAddress,
+      if (deliveryState != null) 'p_delivery_state': deliveryState,
+      if (deliveryLga != null) 'p_delivery_lga': deliveryLga,
+      if (notes != null) 'p_notes': notes,
+    });
+    return Map<String, dynamic>.from(response as Map);
   }
 }

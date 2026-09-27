@@ -51,6 +51,7 @@ $functions = @(
     "request-balance-payout",
     "request-stock-transfer",
     "submit-cash-remittance",
+    "submit-order",
     "update-rider-telemetry"
 )
 
