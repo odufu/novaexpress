@@ -383,6 +383,7 @@ class _DCTransactionsPageState extends ConsumerState<DCTransactionsPage> {
         initialPageSize: 25,
         rowHeight: 66.0,
         brandPrimary: const Color(0xFF00A2D3),
+        dateExtractor: (txn) => txn.createdAt,
         onRowTap: (txn) => _openTransactionAuditModal(context, txn, isDark),
         columns: [
           ExcelColumnDef<DCTransactionRecord>(
@@ -393,6 +394,7 @@ class _DCTransactionsPageState extends ConsumerState<DCTransactionsPage> {
             minWidth: 130,
             searchString: (t) => '${t.transactionCode} ${t.categoryDisplay} ${t.channel}',
             sortValue: (t) => t.createdAt,
+            dateValue: (t) => t.createdAt,
             cellBuilder: (context, txn, row, isDark, brand) {
               final isPstk = txn.isPaystack;
               return Column(

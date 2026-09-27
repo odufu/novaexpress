@@ -2,10 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../dc_console/domain/entities/product_package.dart';
 import '../../../dc_console/presentation/providers/dc_console_provider.dart';
-import '../../../dc_console/presentation/providers/product_catalog_provider.dart';
 import '../../../stock/presentation/providers/stock_provider.dart';
 import '../../domain/entities/client_stock_invoice.dart';
 import '../providers/client_portal_provider.dart';
@@ -76,7 +74,7 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
   String? _selectedSupplierId;
   String _invoiceNumber = '';
   String? _selectedDcId = '22222222-2222-4222-8222-222222222222';
-  String _targetWarehouse = 'Wuse Central Distribution Hub';
+  String _targetWarehouse = 'Wuse Grand Central Distribution Center';
   String _paymentStatus = 'unpaid';
   final _notesController = TextEditingController();
   final _waybillRefController = TextEditingController();
@@ -141,13 +139,13 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
         setState(() {
           _items.add(
             _InvoiceItemDraft(
-              productName: 'Grazer Herbal Tea (20 Tea Bags)',
-              sku: 'GRAZER-TEA-20',
-              quantity: 250,
-              unitCost: 1500.0,
-              packagingCost: 250.0,
-              freightCost: 150.0,
-              handlingCost: 50.0,
+              productName: '',
+              sku: '',
+              quantity: 1,
+              unitCost: 0.0,
+              packagingCost: 0.0,
+              freightCost: 0.0,
+              handlingCost: 0.0,
             ),
           );
         });
@@ -244,7 +242,7 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
         supplierName: supplier?.name ?? 'Direct Procurement Partner',
         destinationWarehouse: _targetWarehouse,
         entryDate: DateTime.now(),
-        status: 'verified',
+        status: 'in_transit',
         paymentStatus: _paymentStatus,
         totalUnits: _totalQuantity,
         subtotalRawProductCost: _totalBaseCost,
@@ -262,12 +260,8 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
             items: invoiceItems,
           );
 
-      // Automatically register the corresponding physical consignment handshake to the destination DC
+      // Refresh destination DC inbound consignments in background
       try {
-        final authState = ref.read(authProvider);
-        final senderName = authState.user?.fullName ??
-            (state.clientProfile.companyName.isNotEmpty ? state.clientProfile.companyName : 'Merchant Procurement');
-
         final dcState = ref.read(dcConsoleProvider);
         final allDcs = dcState.distributionCenters.isNotEmpty
             ? dcState.distributionCenters
@@ -280,35 +274,10 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
           ).firstOrNull ?? allDcs.first,
         );
 
-        final supplyItems = _items.map((i) {
-          var pId = i.productId;
-          if (pId == null || !RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(pId)) {
-            final catalog = ref.read(productCatalogProvider);
-            final match = catalog.findProductBySku(i.sku) ?? catalog.findProductByName(i.productName);
-            if (match != null && RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(match.id)) {
-              pId = match.id;
-            }
-          }
-          return {
-            'product_id': pId,
-            'quantity': i.quantity,
-            'notes': 'Intake bill: ${invoice.invoiceNumber}',
-          };
-        }).toList();
-
-        await ref.read(stockProvider.notifier).dispatchClientSupply(
-          clientId: state.clientProfile.id.isNotEmpty ? state.clientProfile.id : '00000000-0000-4000-8000-789382731303',
-          dcId: targetDc.id,
-          items: supplyItems,
-          senderId: authState.user?.id,
-          senderName: senderName,
-          notes: 'Procurement Intake from ${supplier?.name ?? "Vendor"} (Invoice: ${invoice.invoiceNumber})',
-        );
-
         // Immediate background refresh of DC inbound stock transfers
         await ref.read(stockProvider.notifier).fetchStockTransfers(dcId: targetDc.id);
       } catch (consignmentErr) {
-        debugPrint('[INTAKE_MODAL] ℹ️ Handshake consignment creation notice: $consignmentErr');
+        debugPrint('[INTAKE_MODAL] ℹ️ Handshake consignment sync notice: $consignmentErr');
       }
 
       if (mounted) {
@@ -600,9 +569,42 @@ class _ClientRaiseStockInvoiceModalState extends ConsumerState<ClientRaiseStockI
                                     items: allDcs.map((dc) {
                                       return DropdownMenuItem<String>(
                                         value: dc.id,
-                                        child: Text(
-                                          '${dc.name} (${dc.code})',
-                                          overflow: TextOverflow.ellipsis,
+                                        child: Row(
+                                          children: [
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: (dc.isGrand
+                                                        ? const Color(0xFF8B5CF6)
+                                                        : (dc.isHubDc ? const Color(0xFF3B82F6) : const Color(0xFF0D9488)))
+                                                    .withValues(alpha: 0.12),
+                                                borderRadius: BorderRadius.circular(4),
+                                                border: Border.all(
+                                                  color: (dc.isGrand
+                                                          ? const Color(0xFF8B5CF6)
+                                                          : (dc.isHubDc ? const Color(0xFF3B82F6) : const Color(0xFF0D9488)))
+                                                      .withValues(alpha: 0.3),
+                                                ),
+                                              ),
+                                              child: Text(
+                                                dc.tierBadge,
+                                                style: TextStyle(
+                                                  fontSize: 9.5,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: dc.isGrand
+                                                      ? const Color(0xFF8B5CF6)
+                                                      : (dc.isHubDc ? const Color(0xFF3B82F6) : const Color(0xFF0D9488)),
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                '${dc.name} (${dc.code})',
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       );
                                     }).toList(),

@@ -11,6 +11,7 @@ import '../../domain/entities/client_closer_payout.dart';
 import '../../domain/entities/client_supplier.dart';
 import '../../domain/entities/client_stock_invoice.dart';
 import '../../domain/entities/client_stock_balance.dart';
+import '../../domain/entities/stock_holder_custody.dart';
 import '../../../../core/helpers/uuid_helper.dart';
 
 abstract class ClientPortalRemoteDataSource {
@@ -113,6 +114,14 @@ abstract class ClientPortalRemoteDataSource {
     DateTime? endDate,
   });
   Future<void> importStockBalanceCsv(String clientId, String csvContent);
+  Future<List<StockHolderCustodyEntity>> fetchProductHoldersCustody(
+    String clientId, {
+    String? productId,
+    DateTime? startDate,
+    DateTime? endDate,
+    String? state,
+    String? lga,
+  });
 }
 
 class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
@@ -916,144 +925,21 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
           .eq('client_id', clientId)
           .order('created_at', ascending: false);
 
-      if (response.isNotEmpty) {
-        return response
-            .map((item) => ClientSupplier.fromJson(Map<String, dynamic>.from(item as Map)))
-            .toList();
-      }
-    } catch (e) {
-      debugPrint('[CLIENT_PORTAL] ⚠️ Remote fetchSuppliers: $e (using built-in suppliers)');
-    }
+      final remoteSuppliers = response
+          .map((item) => ClientSupplier.fromJson(Map<String, dynamic>.from(item as Map)))
+          .toList();
 
-    // High-fidelity fallback suppliers ONLY for Novacare Ltd
-    final isNovacare = clientId == '00000000-0000-4000-8000-789382731303' || clientId == '33333333-3333-4333-8333-333333333333';
-    if (!isNovacare) {
+      final combined = <ClientSupplier>[...remoteSuppliers];
+      for (final s in _inMemorySuppliers.where((s) => s.clientId == clientId)) {
+        if (!combined.any((c) => c.id == s.id || c.supplierName.toLowerCase() == s.supplierName.toLowerCase())) {
+          combined.add(s);
+        }
+      }
+      return combined;
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] ⚠️ Remote fetchSuppliers: $e');
       return _inMemorySuppliers.where((s) => s.clientId == clientId).toList();
     }
-
-    final defaultSuppliers = [
-      ClientSupplier(
-        id: 'sup-apex-01',
-        clientId: clientId,
-        supplierName: 'Apex Herbal Laboratories Ltd',
-        contactPerson: 'Alhaji Musa Danjuma',
-        email: 'supplies@apexherbal.ng',
-        phone: '08023456781',
-        address: 'Plot 45, Industrial Estate, Kano',
-        city: 'Kano',
-        country: 'Nigeria',
-        suppliedProducts: const [
-          'Grazer Herbal Tea',
-          'Ura Clear Tea',
-          'VELORA HERBAL TEA',
-          'ALPHA MAN HERBAL TEA',
-          'RESPIRA LUNG TEA',
-          'Grazer Herbal Balm',
-          'Clear Vision Tea',
-        ],
-        paymentTerms: 'Net 15',
-        bankName: 'Zenith Bank',
-        accountNumber: '1019283746',
-        accountName: 'Apex Herbal Laboratories Ltd',
-        notes: 'Primary raw herbal formulations manufacturer for Grazer and Ura Clear lines.',
-        createdAt: DateTime.now().subtract(const Duration(days: 90)),
-      ),
-      ClientSupplier(
-        id: 'sup-polypack-02',
-        clientId: clientId,
-        supplierName: 'PolyPack & Foil Print Works',
-        contactPerson: 'Mrs. Folashade Adeyemi',
-        email: 'orders@polypackng.com',
-        phone: '08139876543',
-        address: '14 Oshodi Expressway, Ilupeju, Lagos',
-        city: 'Lagos',
-        country: 'Nigeria',
-        suppliedProducts: const [
-          'Custom Tea Pouches (Grazer)',
-          'Tamper-proof Foil Seals',
-          'Carton Outer Packaging',
-          'Bottle Labels & Boxes',
-        ],
-        paymentTerms: 'Immediate',
-        bankName: 'Access Bank',
-        accountNumber: '0029384756',
-        accountName: 'PolyPack Solutions Nigeria',
-        notes: 'Manufacturer of branded inner foil pouches, shrink sleeves, and presentation cartons.',
-        createdAt: DateTime.now().subtract(const Duration(days: 75)),
-      ),
-      ClientSupplier(
-        id: 'sup-haulage-03',
-        clientId: clientId,
-        supplierName: 'Trans-Sahara Inter-State Haulage',
-        contactPerson: 'Captain Godwin Effiong',
-        email: 'dispatch@transsaharalogistics.com',
-        phone: '09056781234',
-        address: 'Central Heavy Truck Terminal, Idu, Abuja',
-        city: 'Abuja',
-        country: 'Nigeria',
-        suppliedProducts: const [
-          'Inter-State Heavy Haulage Freight',
-          'Regional DC Transit Transfers',
-        ],
-        paymentTerms: '50% Advance',
-        bankName: 'First Bank of Nigeria',
-        accountNumber: '3049586712',
-        accountName: 'Trans Sahara Freight Ltd',
-        notes: 'Hauls bulk manufactured cartons from northern factories to Abuja Central Stores.',
-        createdAt: DateTime.now().subtract(const Duration(days: 60)),
-      ),
-      ClientSupplier(
-        id: 'sup-dermacare-04',
-        clientId: clientId,
-        supplierName: 'DermaCare Naturals & Cosmeceuticals',
-        contactPerson: 'Dr. (Mrs) Nkechi Eze',
-        email: 'b2b@dermacarenaturals.com',
-        phone: '08035544332',
-        address: '8 Commercial Rd, Ikeja, Lagos',
-        city: 'Lagos',
-        country: 'Nigeria',
-        suppliedProducts: const [
-          'Hair Dye Shampoo',
-          'Hair Growth Oil',
-          'Nail Repair',
-          'ORAVITA CAPSULE',
-        ],
-        paymentTerms: 'Net 30',
-        bankName: 'Guaranty Trust Bank',
-        accountNumber: '0123456789',
-        accountName: 'DermaCare Lab Services',
-        notes: 'Producer of topical cosmetic shampoos, hair restoration extracts, and capsule lines.',
-        createdAt: DateTime.now().subtract(const Duration(days: 45)),
-      ),
-      ClientSupplier(
-        id: 'sup-profit-05',
-        clientId: clientId,
-        supplierName: 'ProFit Activewear & Medical Goods',
-        contactPerson: 'Mr. David Adeleke',
-        email: 'wholesale@profithealth.ng',
-        phone: '07031122334',
-        address: 'Plot 22 Garki Area 11, Abuja',
-        city: 'Abuja',
-        country: 'Nigeria',
-        suppliedProducts: const [
-          'Compression Vest',
-          'Push Board Pro',
-        ],
-        paymentTerms: 'Immediate',
-        bankName: 'United Bank for Africa',
-        accountNumber: '2098765432',
-        accountName: 'ProFit Activewear Ltd',
-        notes: 'Manufacturer of therapeutic compression shapewear and ergonomic fitness accessories.',
-        createdAt: DateTime.now().subtract(const Duration(days: 30)),
-      ),
-    ];
-    final combined = <ClientSupplier>[..._inMemorySuppliers];
-    for (final s in defaultSuppliers) {
-      if (!combined.any((c) => c.id == s.id || c.supplierName.toLowerCase() == s.supplierName.toLowerCase())) {
-        combined.add(s);
-      }
-    }
-    return combined;
   }
 
   @override
@@ -1063,7 +949,6 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
         ? supplier
         : supplier.copyWith(id: UuidHelper.generate());
     final payload = Map<String, dynamic>.from(withId.toJson())
-      ..remove('category')
       ..remove('lead_time_days');
     try {
       final res = await adminDb
@@ -1086,13 +971,21 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
   @override
   Future<void> updateSupplier(ClientSupplier supplier) async {
     final adminDb = _getAdminClient();
+    final payload = Map<String, dynamic>.from(supplier.toJson())
+      ..remove('id')
+      ..remove('lead_time_days')
+      ..remove('created_at');
     try {
       await adminDb
           .from('client_suppliers')
-          .update(supplier.toJson())
+          .update(payload)
           .eq('id', supplier.id);
+      _inMemorySuppliers.removeWhere((s) => s.id == supplier.id);
+      _inMemorySuppliers.insert(0, supplier);
     } catch (e) {
       debugPrint('[CLIENT_PORTAL] ⚠️ Remote updateSupplier error: $e');
+      _inMemorySuppliers.removeWhere((s) => s.id == supplier.id);
+      _inMemorySuppliers.insert(0, supplier);
     }
   }
 
@@ -1107,167 +1000,24 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
           .eq('client_id', clientId)
           .order('entry_date', ascending: false);
 
-      if (res.isNotEmpty) {
-        return res
-            .map((item) => ClientStockInvoice.fromJson(Map<String, dynamic>.from(item as Map)))
-            .toList();
-      }
-    } catch (e) {
-      debugPrint('[CLIENT_PORTAL] ⚠️ Remote fetchStockInvoices: $e (using built-in invoices)');
-    }
+      final remoteInvoices = res
+          .map((item) => ClientStockInvoice.fromJson(Map<String, dynamic>.from(item as Map)))
+          .toList();
 
-    // High-fidelity fallback stock intake invoices ONLY for Novacare Ltd
-    final isNovacare = clientId == '00000000-0000-4000-8000-789382731303' || clientId == '33333333-3333-4333-8333-333333333333';
-    if (!isNovacare) {
+      final combined = <ClientStockInvoice>[...remoteInvoices];
+      for (final mem in _inMemoryStockInvoices.where((i) => i.clientId == clientId)) {
+        if (!combined.any((c) => c.id == mem.id || c.invoiceNumber == mem.invoiceNumber)) {
+          combined.add(mem);
+        }
+      }
+      return combined;
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] ⚠️ Remote fetchStockInvoices: $e');
       return _inMemoryStockInvoices.where((i) => i.clientId == clientId).toList();
     }
-
-    final defaultInvoices = [
-      ClientStockInvoice(
-        id: 'inv-stk-nov-001',
-        clientId: clientId,
-        invoiceNumber: 'INV-STK-NOV-2026-001',
-        supplierId: 'sup-apex-01',
-        supplierName: 'Apex Herbal Laboratories Ltd',
-        destinationWarehouse: 'Stores - NL',
-        entryDate: DateTime.now().subtract(const Duration(days: 6)),
-        status: 'verified',
-        paymentStatus: 'paid',
-        totalUnits: 5000,
-        subtotalRawProductCost: 6000000.0, // 5000 * ₦1,200
-        totalPackagingCost: 1750000.0,     // 5000 * ₦350
-        totalTransportationCost: 1792780.0,// 5000 * ₦358.556
-        grandTotalLandedCost: 9542780.0,   // 5000 * ₦1,908.556 (Exact Valuation Rate!)
-        notes: 'Bulk production intake batch #GH-2026-88. Verified and received at Stores - NL central depot.',
-        items: [
-          ClientStockInvoiceItem(
-            id: 'item-inv-001',
-            invoiceId: 'inv-stk-nov-001',
-            productName: 'Grazer Herbal Tea',
-            productSku: 'SKU-GRAZ-TEA',
-            quantity: 5000,
-            supplierUnitPrice: 1200.0,
-            packagingCostPerUnit: 350.0,
-            transportationCostPerUnit: 358.556,
-            effectiveLandedCostPerUnit: 1908.556,
-            totalLandedCost: 9542780.0,
-            targetRetailPrice: 12500.0,
-            projectedMarginPercent: 84.73,
-          ),
-        ],
-        createdAt: DateTime.now().subtract(const Duration(days: 6)),
-      ),
-      ClientStockInvoice(
-        id: 'inv-stk-nov-002',
-        clientId: clientId,
-        invoiceNumber: 'INV-STK-NOV-2026-002',
-        supplierId: 'sup-apex-01',
-        supplierName: 'Apex Herbal Laboratories Ltd',
-        destinationWarehouse: 'Stores - NL',
-        entryDate: DateTime.now().subtract(const Duration(days: 5)),
-        status: 'verified',
-        paymentStatus: 'paid',
-        totalUnits: 4000,
-        subtotalRawProductCost: 8400000.0, // 4000 * ₦2,100
-        totalPackagingCost: 1800000.0,     // 4000 * ₦450
-        totalTransportationCost: 1600000.0,// 4000 * ₦400
-        grandTotalLandedCost: 11800000.0,  // 4000 * ₦2,950 (Exact Valuation Rate!)
-        notes: 'Ura Clear intake batch #UC-901. Received intact at central hub.',
-        items: [
-          ClientStockInvoiceItem(
-            id: 'item-inv-002',
-            invoiceId: 'inv-stk-nov-002',
-            productName: 'Ura Clear Tea',
-            productSku: 'SKU-URA-TEA',
-            quantity: 4000,
-            supplierUnitPrice: 2100.0,
-            packagingCostPerUnit: 450.0,
-            transportationCostPerUnit: 400.0,
-            effectiveLandedCostPerUnit: 2950.0,
-            totalLandedCost: 11800000.0,
-            targetRetailPrice: 14000.0,
-            projectedMarginPercent: 78.93,
-          ),
-        ],
-        createdAt: DateTime.now().subtract(const Duration(days: 5)),
-      ),
-      ClientStockInvoice(
-        id: 'inv-stk-nov-003',
-        clientId: clientId,
-        invoiceNumber: 'INV-STK-NOV-2026-003',
-        supplierId: 'sup-profit-05',
-        supplierName: 'ProFit Activewear & Medical Goods',
-        destinationWarehouse: 'Stores - NL',
-        entryDate: DateTime.now().subtract(const Duration(days: 3)),
-        status: 'verified',
-        paymentStatus: 'unpaid',
-        totalUnits: 2000,
-        subtotalRawProductCost: 7600000.0, // 2000 * ₦3,800
-        totalPackagingCost: 1000000.0,     // 2000 * ₦500
-        totalTransportationCost: 1400000.0,// 2000 * ₦700
-        grandTotalLandedCost: 10000000.0,  // 2000 * ₦5,000 (Exact Valuation Rate!)
-        notes: 'Import consignment cleared through Lagos port and received in Abuja.',
-        items: [
-          ClientStockInvoiceItem(
-            id: 'item-inv-003',
-            invoiceId: 'inv-stk-nov-003',
-            productName: 'Compression Vest',
-            productSku: 'SKU-COMP-VEST',
-            quantity: 2000,
-            supplierUnitPrice: 3800.0,
-            packagingCostPerUnit: 500.0,
-            transportationCostPerUnit: 700.0,
-            effectiveLandedCostPerUnit: 5000.0,
-            totalLandedCost: 10000000.0,
-            targetRetailPrice: 18500.0,
-            projectedMarginPercent: 72.97,
-          ),
-        ],
-        createdAt: DateTime.now().subtract(const Duration(days: 3)),
-      ),
-      ClientStockInvoice(
-        id: 'inv-stk-nov-004',
-        clientId: clientId,
-        invoiceNumber: 'INV-STK-NOV-2026-004',
-        supplierId: 'sup-dermacare-04',
-        supplierName: 'DermaCare Naturals & Cosmeceuticals',
-        destinationWarehouse: 'Stores - NL',
-        entryDate: DateTime.now().subtract(const Duration(days: 1)),
-        status: 'verified',
-        paymentStatus: 'unpaid',
-        totalUnits: 1500,
-        subtotalRawProductCost: 5250000.0, // 1500 * ₦3,500
-        totalPackagingCost: 1200000.0,     // 1500 * ₦800
-        totalTransportationCost: 1050000.0,// 1500 * ₦700
-        grandTotalLandedCost: 7500000.0,   // 1500 * ₦5,000 (Exact Valuation Rate!)
-        notes: 'Organic Hair Dye Shampoo batch #HDS-2026. Includes application glove sachets.',
-        items: [
-          ClientStockInvoiceItem(
-            id: 'item-inv-004',
-            invoiceId: 'inv-stk-nov-004',
-            productName: 'Hair Dye Shampoo',
-            productSku: 'SKU-HAIR-SHMP',
-            quantity: 1500,
-            supplierUnitPrice: 3500.0,
-            packagingCostPerUnit: 800.0,
-            transportationCostPerUnit: 700.0,
-            effectiveLandedCostPerUnit: 5000.0,
-            totalLandedCost: 7500000.0,
-            targetRetailPrice: 16000.0,
-            projectedMarginPercent: 68.75,
-          ),
-        ],
-        createdAt: DateTime.now().subtract(const Duration(days: 1)),
-      ),
-    ];
-    final combined = <ClientStockInvoice>[..._inMemoryStockInvoices];
-    for (final inv in defaultInvoices) {
-      if (!combined.any((c) => c.id == inv.id || c.invoiceNumber == inv.invoiceNumber)) {
-        combined.add(inv);
-      }
-    }
-    return combined;
   }
+
+
 
   @override
   Future<ClientStockInvoice> raiseStockInvoice({
@@ -1301,13 +1051,16 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
 
       await adminDb.from('client_stock_invoice_items').insert(itemsPayload);
 
-      // Invoke RPC to update stock balances and product valuation rates
+      // Automatically register the physical DC consignment handshake in stock_transfers
       try {
-        await adminDb.rpc('fn_process_client_stock_intake_invoice', params: {
+        await adminDb.rpc('fn_create_dc_consignment_for_intake_invoice', params: {
           'p_invoice_id': createdInv.id,
+          'p_sender_id': createdInv.clientId,
+          'p_sender_name': createdInv.supplierName,
         });
-      } catch (rpcErr) {
-        debugPrint('[CLIENT_PORTAL] ⚠️ rpc fn_process_client_stock_intake_invoice: $rpcErr');
+        debugPrint('[CLIENT_PORTAL] ✅ Registered DC consignment handshake for invoice: ${createdInv.id}');
+      } catch (handshakeErr) {
+        debugPrint('[CLIENT_PORTAL] ⚠️ rpc fn_create_dc_consignment_for_intake_invoice: $handshakeErr');
       }
 
       final result = createdInv.copyWith(items: items);
@@ -1422,487 +1175,31 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
       }
 
       final res = await query.order('balance_value', ascending: false);
-      if (res.isNotEmpty) {
-        return res
-            .map((item) => ClientStockBalance.fromJson(Map<String, dynamic>.from(item as Map)))
-            .toList();
+      final remoteBalances = res
+          .map((item) => ClientStockBalance.fromJson(Map<String, dynamic>.from(item as Map)))
+          .toList();
+
+      final combined = <ClientStockBalance>[...remoteBalances];
+      for (final mem in _inMemoryStockBalances.where((b) => b.clientId == clientId)) {
+        if (!combined.any((c) => c.itemCode == mem.itemCode && c.warehouse == mem.warehouse)) {
+          combined.add(mem);
+        }
       }
+
+      var filtered = combined;
+      if (warehouseFilter != null && warehouseFilter != 'all' && warehouseFilter.isNotEmpty) {
+        filtered = filtered.where((b) => b.warehouse.toLowerCase().contains(warehouseFilter.toLowerCase())).toList();
+      }
+      if (itemFilter != null && itemFilter != 'all' && itemFilter.isNotEmpty) {
+        filtered = filtered.where((b) => b.itemName.toLowerCase() == itemFilter.toLowerCase()).toList();
+      }
+      return filtered;
     } catch (e) {
-      debugPrint('[CLIENT_PORTAL] ⚠️ Remote fetchStockBalances: $e (using built-in Novacare ledger)');
+      debugPrint('[CLIENT_PORTAL] ⚠️ Remote fetchStockBalances: $e');
+      return _inMemoryStockBalances.where((b) => b.clientId == clientId).toList();
     }
-
-    // High-fidelity fallback ledger ONLY for Novacare Ltd
-    final isNovacare = clientId == '00000000-0000-4000-8000-789382731303' || clientId == '33333333-3333-4333-8333-333333333333';
-    if (!isNovacare) {
-      return [];
-    }
-
-    final List<ClientStockBalance> baseLedger = [
-      // 1. Grazer Herbal Tea
-      ClientStockBalance(
-        id: 'bal-grazer-stores',
-        clientId: clientId,
-        itemCode: 'SKU-GRAZ-TEA',
-        itemName: 'Grazer Herbal Tea',
-        itemGroup: 'Novacare',
-        warehouse: 'Stores - NL',
-        stockUom: 'Nos',
-        openingQty: 24177,
-        openingValue: 46131425.51,
-        inQty: 34,
-        inValue: 66752.39,
-        outQty: 3040,
-        outValue: 5792142.4,
-        balanceQty: 21171,
-        balanceValue: 40406035.5,
-        valuationRate: 1908.556,
-        reservedStock: 250,
-        company: 'Novacare Ltd',
-        updatedAt: DateTime.now(),
-      ),
-      ClientStockBalance(
-        id: 'bal-grazer-adeyemo',
-        clientId: clientId,
-        itemCode: 'SKU-GRAZ-TEA',
-        itemName: 'Grazer Herbal Tea',
-        itemGroup: 'Novacare',
-        warehouse: 'Adeyemo Adeola LOGISTICS - Novacare Ltd - NL',
-        stockUom: 'Nos',
-        openingQty: 101,
-        openingValue: 194424.8,
-        inQty: 0,
-        inValue: 0,
-        outQty: 0,
-        outValue: 0,
-        balanceQty: 101,
-        balanceValue: 194424.8,
-        valuationRate: 1924.998,
-        reservedStock: 0,
-        company: 'Novacare Ltd',
-        updatedAt: DateTime.now(),
-      ),
-      ClientStockBalance(
-        id: 'bal-grazer-ibylogistics',
-        clientId: clientId,
-        itemCode: 'SKU-GRAZ-TEA',
-        itemName: 'Grazer Herbal Tea',
-        itemGroup: 'Novacare',
-        warehouse: 'Ibylogistics Limited LOGISTICS - Novacare Ltd - NL',
-        stockUom: 'Nos',
-        openingQty: 680,
-        openingValue: 1309814.3,
-        inQty: 0,
-        inValue: 0,
-        outQty: 69,
-        outValue: 131466.39,
-        balanceQty: 611,
-        balanceValue: 1178347.91,
-        valuationRate: 1928.556,
-        reservedStock: 15,
-        company: 'Novacare Ltd',
-        updatedAt: DateTime.now(),
-      ),
-      ClientStockBalance(
-        id: 'bal-grazer-enny',
-        clientId: clientId,
-        itemCode: 'SKU-GRAZ-TEA',
-        itemName: 'Grazer Herbal Tea',
-        itemGroup: 'Novacare',
-        warehouse: 'Enny logistics LOGISTICS - Novacare Ltd - NL',
-        stockUom: 'Nos',
-        openingQty: 440,
-        openingValue: 94684.8,
-        inQty: 160,
-        inValue: 304849.6,
-        outQty: 74,
-        outValue: 142481.08,
-        balanceQty: 526,
-        balanceValue: 257053.32,
-        valuationRate: 1919.303,
-        reservedStock: 12,
-        company: 'Novacare Ltd',
-        updatedAt: DateTime.now(),
-      ),
-      ClientStockBalance(
-        id: 'bal-grazer-total-aggregate',
-        clientId: clientId,
-        itemCode: 'SKU-GRAZ-TEA',
-        itemName: 'Grazer Herbal Tea',
-        itemGroup: 'Novacare',
-        warehouse: 'National Aggregate (All 97 Hubs)',
-        stockUom: 'Nos',
-        openingQty: 64034,
-        openingValue: 121542880.0,
-        inQty: 3074,
-        inValue: 5866890.0,
-        outQty: 8513,
-        outValue: 16246028.87,
-        balanceQty: 58595,
-        balanceValue: 111163741.13,
-        valuationRate: 1908.556,
-        reservedStock: 1250,
-        company: 'Novacare Ltd',
-        updatedAt: DateTime.now(),
-      ),
-
-      // 2. Ura Clear Tea
-      ClientStockBalance(
-        id: 'bal-ura-stores',
-        clientId: clientId,
-        itemCode: 'SKU-URA-TEA',
-        itemName: 'Ura Clear Tea',
-        itemGroup: 'Novacare',
-        warehouse: 'Stores - NL',
-        stockUom: 'Nos',
-        openingQty: 32000,
-        openingValue: 94400000.0,
-        inQty: 4000,
-        inValue: 11800000.0,
-        outQty: 4500,
-        outValue: 13275000.0,
-        balanceQty: 31500,
-        balanceValue: 92925000.0,
-        valuationRate: 2950.0,
-        reservedStock: 380,
-        company: 'Novacare Ltd',
-        updatedAt: DateTime.now(),
-      ),
-      ClientStockBalance(
-        id: 'bal-ura-total-aggregate',
-        clientId: clientId,
-        itemCode: 'SKU-URA-TEA',
-        itemName: 'Ura Clear Tea',
-        itemGroup: 'Novacare',
-        warehouse: 'National Aggregate (All 99 Hubs)',
-        stockUom: 'Nos',
-        openingQty: 42982,
-        openingValue: 126796900.0,
-        inQty: 4346,
-        inValue: 12820700.0,
-        outQty: 7512,
-        outValue: 22160200.0,
-        balanceQty: 39816,
-        balanceValue: 115586781.17,
-        valuationRate: 2950.0,
-        reservedStock: 890,
-        company: 'Novacare Ltd',
-        updatedAt: DateTime.now(),
-      ),
-
-      // 3. Compression Vest
-      ClientStockBalance(
-        id: 'bal-comp-stores',
-        clientId: clientId,
-        itemCode: 'SKU-COMP-VEST',
-        itemName: 'Compression Vest',
-        itemGroup: 'Novacare',
-        warehouse: 'Stores - NL',
-        stockUom: 'Nos',
-        openingQty: 11200,
-        openingValue: 56000000.0,
-        inQty: 40,
-        inValue: 200000.0,
-        outQty: 44,
-        outValue: 220000.0,
-        balanceQty: 11196,
-        balanceValue: 55980000.0,
-        valuationRate: 5000.0,
-        reservedStock: 45,
-        company: 'Novacare Ltd',
-        updatedAt: DateTime.now(),
-      ),
-      ClientStockBalance(
-        id: 'bal-comp-total-aggregate',
-        clientId: clientId,
-        itemCode: 'SKU-COMP-VEST',
-        itemName: 'Compression Vest',
-        itemGroup: 'Novacare',
-        warehouse: 'National Aggregate (All 84 Hubs)',
-        stockUom: 'Nos',
-        openingQty: 12262,
-        openingValue: 49028000.0,
-        inQty: 40,
-        inValue: 200000.0,
-        outQty: 74,
-        outValue: 370000.0,
-        balanceQty: 12228,
-        balanceValue: 48891404.65,
-        valuationRate: 5000.0,
-        reservedStock: 110,
-        company: 'Novacare Ltd',
-        updatedAt: DateTime.now(),
-      ),
-
-      // 4. Hair Dye Shampoo
-      ClientStockBalance(
-        id: 'bal-shampoo-stores',
-        clientId: clientId,
-        itemCode: 'SKU-HAIR-SHMP',
-        itemName: 'Hair Dye Shampoo',
-        itemGroup: 'Novacare',
-        warehouse: 'Stores - NL',
-        stockUom: 'Nos',
-        openingQty: 5400,
-        openingValue: 27000000.0,
-        inQty: 105,
-        inValue: 525000.0,
-        outQty: 95,
-        outValue: 475000.0,
-        balanceQty: 5410,
-        balanceValue: 27050000.0,
-        valuationRate: 5000.0,
-        reservedStock: 60,
-        company: 'Novacare Ltd',
-        updatedAt: DateTime.now(),
-      ),
-      ClientStockBalance(
-        id: 'bal-shampoo-total-aggregate',
-        clientId: clientId,
-        itemCode: 'SKU-HAIR-SHMP',
-        itemName: 'Hair Dye Shampoo',
-        itemGroup: 'Novacare',
-        warehouse: 'National Aggregate (All 93 Hubs)',
-        stockUom: 'Nos',
-        openingQty: 6148,
-        openingValue: 30740000.0,
-        inQty: 105,
-        inValue: 525000.0,
-        outQty: 141,
-        outValue: 705000.0,
-        balanceQty: 6112,
-        balanceValue: 30465000.0,
-        valuationRate: 5000.0,
-        reservedStock: 95,
-        company: 'Novacare Ltd',
-        updatedAt: DateTime.now(),
-      ),
-
-      // 5. ORAVITA CAPSULE
-      ClientStockBalance(
-        id: 'bal-oravita-total-aggregate',
-        clientId: clientId,
-        itemCode: 'SKU-ORAV-CAPS',
-        itemName: 'ORAVITA CAPSULE',
-        itemGroup: 'Novacare',
-        warehouse: 'National Aggregate (All 53 Hubs)',
-        stockUom: 'Nos',
-        openingQty: 6046,
-        openingValue: 11789700.0,
-        inQty: 480,
-        inValue: 936000.0,
-        outQty: 1708,
-        outValue: 3330600.0,
-        balanceQty: 4818,
-        balanceValue: 9386700.0,
-        valuationRate: 1950.0,
-        reservedStock: 140,
-        company: 'Novacare Ltd',
-        updatedAt: DateTime.now(),
-      ),
-
-      // 6. RESPIRA LUNG TEA
-      ClientStockBalance(
-        id: 'bal-respira-total-aggregate',
-        clientId: clientId,
-        itemCode: 'SKU-RESP-TEA',
-        itemName: 'RESPIRA LUNG TEA',
-        itemGroup: 'Novacare',
-        warehouse: 'National Aggregate (All 94 Hubs)',
-        stockUom: 'Nos',
-        openingQty: 3594,
-        openingValue: 6469200.0,
-        inQty: 104,
-        inValue: 187200.0,
-        outQty: 725,
-        outValue: 1305000.0,
-        balanceQty: 2973,
-        balanceValue: 5379712.2,
-        valuationRate: 1800.0,
-        reservedStock: 75,
-        company: 'Novacare Ltd',
-        updatedAt: DateTime.now(),
-      ),
-
-      // 7. ALPHA MAN HERBAL TEA
-      ClientStockBalance(
-        id: 'bal-alphaman-total-aggregate',
-        clientId: clientId,
-        itemCode: 'SKU-ALPH-MAN',
-        itemName: 'ALPHA MAN HERBAL TEA',
-        itemGroup: 'Novacare',
-        warehouse: 'National Aggregate (All 92 Hubs)',
-        stockUom: 'Nos',
-        openingQty: 3504,
-        openingValue: 7008000.0,
-        inQty: 33,
-        inValue: 66000.0,
-        outQty: 606,
-        outValue: 1212000.0,
-        balanceQty: 2931,
-        balanceValue: 5862000.0,
-        valuationRate: 2000.0,
-        reservedStock: 80,
-        company: 'Novacare Ltd',
-        updatedAt: DateTime.now(),
-      ),
-
-      // 8. Grazer Herbal Balm
-      ClientStockBalance(
-        id: 'bal-balm-total-aggregate',
-        clientId: clientId,
-        itemCode: 'SKU-GRAZ-BALM',
-        itemName: 'Grazer Herbal Balm',
-        itemGroup: 'Novacare',
-        warehouse: 'National Aggregate (All 76 Hubs)',
-        stockUom: 'Nos',
-        openingQty: 2500,
-        openingValue: 6250000.0,
-        inQty: 0,
-        inValue: 0,
-        outQty: 4,
-        outValue: 10000.0,
-        balanceQty: 2496,
-        balanceValue: 6043624.31,
-        valuationRate: 2500.0,
-        reservedStock: 20,
-        company: 'Novacare Ltd',
-        updatedAt: DateTime.now(),
-      ),
-
-      // 9. Clear Vision Tea
-      ClientStockBalance(
-        id: 'bal-vision-total-aggregate',
-        clientId: clientId,
-        itemCode: 'SKU-VISN-TEA',
-        itemName: 'Clear Vision Tea',
-        itemGroup: 'Novacare',
-        warehouse: 'National Aggregate (All 70 Hubs)',
-        stockUom: 'Nos',
-        openingQty: 2460,
-        openingValue: 5414910.25,
-        inQty: 0,
-        inValue: 0,
-        outQty: 0,
-        outValue: 0,
-        balanceQty: 2460,
-        balanceValue: 5414910.25,
-        valuationRate: 2256.41,
-        reservedStock: 30,
-        company: 'Novacare Ltd',
-        updatedAt: DateTime.now(),
-      ),
-
-      // 10. Hair Growth Oil
-      ClientStockBalance(
-        id: 'bal-hairgrowth-total-aggregate',
-        clientId: clientId,
-        itemCode: 'SKU-HAIR-GROW',
-        itemName: 'Hair Growth Oil',
-        itemGroup: 'Novacare',
-        warehouse: 'National Aggregate (All 65 Hubs)',
-        stockUom: 'Nos',
-        openingQty: 1515,
-        openingValue: 2612700.0,
-        inQty: 0,
-        inValue: 0,
-        outQty: 0,
-        outValue: 0,
-        balanceQty: 1515,
-        balanceValue: 2612700.0,
-        valuationRate: 1800.0,
-        reservedStock: 25,
-        company: 'Novacare Ltd',
-        updatedAt: DateTime.now(),
-      ),
-
-      // 11. VELORA HERBAL TEA
-      ClientStockBalance(
-        id: 'bal-velora-total-aggregate',
-        clientId: clientId,
-        itemCode: 'SKU-VELO-TEA',
-        itemName: 'VELORA HERBAL TEA',
-        itemGroup: 'Novacare',
-        warehouse: 'National Aggregate (All 52 Hubs)',
-        stockUom: 'Nos',
-        openingQty: 1471,
-        openingValue: 3383300.0,
-        inQty: 30,
-        inValue: 69000.0,
-        outQty: 105,
-        outValue: 241500.0,
-        balanceQty: 1396,
-        balanceValue: 3177200.0,
-        valuationRate: 2300.0,
-        reservedStock: 35,
-        company: 'Novacare Ltd',
-        updatedAt: DateTime.now(),
-      ),
-
-      // 12. Nail Repair
-      ClientStockBalance(
-        id: 'bal-nail-total-aggregate',
-        clientId: clientId,
-        itemCode: 'SKU-NAIL-REPR',
-        itemName: 'Nail Repair',
-        itemGroup: 'Novacare',
-        warehouse: 'National Aggregate (All 41 Hubs)',
-        stockUom: 'Nos',
-        openingQty: 448,
-        openingValue: 687186.88,
-        inQty: 0,
-        inValue: 0,
-        outQty: 0,
-        outValue: 0,
-        balanceQty: 448,
-        balanceValue: 687186.88,
-        valuationRate: 1248.99,
-        reservedStock: 10,
-        company: 'Novacare Ltd',
-        updatedAt: DateTime.now(),
-      ),
-
-      // 13. Push Board Pro
-      ClientStockBalance(
-        id: 'bal-pushboard-total-aggregate',
-        clientId: clientId,
-        itemCode: 'SKU-PUSH-PRO',
-        itemName: 'Push Board Pro',
-        itemGroup: 'Novacare',
-        warehouse: 'Stores - NL',
-        stockUom: 'Nos',
-        openingQty: 10,
-        openingValue: 20000.0,
-        inQty: 0,
-        inValue: 0,
-        outQty: 0,
-        outValue: 0,
-        balanceQty: 10,
-        balanceValue: 20000.0,
-        valuationRate: 2000.0,
-        reservedStock: 0,
-        company: 'Novacare Ltd',
-        updatedAt: DateTime.now(),
-      ),
-    ];
-
-    // Combine with in-memory balances
-    final combined = <ClientStockBalance>[..._inMemoryStockBalances];
-    for (final b in baseLedger) {
-      if (!combined.any((c) => c.itemCode == b.itemCode && c.warehouse == b.warehouse)) {
-        combined.add(b);
-      }
-    }
-
-    // Filter in-memory if needed
-    var filtered = combined;
-    if (warehouseFilter != null && warehouseFilter != 'all' && warehouseFilter.isNotEmpty) {
-      filtered = filtered.where((b) => b.warehouse.toLowerCase().contains(warehouseFilter.toLowerCase())).toList();
-    }
-    if (itemFilter != null && itemFilter != 'all' && itemFilter.isNotEmpty) {
-      filtered = filtered.where((b) => b.itemName.toLowerCase() == itemFilter.toLowerCase()).toList();
-    }
-    return filtered;
   }
+
 
   @override
   Future<void> importStockBalanceCsv(String clientId, String csvContent) async {
@@ -2015,6 +1312,194 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
       } catch (e) {
         debugPrint('[CLIENT_PORTAL] ⚠️ Remote importStockBalanceCsv upsert: $e');
       }
+    }
+  }
+
+  @override
+  Future<List<StockHolderCustodyEntity>> fetchProductHoldersCustody(
+    String clientId, {
+    String? productId,
+    DateTime? startDate,
+    DateTime? endDate,
+    String? state,
+    String? lga,
+  }) async {
+    if (clientId.trim().isEmpty) return [];
+    final adminDb = _getAdminClient();
+
+    // 1. Try querying PostgreSQL RPC fn_get_product_holders_custody
+    try {
+      final startStr = startDate != null
+          ? '${startDate.year.toString().padLeft(4, '0')}-${startDate.month.toString().padLeft(2, '0')}-${startDate.day.toString().padLeft(2, '0')}'
+          : null;
+      final endStr = endDate != null
+          ? '${endDate.year.toString().padLeft(4, '0')}-${endDate.month.toString().padLeft(2, '0')}-${endDate.day.toString().padLeft(2, '0')}'
+          : null;
+
+      final rpcRes = await adminDb.rpc('fn_get_product_holders_custody', params: {
+        'p_client_id': clientId,
+        'p_product_id': (productId != null && productId.isNotEmpty && productId != 'all') ? productId : null,
+        'p_start_date': startStr,
+        'p_end_date': endStr,
+        'p_state': (state != null && state != 'All States' && state.isNotEmpty) ? state : null,
+        'p_lga': (lga != null && lga != 'All LGAs' && lga.isNotEmpty) ? lga : null,
+      }).timeout(const Duration(seconds: 8));
+
+      if (rpcRes is List && rpcRes.isNotEmpty) {
+        return rpcRes
+            .map((item) => StockHolderCustodyEntity.fromJson(Map<String, dynamic>.from(item as Map)))
+            .toList();
+      }
+    } catch (rpcErr) {
+      debugPrint('[CLIENT_PORTAL] ℹ️ RPC fn_get_product_holders_custody notice: $rpcErr (using synthesized custody ledger)');
+    }
+
+
+    // 2. Database-driven dynamic physical custody breakdown from client_stock_balances
+    try {
+      final balances = await fetchStockBalances(
+        clientId,
+        itemFilter: (productId != null && productId.isNotEmpty && productId != 'all') ? null : null,
+      );
+
+      // Load live distribution centers to resolve authentic facility metadata
+      final Map<String, Map<String, dynamic>> dcLookup = {};
+      try {
+        final dcsRes = await adminDb.from('distribution_centers').select('id, name, code, state, city, contact_phone, is_grand_dc, is_hub, operating_zones');
+        for (final raw in dcsRes) {
+          final dc = Map<String, dynamic>.from(raw);
+          final nameKey = (dc['name'] ?? '').toString().trim().toLowerCase();
+          final codeKey = (dc['code'] ?? '').toString().trim().toLowerCase();
+          final idKey = (dc['id'] ?? '').toString().trim().toLowerCase();
+          if (nameKey.isNotEmpty) dcLookup[nameKey] = dc;
+          if (codeKey.isNotEmpty) dcLookup[codeKey] = dc;
+          if (idKey.isNotEmpty) dcLookup[idKey] = dc;
+        }
+      } catch (dcErr) {
+        debugPrint('[CLIENT_PORTAL] ℹ️ DC lookup notice: $dcErr');
+      }
+
+      final List<StockHolderCustodyEntity> dynamicList = balances.map((bal) {
+        final wh = bal.warehouse.trim().toLowerCase();
+        
+        // Find matching DC from live database
+        Map<String, dynamic>? matchedDc = dcLookup[wh];
+        if (matchedDc == null) {
+          for (final entry in dcLookup.entries) {
+            if (entry.key.length >= 3 && (wh.contains(entry.key) || entry.key.contains(wh))) {
+              matchedDc = entry.value;
+              break;
+            }
+          }
+        }
+
+        final st = matchedDc?['state']?.toString() ?? 'Federal Capital Territory';
+        final lgaName = (matchedDc?['operating_zones'] is List && (matchedDc!['operating_zones'] as List).isNotEmpty)
+            ? matchedDc['operating_zones'][0].toString()
+            : (matchedDc?['city']?.toString() ?? 'Central');
+        final city = matchedDc?['city']?.toString() ?? 'Main Hub';
+        final phone = matchedDc?['contact_phone']?.toString() ?? '';
+        final isGrand = matchedDc?['is_grand_dc'] == true;
+        final isHub = matchedDc?['is_hub'] == true;
+
+        final holderType = isGrand
+            ? 'Grand DC'
+            : (isHub ? 'Hub DC' : 'General DC');
+
+        return StockHolderCustodyEntity(
+          id: 'custody-${bal.id}',
+          holderId: matchedDc?['id']?.toString() ?? bal.warehouse,
+          holderName: matchedDc?['name']?.toString() ?? bal.warehouse,
+          holderType: holderType,
+          state: st,
+          lga: lgaName,
+          city: city,
+          phone: phone,
+          productId: bal.productId ?? bal.itemCode,
+          productSku: bal.itemCode,
+          productName: bal.itemName,
+          openingQty: bal.openingQty.toInt(),
+          openingValue: bal.openingValue,
+          inQty: bal.inQty.toInt(),
+          inValue: bal.inValue,
+          outQty: bal.outQty.toInt(),
+          outValue: bal.outValue,
+          closingQty: bal.balanceQty.toInt(),
+          closingValue: bal.balanceValue,
+          valuationRate: bal.valuationRate,
+          lastUpdated: bal.updatedAt,
+          status: bal.balanceQty > 0 ? 'Active Custody' : 'Out of Stock',
+        );
+      }).toList();
+
+      // Also query live agent_inventory for PDA positions from database
+      try {
+        final agentsRes = await adminDb
+            .from('agent_inventory')
+            .select('id, total_in_custody, available_count, product_id, updated_at, delivery_agents(id, agent_code, bank_account_name, operating_city, operating_state, phone)')
+            .gt('available_count', 0);
+        for (final raw in agentsRes) {
+          final row = Map<String, dynamic>.from(raw);
+          final pId = row['product_id']?.toString() ?? '';
+          if (productId != null && productId.isNotEmpty && productId != 'all' && pId != productId) {
+            continue;
+          }
+          final da = row['delivery_agents'] is Map ? Map<String, dynamic>.from(row['delivery_agents'] as Map) : null;
+          final daName = da?['bank_account_name']?.toString() ?? 'Dispatch PDA';
+          final daCode = da?['agent_code']?.toString() ?? 'PDA';
+          final daCity = da?['operating_city']?.toString() ?? 'Central';
+          final daState = da?['operating_state']?.toString() ?? 'Federal Capital Territory';
+          final daPhone = da?['phone']?.toString() ?? '';
+          final qty = (row['available_count'] as num?)?.toInt() ?? 0;
+
+          dynamicList.add(StockHolderCustodyEntity(
+            id: 'pda-custody-${row['id']}',
+            holderId: da?['id']?.toString() ?? row['id'].toString(),
+            holderName: '$daName ($daCode)',
+            holderType: 'PDA / Dispatch Personnel',
+            state: daState,
+            lga: daCity,
+            city: daCity,
+            phone: daPhone,
+            productId: pId,
+            productSku: '',
+            productName: '',
+            openingQty: qty,
+            openingValue: 0.0,
+            inQty: 0,
+            inValue: 0.0,
+            outQty: 0,
+            outValue: 0.0,
+            closingQty: qty,
+            closingValue: 0.0,
+            valuationRate: 0.0,
+            status: 'Active Custody',
+            lastUpdated: DateTime.tryParse(row['updated_at']?.toString() ?? '') ?? DateTime.now(),
+          ));
+        }
+      } catch (agentErr) {
+        debugPrint('[CLIENT_PORTAL] ℹ️ Agent inventory notice: $agentErr');
+      }
+
+      return dynamicList.where((h) {
+        if (productId != null && productId.isNotEmpty && productId != 'all') {
+          final pId = productId.trim().toLowerCase();
+          final matches = h.productId.toLowerCase() == pId ||
+              h.productSku.toLowerCase() == pId ||
+              h.productName.toLowerCase() == pId;
+          if (!matches) return false;
+        }
+        if (state != null && state.isNotEmpty && state != 'All States') {
+          if (h.state.toLowerCase() != state.toLowerCase()) return false;
+        }
+        if (lga != null && lga.isNotEmpty && lga != 'All LGAs') {
+          if (!h.lga.toLowerCase().contains(lga.toLowerCase())) return false;
+        }
+        return true;
+      }).toList();
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] ⚠️ Error generating dynamic custody list: $e');
+      return [];
     }
   }
 }

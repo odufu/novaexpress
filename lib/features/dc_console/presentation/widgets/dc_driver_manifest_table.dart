@@ -435,24 +435,27 @@ class _DCDriverManifestTableState extends ConsumerState<DCDriverManifestTable> {
                                 : const Color(0xFF10B981).withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(6),
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                driver.isPda ? Icons.phone_android_rounded : Icons.two_wheeler_rounded,
-                                size: 12,
-                                color: driver.isPda ? const Color(0xFF2563EB) : const Color(0xFF059669),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                driver.isPda ? 'PDA Agent' : 'In-House Fleet',
-                                style: GoogleFonts.inter(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  driver.isPda ? Icons.phone_android_rounded : Icons.two_wheeler_rounded,
+                                  size: 12,
                                   color: driver.isPda ? const Color(0xFF2563EB) : const Color(0xFF059669),
                                 ),
-                              ),
-                            ],
+                                const SizedBox(width: 4),
+                                Text(
+                                  driver.isPda ? 'PDA Agent' : 'In-House Fleet',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: driver.isPda ? const Color(0xFF2563EB) : const Color(0xFF059669),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         );
                       },

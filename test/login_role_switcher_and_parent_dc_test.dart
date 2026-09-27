@@ -222,10 +222,16 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      expect(find.text('QUICK OPERATIONS SELECTOR'), findsOneWidget);
-      expect(find.text('Field Rider (PDA)'), findsOneWidget);
-      expect(find.text('DC Supervisor'), findsOneWidget);
+      expect(find.text('QUICK ACCOUNT SELECTOR'), findsOneWidget);
+      expect(find.text('DC Supervisor'), findsWidgets);
       expect(find.text('Sign In as DC Supervisor'), findsOneWidget);
+
+      // Tap selector to expand
+      await tester.tap(find.text('QUICK ACCOUNT SELECTOR'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Field Rider (PDA)'), findsOneWidget);
+      expect(find.text('Novacare Client'), findsOneWidget);
     });
 
     testWidgets('2. Tapping DC Manager card automatically fills DC supervisor credentials and changes button', (tester) async {
@@ -244,12 +250,20 @@ void main() {
 
       await tester.pumpAndSettle();
 
+      // Expand dropdown
+      await tester.tap(find.text('QUICK ACCOUNT SELECTOR'));
+      await tester.pumpAndSettle();
+
       // Tap Rider card
       await tester.tap(find.text('Field Rider (PDA)'));
       await tester.pumpAndSettle();
 
       expect(find.text('rider.emeka@novaxpress.com'), findsOneWidget);
       expect(find.text('Sign In as Field Rider (PDA)'), findsOneWidget);
+
+      // Expand dropdown again
+      await tester.tap(find.text('QUICK ACCOUNT SELECTOR'));
+      await tester.pumpAndSettle();
 
       // Tap DC Supervisor card
       await tester.tap(find.text('DC Supervisor'));

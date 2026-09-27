@@ -2606,28 +2606,35 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF10B981).withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.account_balance_wallet_rounded, color: Color(0xFF10B981), size: 20),
                     ),
-                    child: const Icon(Icons.account_balance_wallet_rounded, color: Color(0xFF10B981), size: 20),
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    'WITHDRAWABLE COMMISSION BALANCE',
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.6,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'WITHDRAWABLE COMMISSION BALANCE',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.6,
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(

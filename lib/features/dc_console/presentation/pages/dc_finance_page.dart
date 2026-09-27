@@ -810,6 +810,7 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
         initialPageSize: 25,
         rowHeight: 64.0,
         brandPrimary: const Color(0xFF0D9488),
+        dateExtractor: (rem) => rem.createdAt,
         onRowTap: (rem) {
           final driver = drivers.where((d) => d.id == rem.deliveryAgentId || d.driverCode == rem.deliveryAgentId).firstOrNull;
           final riderName = driver != null ? driver.name : (rem.payerName?.isNotEmpty == true ? rem.payerName! : 'Unassigned Rider');
@@ -830,6 +831,7 @@ class _DCFinancePageState extends ConsumerState<DCFinancePage> {
               return '$refCode ${rem.paymentMethod}';
             },
             sortValue: (rem) => rem.createdAt,
+            dateValue: (rem) => rem.createdAt,
             cellBuilder: (context, rem, row, isDark, brand) {
               final refCode = rem.referenceNumber.isNotEmpty
                   ? rem.referenceNumber

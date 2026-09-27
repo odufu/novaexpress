@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../widgets/login_form.dart';
 
@@ -9,136 +10,238 @@ class LoginPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isCompact = screenWidth < 450;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF7FAFC),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.symmetric(
-              horizontal: isCompact ? 12 : 24,
-              vertical: isCompact ? 12 : 16,
+      backgroundColor: isDark ? const Color(0xFF0B132B) : const Color(0xFFF8FAFC),
+      body: Stack(
+        children: [
+          // Ambient Background Decorative Circles
+          Positioned(
+            top: -120,
+            right: -100,
+            child: Container(
+              width: 380,
+              height: 380,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    const Color(0xFF006C4C).withValues(alpha: isDark ? 0.2 : 0.07),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
             ),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 480),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Login Form Card
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
+          ),
+          Positioned(
+            bottom: -100,
+            left: -80,
+            child: Container(
+              width: 320,
+              height: 320,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    const Color(0xFF1E3A8A).withValues(alpha: isDark ? 0.25 : 0.06),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // Main Login Content
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isCompact ? 14 : 24,
+                  vertical: isCompact ? 16 : 24,
+                ),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 480),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Login Form Card
+                      Container(
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(
+                            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                            width: 1.2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.06),
+                              blurRadius: 24,
+                              offset: const Offset(0, 10),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    padding: EdgeInsets.symmetric(
-                      horizontal: isCompact ? 14 : 24,
-                      vertical: isCompact ? 16 : 24,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        // Circular Logo Header Badge
-                        Container(
-                          width: isCompact ? 96 : 110,
-                          height: isCompact ? 96 : 110,
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: const Color(0xFFC5C6CE)),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.04),
-                                blurRadius: 6,
-                                offset: const Offset(0, 2),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isCompact ? 16 : 28,
+                          vertical: isCompact ? 20 : 28,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            // Circular Logo Header Badge
+                            Container(
+                              width: isCompact ? 92 : 106,
+                              height: isCompact ? 92 : 106,
+                              padding: const EdgeInsets.all(7),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: const Color(0xFF006C4C).withValues(alpha: 0.25),
+                                  width: 2,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFF006C4C).withValues(alpha: 0.12),
+                                    blurRadius: 14,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                          child: ClipOval(
-                            child: Image.asset(
-                              'assets/images/square_logo.png',
-                              fit: BoxFit.cover,
+                              child: ClipOval(
+                                child: Image.asset(
+                                  'assets/images/square_logo.png',
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        Text(
-                          'NovaXpress',
-                          style: TextStyle(
-                            fontSize: isCompact ? 22 : 24,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF181C1E),
-                          ),
-                        ),
-                        const Text(
-                          'Operations & Logistics Portal',
-                          style: TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF0F172A),
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        const Text(
-                          'Single unified sign-in for DCs, Merchants, Closers & Field PDAs',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            color: Color(0xFF64748B),
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        SizedBox(height: isCompact ? 18 : 24),
-                        const LoginForm(),
-                        const SizedBox(height: 18),
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton(
-                            onPressed: () async {
-                              final uri = Uri.parse('presentation/index.html');
-                              if (await canLaunchUrl(uri)) {
-                                await launchUrl(uri);
-                              }
-                            },
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                              side: const BorderSide(color: Color(0xFF006C4C)),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            const SizedBox(height: 14),
+
+                            // Platform Branding Titles
+                            Text(
+                              'NovaXpress',
+                              style: GoogleFonts.inter(
+                                fontSize: isCompact ? 22 : 25,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: -0.5,
+                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                              ),
                             ),
-                            child: const FittedBox(
-                              fit: BoxFit.scaleDown,
+                            const SizedBox(height: 3),
+                            Text(
+                              'Operations & Enterprise Logistics Portal',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF334155),
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 6),
+
+                            // Secure SSL / TLS Pill Badge
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3.5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF006C4C).withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: const Color(0xFF006C4C).withValues(alpha: 0.2),
+                                  width: 0.8,
+                                ),
+                              ),
                               child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.slideshow_rounded, size: 18, color: Color(0xFF006C4C)),
-                                  SizedBox(width: 8),
+                                  Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFF16A34A),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
                                   Text(
-                                    'Open Interactive System Presentation',
-                                    style: TextStyle(
-                                      color: Color(0xFF006C4C),
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 13,
+                                    'Multi-Tenant Unified Sign-In',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: const Color(0xFF006C4C),
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                          ),
+                            SizedBox(height: isCompact ? 18 : 22),
+
+                            // The Unified Login Form with QuickAccountDropdown
+                            const LoginForm(),
+                            const SizedBox(height: 18),
+
+                            // Interactive Presentation Launcher Button
+                            SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton(
+                                onPressed: () async {
+                                  final uri = Uri.parse('presentation/index.html');
+                                  if (await canLaunchUrl(uri)) {
+                                    await launchUrl(uri);
+                                  }
+                                },
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                  side: BorderSide(
+                                    color: const Color(0xFF006C4C).withValues(alpha: 0.4),
+                                    width: 1.2,
+                                  ),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  backgroundColor: const Color(0xFF006C4C).withValues(alpha: 0.04),
+                                ),
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(Icons.slideshow_rounded, size: 18, color: Color(0xFF006C4C)),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Open Interactive System Presentation',
+                                        style: GoogleFonts.inter(
+                                          color: const Color(0xFF006C4C),
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 12.5,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Footer Subtext
+                      Text(
+                        '© 2026 NovaXpress Platform • Secure Supabase TLS 1.3 Authentication',
+                        style: GoogleFonts.inter(
+                          fontSize: 10.5,
+                          color: const Color(0xFF94A3B8),
+                          fontWeight: FontWeight.w500,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../domain/entities/client_supplier.dart';
 import '../providers/client_portal_provider.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 
 class ClientAddSupplierModal extends ConsumerStatefulWidget {
   final ClientSupplier? existingSupplier;
@@ -37,6 +38,7 @@ class _ClientAddSupplierModalState extends ConsumerState<ClientAddSupplierModal>
   final _bankAccountController = TextEditingController();
   final _notesController = TextEditingController();
   bool _isSubmitting = false;
+  List<String> _selectedProductNames = [];
 
   final List<String> _commonCategories = [
     'Herbal Formulations & Pharma',
@@ -61,6 +63,7 @@ class _ClientAddSupplierModalState extends ConsumerState<ClientAddSupplierModal>
       _bankNameController.text = s.bankName;
       _bankAccountController.text = s.accountNumber;
       _notesController.text = s.notes;
+      _selectedProductNames = List<String>.from(s.suppliedProducts);
     }
   }
 
@@ -84,6 +87,14 @@ class _ClientAddSupplierModalState extends ConsumerState<ClientAddSupplierModal>
 
     setState(() => _isSubmitting = true);
     try {
+      final profile = ref.read(clientPortalProvider).clientProfile;
+      var clientId = profile.id.isNotEmpty
+          ? profile.id
+          : (ref.read(authProvider).user?.clientId ?? '');
+      if (clientId.isEmpty) {
+        clientId = '00000000-0000-4000-8000-789382731303';
+      }
+
       if (widget.existingSupplier != null) {
         final updated = widget.existingSupplier!.copyWith(
           supplierName: _nameController.text.trim(),
@@ -97,6 +108,7 @@ class _ClientAddSupplierModalState extends ConsumerState<ClientAddSupplierModal>
           accountNumber: _bankAccountController.text.trim(),
           accountName: _nameController.text.trim(),
           notes: _notesController.text.trim(),
+          suppliedProducts: _selectedProductNames,
         );
         await ref.read(clientPortalProvider.notifier).updateSupplier(updated);
 
@@ -113,7 +125,7 @@ class _ClientAddSupplierModalState extends ConsumerState<ClientAddSupplierModal>
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Supplier "${updated.name}" updated successfully!',
+                      'Supplier "${updated.name}" updated successfully (${_selectedProductNames.length} products linked)!',
                       style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: Colors.white),
                     ),
                   ),
@@ -125,7 +137,7 @@ class _ClientAddSupplierModalState extends ConsumerState<ClientAddSupplierModal>
       } else {
         final newSupplier = ClientSupplier(
           id: '',
-          clientId: ref.read(clientPortalProvider).clientProfile.id,
+          clientId: clientId,
           supplierName: _nameController.text.trim(),
           contactPerson: _contactPersonController.text.trim(),
           email: _emailController.text.trim(),
@@ -137,6 +149,7 @@ class _ClientAddSupplierModalState extends ConsumerState<ClientAddSupplierModal>
           accountNumber: _bankAccountController.text.trim(),
           accountName: _nameController.text.trim(),
           notes: _notesController.text.trim(),
+          suppliedProducts: _selectedProductNames,
           createdAt: DateTime.now(),
         );
         final supplier = await ref.read(clientPortalProvider.notifier).createSupplier(newSupplier);
@@ -308,6 +321,7 @@ class _ClientAddSupplierModalState extends ConsumerState<ClientAddSupplierModal>
                                 _buildLabel('Procurement Category', isDark),
                                 const SizedBox(height: 6),
                                 DropdownButtonFormField<String>(
+                                  isExpanded: true,
                                   value: _commonCategories.contains(_categoryController.text)
                                       ? _categoryController.text
                                       : _commonCategories.first,
@@ -429,6 +443,46 @@ class _ClientAddSupplierModalState extends ConsumerState<ClientAddSupplierModal>
                               isDark: isDark,
                             ),
                           ),
+                          const SizedBox(height: 20),
+
+                          // Linked Catalog Products Selection Section
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0D9488).withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Icon(Icons.inventory_2_outlined, size: 15, color: Color(0xFF0D9488)),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Linked Catalog Products',
+                                style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700),
+                              ),
+                              const Spacer(),
+                              if (_selectedProductNames.isNotEmpty)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0D9488).withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    '${_selectedProductNames.length} linked',
+                                    style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF0D9488)),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Select the products supplied by this vendor to calculate network stock, evaluate stock health, and enable 1-click reorder intake.',
+                            style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                          ),
+                          const SizedBox(height: 10),
+                          _buildProductSelectionGrid(isDark),
                         ],
                       ),
                     ),
@@ -527,6 +581,200 @@ class _ClientAddSupplierModalState extends ConsumerState<ClientAddSupplierModal>
         borderRadius: BorderRadius.circular(10),
         borderSide: const BorderSide(color: Color(0xFF0D9488), width: 1.8),
       ),
+    );
+  }
+
+  Widget _buildProductSelectionGrid(bool isDark) {
+    final allProducts = ref.watch(clientPortalProvider).products;
+    if (allProducts.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFF94A3B8)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'No products found in catalog. Create products in "Products & Deals" to link them to this vendor.',
+                style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Action toolbar: Quick Select All / Clear
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Select all products supplied by this vendor:',
+              style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w500, color: const Color(0xFF64748B)),
+            ),
+            Row(
+              children: [
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _selectedProductNames = allProducts.map((p) => p.name).toList();
+                    });
+                  },
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: Text('Select All', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF0D9488))),
+                ),
+                const SizedBox(width: 8),
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _selectedProductNames.clear();
+                    });
+                  },
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: Text('Clear', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF94A3B8))),
+                ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+
+        // Product Cards List
+        Container(
+          constraints: const BoxConstraints(maxHeight: 220),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF0B1120) : const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+          ),
+          child: ListView.separated(
+            shrinkWrap: true,
+            padding: const EdgeInsets.all(8),
+            itemCount: allProducts.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 6),
+            itemBuilder: (context, index) {
+              final product = allProducts[index];
+              final isSelected = _selectedProductNames.any((sp) {
+                final target = sp.trim().toLowerCase();
+                return target == product.name.trim().toLowerCase() ||
+                    target == product.sku.trim().toLowerCase() ||
+                    target == product.id.trim().toLowerCase();
+              });
+
+              return InkWell(
+                onTap: () {
+                  setState(() {
+                    if (isSelected) {
+                      _selectedProductNames.removeWhere((sp) {
+                        final target = sp.trim().toLowerCase();
+                        return target == product.name.trim().toLowerCase() ||
+                            target == product.sku.trim().toLowerCase() ||
+                            target == product.id.trim().toLowerCase();
+                      });
+                    } else {
+                      _selectedProductNames.add(product.name);
+                    }
+                  });
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? (isDark ? const Color(0xFF0D9488).withValues(alpha: 0.18) : const Color(0xFF0D9488).withValues(alpha: 0.08))
+                        : (isDark ? const Color(0xFF1E293B) : Colors.white),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isSelected
+                          ? const Color(0xFF0D9488)
+                          : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                      width: isSelected ? 1.5 : 1.0,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 18,
+                        height: 18,
+                        decoration: BoxDecoration(
+                          color: isSelected ? const Color(0xFF0D9488) : Colors.transparent,
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(
+                            color: isSelected ? const Color(0xFF0D9488) : const Color(0xFF94A3B8),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: isSelected
+                            ? const Icon(Icons.check, size: 13, color: Colors.white)
+                            : null,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              product.name,
+                              style: GoogleFonts.inter(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              'SKU: ${product.sku.isNotEmpty ? product.sku : 'N/A'} • ${product.category}',
+                              style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: product.stockQuantity <= product.lowStockThreshold
+                              ? const Color(0xFFFEE2E2)
+                              : (isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)),
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        child: Text(
+                          '${product.stockQuantity} units',
+                          style: GoogleFonts.jetBrainsMono(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            color: product.stockQuantity <= product.lowStockThreshold
+                                ? const Color(0xFFDC2626)
+                                : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }

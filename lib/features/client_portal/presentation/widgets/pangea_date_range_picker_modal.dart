@@ -17,6 +17,38 @@ enum DateRangePreset {
   custom,
 }
 
+extension DateRangePresetExtension on DateRangePreset {
+  String get label {
+    switch (this) {
+      case DateRangePreset.today:
+        return 'Today';
+      case DateRangePreset.yesterday:
+        return 'Yesterday';
+      case DateRangePreset.thisMonth:
+        return 'This month';
+      case DateRangePreset.todayAndYesterday:
+        return 'Today and yesterday';
+      case DateRangePreset.last7Days:
+        return 'Last 7 days';
+      case DateRangePreset.last14Days:
+        return 'Last 14 days';
+      case DateRangePreset.last28Days:
+        return 'Last 28 days';
+      case DateRangePreset.last30Days:
+        return 'Last 30 days';
+      case DateRangePreset.thisWeek:
+        return 'This week';
+      case DateRangePreset.lastWeek:
+        return 'Last week';
+      case DateRangePreset.lastMonth:
+        return 'Last month';
+      case DateRangePreset.custom:
+        return 'Custom';
+    }
+  }
+}
+
+
 class PangeaDateRangeResult {
   final DateTime startDate;
   final DateTime endDate;
@@ -493,39 +525,94 @@ class _PangeaDateRangePickerModalState extends State<PangeaDateRangePickerModal>
             else
               const SizedBox(width: 28),
             const Spacer(),
-            InkWell(
-              onTap: () {},
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    monthName,
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+            PopupMenuButton<int>(
+              tooltip: 'Select month',
+              initialValue: monthDate.month,
+              color: isDark ? const Color(0xFF1E293B) : Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              onSelected: (m) {
+                setState(() {
+                  if (isLeft) {
+                    _leftMonth = DateTime(monthDate.year, m, 1);
+                  } else {
+                    final newRight = DateTime(monthDate.year, m, 1);
+                    final prevMonth = newRight.month == 1 ? 12 : newRight.month - 1;
+                    final prevYear = newRight.month == 1 ? newRight.year - 1 : newRight.year;
+                    _leftMonth = DateTime(prevYear, prevMonth, 1);
+                  }
+                });
+              },
+              itemBuilder: (context) {
+                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                return List.generate(12, (i) {
+                  return PopupMenuItem(
+                    value: i + 1,
+                    child: Text(months[i], style: GoogleFonts.inter(fontSize: 12.5)),
+                  );
+                });
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      monthName,
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
                     ),
-                  ),
-                  const Icon(Icons.arrow_drop_down_rounded, size: 18),
-                ],
+                    const Icon(Icons.arrow_drop_down_rounded, size: 18),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(width: 8),
-            InkWell(
-              onTap: () {},
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    yearStr,
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+            const SizedBox(width: 4),
+            PopupMenuButton<int>(
+              tooltip: 'Select year',
+              initialValue: monthDate.year,
+              color: isDark ? const Color(0xFF1E293B) : Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              onSelected: (y) {
+                setState(() {
+                  if (isLeft) {
+                    _leftMonth = DateTime(y, monthDate.month, 1);
+                  } else {
+                    final newRight = DateTime(y, monthDate.month, 1);
+                    final prevMonth = newRight.month == 1 ? 12 : newRight.month - 1;
+                    final prevYear = newRight.month == 1 ? newRight.year - 1 : newRight.year;
+                    _leftMonth = DateTime(prevYear, prevMonth, 1);
+                  }
+                });
+              },
+              itemBuilder: (context) {
+                final currentYear = today.year;
+                final years = List.generate(7, (i) => currentYear - 3 + i);
+                return years.map((y) {
+                  return PopupMenuItem(
+                    value: y,
+                    child: Text('$y', style: GoogleFonts.inter(fontSize: 12.5)),
+                  );
+                }).toList();
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      yearStr,
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
                     ),
-                  ),
-                  const Icon(Icons.arrow_drop_down_rounded, size: 18),
-                ],
+                    const Icon(Icons.arrow_drop_down_rounded, size: 18),
+                  ],
+                ),
               ),
             ),
             const Spacer(),
@@ -603,23 +690,29 @@ class _PangeaDateRangePickerModalState extends State<PangeaDateRangePickerModal>
                                     ),
                                   )
                                 else if (isStart && !_startDate.isAtSameMomentAs(_endDate))
-                                  Positioned(
-                                    right: 0,
-                                    top: 0,
-                                    bottom: 0,
-                                    left: constraints.maxWidth / 14,
-                                    child: Container(
-                                      color: rangeHighlightColor,
+                                  Positioned.fill(
+                                    child: Align(
+                                      alignment: Alignment.centerRight,
+                                      child: FractionallySizedBox(
+                                        widthFactor: 0.5,
+                                        heightFactor: 1.0,
+                                        child: Container(
+                                          color: rangeHighlightColor,
+                                        ),
+                                      ),
                                     ),
                                   )
                                 else if (isEnd && !_startDate.isAtSameMomentAs(_endDate))
-                                  Positioned(
-                                    left: 0,
-                                    top: 0,
-                                    bottom: 0,
-                                    right: constraints.maxWidth / 14,
-                                    child: Container(
-                                      color: rangeHighlightColor,
+                                  Positioned.fill(
+                                    child: Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: FractionallySizedBox(
+                                        widthFactor: 0.5,
+                                        heightFactor: 1.0,
+                                        child: Container(
+                                          color: rangeHighlightColor,
+                                        ),
+                                      ),
                                     ),
                                   ),
 

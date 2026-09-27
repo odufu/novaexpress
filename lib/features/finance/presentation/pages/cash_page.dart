@@ -55,8 +55,8 @@ class _CashPageState extends ConsumerState<CashPage> {
     final user = authState.user;
     final agentName = user != null && (user.firstName.isNotEmpty || user.lastName.isNotEmpty)
         ? '${user.firstName} ${user.lastName}'.trim()
-        : 'Joel Odufu';
-    final agentCode = user?.deliveryAgentCode ?? 'PDA-7182';
+        : 'NovaXpress Rider';
+    final agentCode = user?.deliveryAgentCode ?? 'PDA-AGENT';
 
     final dcFinanceSettings = ref.watch(dcConsoleProvider).financeSettings;
     final unremittedCashOrders = ordersState.orders

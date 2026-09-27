@@ -13,6 +13,7 @@ class OrderModel extends OrderEntity {
     required super.deliveryAddress,
     super.landmark,
     super.lga,
+    super.productId,
     super.productName,
     required super.status,
     required super.quantity,
@@ -76,6 +77,7 @@ class OrderModel extends OrderEntity {
         deliveryState: '',
         deliveryCity: '',
         deliveryAddress: '',
+        productId: '',
         productName: '',
         status: 'pending',
         quantity: 0,
@@ -89,13 +91,13 @@ class OrderModel extends OrderEntity {
 
   factory OrderModel.fromJson(Map<String, dynamic> json) {
     final rawProduct = json['products'];
-    String name = 'Respira Detox Tea';
+    String name = json['product_name']?.toString() ?? '';
+    String? prodId = json['product_id']?.toString();
     String? sku = json['sku']?.toString() ?? json['product_sku']?.toString();
     if (rawProduct is Map) {
+      if (rawProduct['id'] != null) prodId = rawProduct['id'].toString();
       if (rawProduct['name'] != null) name = rawProduct['name'].toString();
       if (rawProduct['sku'] != null) sku = rawProduct['sku'].toString();
-    } else if (json['product_name'] != null) {
-      name = json['product_name'].toString();
     }
 
     final notes = json['delivery_notes']?.toString() ?? '';
@@ -220,6 +222,7 @@ class OrderModel extends OrderEntity {
       deliveryAddress: json['delivery_address'] ?? '',
       landmark: json['landmark'],
       lga: json['lga'],
+      productId: prodId,
       productName: name,
       status: (json['status'] == 'new' || json['status'] == 'unassigned') ? 'pending' : (json['status'] ?? 'pending'),
       quantity: json['quantity'] ?? 1,
@@ -291,6 +294,7 @@ class OrderModel extends OrderEntity {
       deliveryAddress: entity.deliveryAddress,
       landmark: entity.landmark,
       lga: entity.lga,
+      productId: entity.productId,
       productName: entity.productName,
       status: entity.status,
       quantity: entity.quantity,
@@ -359,6 +363,8 @@ class OrderModel extends OrderEntity {
       'delivery_address': deliveryAddress,
       'landmark': landmark,
       'lga': lga,
+      'product_id': productId,
+      'product_name': productName,
       'status': status,
       'quantity': quantity,
       'paid_quantity': paidQuantity,

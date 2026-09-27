@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_skeleton_loader.dart';
+import '../../../orders/presentation/providers/orders_provider.dart';
 import '../providers/stock_provider.dart';
 
 final stockHistoryFilterProvider = StateProvider.autoDispose<String>((ref) => 'All');
@@ -20,84 +21,162 @@ class StockHistoryPage extends ConsumerWidget {
     'Adjusted',
   ];
 
-  static const List<Map<String, dynamic>> _movements = [
-    {
-      'type': 'RECEIVED',
-      'category': 'Received',
-      'productName': 'Respira Detox Tea',
-      'quantityText': '+10 Units',
-      'isPositive': true,
-      'source': 'Wuse Distribution Center',
-      'reference': 'STK-00482',
-      'timestamp': 'Today • 10:42 AM',
-      'badgeColor': Color(0xFF16A34A),
-      'icon': Icons.move_to_inbox_rounded,
-    },
-    {
-      'type': 'DELIVERED',
-      'category': 'Delivered',
-      'productName': 'Respira Detox Tea',
-      'quantityText': '-2 Units',
-      'isPositive': false,
-      'source': 'Order NX-00482 • Emeka Nwosu',
-      'reference': 'NX-00482',
-      'timestamp': 'Today • 02:14 PM',
-      'badgeColor': Color(0xFFE11D48),
-      'icon': Icons.local_shipping_rounded,
-    },
-    {
-      'type': 'RETURNED',
-      'category': 'Returned',
-      'productName': 'Grazer Herbal Tea',
-      'quantityText': '+1 Unit',
-      'isPositive': true,
-      'source': 'Order NX-00471 • Mrs. Folake Adebayo',
-      'reference': 'NX-00471',
-      'timestamp': 'Today • 04:02 PM',
-      'badgeColor': Color(0xFFEA580C),
-      'icon': Icons.replay_rounded,
-    },
-    {
-      'type': 'DAMAGED',
-      'category': 'Damaged',
-      'productName': 'Respira Detox Tea',
-      'quantityText': '-1 Unit',
-      'isPositive': false,
-      'source': 'Transit Damage Logged',
-      'reference': 'AUD-00192',
-      'timestamp': 'Yesterday • 06:30 PM',
-      'badgeColor': Color(0xFFDC2626),
-      'icon': Icons.broken_image_rounded,
-    },
-    {
-      'type': 'ADJUSTED',
-      'category': 'Adjusted',
-      'productName': 'Grazer Herbal Tea',
-      'quantityText': '+2 Units',
-      'isPositive': true,
-      'source': 'Physical Count Reconciliation',
-      'reference': 'AUD-00188',
-      'timestamp': '2 days ago • 11:15 AM',
-      'badgeColor': Color(0xFF2563EB),
-      'icon': Icons.tune_rounded,
-    },
-  ];
+  String _formatRelative(DateTime dt) {
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+    if (diff.inMinutes < 60) {
+      return diff.inMinutes <= 1 ? 'Just now' : '${diff.inMinutes} mins ago';
+    } else if (diff.inHours < 24) {
+      return '${diff.inHours} hrs ago';
+    } else if (diff.inDays < 7) {
+      return '${diff.inDays} days ago';
+    } else {
+      return '${dt.day}/${dt.month}/${dt.year}';
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final stockState = ref.watch(stockProvider);
+    final ordersState = ref.watch(ordersProvider);
     final selectedFilter = ref.watch(stockHistoryFilterProvider);
 
-    final filteredMovements = _movements.where((m) {
+    final List<Map<String, dynamic>> movements = [];
+
+    // 1. Inbound stock transfers and receptions
+    for (final transfer in stockState.stockTransfers) {
+      final isCompletedOrDispatched = transfer.isCompleted || transfer.isDispatched || transfer.isPendingReception;
+      final sourceName = transfer.sourceWarehouseName?.isNotEmpty == true
+          ? transfer.sourceWarehouseName!
+          : (transfer.clientName?.isNotEmpty == true ? transfer.clientName! : 'Central DC');
+      final destName = transfer.destinationWarehouseName?.isNotEmpty == true
+          ? transfer.destinationWarehouseName!
+          : 'Distribution Hub';
+
+      for (final item in transfer.items) {
+        if (item.quantityReceived > 0 || isCompletedOrDispatched) {
+          movements.add({
+            'type': 'RECEIVED',
+            'category': 'Received',
+            'productName': item.productName.isNotEmpty ? item.productName : item.sku,
+            'quantityText': '+${item.quantityReceived > 0 ? item.quantityReceived : item.quantity} Units',
+            'isPositive': true,
+            'source': '$sourceName → $destName',
+            'reference': transfer.transferNumber,
+            'timestamp': _formatRelative(transfer.createdAt),
+            'badgeColor': const Color(0xFF16A34A),
+            'icon': Icons.move_to_inbox_rounded,
+          });
+        }
+        if (item.quantityDamaged > 0) {
+          movements.add({
+            'type': 'DAMAGED',
+            'category': 'Damaged',
+            'productName': item.productName.isNotEmpty ? item.productName : item.sku,
+            'quantityText': '-${item.quantityDamaged} Units',
+            'isPositive': false,
+            'source': 'Damaged during transfer to $destName',
+            'reference': transfer.transferNumber,
+            'timestamp': _formatRelative(transfer.createdAt),
+            'badgeColor': const Color(0xFFDC2626),
+            'icon': Icons.broken_image_rounded,
+          });
+        }
+      }
+    }
+
+    // 2. Customer deliveries and returns from live orders
+    for (final order in ordersState.orders) {
+      final pName = order.productName.isNotEmpty ? order.productName : (order.productSku ?? 'Product Item');
+      final statusLower = order.status.toLowerCase();
+
+      if (statusLower == 'delivered') {
+        movements.add({
+          'type': 'DELIVERED',
+          'category': 'Delivered',
+          'productName': pName,
+          'quantityText': '-1 Unit',
+          'isPositive': false,
+          'source': 'Order ${order.orderNumber} • ${order.customerName}',
+          'reference': order.orderNumber,
+          'timestamp': order.updatedAt != null ? _formatRelative(order.updatedAt!) : 'Delivered',
+          'badgeColor': const Color(0xFFE11D48),
+          'icon': Icons.local_shipping_rounded,
+        });
+      } else if (statusLower == 'cancelled' || statusLower == 'returned') {
+        movements.add({
+          'type': 'RETURNED',
+          'category': 'Returned',
+          'productName': pName,
+          'quantityText': '+1 Unit',
+          'isPositive': true,
+          'source': 'Order ${order.orderNumber} • ${order.customerName}',
+          'reference': order.orderNumber,
+          'timestamp': order.updatedAt != null ? _formatRelative(order.updatedAt!) : 'Returned',
+          'badgeColor': const Color(0xFFEA580C),
+          'icon': Icons.replay_rounded,
+        });
+      }
+    }
+
+    // 3. Dynamic fallback from live catalog stock items
+    if (movements.isEmpty && stockState.stockItems.isNotEmpty) {
+      for (final item in stockState.stockItems) {
+        if (item.assignedCount > 0) {
+          movements.add({
+            'type': 'RECEIVED',
+            'category': 'Received',
+            'productName': item.name,
+            'quantityText': '+${item.assignedCount} Units',
+            'isPositive': true,
+            'source': '${item.ownerName.isNotEmpty ? item.ownerName : "DC"} Inbound Allocation',
+            'reference': 'ALLOC-${item.sku}',
+            'timestamp': 'Initial Allocation',
+            'badgeColor': const Color(0xFF16A34A),
+            'icon': Icons.move_to_inbox_rounded,
+          });
+        }
+        if (item.deliveredCount > 0) {
+          movements.add({
+            'type': 'DELIVERED',
+            'category': 'Delivered',
+            'productName': item.name,
+            'quantityText': '-${item.deliveredCount} Units',
+            'isPositive': false,
+            'source': 'Customer Fulfillment',
+            'reference': 'DISP-${item.sku}',
+            'timestamp': 'Completed Dispatch',
+            'badgeColor': const Color(0xFFE11D48),
+            'icon': Icons.local_shipping_rounded,
+          });
+        }
+        if (item.returnedCount > 0) {
+          movements.add({
+            'type': 'RETURNED',
+            'category': 'Returned',
+            'productName': item.name,
+            'quantityText': '+${item.returnedCount} Units',
+            'isPositive': true,
+            'source': 'DC Depot Return',
+            'reference': 'RET-${item.sku}',
+            'timestamp': 'Reversed Inventory',
+            'badgeColor': const Color(0xFFEA580C),
+            'icon': Icons.replay_rounded,
+          });
+        }
+      }
+    }
+
+    final filteredMovements = movements.where((m) {
       if (selectedFilter == 'All') return true;
       return (m['category'] as String).toLowerCase() == selectedFilter.toLowerCase();
     }).toList();
 
-    final totalReceived = _movements.where((m) => m['category'] == 'Received').length;
-    final totalDelivered = _movements.where((m) => m['category'] == 'Delivered').length;
-    final totalReturned = _movements.where((m) => m['category'] == 'Returned').length;
+    final totalReceived = movements.where((m) => m['category'] == 'Received').length;
+    final totalDelivered = movements.where((m) => m['category'] == 'Delivered').length;
+    final totalReturned = movements.where((m) => m['category'] == 'Returned').length;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -112,6 +191,7 @@ class StockHistoryPage extends ConsumerWidget {
       body: RefreshIndicator(
         onRefresh: () async {
           await ref.read(stockProvider.notifier).fetchStockItems();
+          await ref.read(ordersProvider.notifier).fetchOrders();
         },
         child: ListView(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -287,9 +367,9 @@ class StockHistoryPage extends ConsumerWidget {
                               Text(
                                 m['productName'] as String,
                                 style: GoogleFonts.inter(
-                                  fontSize: 14.5,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                               ),
                               const SizedBox(height: 4),
                               Text(

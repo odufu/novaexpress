@@ -28,6 +28,7 @@ import '../../domain/entities/client_supplier.dart';
 import '../../domain/entities/client_stock_invoice.dart';
 import '../../domain/entities/client_stock_balance.dart';
 import '../../domain/entities/client_unit_economics.dart';
+import '../../domain/entities/stock_holder_custody.dart';
 
 /// Financial metrics summary per product or aggregate
 class ClientProductFinanceSummary {
@@ -190,6 +191,7 @@ class ClientPortalState {
   final List<ClientSupplier> suppliers;
   final List<ClientStockInvoice> stockInvoices;
   final List<ClientStockBalance> stockBalances;
+  final List<StockHolderCustodyEntity> stockHolders;
   final List<ClientCloserPayout> closerPayouts;
   final String selectedInventoryWarehouseFilter; // 'all' or specific warehouse
   final String selectedInventoryItemFilter; // 'all' or specific item
@@ -219,6 +221,7 @@ class ClientPortalState {
     this.suppliers = const [],
     this.stockInvoices = const [],
     this.stockBalances = const [],
+    this.stockHolders = const [],
     this.selectedInventoryWarehouseFilter = 'all',
     this.selectedInventoryItemFilter = 'all',
     this.isInventoryLoading = false,
@@ -248,6 +251,7 @@ class ClientPortalState {
     List<ClientSupplier>? suppliers,
     List<ClientStockInvoice>? stockInvoices,
     List<ClientStockBalance>? stockBalances,
+    List<StockHolderCustodyEntity>? stockHolders,
     String? selectedInventoryWarehouseFilter,
     String? selectedInventoryItemFilter,
     bool? isInventoryLoading,
@@ -276,6 +280,7 @@ class ClientPortalState {
       suppliers: suppliers ?? this.suppliers,
       stockInvoices: stockInvoices ?? this.stockInvoices,
       stockBalances: stockBalances ?? this.stockBalances,
+      stockHolders: stockHolders ?? this.stockHolders,
       selectedInventoryWarehouseFilter: selectedInventoryWarehouseFilter ?? this.selectedInventoryWarehouseFilter,
       selectedInventoryItemFilter: selectedInventoryItemFilter ?? this.selectedInventoryItemFilter,
       isInventoryLoading: isInventoryLoading ?? this.isInventoryLoading,
@@ -290,6 +295,16 @@ class ClientPortalState {
 
   double get totalInventoryUnits => stockBalances.fold(0.0, (sum, b) => sum + b.balanceQty);
   double get totalStockQuantity => totalInventoryUnits;
+
+  // Stock Holders & Multi-Holder Custody KPIs (DCs, PDAs, Depots)
+  int get totalStockHoldersUnits => stockHolders.fold(0, (sum, h) => sum + h.closingQty);
+  double get totalStockHoldersValuation => stockHolders.fold(0.0, (sum, h) => sum + h.closingValue);
+  int get totalDcStockUnits => stockHolders.where((h) => h.isDistributionCenter).fold(0, (sum, h) => sum + h.closingQty);
+  double get totalDcStockValuation => stockHolders.where((h) => h.isDistributionCenter).fold(0.0, (sum, h) => sum + h.closingValue);
+  int get totalPdaStockUnits => stockHolders.where((h) => h.isPdaRider).fold(0, (sum, h) => sum + h.closingQty);
+  double get totalPdaStockValuation => stockHolders.where((h) => h.isPdaRider).fold(0.0, (sum, h) => sum + h.closingValue);
+  int get totalInTransitStockUnits => stockHolders.where((h) => h.isInTransitOrDepot).fold(0, (sum, h) => sum + h.closingQty);
+  double get totalInTransitStockValuation => stockHolders.where((h) => h.isInTransitOrDepot).fold(0.0, (sum, h) => sum + h.closingValue);
 
   int get totalReservedStock => stockBalances.fold(0.0, (sum, b) => sum + b.reservedStock).toInt();
 
@@ -347,7 +362,8 @@ class ClientPortalState {
       ClientStockInvoiceItem? latestItem;
       for (final inv in stockInvoices) {
         for (final it in inv.items) {
-          if (it.productName.toLowerCase() == bal.itemName.toLowerCase() ||
+          if ((bal.productId != null && bal.productId!.isNotEmpty && it.productId == bal.productId) ||
+              it.productName.toLowerCase() == bal.itemName.toLowerCase() ||
               it.productSku.toLowerCase() == bal.itemCode.toLowerCase()) {
             latestItem = it;
             break;
@@ -363,12 +379,18 @@ class ClientPortalState {
 
       // Find catalog retail selling price
       double retail = 0.0;
-      final matchedProd = products.where((p) => p.name.toLowerCase() == bal.itemName.toLowerCase()).firstOrNull;
+      final matchedProd = products.where((p) =>
+          (bal.productId != null && bal.productId!.isNotEmpty && bal.productId == p.id) ||
+          p.name.toLowerCase() == bal.itemName.toLowerCase() ||
+          (p.sku.isNotEmpty && p.sku.toLowerCase() == bal.itemCode.toLowerCase())).firstOrNull;
       if (matchedProd != null && matchedProd.defaultUnitPrice > 0) {
         retail = matchedProd.defaultUnitPrice;
       } else {
         // Fallback standard retail price estimation based on commercial packages
-        final pkgs = packages.where((p) => p.productName.toLowerCase() == bal.itemName.toLowerCase()).toList();
+        final pkgs = packages.where((p) =>
+            (bal.productId != null && bal.productId!.isNotEmpty && bal.productId == p.productId) ||
+            p.productName.toLowerCase() == bal.itemName.toLowerCase() ||
+            (p.productSku != null && p.productSku!.isNotEmpty && p.productSku!.toLowerCase() == bal.itemCode.toLowerCase())).toList();
         if (pkgs.isNotEmpty) {
           retail = pkgs.first.unitPrice;
         } else {
@@ -376,24 +398,32 @@ class ClientPortalState {
         }
       }
 
-      // Find orders matching this product
+      // Find orders matching this product across all client transactions
       final matchingOrders = orders.where((o) {
-        // Date range filtering if active
-        if (inventoryStartDate != null || inventoryEndDate != null) {
-          final dt = (o.deliveredAt ?? o.createdAt).toLocal();
-          if (inventoryStartDate != null && dt.isBefore(inventoryStartDate!)) return false;
-          if (inventoryEndDate != null) {
-            final endOfDay = DateTime(inventoryEndDate!.year, inventoryEndDate!.month, inventoryEndDate!.day, 23, 59, 59);
-            if (dt.isAfter(endOfDay)) return false;
-          }
+        // 1. Direct Foreign Key (Product ID) Match - Primary & Authoritative
+        if (o.productId != null && bal.productId != null &&
+            o.productId!.isNotEmpty && bal.productId!.isNotEmpty &&
+            o.productId == bal.productId) {
+          return true;
         }
 
-        final oProd = o.productName.trim().toLowerCase();
-        final balName = bal.itemName.trim().toLowerCase();
+        // 2. Exact SKU match
         final oSku = (o.productSku ?? '').trim().toLowerCase();
         final balSku = bal.itemCode.trim().toLowerCase();
-        return (oProd.isNotEmpty && (oProd == balName || oProd.contains(balName) || balName.contains(oProd))) ||
-            (oSku.isNotEmpty && balSku.isNotEmpty && oSku == balSku);
+        if (oSku.isNotEmpty && balSku.isNotEmpty && oSku == balSku) return true;
+
+        // 3. Exact or substring product name match
+        final oProd = o.productName.trim().toLowerCase();
+        final balName = bal.itemName.trim().toLowerCase();
+        if (oProd.isNotEmpty && (oProd == balName || oProd.contains(balName) || balName.contains(oProd))) return true;
+
+        // 4. Normalized significant token overlap (generic without domain-specific product names)
+        String clean(String s) => s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9\s]'), ' ');
+        const genericStopWords = {'the', 'and', 'for', 'with', 'pack', 'bottle', 'box', 'set', 'bag', 'bags'};
+        final t1 = clean(oProd).split(' ').where((w) => w.length >= 4 && !genericStopWords.contains(w)).toSet();
+        final t2 = clean(balName).split(' ').where((w) => w.length >= 4 && !genericStopWords.contains(w)).toSet();
+
+        return t1.isNotEmpty && t2.isNotEmpty && t1.intersection(t2).isNotEmpty;
       }).toList();
 
       final deliveredOrders = matchingOrders.where((o) =>
@@ -875,6 +905,11 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
     required String clientId,
     required String companyName,
   }) {
+    // Exclude automated integration test artifacts from merchant view
+    if (product.sku.toUpperCase().startsWith('SKU-TEST-')) {
+      return false;
+    }
+
     if (clientId.isNotEmpty && product.clientId != null && product.clientId == clientId) {
       return true;
     }
@@ -882,11 +917,11 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
     final pClient = product.clientName.trim().toLowerCase();
     if (cName.isNotEmpty && pClient.isNotEmpty) {
       if (cName == pClient) return true;
-      if (cName.contains('novacare') && pClient.contains('novacare')) return true;
-      if (cName.contains('leafora') && pClient.contains('leafora')) return true;
-      if (cName.contains('emerald') && pClient.contains('emerald')) return true;
+      if (cName.length >= 3 && pClient.length >= 3) {
+        if (cName.contains(pClient) || pClient.contains(cName)) return true;
+      }
     }
-    if (cName.contains('novacare') && product.name.toLowerCase().contains('novacare')) {
+    if (cName.isNotEmpty && cName.length >= 3 && product.name.toLowerCase().contains(cName)) {
       return true;
     }
     return false;
@@ -913,6 +948,7 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
           ),
         ) {
     loadClientData();
+    _subscribeToRealtimeInvoices();
 
     // 1. Reactive listener to auth changes (when client merchant logs in or profile hydrates)
     _ref.listen<AuthState>(authProvider, (previous, next) {
@@ -1069,16 +1105,45 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         startDate: startDate,
         endDate: endDate,
       );
+      final holders = await _repository.getProductHoldersCustody(
+        clientId,
+        startDate: startDate,
+        endDate: endDate,
+      );
       state = state.copyWith(
         suppliers: sups,
         stockInvoices: invs,
         stockBalances: bals,
+        stockHolders: holders,
         isInventoryLoading: false,
       );
     } catch (e) {
       debugPrint('[CLIENT_PORTAL] ⚠️ reloadInventoryData error: $e');
       state = state.copyWith(isInventoryLoading: false);
     }
+  }
+
+  Future<List<StockHolderCustodyEntity>> fetchCustodyForProduct(
+    String productId, {
+    DateTime? startDate,
+    DateTime? endDate,
+    String? stateFilter,
+    String? lgaFilter,
+  }) async {
+    final user = _ref.read(authProvider).user;
+    final clientId = state.clientProfile.id.isNotEmpty
+        ? state.clientProfile.id
+        : (user?.clientId ?? '');
+    if (clientId.isEmpty) return [];
+
+    return await _repository.getProductHoldersCustody(
+      clientId,
+      productId: productId,
+      startDate: startDate,
+      endDate: endDate,
+      state: stateFilter,
+      lga: lgaFilter,
+    );
   }
 
   Future<ClientSupplier> createSupplier(ClientSupplier supplier) async {
@@ -1204,8 +1269,8 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         } catch (_) {}
       }
 
-      // Hard fallback if still empty: Novacare
-      if (clientId.isEmpty && (user?.email.contains('novacare') == true || user?.clientCompanyName?.contains('Novacare') == true)) {
+      // Fallback if still empty: Default to Novacare
+      if (clientId.isEmpty) {
         clientId = '00000000-0000-4000-8000-789382731303';
         if (companyName.isEmpty) companyName = 'Novacare Health & Wellness Ltd';
       }
@@ -1393,14 +1458,16 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
       List<ClientStockInvoice> stockInvoices = [];
       List<ClientStockBalance> stockBalances = [];
       List<ClientCloserPayout> closerPayouts = [];
+      List<StockHolderCustodyEntity> stockHolders = [];
 
       try {
         suppliers = await _repository.getSuppliers(clientId);
         stockInvoices = await _repository.getStockInvoices(clientId);
         stockBalances = await _repository.getStockBalances(clientId);
         closerPayouts = await _repository.getClientCloserPayouts(clientId);
+        stockHolders = await _repository.getProductHoldersCustody(clientId);
       } catch (e) {
-        debugPrint('[CLIENT_PORTAL] ⚠️ Error loading inventory / closer payouts data: $e');
+        debugPrint('[CLIENT_PORTAL] ⚠️ Error loading inventory / custody / closer payouts data: $e');
       }
 
       if (!mounted) return;
@@ -1417,6 +1484,7 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         suppliers: suppliers,
         stockInvoices: stockInvoices,
         stockBalances: stockBalances,
+        stockHolders: stockHolders,
         isLoading: false,
       );
     } catch (e) {
@@ -1853,8 +1921,8 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
     String? customerAddress,
     String deliveryState = 'Federal Capital Territory',
     String deliveryLga = 'Abuja Municipal (AMAC)',
-    String productInterest = 'Grazer Tea',
-    String packageInterest = '2 Packs Promo Deal',
+    String productInterest = '',
+    String packageInterest = '',
     String? assignedCloserId,
     String? callNotes,
   }) async {
@@ -2064,12 +2132,8 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
 
       // 1. Gather all Distribution Centers and Drivers from DCConsoleProvider
       final dcState = _ref.read(dcConsoleProvider);
-      final allDcs = dcState.distributionCenters.isNotEmpty
-          ? dcState.distributionCenters
-          : defaultDistributionCenters;
-      final allDrivers = dcState.drivers.isNotEmpty
-          ? dcState.drivers
-          : defaultFleetDrivers;
+      final allDcs = dcState.distributionCenters;
+      final allDrivers = dcState.drivers;
 
       final authUser = _ref.read(authProvider).user;
       final effectiveClientId = state.clientProfile.id.isNotEmpty
@@ -2646,7 +2710,12 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         final stateName = row['state']?.toString() ?? row['delivery_state']?.toString() ?? 'Federal Capital Territory';
         final lga = row['lga']?.toString() ?? row['delivery_lga']?.toString() ?? 'Abuja Municipal (AMAC)';
         final address = row['address']?.toString() ?? row['delivery_address']?.toString() ?? 'Abuja';
-        final prodName = row['product_name']?.toString() ?? 'Grazer Tea';
+        final defaultProd = state.products.isNotEmpty ? state.products.first : null;
+        final prodName = row['product_name']?.toString() ?? (defaultProd?.name ?? 'General Product');
+        final resolvedProd = state.products.where((p) =>
+            p.name.toLowerCase() == prodName.toLowerCase() ||
+            p.id == row['product_id']?.toString()).firstOrNull;
+        final prodId = resolvedProd?.id ?? row['product_id']?.toString() ?? defaultProd?.id;
         final qty = int.tryParse(row['quantity']?.toString() ?? '1') ?? 1;
         final amount = double.tryParse(row['amount']?.toString() ?? '22000') ?? 22000.0;
 
@@ -2656,7 +2725,7 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
           deliveryState: stateName,
           deliveryLga: lga,
           deliveryAddress: address,
-          productId: 'prod-grazer-01',
+          productId: prodId ?? '',
           productName: prodName,
           quantity: qty,
           totalAmount: amount,
@@ -2672,6 +2741,9 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
   }
 
   Future<int> importBulkOrdersCsv() async {
+    final activeProdName = state.products.isNotEmpty
+        ? state.products.first.name
+        : 'Health Product';
     final sampleBatch = [
       {
         'customer_name': 'Chief Adeleke',
@@ -2679,7 +2751,7 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         'delivery_address': 'Plot 14, Ahmadu Bello Way, Garki',
         'delivery_state': 'Federal Capital Territory',
         'delivery_lga': 'Abuja Municipal (AMAC)',
-        'product_name': 'Grazer Tea',
+        'product_name': activeProdName,
         'quantity': 2,
         'amount': 35000.0,
       },
@@ -2689,7 +2761,7 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         'delivery_address': 'Flat 4B, Hillview Estate, Guzape',
         'delivery_state': 'Federal Capital Territory',
         'delivery_lga': 'Abuja Municipal (AMAC)',
-        'product_name': 'Grazer Tea',
+        'product_name': activeProdName,
         'quantity': 3,
         'amount': 50000.0,
       },
@@ -2726,6 +2798,43 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
     final hex = values.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
     return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20, 32)}';
   }
+
+  RealtimeChannel? _invoicesRealtimeChannel;
+
+  void _subscribeToRealtimeInvoices() {
+    try {
+      final client = Supabase.instance.client;
+      _invoicesRealtimeChannel = client.channel('public:client_stock_invoices_channel')
+        ..onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'client_stock_invoices',
+          callback: (payload) {
+            debugPrint('[CLIENT_PORTAL] ⚡ Realtime event on client_stock_invoices (${payload.eventType}). Reloading inventory data...');
+            reloadInventoryData();
+          },
+        )
+        ..onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'client_stock_balances',
+          callback: (payload) {
+            debugPrint('[CLIENT_PORTAL] ⚡ Realtime event on client_stock_balances (${payload.eventType}). Reloading inventory data...');
+            reloadInventoryData();
+          },
+        )
+        ..subscribe();
+      debugPrint('[CLIENT_PORTAL] 📡 Realtime channel active for intake invoices & stock balances.');
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] ℹ️ Realtime invoices subscription notice: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _invoicesRealtimeChannel?.unsubscribe();
+    super.dispose();
+  }
 }
 
 final clientPortalRepositoryProvider = Provider<ClientPortalRepository>((ref) {
@@ -2736,4 +2845,10 @@ final clientPortalProvider = StateNotifierProvider<ClientPortalNotifier, ClientP
   final repository = ref.watch(clientPortalRepositoryProvider);
   return ClientPortalNotifier(ref, repository: repository);
 });
+
+/// Controls which sub-tab is active on the Inventory page (0: Stock Ledger, 1: Custody & Holders, 2: Invoices, 3: Suppliers, 4: Unit Economics)
+final clientInventoryActiveSubTabProvider = StateProvider<int>((ref) => 0);
+
+/// Controls pre-selected product filter on the Inventory page
+final clientInventoryProductFilterProvider = StateProvider<String>((ref) => 'All Products');
 

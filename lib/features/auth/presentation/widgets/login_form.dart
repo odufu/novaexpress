@@ -5,6 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../providers/auth_provider.dart';
 
+import './quick_account_dropdown.dart';
+
 final loginObscurePasswordProvider = StateProvider.autoDispose<bool>((ref) => true);
 final loginRememberMeProvider = StateProvider.autoDispose<bool>((ref) => true);
 
@@ -15,76 +17,11 @@ class LoginForm extends ConsumerStatefulWidget {
   ConsumerState<LoginForm> createState() => _LoginFormState();
 }
 
-class _QuickAccount {
-  final String roleKey;
-  final String title;
-  final String personName;
-  final String badge;
-  final String email;
-  final String password;
-  final IconData icon;
-  final Color themeColor;
-
-  const _QuickAccount({
-    required this.roleKey,
-    required this.title,
-    required this.personName,
-    required this.badge,
-    required this.email,
-    required this.password,
-    required this.icon,
-    required this.themeColor,
-  });
-}
-
 class _LoginFormState extends ConsumerState<LoginForm> {
   final _formKey = GlobalKey<FormState>();
   final _agentIdController = TextEditingController(text: 'dc.supervisor@novaxpress.ng');
   final _passwordController = TextEditingController(text: 'Password123!');
   String? _selectedDemoRole = 'dc_manager';
-
-  static const List<_QuickAccount> _primaryAccounts = [
-    _QuickAccount(
-      roleKey: 'client',
-      title: 'Novacare Client',
-      personName: 'Dr. Chuka Okafor',
-      badge: 'Merchant Portal',
-      email: 'merchant@novacare.com',
-      password: 'Password123!',
-      icon: Icons.storefront_rounded,
-      themeColor: Color(0xFF0D9488),
-    ),
-    _QuickAccount(
-      roleKey: 'closer',
-      title: 'Novacare Closer',
-      personName: 'Amaka Chioma',
-      badge: 'Telesales Closer',
-      email: 'closer@novacare.com',
-      password: 'Password123!',
-      icon: Icons.headset_mic_rounded,
-      themeColor: Color(0xFF7C3AED),
-    ),
-    _QuickAccount(
-      roleKey: 'dc_manager',
-      title: 'DC Supervisor',
-      personName: 'Ahmed Bello',
-      badge: 'Wuse Central Hub',
-      email: 'dc.supervisor@novaxpress.ng',
-      password: 'Password123!',
-      icon: Icons.warehouse_rounded,
-      themeColor: Color(0xFF1E3A8A),
-    ),
-    _QuickAccount(
-      roleKey: 'rider',
-      title: 'Field Rider (PDA)',
-      personName: 'Emeka Rider',
-      badge: 'PDA-7000 (Abuja)',
-      email: 'rider.emeka@novaxpress.com',
-      password: 'Password123!',
-      icon: Icons.two_wheeler_rounded,
-      themeColor: Color(0xFFEA580C),
-    ),
-  ];
 
   @override
   void initState() {
@@ -94,7 +31,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
 
   void _onEmailChanged() {
     final text = _agentIdController.text.trim().toLowerCase();
-    final matchingAcc = _primaryAccounts.where((a) => a.email.toLowerCase() == text).firstOrNull;
+    final matchingAcc = QuickAccountDropdown.allAccounts.where((a) => a.email.toLowerCase() == text).firstOrNull;
     if (matchingAcc != null) {
       if (_selectedDemoRole != matchingAcc.roleKey) {
         setState(() => _selectedDemoRole = matchingAcc.roleKey);
@@ -174,192 +111,16 @@ class _LoginFormState extends ConsumerState<LoginForm> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Quick Operations Selector Card
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.flash_on_rounded, size: 15, color: Color(0xFFEA580C)),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        'QUICK OPERATIONS SELECTOR',
-                        style: GoogleFonts.inter(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.4,
-                          color: const Color(0xFF475569),
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE2E8F0),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        '1-Tap Fill',
-                        style: GoogleFonts.inter(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFF64748B),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Column(
-                  children: _primaryAccounts.map((acc) {
-                    final isSelected = _selectedDemoRole == acc.roleKey;
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: Material(
-                        color: isSelected
-                            ? acc.themeColor.withValues(alpha: 0.08)
-                            : Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        child: InkWell(
-                          onTap: () {
-                            if (_selectedDemoRole == acc.roleKey) {
-                              _instantLogin(acc.roleKey, acc.email, acc.password);
-                            } else {
-                              _quickFill(acc.roleKey, acc.email, acc.password);
-                            }
-                          },
-                          borderRadius: BorderRadius.circular(10),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: isSelected ? acc.themeColor : const Color(0xFFE2E8F0),
-                                width: isSelected ? 1.6 : 1,
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: BoxDecoration(
-                                    color: acc.themeColor.withValues(alpha: isSelected ? 0.18 : 0.1),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(acc.icon, size: 15, color: acc.themeColor),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Wrap(
-                                        spacing: 5,
-                                        runSpacing: 2,
-                                        crossAxisAlignment: WrapCrossAlignment.center,
-                                        children: [
-                                          Text(
-                                            acc.title,
-                                            style: GoogleFonts.inter(
-                                              fontSize: 12,
-                                              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w700,
-                                              color: const Color(0xFF0F172A),
-                                            ),
-                                          ),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                            decoration: BoxDecoration(
-                                              color: acc.themeColor.withValues(alpha: 0.12),
-                                              borderRadius: BorderRadius.circular(4),
-                                            ),
-                                            child: Text(
-                                              acc.badge,
-                                              style: GoogleFonts.inter(
-                                                fontSize: 8.5,
-                                                fontWeight: FontWeight.bold,
-                                                color: acc.themeColor,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 1),
-                                      Text(
-                                        '${acc.personName} • ${acc.email}',
-                                        style: GoogleFonts.inter(
-                                          fontSize: 10,
-                                          color: const Color(0xFF64748B),
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Icon(
-                                  isSelected ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
-                                  color: isSelected ? acc.themeColor : const Color(0xFFCBD5E1),
-                                  size: 18,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 2),
-                // Alternate Demos
-                Wrap(
-                  spacing: 5,
-                  runSpacing: 4,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Text(
-                      'Alt:',
-                      style: GoogleFonts.inter(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFF94A3B8),
-                      ),
-                    ),
-                    _buildMiniChip(
-                      label: 'closer.amaka@novacale.ng',
-                      roleKey: 'closer_alt',
-                      color: const Color(0xFF7C3AED),
-                      onTap: () => _quickFill('closer', 'closer.amaka@novacale.ng', 'Password123!'),
-                    ),
-                    _buildMiniChip(
-                      label: 'client@novaxpress.ng',
-                      roleKey: 'client_alt',
-                      color: const Color(0xFF0D9488),
-                      onTap: () => _quickFill('client', 'client@novaxpress.ng', 'Password123!'),
-                    ),
-                    _buildMiniChip(
-                      label: 'emeka.rider@novaxpress.ng',
-                      roleKey: 'rider_alt',
-                      color: const Color(0xFFEA580C),
-                      onTap: () => _quickFill('rider', 'emeka.rider@novaxpress.ng', 'Password123!'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+          // Custom Quick Account Selector Dropdown
+          QuickAccountDropdown(
+            selectedRoleKey: _selectedDemoRole,
+            onAccountSelected: (acc) {
+              _quickFill(acc.roleKey, acc.email, acc.password);
+            },
+            onInstantLogin: (acc) {
+              _instantLogin(acc.roleKey, acc.email, acc.password);
+            },
           ),
-
           const SizedBox(height: 18),
 
           if (authState.errorMessage != null) ...[
@@ -536,7 +297,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
           // Single Unified Sign In Button
           Builder(
             builder: (context) {
-              final selectedAcc = _primaryAccounts.where((a) => a.roleKey == _selectedDemoRole).firstOrNull;
+              final selectedAcc = QuickAccountDropdown.allAccounts.where((a) => a.roleKey == _selectedDemoRole).firstOrNull;
               final btnColor = selectedAcc?.themeColor ?? const Color(0xFF0F172A);
               final btnTitle = selectedAcc != null ? 'Sign In as ${selectedAcc.title}' : 'Sign In to Assigned Workspace';
 
@@ -583,41 +344,6 @@ class _LoginFormState extends ConsumerState<LoginForm> {
             },
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildMiniChip({
-    required String label,
-    required String roleKey,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    final isSelected = _selectedDemoRole == roleKey;
-    return Material(
-      color: isSelected ? color.withValues(alpha: 0.15) : Colors.white,
-      borderRadius: BorderRadius.circular(6),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(6),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(
-              color: isSelected ? color : const Color(0xFFCBD5E1),
-              width: isSelected ? 1.2 : 1,
-            ),
-          ),
-          child: Text(
-            label,
-            style: GoogleFonts.inter(
-              fontSize: 9.5,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-              color: isSelected ? color : const Color(0xFF475569),
-            ),
-          ),
-        ),
       ),
     );
   }

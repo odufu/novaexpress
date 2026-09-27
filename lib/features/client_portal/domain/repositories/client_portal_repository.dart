@@ -6,6 +6,7 @@ import '../entities/customer_lead.dart';
 import '../entities/client_supplier.dart';
 import '../entities/client_stock_invoice.dart';
 import '../entities/client_stock_balance.dart';
+import '../entities/stock_holder_custody.dart';
 
 abstract class ClientPortalRepository {
   /// Onboards a new Closer for an Enterprise Client
@@ -143,4 +144,12 @@ abstract class ClientPortalRepository {
     DateTime? endDate,
   });
   Future<void> importStockBalanceCsv(String clientId, String csvContent);
+  Future<List<StockHolderCustodyEntity>> getProductHoldersCustody(
+    String clientId, {
+    String? productId,
+    DateTime? startDate,
+    DateTime? endDate,
+    String? state,
+    String? lga,
+  });
 }

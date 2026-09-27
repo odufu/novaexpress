@@ -9,6 +9,7 @@ class OrderEntity {
   final String deliveryAddress;
   final String? landmark;
   final String? lga;
+  final String? productId;
   final String productName;
   final String status;
   final int quantity;
@@ -75,7 +76,8 @@ class OrderEntity {
     required this.deliveryAddress,
     this.landmark,
     this.lga,
-    this.productName = 'Respira Detox Tea',
+    this.productId,
+    this.productName = '',
     required this.status,
     required this.quantity,
     this.paidQuantity = 1,
@@ -426,6 +428,7 @@ Kindly tap the "📎" attach button below and share your *Current Location / Liv
     String? deliveryAddress,
     String? landmark,
     String? lga,
+    String? productId,
     String? productName,
     String? status,
     int? quantity,
@@ -493,6 +496,7 @@ Kindly tap the "📎" attach button below and share your *Current Location / Liv
       deliveryAddress: deliveryAddress ?? this.deliveryAddress,
       landmark: landmark ?? this.landmark,
       lga: lga ?? this.lga,
+      productId: productId ?? this.productId,
       productName: productName ?? this.productName,
       status: status ?? this.status,
       quantity: quantity ?? this.quantity,

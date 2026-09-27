@@ -123,6 +123,15 @@ class StockTransferRecord {
   final String? receiverRole;
   final String? receiverSignatureUrl;
   final DateTime? receivedAt;
+  final String? invoiceId;
+  final String? carrierDriverName;
+  final String? carrierPhone;
+  final String? carrierLicensePlate;
+  final String? waybillSlipUrl;
+  final String? destinationBin;
+  final int verifiedUnits;
+  final int damagedUnits;
+  final int missingUnits;
   final bool hasDiscrepancy;
   final String? discrepancyNotes;
   final String? notes;
@@ -142,10 +151,19 @@ class StockTransferRecord {
     this.destinationWarehouseName,
     this.sourceDcId,
     this.destinationDcId,
+    this.invoiceId,
     this.senderId,
     this.senderName,
     this.senderRole,
     this.senderSignatureUrl,
+    this.carrierDriverName,
+    this.carrierPhone,
+    this.carrierLicensePlate,
+    this.waybillSlipUrl,
+    this.destinationBin,
+    this.verifiedUnits = 0,
+    this.damagedUnits = 0,
+    this.missingUnits = 0,
     this.dispatchedAt,
     this.receiverId,
     this.receiverName,
@@ -166,9 +184,15 @@ class StockTransferRecord {
   bool get isRiderReturn => transferType == 'rider_return';
   bool get isInterDc => transferType == 'inter_dc';
 
-  bool get isDispatched => status == 'dispatched' || status == 'pending_dc_acceptance';
+  bool get isPendingReception =>
+      status == 'dispatched' || status == 'in_transit' || status == 'pending_dc_acceptance';
+  bool get isDispatched =>
+      status == 'dispatched' || status == 'in_transit' || status == 'pending_dc_acceptance';
   bool get isPendingRiderAcceptance => status == 'pending_rider_acceptance';
-  bool get isPendingDestinationAcceptance => status == 'pending_destination_acceptance' || status == 'in_transit';
+  bool get isPendingDestinationAcceptance =>
+      status == 'pending_destination_acceptance' ||
+      status == 'in_transit' ||
+      status == 'dispatched';
   bool get isInTransit => status == 'in_transit';
   bool get isCompleted => status == 'completed';
   bool get isRejected => status == 'rejected';
@@ -241,10 +265,19 @@ class StockTransferRecord {
           : json['destination_warehouse_name']?.toString(),
       sourceDcId: json['source_dc_id']?.toString(),
       destinationDcId: json['destination_dc_id']?.toString(),
+      invoiceId: json['invoice_id']?.toString(),
       senderId: json['sender_id']?.toString(),
       senderName: json['sender_name']?.toString(),
       senderRole: json['sender_role']?.toString(),
       senderSignatureUrl: json['sender_signature_url']?.toString(),
+      carrierDriverName: json['carrier_driver_name']?.toString(),
+      carrierPhone: json['carrier_phone']?.toString(),
+      carrierLicensePlate: json['carrier_license_plate']?.toString(),
+      waybillSlipUrl: json['waybill_slip_url']?.toString(),
+      destinationBin: json['destination_bin']?.toString(),
+      verifiedUnits: (json['verified_units'] as num?)?.toInt() ?? 0,
+      damagedUnits: (json['damaged_units'] as num?)?.toInt() ?? 0,
+      missingUnits: (json['missing_units'] as num?)?.toInt() ?? 0,
       dispatchedAt: parseNullableDate(json['dispatched_at']),
       receiverId: json['receiver_id']?.toString(),
       receiverName: json['receiver_name']?.toString(),
@@ -272,10 +305,19 @@ class StockTransferRecord {
         'destination_warehouse_name': destinationWarehouseName,
         'source_dc_id': sourceDcId,
         'destination_dc_id': destinationDcId,
+        'invoice_id': invoiceId,
         'sender_id': senderId,
         'sender_name': senderName,
         'sender_role': senderRole,
         'sender_signature_url': senderSignatureUrl,
+        'carrier_driver_name': carrierDriverName,
+        'carrier_phone': carrierPhone,
+        'carrier_license_plate': carrierLicensePlate,
+        'waybill_slip_url': waybillSlipUrl,
+        'destination_bin': destinationBin,
+        'verified_units': verifiedUnits,
+        'damaged_units': damagedUnits,
+        'missing_units': missingUnits,
         'dispatched_at': dispatchedAt?.toIso8601String(),
         'receiver_id': receiverId,
         'receiver_name': receiverName,
@@ -302,10 +344,19 @@ class StockTransferRecord {
     String? destinationWarehouseName,
     String? sourceDcId,
     String? destinationDcId,
+    String? invoiceId,
     String? senderId,
     String? senderName,
     String? senderRole,
     String? senderSignatureUrl,
+    String? carrierDriverName,
+    String? carrierPhone,
+    String? carrierLicensePlate,
+    String? waybillSlipUrl,
+    String? destinationBin,
+    int? verifiedUnits,
+    int? damagedUnits,
+    int? missingUnits,
     DateTime? dispatchedAt,
     String? receiverId,
     String? receiverName,
@@ -332,10 +383,19 @@ class StockTransferRecord {
           destinationWarehouseName ?? this.destinationWarehouseName,
       sourceDcId: sourceDcId ?? this.sourceDcId,
       destinationDcId: destinationDcId ?? this.destinationDcId,
+      invoiceId: invoiceId ?? this.invoiceId,
       senderId: senderId ?? this.senderId,
       senderName: senderName ?? this.senderName,
       senderRole: senderRole ?? this.senderRole,
       senderSignatureUrl: senderSignatureUrl ?? this.senderSignatureUrl,
+      carrierDriverName: carrierDriverName ?? this.carrierDriverName,
+      carrierPhone: carrierPhone ?? this.carrierPhone,
+      carrierLicensePlate: carrierLicensePlate ?? this.carrierLicensePlate,
+      waybillSlipUrl: waybillSlipUrl ?? this.waybillSlipUrl,
+      destinationBin: destinationBin ?? this.destinationBin,
+      verifiedUnits: verifiedUnits ?? this.verifiedUnits,
+      damagedUnits: damagedUnits ?? this.damagedUnits,
+      missingUnits: missingUnits ?? this.missingUnits,
       dispatchedAt: dispatchedAt ?? this.dispatchedAt,
       receiverId: receiverId ?? this.receiverId,
       receiverName: receiverName ?? this.receiverName,

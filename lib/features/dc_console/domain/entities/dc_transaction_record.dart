@@ -186,8 +186,8 @@ class DCTransactionRecord {
   }
 
   factory DCTransactionRecord.fromJson(Map<String, dynamic> json) {
-    String rName = json['rider_name']?.toString() ?? 'Joel Rider';
-    String rCode = json['rider_code']?.toString() ?? 'PDA-7000';
+    String rName = json['rider_name']?.toString() ?? 'Assigned Rider';
+    String rCode = json['rider_code']?.toString() ?? 'PDA-AGENT';
     String rId = json['delivery_agent_id']?.toString() ?? json['rider_id']?.toString() ?? '';
 
     if (json['delivery_agents'] is Map) {
@@ -243,7 +243,7 @@ class DCTransactionRecord {
       transactionCode: json['transaction_code']?.toString() ?? json['reference']?.toString() ?? 'TXN-0000',
       orderNumber: oNumber,
       orderId: json['order_id']?.toString(),
-      productName: pName ?? 'Respira Detox Formula',
+      productName: pName ?? 'General Item',
       customerName: cName,
       customerPhone: cPhone,
       deliveryLocation: dLocation,

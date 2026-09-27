@@ -481,6 +481,7 @@ class _DCPayoutsPageState extends ConsumerState<DCPayoutsPage> {
         rowHeight: 52,
         enablePagination: true,
         initialPageSize: 10,
+        dateExtractor: (c) => c.requestedAt,
         onRowTap: (claim) {
           if (claim.isPending) {
             _showDisbursementModal(context, isDark, claim);
@@ -495,6 +496,7 @@ class _DCPayoutsPageState extends ConsumerState<DCPayoutsPage> {
             defaultWidth: 170,
             minWidth: 140,
             sortValue: (c) => c.requestedAt,
+            dateValue: (c) => c.requestedAt,
             searchString: (c) => '${c.claimNumber} ${c.disbursementRef ?? ''}',
             cellBuilder: (context, c, row, isDark, brand) {
               final dateStr = DateFormat('MMM dd, yyyy • HH:mm').format(c.requestedAt);
@@ -1529,6 +1531,7 @@ class _DCPayoutsPageState extends ConsumerState<DCPayoutsPage> {
         rowHeight: 52,
         enablePagination: true,
         initialPageSize: 10,
+        dateExtractor: (s) => s.createdAt,
         onRowTap: (s) {
           final client = clients.where((c) => c.id == s.clientId).firstOrNull;
           ClientSettlementDetailModal.show(
@@ -1545,7 +1548,8 @@ class _DCPayoutsPageState extends ConsumerState<DCPayoutsPage> {
             label: 'SETTLEMENT REF',
             defaultWidth: 180,
             minWidth: 140,
-            sortValue: (s) => s.settlementNumber,
+            sortValue: (s) => s.createdAt,
+            dateValue: (s) => s.createdAt,
             searchString: (s) => '${s.settlementNumber} ${s.payoutReference ?? ''}',
             cellBuilder: (context, s, row, isDark, brand) {
               final dateStr = DateFormat('MMM dd, yyyy • HH:mm').format(s.createdAt);

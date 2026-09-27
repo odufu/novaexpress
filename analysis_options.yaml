@@ -1,6 +1,10 @@
 include: package:flutter_lints/flutter.yaml
 
 analyzer:
+  exclude:
+    - scratch/**
+    - scripts/**
+    - "*.dart"
   errors:
     deprecated_member_use: ignore
     avoid_print: ignore

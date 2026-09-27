@@ -1592,6 +1592,7 @@ class DCOrderPaymentMatchingPageState
           enablePagination: false,
           rowHeight: 68.0,
           brandPrimary: const Color(0xFFF37021),
+          dateExtractor: (item) => item.openingDate,
           onRowTap: (item) {
             showDialog(
               context: context,

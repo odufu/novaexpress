@@ -163,7 +163,7 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
                       width: cardWidth,
                       title: 'Primary Regional Hubs',
                       value: '$totalHubs Hubs',
-                      subtext: '${totalDcs - totalHubs} satellite depots',
+                      subtext: '${allDcs.where((d) => d.isGeneralDc).length} general distribution centers',
                       icon: Icons.star_rounded,
                       color: const Color(0xFFF37021),
                       isDark: isDark,
@@ -319,11 +319,13 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
                     scrollDirection: Axis.horizontal,
                     child: Row(
                       children: [
-                        _buildFilterChip('all', 'All Hubs (${allDcs.length})', dcState.dcFilter, isDark, (f) => notifier.setDcFilter(f)),
+                        _buildFilterChip('all', 'All DCs (${allDcs.length})', dcState.dcFilter, isDark, (f) => notifier.setDcFilter(f)),
                         const SizedBox(width: 8),
-                        _buildFilterChip('hubs', '⭐ Regional Hubs (${allDcs.where((d) => d.isHub).length})', dcState.dcFilter, isDark, (f) => notifier.setDcFilter(f)),
+                        _buildFilterChip('grand', '👑 Grand DC (${allDcs.where((d) => d.isGrand).length})', dcState.dcFilter, isDark, (f) => notifier.setDcFilter(f)),
                         const SizedBox(width: 8),
-                        _buildFilterChip('satellites', '🛰️ Satellite Depots (${allDcs.where((d) => !d.isHub).length})', dcState.dcFilter, isDark, (f) => notifier.setDcFilter(f)),
+                        _buildFilterChip('hubs', '⭐ Regional Hubs (${allDcs.where((d) => d.isHubDc).length})', dcState.dcFilter, isDark, (f) => notifier.setDcFilter(f)),
+                        const SizedBox(width: 8),
+                        _buildFilterChip('general', '🏬 General DCs (${allDcs.where((d) => d.isGeneralDc).length})', dcState.dcFilter, isDark, (f) => notifier.setDcFilter(f)),
                         const SizedBox(width: 8),
                         _buildFilterChip('active', '✅ Active Operations (${allDcs.where((d) => d.isActive).length})', dcState.dcFilter, isDark, (f) => notifier.setDcFilter(f)),
                         const SizedBox(width: 8),
@@ -621,14 +623,20 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: dc.isHub
-                          ? const Color(0xFFF37021).withValues(alpha: 0.12)
-                          : const Color(0xFF2563EB).withValues(alpha: 0.12),
+                      color: dc.isGrand
+                          ? const Color(0xFF7C3AED).withValues(alpha: 0.12)
+                          : (dc.isHubDc
+                              ? const Color(0xFFF37021).withValues(alpha: 0.12)
+                              : const Color(0xFF0D9488).withValues(alpha: 0.12)),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(
-                      dc.isHub ? Icons.warehouse_rounded : Icons.apartment_rounded,
-                      color: dc.isHub ? const Color(0xFFF37021) : const Color(0xFF2563EB),
+                      dc.isGrand
+                          ? Icons.domain_rounded
+                          : (dc.isHubDc ? Icons.warehouse_rounded : Icons.store_mall_directory_rounded),
+                      color: dc.isGrand
+                          ? const Color(0xFF7C3AED)
+                          : (dc.isHubDc ? const Color(0xFFF37021) : const Color(0xFF0D9488)),
                       size: 20,
                     ),
                   ),
@@ -688,8 +696,14 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
                             const SizedBox(width: 6),
                             Flexible(
                               child: Text(
-                                dc.isHub ? 'Regional Hub' : 'Satellite Depot',
-                                style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                                dc.dcTierLabel,
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: dc.isGrand
+                                      ? const Color(0xFF7C3AED)
+                                      : (dc.isHubDc ? const Color(0xFFF37021) : const Color(0xFF0D9488)),
+                                ),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
@@ -1004,14 +1018,20 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: dc.isHub
-                      ? const Color(0xFFF37021).withValues(alpha: 0.12)
-                      : const Color(0xFF2563EB).withValues(alpha: 0.12),
+                  color: dc.isGrand
+                      ? const Color(0xFF7C3AED).withValues(alpha: 0.12)
+                      : (dc.isHubDc
+                          ? const Color(0xFFF37021).withValues(alpha: 0.12)
+                          : const Color(0xFF0D9488).withValues(alpha: 0.12)),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
-                  dc.isHub ? Icons.warehouse_rounded : Icons.apartment_rounded,
-                  color: dc.isHub ? const Color(0xFFF37021) : const Color(0xFF2563EB),
+                  dc.isGrand
+                      ? Icons.domain_rounded
+                      : (dc.isHubDc ? Icons.warehouse_rounded : Icons.store_mall_directory_rounded),
+                  color: dc.isGrand
+                      ? const Color(0xFF7C3AED)
+                      : (dc.isHubDc ? const Color(0xFFF37021) : const Color(0xFF0D9488)),
                   size: 24,
                 ),
               ),
@@ -1065,6 +1085,28 @@ class _DCDistributionCentersPageState extends ConsumerState<DCDistributionCenter
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
                               color: const Color(0xFF2563EB),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: dc.isGrand
+                                ? const Color(0xFF7C3AED).withValues(alpha: 0.12)
+                                : (dc.isHubDc
+                                    ? const Color(0xFFF37021).withValues(alpha: 0.12)
+                                    : const Color(0xFF0D9488).withValues(alpha: 0.12)),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            dc.tierBadge,
+                            style: TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.bold,
+                              color: dc.isGrand
+                                  ? const Color(0xFF7C3AED)
+                                  : (dc.isHubDc ? const Color(0xFFF37021) : const Color(0xFF0D9488)),
                             ),
                           ),
                         ),

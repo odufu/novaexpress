@@ -104,18 +104,6 @@ class StockItemModel extends StockItemEntity {
         }
       } catch (_) {}
     }
-    if (imageAsset == null || imageAsset.isEmpty) {
-      final lower = name.toLowerCase();
-      if (lower.contains('respira')) {
-        imageAsset = 'assets/images/products/respira_detox_tea.jpg';
-      } else if (lower.contains('cleanse') || lower.contains('herbal cleanse')) {
-        imageAsset = 'assets/images/products/herbal_cleanse_pack.jpg';
-      } else if (lower.contains('immunity') || lower.contains('booster')) {
-        imageAsset = 'assets/images/products/immunity_booster_pack.jpg';
-      } else if (lower.contains('slimfit') || lower.contains('capsule') || lower.contains('alpha')) {
-        imageAsset = 'assets/images/products/slimfit_herbal_capsules.jpg';
-      }
-    }
 
     final costPrice = (json['cost_price'] as num?)?.toDouble() ?? 0.0;
     final barcode = json['barcode']?.toString();

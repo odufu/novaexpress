@@ -85,121 +85,7 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
   }) {
     final sku = productSku ?? 'SKU-${productName.hashCode.abs()}';
     final p1Price = baseUnitPrice > 0 ? baseUnitPrice : 0.0;
-    final lower = productName.toLowerCase();
 
-    if (lower.contains('respira')) {
-      return [
-        ProductPackage(
-          id: 'pkg-${sku.toLowerCase()}-1',
-          productId: productId,
-          productName: productName,
-          productSku: sku,
-          packageName: '1 Unit (Single) - 1 Box',
-          quantity: 1,
-          paidQuantity: 1,
-          freeQuantity: 0,
-          packagePrice: 21500.0,
-          clientName: clientName,
-          createdAt: DateTime.now(),
-        ),
-        ProductPackage(
-          id: 'pkg-${sku.toLowerCase()}-2',
-          productId: productId,
-          productName: productName,
-          productSku: sku,
-          packageName: '2 Boxes Promo Deal',
-          quantity: 2,
-          paidQuantity: 2,
-          freeQuantity: 0,
-          packagePrice: 35000.0,
-          clientName: clientName,
-          createdAt: DateTime.now(),
-        ),
-        ProductPackage(
-          id: 'pkg-${sku.toLowerCase()}-3',
-          productId: productId,
-          productName: productName,
-          productSku: sku,
-          packageName: '3 Boxes Cleanse Bundle',
-          quantity: 3,
-          paidQuantity: 3,
-          freeQuantity: 0,
-          packagePrice: 45000.0,
-          clientName: clientName,
-          createdAt: DateTime.now(),
-        ),
-        ProductPackage(
-          id: 'pkg-${sku.toLowerCase()}-5',
-          productId: productId,
-          productName: productName,
-          productSku: sku,
-          packageName: '4 Boxes + 1 Box Free Mega Deal (4 + 1 Free)',
-          quantity: 5,
-          paidQuantity: 4,
-          freeQuantity: 1,
-          packagePrice: 55000.0,
-          clientName: clientName,
-          createdAt: DateTime.now(),
-        ),
-      ];
-    }
-
-    if (lower.contains('grazer')) {
-      return [
-        ProductPackage(
-          id: 'pkg-${sku.toLowerCase()}-1',
-          productId: productId,
-          productName: productName,
-          productSku: sku,
-          packageName: '1 Unit (Single)',
-          quantity: 1,
-          paidQuantity: 1,
-          freeQuantity: 0,
-          packagePrice: 25000.0,
-          clientName: clientName,
-          createdAt: DateTime.now(),
-        ),
-        ProductPackage(
-          id: 'pkg-${sku.toLowerCase()}-2',
-          productId: productId,
-          productName: productName,
-          productSku: sku,
-          packageName: '2-Pack Deal',
-          quantity: 2,
-          paidQuantity: 2,
-          freeQuantity: 0,
-          packagePrice: 35000.0,
-          clientName: clientName,
-          createdAt: DateTime.now(),
-        ),
-        ProductPackage(
-          id: 'pkg-${sku.toLowerCase()}-3',
-          productId: productId,
-          productName: productName,
-          productSku: sku,
-          packageName: '3-Pack Family Deal',
-          quantity: 3,
-          paidQuantity: 3,
-          freeQuantity: 0,
-          packagePrice: 50000.0,
-          clientName: clientName,
-          createdAt: DateTime.now(),
-        ),
-        ProductPackage(
-          id: 'pkg-${sku.toLowerCase()}-5',
-          productId: productId,
-          productName: productName,
-          productSku: sku,
-          packageName: '5-Pack Mega Deal (4 + 1 Free)',
-          quantity: 5,
-          paidQuantity: 4,
-          freeQuantity: 1,
-          packagePrice: 55000.0,
-          clientName: clientName,
-          createdAt: DateTime.now(),
-        ),
-      ];
-    }
 
     return [
       ProductPackage(
@@ -378,17 +264,13 @@ class ProductCatalogNotifier extends StateNotifier<ProductCatalogState> {
 
         final skuUpper = sku.trim().toUpperCase();
         final nameLower = name.trim().toLowerCase();
-        int stockCount = (map['available_count'] ?? map['stock_quantity'] as num?)?.toInt() ?? 0;
-        if (stockCount == 0) {
+        int stockCount = 0;
+        if (map['stock_quantity'] != null) {
+          stockCount = (map['stock_quantity'] as num).toInt();
+        } else if (map['available_count'] != null) {
+          stockCount = (map['available_count'] as num).toInt();
+        } else {
           stockCount = stockAggregates[skuUpper] ?? stockAggregates[nameLower] ?? 0;
-          if (stockCount == 0) {
-            for (final entry in stockAggregates.entries) {
-              if (nameLower.contains(entry.key) || entry.key.contains(nameLower)) {
-                stockCount = entry.value;
-                break;
-              }
-            }
-          }
         }
 
         List<String> parsedCoveringStates = [];

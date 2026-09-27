@@ -169,15 +169,16 @@ void main() {
 
     // Verify Header
     expect(find.text('PANGEA SUITE COMPATIBLE'), findsOneWidget);
-    expect(find.text('Inventory & Landed Cost Supply Chain'), findsOneWidget);
+    expect(find.text('Inventory & Stock'), findsOneWidget);
 
     // Verify Action Buttons
     expect(find.text('+ Raise Stock Invoice'), findsOneWidget);
     expect(find.text('Import CSV'), findsOneWidget);
     expect(find.text('Export CSV'), findsOneWidget);
 
-    // Verify Tabs
+    // Verify Tabs (All 5 Sub-Tabs)
     expect(find.textContaining('Stock Ledger'), findsOneWidget);
+    expect(find.textContaining('Custody & Holders'), findsOneWidget);
     expect(find.textContaining('Intake Invoices'), findsOneWidget);
     expect(find.textContaining('Suppliers Directory'), findsOneWidget);
     expect(find.textContaining('Unit Economics & Landed Cost'), findsOneWidget);
@@ -185,6 +186,10 @@ void main() {
     // Verify Stock Ledger Table Data
     expect(find.text('Grazer Herbal Tea'), findsWidgets);
     expect(find.text('SKU-GRAZ-TEA'), findsWidgets);
+
+    // Switch to Custody & Holders tab
+    await tester.tap(find.textContaining('Custody & Holders'));
+    await tester.pumpAndSettle();
 
     // Switch to Intake Invoices tab
     await tester.tap(find.textContaining('Intake Invoices'));
@@ -198,7 +203,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('+ Register Supplier'), findsWidgets);
-    expect(find.text('Musa Danjuma'), findsOneWidget);
+    expect(find.textContaining('Musa Danjuma'), findsOneWidget);
 
     // Switch to Unit Economics tab
     await tester.tap(find.textContaining('Unit Economics & Landed Cost'));

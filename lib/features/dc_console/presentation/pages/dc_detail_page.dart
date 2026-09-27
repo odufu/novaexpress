@@ -1048,6 +1048,7 @@ class _DCDetailPageState extends ConsumerState<DCDetailPage> with SingleTickerPr
         initialPageSize: 20,
         rowHeight: 64.0,
         brandPrimary: const Color(0xFF2563EB),
+        dateExtractor: (o) => o.createdAt,
         onRowTap: (o) => showDialog(context: context, builder: (ctx) => DCOrderDetailModal(order: o)),
         columns: [
           ExcelColumnDef<OrderEntity>(
@@ -1058,6 +1059,7 @@ class _DCDetailPageState extends ConsumerState<DCDetailPage> with SingleTickerPr
             minWidth: 120,
             searchString: (o) => '${o.orderNumber} ${DateFormat('dd MMM, hh:mm a').format(o.createdAt)}',
             sortValue: (o) => o.createdAt,
+            dateValue: (o) => o.createdAt,
             cellBuilder: (context, o, row, isDark, brand) {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1504,6 +1506,7 @@ class _DCDetailPageState extends ConsumerState<DCDetailPage> with SingleTickerPr
         initialPageSize: 20,
         rowHeight: 64.0,
         brandPrimary: const Color(0xFF2563EB),
+        dateExtractor: (r) => r.openingDate,
         onRowTap: (r) {
           showModalBottomSheet(
             context: context,

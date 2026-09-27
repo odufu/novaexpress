@@ -222,20 +222,45 @@ class _ClientStockInvoiceDetailModalState extends ConsumerState<ClientStockInvoi
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                                color: (inv.hasDiscrepancy
+                                        ? const Color(0xFFEF4444)
+                                        : inv.isVerified
+                                            ? const Color(0xFF10B981)
+                                            : const Color(0xFF3B82F6))
+                                    .withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(Icons.check_circle_rounded, size: 12, color: Color(0xFF10B981)),
+                                  Icon(
+                                    inv.hasDiscrepancy
+                                        ? Icons.warning_amber_rounded
+                                        : inv.isVerified
+                                            ? Icons.verified_rounded
+                                            : Icons.local_shipping_rounded,
+                                    size: 12,
+                                    color: inv.hasDiscrepancy
+                                        ? const Color(0xFFEF4444)
+                                        : inv.isVerified
+                                            ? const Color(0xFF10B981)
+                                            : const Color(0xFF3B82F6),
+                                  ),
                                   const SizedBox(width: 4),
                                   Text(
-                                    inv.isProcessed ? 'Ledger Posted' : 'Draft Intake',
+                                    inv.hasDiscrepancy
+                                        ? 'Discrepancy Flagged'
+                                        : inv.isVerified
+                                            ? 'Verified & Credited'
+                                            : 'Awaiting DC Intake',
                                     style: GoogleFonts.inter(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w700,
-                                      color: const Color(0xFF10B981),
+                                      color: inv.hasDiscrepancy
+                                          ? const Color(0xFFEF4444)
+                                          : inv.isVerified
+                                              ? const Color(0xFF10B981)
+                                              : const Color(0xFF3B82F6),
                                     ),
                                   ),
                                 ],
@@ -292,6 +317,10 @@ class _ClientStockInvoiceDetailModalState extends ConsumerState<ClientStockInvoi
                   children: [
                     // Financial Breakdown Cards
                     _buildFinancialSummaryBar(inv, isDark, isCompact),
+                    const SizedBox(height: 24),
+
+                    // DC Physical Reception Handshake Certificate
+                    _buildDcReceptionHandshakeCard(inv, isDark, isCompact),
                     const SizedBox(height: 24),
 
                     // Payment Receipt Attachment Banner
@@ -526,6 +555,198 @@ class _ClientStockInvoiceDetailModalState extends ConsumerState<ClientStockInvoi
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildDcReceptionHandshakeCard(ClientStockInvoice inv, bool isDark, bool isCompact) {
+    final isDiscrepancy = inv.hasDiscrepancy;
+    final isVerified = inv.isVerified;
+
+    Color cardBorder;
+    Color iconBg;
+    Color iconColor;
+    IconData headerIcon;
+    String statusTitle;
+    String statusBadge;
+
+    if (isDiscrepancy) {
+      cardBorder = const Color(0xFFEF4444);
+      iconBg = const Color(0xFFEF4444).withValues(alpha: 0.15);
+      iconColor = const Color(0xFFEF4444);
+      headerIcon = Icons.warning_amber_rounded;
+      statusTitle = 'DC Physical Handshake & Verification: Discrepancy Flagged';
+      statusBadge = 'Discrepancy Logged';
+    } else if (isVerified) {
+      cardBorder = const Color(0xFF10B981);
+      iconBg = const Color(0xFF10B981).withValues(alpha: 0.15);
+      iconColor = const Color(0xFF10B981);
+      headerIcon = Icons.verified_user_rounded;
+      statusTitle = 'DC Physical Handshake & Verification: Completed';
+      statusBadge = 'Verified & Credited';
+    } else {
+      cardBorder = const Color(0xFF3B82F6);
+      iconBg = const Color(0xFF3B82F6).withValues(alpha: 0.15);
+      iconColor = const Color(0xFF3B82F6);
+      headerIcon = Icons.local_shipping_rounded;
+      statusTitle = 'In Transit — Awaiting Physical DC Dock Handshake';
+      statusBadge = 'Pending DC Intake';
+    }
+
+    final verifiedCount = inv.verifiedUnits > 0 ? inv.verifiedUnits : (isVerified && !isDiscrepancy ? inv.totalUnits : 0);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? cardBorder.withValues(alpha: 0.4) : cardBorder.withValues(alpha: 0.6),
+          width: 1.2,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: iconBg,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(headerIcon, color: iconColor, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      statusTitle,
+                      style: GoogleFonts.inter(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
+                    ),
+                    Text(
+                      'Hub: ${inv.destinationWarehouse} • Waybill: ${inv.waybillNumber ?? "Pending"}',
+                      style: GoogleFonts.inter(
+                        fontSize: 11.5,
+                        color: const Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: iconBg,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  statusBadge,
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: iconColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          const Divider(height: 1),
+          const SizedBox(height: 14),
+
+          // Quantitative Handshake Breakdown
+          Wrap(
+            spacing: 20,
+            runSpacing: 12,
+            children: [
+              _buildHandshakeMetric(
+                'Billed Total',
+                '${NumberFormat('#,###').format(inv.totalUnits)} units',
+                const Color(0xFF64748B),
+                isDark,
+              ),
+              _buildHandshakeMetric(
+                'Good Physical Units',
+                isVerified || verifiedCount > 0 ? '${NumberFormat('#,###').format(verifiedCount)} units' : 'Pending Count',
+                const Color(0xFF10B981),
+                isDark,
+              ),
+              _buildHandshakeMetric(
+                'Damaged Units',
+                '${NumberFormat('#,###').format(inv.damagedUnits)} units',
+                inv.damagedUnits > 0 ? const Color(0xFFEF4444) : const Color(0xFF94A3B8),
+                isDark,
+              ),
+              _buildHandshakeMetric(
+                'Missing / Shortage',
+                '${NumberFormat('#,###').format(inv.missingUnits)} units',
+                inv.missingUnits > 0 ? const Color(0xFFF59E0B) : const Color(0xFF94A3B8),
+                isDark,
+              ),
+            ],
+          ),
+
+          if (isVerified || isDiscrepancy) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0F172A) : Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.badge_outlined, size: 16, color: Color(0xFF0D9488)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Supervisor Sign-off: ${inv.verifiedBy ?? "DC Reception Lead"} • ${inv.verifiedAt != null ? _dateFormat.format(inv.verifiedAt!) : "Verified"}${inv.handshakeNotes != null && inv.handshakeNotes!.isNotEmpty ? " • Note: ${inv.handshakeNotes}" : ""}',
+                      style: GoogleFonts.inter(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF334155),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            const SizedBox(height: 10),
+            Text(
+              'Consignment is in transit. Upon arrival at ${inv.destinationWarehouse}, the station supervisor will physically inspect, count, and sign off the stock intake. The merchant stock balance will credit automatically.',
+              style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B), fontStyle: FontStyle.italic),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHandshakeMetric(String label, String value, Color valueColor, bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8), fontWeight: FontWeight.w500),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w800, color: valueColor),
+        ),
+      ],
     );
   }
 

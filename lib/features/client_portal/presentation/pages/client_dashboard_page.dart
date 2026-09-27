@@ -498,10 +498,12 @@ class ClientDashboardPage extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 600;
+
+              final headerTitle = Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
                     padding: const EdgeInsets.all(8),
@@ -512,39 +514,72 @@ class ClientDashboardPage extends ConsumerWidget {
                     child: const Icon(Icons.warehouse_rounded, color: Color(0xFF0D9488), size: 18),
                   ),
                   const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Physical Inventory Custody & Landed Valuation',
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Physical Inventory Custody & Landed Valuation',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                      Text(
-                        'Consolidated stock valuation and regional warehouse asset holding',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          color: const Color(0xFF64748B),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Consolidated stock valuation and regional warehouse asset holding',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            color: const Color(0xFF64748B),
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ],
-              ),
-              if (onNavigateToInventory != null)
-                TextButton.icon(
-                  onPressed: onNavigateToInventory,
-                  icon: const Icon(Icons.arrow_forward_rounded, size: 14),
-                  label: Text('Open Ledger', style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w700)),
-                  style: TextButton.styleFrom(
-                    foregroundColor: const Color(0xFF0D9488),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  ),
-                ),
-            ],
+              );
+
+              final actionBtn = onNavigateToInventory != null
+                  ? TextButton.icon(
+                      onPressed: onNavigateToInventory,
+                      icon: const Icon(Icons.arrow_forward_rounded, size: 14),
+                      label: Text('Open Ledger', style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w700)),
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFF0D9488),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      ),
+                    )
+                  : null;
+
+              if (isNarrow) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    headerTitle,
+                    if (actionBtn != null) ...[
+                      const SizedBox(height: 6),
+                      Align(alignment: Alignment.centerRight, child: actionBtn),
+                    ],
+                  ],
+                );
+              }
+
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(child: headerTitle),
+                  if (actionBtn != null) ...[
+                    const SizedBox(width: 12),
+                    actionBtn,
+                  ],
+                ],
+              );
+            },
           ),
           const SizedBox(height: 16),
           LayoutBuilder(
@@ -921,6 +956,8 @@ class ClientDashboardPage extends ConsumerWidget {
                         fontSize: 11,
                         color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF047857),
                       ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),

@@ -6,6 +6,7 @@ import '../../domain/entities/customer_lead.dart';
 import '../../domain/entities/client_supplier.dart';
 import '../../domain/entities/client_stock_invoice.dart';
 import '../../domain/entities/client_stock_balance.dart';
+import '../../domain/entities/stock_holder_custody.dart';
 import '../../domain/repositories/client_portal_repository.dart';
 import '../datasources/client_portal_remote_datasource.dart';
 
@@ -335,5 +336,28 @@ class ClientPortalRepositoryImpl implements ClientPortalRepository {
   @override
   Future<void> importStockBalanceCsv(String clientId, String csvContent) async {
     await _remoteDataSource.importStockBalanceCsv(clientId, csvContent);
+  }
+
+  @override
+  Future<List<StockHolderCustodyEntity>> getProductHoldersCustody(
+    String clientId, {
+    String? productId,
+    DateTime? startDate,
+    DateTime? endDate,
+    String? state,
+    String? lga,
+  }) async {
+    try {
+      return await _remoteDataSource.fetchProductHoldersCustody(
+        clientId,
+        productId: productId,
+        startDate: startDate,
+        endDate: endDate,
+        state: state,
+        lga: lga,
+      );
+    } catch (_) {
+      return [];
+    }
   }
 }

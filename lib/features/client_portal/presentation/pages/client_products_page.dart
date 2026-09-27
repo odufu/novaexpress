@@ -18,6 +18,7 @@ import '../widgets/client_create_order_modal.dart';
 import '../widgets/client_product_detail_modal.dart';
 import '../widgets/client_supply_stock_modal.dart';
 import '../widgets/client_raise_stock_invoice_modal.dart';
+import 'client_portal_layout.dart';
 
 class ClientProductsPage extends ConsumerStatefulWidget {
   const ClientProductsPage({super.key});
@@ -94,6 +95,9 @@ class _ClientProductsPageState extends ConsumerState<ClientProductsPage> {
     final Set<String> seenSkus = {};
     final List<CatalogProduct> rawProducts = [];
     for (final p in [...state.products, ...catalogMerchantProducts]) {
+      // Exclude automated integration test artifacts from merchant view
+      if (p.sku.trim().toUpperCase().startsWith('SKU-TEST-')) continue;
+
       final skuKey = p.sku.trim().toUpperCase();
       final idKey = p.id.trim();
       final dedupKey = skuKey.isNotEmpty ? skuKey : idKey;
@@ -107,9 +111,9 @@ class _ClientProductsPageState extends ConsumerState<ClientProductsPage> {
           for (final b in state.stockBalances) {
             final bCode = b.itemCode.trim().toUpperCase();
             final bName = b.itemName.trim().toLowerCase();
-            if ((pSku.isNotEmpty && bCode == pSku) ||
-                (pName.isNotEmpty && bName == pName) ||
-                (pName.isNotEmpty && (bName.contains(pName) || pName.contains(bName)))) {
+            if ((p.id.isNotEmpty && b.productId == p.id) ||
+                (pSku.isNotEmpty && bCode == pSku) ||
+                (pName.isNotEmpty && bName == pName)) {
               liveSum += b.balanceQty.toInt();
             }
           }
@@ -441,9 +445,9 @@ class _ClientProductsPageState extends ConsumerState<ClientProductsPage> {
             color: const Color(0xFF10B981),
           ),
           _KpiItem(
-            title: 'Hub Shelf Stock',
+            title: 'Total Sellable Stock',
             value: '$grandHubStock units',
-            subtitle: 'Across regional hubs',
+            subtitle: 'Combined across regional hubs',
             icon: Icons.warehouse_rounded,
             color: const Color(0xFF8B5CF6),
           ),
@@ -1004,13 +1008,13 @@ class _ClientProductsPageState extends ConsumerState<ClientProductsPage> {
         },
       ),
 
-      // Column 6: Hub Stock
+      // Column 6: Total Sellable Stock
       ExcelColumnDef<CatalogProduct>(
         key: 'hubStock',
         group: 'Inventory Fulfillment',
-        label: 'HUB STOCK',
-        defaultWidth: 120,
-        minWidth: 90,
+        label: 'SELLABLE STOCK',
+        defaultWidth: 130,
+        minWidth: 95,
         align: TextAlign.right,
         sortValue: (p) => p.totalStockAcrossHubs,
         cellBuilder: (context, p, row, isDark, brand) {
@@ -1098,8 +1102,8 @@ class _ClientProductsPageState extends ConsumerState<ClientProductsPage> {
         key: 'actions',
         group: 'Manage',
         label: 'ACTIONS',
-        defaultWidth: 130,
-        minWidth: 100,
+        defaultWidth: 155,
+        minWidth: 120,
         align: TextAlign.center,
         cellBuilder: (context, p, row, isDark, brand) {
           final hasInv = portalState.clientProfile.hasInventoryManagement;
@@ -1124,6 +1128,23 @@ class _ClientProductsPageState extends ConsumerState<ClientProductsPage> {
                   }
                 },
               ),
+              if (hasInv) ...[
+                const SizedBox(width: 4),
+                IconButton(
+                  tooltip: 'View in Physical Stock Ledger',
+                  icon: const Icon(Icons.warehouse_rounded, size: 15),
+                  style: IconButton.styleFrom(
+                    backgroundColor: const Color(0xFF8B5CF6).withValues(alpha: 0.12),
+                    foregroundColor: const Color(0xFF8B5CF6),
+                    padding: const EdgeInsets.all(6),
+                    minimumSize: Size.zero,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                  ),
+                  onPressed: () {
+                    ref.read(clientActiveTabProvider.notifier).state = 'inventory';
+                  },
+                ),
+              ],
               const SizedBox(width: 4),
               IconButton(
                 tooltip: 'Create Order',

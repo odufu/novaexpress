@@ -1155,7 +1155,7 @@ class _DCProductDetailModalState extends ConsumerState<DCProductDetailModal> {
                       controller: nameCtrl,
                       decoration: const InputDecoration(
                         labelText: 'Package Name *',
-                        hintText: 'e.g. 5 Grazer Tea Pack (5 for ₦55,000)',
+                        hintText: 'e.g. 3-Pack Bundle (3 for ₦35,000)',
                       ),
                     ),
                     const SizedBox(height: 12),

@@ -24,14 +24,17 @@ class ClientSupplierExpanded {
     required ClientSupplier supplier,
     required List<CatalogProduct> allProducts,
   }) {
-    // Match products either by preferredSupplierId or by name/sku in supplier.suppliedProducts
+    // Match products either by preferredSupplierId or by name/sku/id in supplier.suppliedProducts
     final linked = allProducts.where((p) {
       if (p.preferredSupplierId != null && p.preferredSupplierId == supplier.id) {
         return true;
       }
-      return supplier.suppliedProducts.any((sp) =>
-          sp.trim().toLowerCase() == p.name.trim().toLowerCase() ||
-          sp.trim().toLowerCase() == p.sku.trim().toLowerCase());
+      return supplier.suppliedProducts.any((sp) {
+        final target = sp.trim().toLowerCase();
+        return target == p.name.trim().toLowerCase() ||
+            target == p.sku.trim().toLowerCase() ||
+            target == p.id.trim().toLowerCase();
+      });
     }).toList();
 
     int totalUnits = 0;

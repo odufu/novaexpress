@@ -17,6 +17,7 @@ import '../widgets/dc_csv_order_import_modal.dart';
 import '../widgets/dc_assign_order_modal.dart';
 import '../../../pipeline_chat/presentation/widgets/order_pipeline_chat_sheet.dart';
 import '../../../client_portal/presentation/widgets/pangea_excel_data_table.dart';
+import '../../../client_portal/presentation/widgets/pangea_date_range_picker_modal.dart';
 
 final dcOrdersDateFilterProvider = StateProvider.autoDispose<String>((ref) => 'all_time');
 final dcOrdersCustomDateRangeProvider = StateProvider.autoDispose<DateTimeRange?>((ref) => null);
@@ -342,45 +343,15 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       onSelected: (choice) async {
         if (choice == 'custom') {
-          final picked = await showDateRangePicker(
-            context: context,
-            firstDate: DateTime(2025, 1, 1),
-            lastDate: DateTime(2030, 12, 31),
-            initialDateRange: customRange ??
-                DateTimeRange(
-                  start: DateTime.now().subtract(const Duration(days: 7)),
-                  end: DateTime.now(),
-                ),
-            helpText: 'SELECT ORDER DATE RANGE',
-            cancelText: 'CANCEL',
-            confirmText: 'APPLY FILTER',
-            saveText: 'APPLY',
-            builder: (context, child) {
-              return Theme(
-                data: Theme.of(context).copyWith(
-                  colorScheme: isDark
-                      ? const ColorScheme.dark(
-                          primary: Color(0xFFF37021),
-                          onPrimary: Colors.white,
-                          surface: Color(0xFF1E293B),
-                          onSurface: Colors.white,
-                          secondary: Color(0xFF2563EB),
-                        )
-                      : const ColorScheme.light(
-                          primary: Color(0xFFF37021),
-                          onPrimary: Colors.white,
-                          surface: Colors.white,
-                          onSurface: Color(0xFF0F172A),
-                          secondary: Color(0xFF2563EB),
-                        ),
-                  dialogBackgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-                ),
-                child: child!,
-              );
-            },
+          final now = DateTime.now();
+          final result = await PangeaDateRangePickerModal.show(
+            context,
+            initialStartDate: customRange?.start ?? now.subtract(const Duration(days: 6)),
+            initialEndDate: customRange?.end ?? now,
+            initialPreset: DateRangePreset.last7Days,
           );
-          if (picked != null) {
-            ref.read(dcOrdersCustomDateRangeProvider.notifier).state = picked;
+          if (result != null) {
+            ref.read(dcOrdersCustomDateRangeProvider.notifier).state = DateTimeRange(start: result.startDate, end: result.endDate);
             ref.read(dcOrdersSingleDateProvider.notifier).state = null;
             ref.read(dcOrdersDateFilterProvider.notifier).state = 'custom';
           }
@@ -1511,6 +1482,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
               enablePagination: false,
               rowHeight: 74.0,
               brandPrimary: const Color(0xFF2563EB),
+              dateExtractor: (order) => order.createdAt,
               onRowTap: (order) => _openOrderDetail(order),
               columns: [
                 // 1. Order # & Date
@@ -1522,6 +1494,7 @@ class _DCOrdersPageState extends ConsumerState<DCOrdersPage> {
                   minWidth: 120,
                   searchString: (o) => '${o.orderNumber} ${DateTimeFormatter.formatRelativeTime(o.createdAt)}',
                   sortValue: (o) => o.createdAt,
+                  dateValue: (o) => o.createdAt,
                   cellBuilder: (context, order, row, isDark, brand) {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,

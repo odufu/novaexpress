@@ -23,5 +23,7 @@ CREATE INDEX IF NOT EXISTS idx_products_preferred_supplier ON public.products(pr
 UPDATE public.products p
 SET preferred_supplier_id = s.id
 FROM public.client_suppliers s
-WHERE (s.supplier_name ILIKE '%Apex%' OR s.supplied_products @> ARRAY[p.name] OR s.supplied_products @> ARRAY[p.sku])
+WHERE (s.supplier_name ILIKE '%Apex%' 
+    OR (s.supplied_products IS NOT NULL AND s.supplied_products::text ILIKE '%' || p.name || '%')
+    OR (s.supplied_products IS NOT NULL AND s.supplied_products::text ILIKE '%' || p.sku || '%'))
   AND p.preferred_supplier_id IS NULL;

@@ -253,6 +253,37 @@ class StockRepositoryImpl implements StockRepository {
   }
 
   @override
+  Future<Map<String, dynamic>> receiveSupplyConsignmentHandshake({
+    required String transferId,
+    required String receiverId,
+    required String receiverName,
+    String receiverRole = 'dc_supervisor',
+    String receiverSignatureUrl = '',
+    String carrierDriverName = '',
+    String carrierPhone = '',
+    String carrierLicensePlate = '',
+    String waybillSlipUrl = '',
+    String destinationBin = '',
+    required List<Map<String, dynamic>> verifiedItems,
+    String? notes,
+  }) async {
+    return await remoteDataSource.receiveSupplyConsignmentHandshake(
+      transferId: transferId,
+      receiverId: receiverId,
+      receiverName: receiverName,
+      receiverRole: receiverRole,
+      receiverSignatureUrl: receiverSignatureUrl,
+      carrierDriverName: carrierDriverName,
+      carrierPhone: carrierPhone,
+      carrierLicensePlate: carrierLicensePlate,
+      waybillSlipUrl: waybillSlipUrl,
+      destinationBin: destinationBin,
+      verifiedItems: verifiedItems,
+      notes: notes,
+    );
+  }
+
+  @override
   Future<Map<String, dynamic>> receiveClientSupply({
     required String transferId,
     required String receiverId,

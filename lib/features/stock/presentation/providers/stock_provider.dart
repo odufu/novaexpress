@@ -65,10 +65,10 @@ class StockState {
   });
 
   List<StockTransferRecord> get pendingClientSupplies =>
-      stockTransfers.where((t) => t.isClientSupply && t.isDispatched).toList();
+      stockTransfers.where((t) => t.isClientSupply && (t.isPendingReception || t.isDispatched)).toList();
 
   List<StockTransferRecord> get pendingInterDcTransfers =>
-      stockTransfers.where((t) => t.isInterDc && t.isPendingDestinationAcceptance).toList();
+      stockTransfers.where((t) => t.isInterDc && (t.isPendingDestinationAcceptance || t.isPendingReception)).toList();
 
   List<StockTransferRecord> get pendingRiderHandovers =>
       stockTransfers.where((t) => t.isDcToRider && t.isPendingRiderAcceptance).toList();
@@ -253,7 +253,8 @@ class StockNotifier extends StateNotifier<StockState> {
           schema: 'public',
           table: 'stock_transfers',
           callback: (payload) {
-            debugPrint('[STOCK_PROVIDER] ⚡ Realtime event on stock_transfers (${payload.eventType}). Refreshing custody...');
+            debugPrint('[STOCK_PROVIDER] ⚡ Realtime event on stock_transfers (${payload.eventType}). Refreshing transfers & custody...');
+            fetchStockTransfers();
             fetchStockItems();
           },
         )
@@ -1572,6 +1573,47 @@ class StockNotifier extends StateNotifier<StockState> {
     }
   }
 
+  /// Universal Handshake Reception for Inbound Consignments (Client Supply or Inter-DC)
+  Future<Map<String, dynamic>> receiveSupplyConsignmentHandshake({
+    required String transferId,
+    required String receiverId,
+    required String receiverName,
+    String receiverRole = 'dc_supervisor',
+    String receiverSignatureUrl = '',
+    String carrierDriverName = '',
+    String carrierPhone = '',
+    String carrierLicensePlate = '',
+    String waybillSlipUrl = '',
+    String destinationBin = '',
+    required List<Map<String, dynamic>> verifiedItems,
+    String? notes,
+    String? dcId,
+  }) async {
+    try {
+      final res = await repository.receiveSupplyConsignmentHandshake(
+        transferId: transferId,
+        receiverId: receiverId,
+        receiverName: receiverName,
+        receiverRole: receiverRole,
+        receiverSignatureUrl: receiverSignatureUrl,
+        carrierDriverName: carrierDriverName,
+        carrierPhone: carrierPhone,
+        carrierLicensePlate: carrierLicensePlate,
+        waybillSlipUrl: waybillSlipUrl,
+        destinationBin: destinationBin,
+        verifiedItems: verifiedItems,
+        notes: notes,
+      );
+      // Refresh inventory and transfers
+      await fetchStockItems(null, dcId);
+      await fetchStockTransfers(dcId: dcId);
+      return res;
+    } catch (e) {
+      debugPrint('[STOCK_PROVIDER] ⚠️ receiveSupplyConsignmentHandshake error: $e');
+      rethrow;
+    }
+  }
+
   /// Party B (DC Supervisor): Inspects physical items, verifies counts, and accepts inbound stock into DC
   Future<Map<String, dynamic>> receiveClientSupply({
     required String transferId,
@@ -1582,23 +1624,15 @@ class StockNotifier extends StateNotifier<StockState> {
     String? notes,
     String? dcId,
   }) async {
-    try {
-      final res = await repository.receiveClientSupply(
-        transferId: transferId,
-        receiverId: receiverId,
-        receiverName: receiverName,
-        receiverSignatureUrl: receiverSignatureUrl,
-        verifiedItems: verifiedItems,
-        notes: notes,
-      );
-      // Refresh inventory and transfers
-      await fetchStockItems(null, dcId);
-      await fetchStockTransfers(dcId: dcId);
-      return res;
-    } catch (e) {
-      debugPrint('[STOCK_PROVIDER] ⚠️ receiveClientSupply error: $e');
-      rethrow;
-    }
+    return receiveSupplyConsignmentHandshake(
+      transferId: transferId,
+      receiverId: receiverId,
+      receiverName: receiverName,
+      receiverSignatureUrl: receiverSignatureUrl,
+      verifiedItems: verifiedItems,
+      notes: notes,
+      dcId: dcId,
+    );
   }
 
   /// Party A (DC Supervisor): Issues stock to rider (reserves shelf stock)

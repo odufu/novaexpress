@@ -187,6 +187,7 @@ class DCReturnsPage extends ConsumerWidget {
         enablePagination: true,
         initialPageSize: 20,
         rowHeight: 46,
+        dateExtractor: (item) => item.returnedAt,
         columns: [
           ExcelColumnDef<DCReturnItem>(
             key: 'ticket',

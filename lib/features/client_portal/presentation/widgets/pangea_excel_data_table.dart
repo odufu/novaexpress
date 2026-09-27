@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'pangea_date_range_picker_modal.dart';
 
 /// Header style themes for Pangea Excel Data Table
 enum TableHeaderStyle {
@@ -156,6 +158,7 @@ class ExcelColumnDef<T> {
   final Widget Function(BuildContext context, T item, int index, bool isDark, Color brandPrimary) cellBuilder;
   final String Function(T item)? searchString;
   final Comparable Function(T item)? sortValue;
+  final DateTime? Function(T item)? dateValue;
 
   const ExcelColumnDef({
     required this.key,
@@ -167,6 +170,7 @@ class ExcelColumnDef<T> {
     required this.cellBuilder,
     this.searchString,
     this.sortValue,
+    this.dateValue,
   });
 }
 
@@ -174,6 +178,7 @@ class ExcelColumnDef<T> {
 /// - Adjustable/resizable columns via mouse drag
 /// - Double-click splitter to reset column width
 /// - Inline per-column search filters
+/// - Dual-month interactive Date Card Filter (Presets, Calendar Range, Compare, Lagos Time)
 /// - Multi-tier category group headers
 /// - Crisp spreadsheet cell borders and alternating row styling
 /// - Built-in pagination and per-page selector
@@ -193,6 +198,28 @@ class PangeaExcelDataTable<T> extends StatefulWidget {
   final bool showSettingsButton;
   final bool showTopToolbar;
 
+  /// Optional date extractor to enable built-in date filtering on in-memory items.
+  /// If null, but one of [columns] has [ExcelColumnDef.dateValue], that will be used automatically.
+  final DateTime? Function(T item)? dateExtractor;
+
+  /// Optional initial date range to filter by.
+  final DateTimeRange? initialDateRange;
+
+  /// Optional initial preset (e.g. [DateRangePreset.last7Days], [DateRangePreset.thisMonth]).
+  final DateRangePreset? initialDatePreset;
+
+  /// Optional callback invoked when the user selects and updates a date range via the Date Card Filter.
+  /// Ideal for triggering server-side / Supabase queries, RPCs, or Edge Functions.
+  final void Function(DateTimeRange? range, DateRangePreset preset, bool compare)? onDateRangeChanged;
+
+  /// Explicit flag to show or hide the date filter button in the top toolbar.
+  /// If null, automatically shown if [dateExtractor] is provided, or any column has a dateValue,
+  /// or [onDateRangeChanged] is provided.
+  final bool? showDateFilter;
+
+  /// Custom label for the date filter button when no range is selected (defaults to 'Date Range')
+  final String dateFilterLabel;
+
   const PangeaExcelDataTable({
     super.key,
     required this.items,
@@ -208,6 +235,12 @@ class PangeaExcelDataTable<T> extends StatefulWidget {
     this.initialPageSize,
     this.showSettingsButton = true,
     this.showTopToolbar = true,
+    this.dateExtractor,
+    this.initialDateRange,
+    this.initialDatePreset,
+    this.onDateRangeChanged,
+    this.showDateFilter,
+    this.dateFilterLabel = 'Date Range',
   });
 
   @override
@@ -227,12 +260,80 @@ class _PangeaExcelDataTableState<T> extends State<PangeaExcelDataTable<T>> {
   int _currentPage = 0;
   late int _pageSize;
 
+  // Active Date Card Filter State
+  DateTime? _activeStartDate;
+  DateTime? _activeEndDate;
+  DateRangePreset _activeDatePreset = DateRangePreset.custom;
+  bool _activeCompare = false;
+
   @override
   void initState() {
     super.initState();
     _colWidths = {for (var c in widget.columns) c.key: c.defaultWidth};
     _pageSize = widget.initialPageSize ?? PangeaTablePreferencesController.instance.defaultPageSize;
     PangeaTablePreferencesController.instance.addListener(_onPreferencesChanged);
+
+    if (widget.initialDateRange != null) {
+      _activeStartDate = widget.initialDateRange!.start;
+      _activeEndDate = widget.initialDateRange!.end;
+      _activeDatePreset = widget.initialDatePreset ?? DateRangePreset.custom;
+    } else if (widget.initialDatePreset != null && widget.initialDatePreset != DateRangePreset.custom) {
+      _activeDatePreset = widget.initialDatePreset!;
+      final lagosNow = DateTime.now().toUtc().add(const Duration(hours: 1));
+      final today = DateTime(lagosNow.year, lagosNow.month, lagosNow.day);
+      switch (widget.initialDatePreset!) {
+        case DateRangePreset.today:
+          _activeStartDate = today;
+          _activeEndDate = today;
+          break;
+        case DateRangePreset.yesterday:
+          _activeStartDate = today.subtract(const Duration(days: 1));
+          _activeEndDate = _activeStartDate;
+          break;
+        case DateRangePreset.todayAndYesterday:
+          _activeStartDate = today.subtract(const Duration(days: 1));
+          _activeEndDate = today;
+          break;
+        case DateRangePreset.last7Days:
+          _activeStartDate = today.subtract(const Duration(days: 6));
+          _activeEndDate = today;
+          break;
+        case DateRangePreset.last14Days:
+          _activeStartDate = today.subtract(const Duration(days: 13));
+          _activeEndDate = today;
+          break;
+        case DateRangePreset.last28Days:
+          _activeStartDate = today.subtract(const Duration(days: 27));
+          _activeEndDate = today;
+          break;
+        case DateRangePreset.last30Days:
+          _activeStartDate = today.subtract(const Duration(days: 29));
+          _activeEndDate = today;
+          break;
+        case DateRangePreset.thisWeek:
+          _activeStartDate = today.subtract(Duration(days: today.weekday % 7));
+          _activeEndDate = today;
+          break;
+        case DateRangePreset.lastWeek:
+          final thisWeekStart = today.subtract(Duration(days: today.weekday % 7));
+          _activeStartDate = thisWeekStart.subtract(const Duration(days: 7));
+          _activeEndDate = thisWeekStart.subtract(const Duration(days: 1));
+          break;
+        case DateRangePreset.thisMonth:
+          _activeStartDate = DateTime(today.year, today.month, 1);
+          _activeEndDate = today;
+          break;
+        case DateRangePreset.lastMonth:
+          final prevMonth = today.month == 1 ? 12 : today.month - 1;
+          final prevYear = today.month == 1 ? today.year - 1 : today.year;
+          _activeStartDate = DateTime(prevYear, prevMonth, 1);
+          final lastDay = DateTime(today.year, today.month, 0).day;
+          _activeEndDate = DateTime(prevYear, prevMonth, lastDay);
+          break;
+        default:
+          break;
+      }
+    }
   }
 
   void _onPreferencesChanged() {
@@ -288,6 +389,62 @@ class _PangeaExcelDataTableState<T> extends State<PangeaExcelDataTable<T>> {
 
   bool get _hasGroupHeaders => widget.columns.any((c) => c.group != null && c.group!.isNotEmpty);
 
+  DateTime? Function(T item)? get _effectiveDateExtractor {
+    if (widget.dateExtractor != null) return widget.dateExtractor;
+    for (final col in widget.columns) {
+      if (col.dateValue != null) return col.dateValue;
+    }
+    return null;
+  }
+
+  bool get _shouldShowDateFilter {
+    if (widget.showDateFilter != null) return widget.showDateFilter!;
+    return _effectiveDateExtractor != null || widget.onDateRangeChanged != null;
+  }
+
+  bool get hasActiveDateFilter => _activeStartDate != null && _activeEndDate != null;
+
+  void _clearDateFilter() {
+    setState(() {
+      _activeStartDate = null;
+      _activeEndDate = null;
+      _activeDatePreset = DateRangePreset.custom;
+      _activeCompare = false;
+      _currentPage = 0;
+    });
+    widget.onDateRangeChanged?.call(null, DateRangePreset.custom, false);
+  }
+
+  Future<void> _openDateCardFilterModal(BuildContext context) async {
+    final lagosNow = DateTime.now().toUtc().add(const Duration(hours: 1));
+    final defaultEnd = DateTime(lagosNow.year, lagosNow.month, lagosNow.day);
+    final defaultStart = defaultEnd.subtract(const Duration(days: 6));
+
+    final result = await PangeaDateRangePickerModal.show(
+      context,
+      initialStartDate: _activeStartDate ?? defaultStart,
+      initialEndDate: _activeEndDate ?? defaultEnd,
+      initialPreset: _activeDatePreset,
+      initialCompare: _activeCompare,
+    );
+
+    if (result != null) {
+      setState(() {
+        _activeStartDate = result.startDate;
+        _activeEndDate = result.endDate;
+        _activeDatePreset = result.preset;
+        _activeCompare = result.compareWithPreviousPeriod;
+        _currentPage = 0;
+      });
+
+      widget.onDateRangeChanged?.call(
+        DateTimeRange(start: result.startDate, end: result.endDate),
+        result.preset,
+        result.compareWithPreviousPeriod,
+      );
+    }
+  }
+
   List<T> get _filteredAndSortedItems {
     var list = widget.items.where((item) {
       for (final entry in _searchFilters.entries) {
@@ -302,6 +459,18 @@ class _PangeaExcelDataTableState<T> extends State<PangeaExcelDataTable<T>> {
       }
       return true;
     }).toList();
+
+    // Active Date Card Range Filter
+    final dateExtractor = _effectiveDateExtractor;
+    if (_activeStartDate != null && _activeEndDate != null && dateExtractor != null) {
+      final start = DateTime(_activeStartDate!.year, _activeStartDate!.month, _activeStartDate!.day, 0, 0, 0);
+      final end = DateTime(_activeEndDate!.year, _activeEndDate!.month, _activeEndDate!.day, 23, 59, 59, 999);
+      list = list.where((item) {
+        final itemDate = dateExtractor(item);
+        if (itemDate == null) return true;
+        return !itemDate.isBefore(start) && !itemDate.isAfter(end);
+      }).toList();
+    }
 
     if (_sortColumnKey != null) {
       final col = widget.columns.firstWhere((c) => c.key == _sortColumnKey);
@@ -896,6 +1065,14 @@ class _PangeaExcelDataTableState<T> extends State<PangeaExcelDataTable<T>> {
               ),
             ),
 
+            // Dual Month Date Card Filter Button (if enabled)
+            if (_shouldShowDateFilter) ...[
+              const SizedBox(width: 12),
+              Container(height: 16, width: 1, color: borderColor),
+              const SizedBox(width: 12),
+              _buildDateFilterButton(isDark, borderColor),
+            ],
+
             // Pagination Controls (if enabled)
             if (isPaginated && filteredCount > 0) ...[
               const SizedBox(width: 12),
@@ -1044,6 +1221,106 @@ class _PangeaExcelDataTableState<T> extends State<PangeaExcelDataTable<T>> {
               widget.trailingFooterAction!,
             ],
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDateFilterButton(bool isDark, Color borderColor) {
+    final hasActive = hasActiveDateFilter;
+    final primary = widget.brandPrimary;
+
+    String dateText;
+    if (hasActive) {
+      final startFmt = DateFormat('d MMM yyyy').format(_activeStartDate!);
+      final endFmt = DateFormat('d MMM yyyy').format(_activeEndDate!);
+      if (_activeStartDate!.year == _activeEndDate!.year &&
+          _activeStartDate!.month == _activeEndDate!.month &&
+          _activeStartDate!.day == _activeEndDate!.day) {
+        dateText = startFmt;
+      } else {
+        dateText = '$startFmt – $endFmt';
+      }
+    } else {
+      dateText = widget.dateFilterLabel;
+    }
+
+    return Tooltip(
+      message: hasActive ? 'Active Date Filter: $dateText\nClick to change' : 'Filter rows by Date Range',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          key: const ValueKey('pangea_table_date_filter_btn'),
+          onTap: () => _openDateCardFilterModal(context),
+          borderRadius: BorderRadius.circular(6),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+            decoration: BoxDecoration(
+              color: hasActive
+                  ? primary.withValues(alpha: isDark ? 0.22 : 0.1)
+                  : (isDark ? const Color(0xFF1E293B) : Colors.white),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: hasActive
+                    ? primary.withValues(alpha: 0.6)
+                    : (isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
+                width: hasActive ? 1.3 : 1.0,
+              ),
+              boxShadow: hasActive
+                  ? [
+                      BoxShadow(
+                        color: primary.withValues(alpha: 0.15),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.calendar_month_rounded,
+                  size: 14,
+                  color: hasActive ? primary : const Color(0xFF64748B),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  dateText,
+                  style: GoogleFonts.inter(
+                    fontSize: 11.5,
+                    fontWeight: hasActive ? FontWeight.w700 : FontWeight.w500,
+                    color: hasActive
+                        ? (isDark ? Colors.white : primary)
+                        : (isDark ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B)),
+                  ),
+                ),
+                if (hasActive) ...[
+                  const SizedBox(width: 6),
+                  InkWell(
+                    onTap: _clearDateFilter,
+                    borderRadius: BorderRadius.circular(10),
+                    child: Padding(
+                      padding: const EdgeInsets.all(2),
+                      child: Icon(
+                        Icons.close_rounded,
+                        size: 13,
+                        color: hasActive ? primary : const Color(0xFF94A3B8),
+                      ),
+                    ),
+                  ),
+                ] else ...[
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.arrow_drop_down_rounded,
+                    size: 16,
+                    color: const Color(0xFF94A3B8),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -1558,7 +1835,7 @@ class PangeaTableSettingsModal extends StatelessWidget {
                             border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                           ),
                           child: Text(
-                            'Preview: #ORD-9821 • Respira Detox Tea • 2x • ₦25,000 • Delivered',
+                            'Preview: #ORD-9821 • Premium Package Item • 2x • ₦25,000 • Delivered',
                             style: GoogleFonts.inter(
                               fontSize: currentFontSize,
                               fontWeight: FontWeight.w600,

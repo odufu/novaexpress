@@ -110,6 +110,20 @@ abstract class StockRemoteDataSource {
     String senderSignatureUrl = '',
     String? notes,
   });
+  Future<Map<String, dynamic>> receiveSupplyConsignmentHandshake({
+    required String transferId,
+    required String receiverId,
+    required String receiverName,
+    String receiverRole,
+    String receiverSignatureUrl,
+    String carrierDriverName,
+    String carrierPhone,
+    String carrierLicensePlate,
+    String waybillSlipUrl,
+    String destinationBin,
+    required List<Map<String, dynamic>> verifiedItems,
+    String? notes,
+  });
   Future<Map<String, dynamic>> receiveClientSupply({
     required String transferId,
     required String receiverId,
@@ -490,13 +504,8 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
 
             isCoveredByTargetDc = matchesDcState || matchesExplicitDc;
           } else {
-            // Legacy untagged products
-            const otukpoDcId = '00000000-0000-4000-8000-788825051520';
-            if (pSku == 'SKU-02900' || pName.toLowerCase().contains('grazer')) {
-              isCoveredByTargetDc = (checkDcId == otukpoDcId);
-            } else {
-              isCoveredByTargetDc = true;
-            }
+            // Products without explicit state/DC constraints are globally available
+            isCoveredByTargetDc = true;
           }
         }
 
@@ -1781,21 +1790,33 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
   }
 
   @override
-  Future<Map<String, dynamic>> receiveClientSupply({
+  Future<Map<String, dynamic>> receiveSupplyConsignmentHandshake({
     required String transferId,
     required String receiverId,
     required String receiverName,
+    String receiverRole = 'dc_supervisor',
     String receiverSignatureUrl = '',
+    String carrierDriverName = '',
+    String carrierPhone = '',
+    String carrierLicensePlate = '',
+    String waybillSlipUrl = '',
+    String destinationBin = '',
     required List<Map<String, dynamic>> verifiedItems,
     String? notes,
   }) async {
     final dbClient = _getAuthDbClient();
     try {
-      final res = await dbClient.rpc('fn_receive_client_supply', params: {
+      final res = await dbClient.rpc('fn_receive_supply_consignment_handshake', params: {
         'p_transfer_id': transferId,
         'p_receiver_id': receiverId,
         'p_receiver_name': receiverName,
+        'p_receiver_role': receiverRole,
         'p_receiver_signature_url': receiverSignatureUrl,
+        'p_carrier_driver_name': carrierDriverName,
+        'p_carrier_phone': carrierPhone,
+        'p_carrier_license_plate': carrierLicensePlate,
+        'p_waybill_slip_url': waybillSlipUrl,
+        'p_destination_bin': destinationBin,
         'p_verified_items': verifiedItems,
         'p_notes': notes ?? '',
       });
@@ -1824,9 +1845,28 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
 
       return resMap;
     } catch (e) {
-      debugPrint('[STOCK_DATASOURCE] ⚠️ receiveClientSupply error: $e');
+      debugPrint('[STOCK_DATASOURCE] ⚠️ receiveSupplyConsignmentHandshake error: $e');
       rethrow;
     }
+  }
+
+  @override
+  Future<Map<String, dynamic>> receiveClientSupply({
+    required String transferId,
+    required String receiverId,
+    required String receiverName,
+    String receiverSignatureUrl = '',
+    required List<Map<String, dynamic>> verifiedItems,
+    String? notes,
+  }) async {
+    return receiveSupplyConsignmentHandshake(
+      transferId: transferId,
+      receiverId: receiverId,
+      receiverName: receiverName,
+      receiverSignatureUrl: receiverSignatureUrl,
+      verifiedItems: verifiedItems,
+      notes: notes,
+    );
   }
 
   Future<void> _ensureDcStockCredited(

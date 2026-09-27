@@ -21,12 +21,14 @@ BEGIN
 END $$;
 
 -- 2. Ensure supplier foreign keys resolve or exist
+ALTER TABLE public.client_suppliers ADD COLUMN IF NOT EXISTS category TEXT;
+
 INSERT INTO public.client_suppliers (
     id, client_id, supplier_name, contact_person, email, phone, category, payment_terms, bank_name, account_number, account_name
 ) VALUES 
-    ('00000000-0000-4000-8000-000000000001', '33333333-3333-4333-8333-333333333333', 'Apex Herbal Laboratories Ltd', 'Dr. Patrick Okonjo', 'procurement@apexherbal.ng', '+234 803 111 2233', 'Herbal Formulations & Pharma', 'Net 30 Days', 'Access Bank', '0123456789', 'Apex Herbal Laboratories Ltd'),
+    ('00000000-0000-4000-8000-000000000001', '33333333-3333-4333-8333-333333333333', 'Apex Herbal Laboratories Ltd', 'Dr. Patrick Okonjo', 'procurement@apexherbal.ng', '+234 803 111 2233', 'Herbal Formulations & Pharma', 'Net 30', 'Access Bank', '0123456789', 'Apex Herbal Laboratories Ltd'),
     ('00000000-0000-4000-8000-000000000002', '33333333-3333-4333-8333-333333333333', 'DermaCare Naturals & Cosmeceuticals', 'Amina Bello', 'orders@dermacare.ng', '+234 802 444 5566', 'Finished Goods Manufacturing', 'Immediate', 'Zenith Bank', '1012345678', 'DermaCare Naturals Ltd'),
-    ('00000000-0000-4000-8000-000000000003', '33333333-3333-4333-8333-333333333333', 'ProFit Activewear & Medical Goods', 'Engr. Emeka Eze', 'sales@profitgoods.ng', '+234 805 777 8899', 'Finished Goods Manufacturing', 'Net 15 Days', 'GTBank', '0234567890', 'ProFit Activewear Nigeria')
+    ('00000000-0000-4000-8000-000000000003', '33333333-3333-4333-8333-333333333333', 'ProFit Activewear & Medical Goods', 'Engr. Emeka Eze', 'sales@profitgoods.ng', '+234 805 777 8899', 'Finished Goods Manufacturing', 'Net 15', 'GTBank', '0234567890', 'ProFit Activewear Nigeria')
 ON CONFLICT (id) DO UPDATE SET
     supplier_name = EXCLUDED.supplier_name,
     email = EXCLUDED.email;

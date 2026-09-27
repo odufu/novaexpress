@@ -159,6 +159,12 @@ class ClientStockInvoice {
   final double grandTotalLandedCost;
   final String? waybillNumber;
   final String? paymentReceiptUrl;
+  final DateTime? verifiedAt;
+  final String? verifiedBy;
+  final int verifiedUnits;
+  final int damagedUnits;
+  final int missingUnits;
+  final String? handshakeNotes;
   final String notes;
   final List<ClientStockInvoiceItem> items;
   final DateTime createdAt;
@@ -166,7 +172,16 @@ class ClientStockInvoice {
   String get targetWarehouse => destinationWarehouse;
   int get totalQuantity => totalUnits;
   double get grandTotalAmount => grandTotalLandedCost;
-  bool get isProcessed => status == 'verified' || status == 'received';
+  bool get isProcessed => status == 'verified' || status == 'received' || status == 'discrepancy';
+  bool get isAwaitingInspection =>
+      status == 'in_transit' ||
+      status == 'pending_inspection' ||
+      status == 'pending_dc_acceptance' ||
+      status == 'draft';
+  bool get isVerified =>
+      (status == 'verified' || (status == 'received' && damagedUnits == 0 && missingUnits == 0)) &&
+      !hasDiscrepancy;
+  bool get hasDiscrepancy => status == 'discrepancy' || damagedUnits > 0 || missingUnits > 0;
   bool get hasPaymentReceipt => paymentReceiptUrl != null && paymentReceiptUrl!.trim().isNotEmpty;
 
   const ClientStockInvoice({
@@ -177,7 +192,7 @@ class ClientStockInvoice {
     required this.supplierName,
     this.destinationWarehouse = 'Stores - NL',
     required this.entryDate,
-    this.status = 'verified',
+    this.status = 'in_transit',
     this.paymentStatus = 'unpaid',
     this.totalUnits = 0,
     this.subtotalRawProductCost = 0.0,
@@ -188,6 +203,12 @@ class ClientStockInvoice {
     this.grandTotalLandedCost = 0.0,
     this.waybillNumber,
     this.paymentReceiptUrl,
+    this.verifiedAt,
+    this.verifiedBy,
+    this.verifiedUnits = 0,
+    this.damagedUnits = 0,
+    this.missingUnits = 0,
+    this.handshakeNotes,
     this.notes = '',
     this.items = const [],
     required this.createdAt,
@@ -222,7 +243,7 @@ class ClientStockInvoice {
       supplierName: json['supplier_name']?.toString() ?? 'Vendor',
       destinationWarehouse: json['destination_warehouse']?.toString() ?? 'Stores - NL',
       entryDate: json['entry_date'] != null ? DateTime.tryParse(json['entry_date'].toString()) ?? DateTime.now() : DateTime.now(),
-      status: json['status']?.toString() ?? 'verified',
+      status: json['status']?.toString() ?? 'in_transit',
       paymentStatus: json['payment_status']?.toString() ?? 'unpaid',
       totalUnits: (json['total_units'] as num?)?.toInt() ?? 0,
       subtotalRawProductCost: (json['subtotal_raw_product_cost'] as num?)?.toDouble() ?? 0.0,
@@ -233,6 +254,12 @@ class ClientStockInvoice {
       grandTotalLandedCost: (json['grand_total_landed_cost'] as num?)?.toDouble() ?? 0.0,
       waybillNumber: json['waybill_number']?.toString(),
       paymentReceiptUrl: receipt,
+      verifiedAt: json['verified_at'] != null ? DateTime.tryParse(json['verified_at'].toString()) : null,
+      verifiedBy: json['verified_by']?.toString(),
+      verifiedUnits: (json['verified_units'] as num?)?.toInt() ?? 0,
+      damagedUnits: (json['damaged_units'] as num?)?.toInt() ?? 0,
+      missingUnits: (json['missing_units'] as num?)?.toInt() ?? 0,
+      handshakeNotes: json['handshake_notes']?.toString(),
       notes: rawNotes,
       items: parsedItems,
       createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now() : DateTime.now(),
@@ -257,7 +284,14 @@ class ClientStockInvoice {
       'total_handling_clearing_cost': totalHandlingClearingCost,
       'other_addons_cost': otherAddonsCost,
       'grand_total_landed_cost': grandTotalLandedCost,
+      if (waybillNumber != null) 'waybill_number': waybillNumber,
       if (paymentReceiptUrl != null) 'payment_receipt_url': paymentReceiptUrl,
+      if (verifiedAt != null) 'verified_at': verifiedAt!.toIso8601String(),
+      if (verifiedBy != null) 'verified_by': verifiedBy,
+      'verified_units': verifiedUnits,
+      'damaged_units': damagedUnits,
+      'missing_units': missingUnits,
+      if (handshakeNotes != null) 'handshake_notes': handshakeNotes,
       'notes': notes,
       'created_at': createdAt.toIso8601String(),
     };
@@ -282,6 +316,12 @@ class ClientStockInvoice {
     double? grandTotalLandedCost,
     String? waybillNumber,
     String? paymentReceiptUrl,
+    DateTime? verifiedAt,
+    String? verifiedBy,
+    int? verifiedUnits,
+    int? damagedUnits,
+    int? missingUnits,
+    String? handshakeNotes,
     String? notes,
     List<ClientStockInvoiceItem>? items,
     DateTime? createdAt,
@@ -305,6 +345,12 @@ class ClientStockInvoice {
       grandTotalLandedCost: grandTotalLandedCost ?? this.grandTotalLandedCost,
       waybillNumber: waybillNumber ?? this.waybillNumber,
       paymentReceiptUrl: paymentReceiptUrl ?? this.paymentReceiptUrl,
+      verifiedAt: verifiedAt ?? this.verifiedAt,
+      verifiedBy: verifiedBy ?? this.verifiedBy,
+      verifiedUnits: verifiedUnits ?? this.verifiedUnits,
+      damagedUnits: damagedUnits ?? this.damagedUnits,
+      missingUnits: missingUnits ?? this.missingUnits,
+      handshakeNotes: handshakeNotes ?? this.handshakeNotes,
       notes: notes ?? this.notes,
       items: items ?? this.items,
       createdAt: createdAt ?? this.createdAt,

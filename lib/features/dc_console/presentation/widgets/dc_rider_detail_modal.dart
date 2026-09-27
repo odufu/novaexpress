@@ -695,6 +695,7 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
               rowHeight: 48,
               enablePagination: true,
               initialPageSize: 10,
+              dateExtractor: (o) => o.createdAt,
               columns: [
                 ExcelColumnDef<OrderEntity>(
                   key: 'orderNum',
@@ -1092,6 +1093,7 @@ class _DCRiderDetailModalState extends ConsumerState<DCRiderDetailModal>
               rowHeight: 48,
               enablePagination: true,
               initialPageSize: 10,
+              dateExtractor: (t) => t.createdAt,
               columns: [
                 ExcelColumnDef<DCTransactionRecord>(
                   key: 'txCode',

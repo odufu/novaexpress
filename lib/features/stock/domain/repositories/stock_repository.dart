@@ -105,6 +105,20 @@ abstract class StockRepository {
     String senderSignatureUrl = '',
     String? notes,
   });
+  Future<Map<String, dynamic>> receiveSupplyConsignmentHandshake({
+    required String transferId,
+    required String receiverId,
+    required String receiverName,
+    String receiverRole = 'dc_supervisor',
+    String receiverSignatureUrl = '',
+    String carrierDriverName = '',
+    String carrierPhone = '',
+    String carrierLicensePlate = '',
+    String waybillSlipUrl = '',
+    String destinationBin = '',
+    required List<Map<String, dynamic>> verifiedItems,
+    String? notes,
+  });
   Future<Map<String, dynamic>> receiveClientSupply({
     required String transferId,
     required String receiverId,

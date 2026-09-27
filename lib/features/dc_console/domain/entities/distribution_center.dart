@@ -1,6 +1,16 @@
 import 'dart:convert';
 import 'package:novexps/core/services/location_lookup_service.dart';
 
+/// 3-Tier Distribution Center Hierarchy
+/// - Grand DC: Apex National Distribution Center (Wuse Central branch default)
+/// - Hub DC: Regional Hub Distribution Center serving clusters of satellite stations
+/// - General DC: Standard Local/Branch Distribution Center
+enum DistributionCenterTier {
+  grandDc,     // Grand DC (Wuse Central branch default)
+  hubDc,       // Hub Distribution Center
+  generalDc,   // General Distribution Center
+}
+
 class DistributionCenter {
   final String id;
   final String companyId;
@@ -46,6 +56,38 @@ class DistributionCenter {
     this.updatedAt,
   });
 
+  /// Distribution Center Tier Hierarchy
+  DistributionCenterTier get dcTier {
+    if (isGrandDc) return DistributionCenterTier.grandDc;
+    if (isHub) return DistributionCenterTier.hubDc;
+    return DistributionCenterTier.generalDc;
+  }
+
+  String get dcTierLabel {
+    switch (dcTier) {
+      case DistributionCenterTier.grandDc:
+        return 'Grand DC';
+      case DistributionCenterTier.hubDc:
+        return 'Hub Distribution Center';
+      case DistributionCenterTier.generalDc:
+        return 'General Distribution Center';
+    }
+  }
+
+  String get tierBadge {
+    switch (dcTier) {
+      case DistributionCenterTier.grandDc:
+        return '[Grand DC - Central]';
+      case DistributionCenterTier.hubDc:
+        return '[Hub DC]';
+      case DistributionCenterTier.generalDc:
+        return '[General DC]';
+    }
+  }
+
+  bool get isGrand => isGrandDc;
+  bool get isHubDc => isHub && !isGrandDc;
+  bool get isGeneralDc => !isGrandDc && !isHub;
   bool get isPrimaryHub => isHub || isGrandDc;
   bool get isGrandHeadquarters => isGrandDc;
   String get fullLocation => '$city, $state';
@@ -143,10 +185,24 @@ class DistributionCenter {
     }
 
     final codeStr = json['code']?.toString() ?? 'DC-001';
+    final rawType = json['dc_type']?.toString().toLowerCase() ?? json['dcType']?.toString().toLowerCase() ?? '';
     final isGrand = json['is_grand_dc'] == true ||
         json['isGrandDc'] == true ||
+        rawType == 'grand_dc' ||
+        rawType.contains('grand') ||
         codeStr == 'DC-ABJ-01' ||
+        codeStr == 'DC-WUSE-01' ||
         json['id'] == '22222222-2222-4222-8222-222222222222';
+
+    final nameLower = (json['name']?.toString() ?? '').toLowerCase();
+    final isHub = isGrand ||
+        json['is_hub'] == true ||
+        json['isHub'] == true ||
+        rawType == 'hub_dc' ||
+        rawType.contains('hub') ||
+        nameLower.contains('hub') ||
+        codeStr == 'DC-KD-001' ||
+        json['id'] == '00000000-0000-4000-8000-789382566045';
 
     return DistributionCenter(
       id: json['id']?.toString() ?? '',
@@ -160,7 +216,7 @@ class DistributionCenter {
       contactEmail: json['contact_email']?.toString() ?? json['contactEmail']?.toString(),
       managerName: json['manager_name']?.toString() ?? json['managerName']?.toString(),
       isGrandDc: isGrand,
-      isHub: json['is_hub'] == true || json['isHub'] == true,
+      isHub: isHub,
       isActive: json['is_active'] != false && json['isActive'] != false,
       parentDcId: json['parent_dc_id']?.toString() ?? json['parentDcId']?.toString(),
       operatingZones: parseZones(json['operating_zones'] ?? json['operatingZones'] ?? json['zones'] ?? json['covered_lgas']),
@@ -186,6 +242,7 @@ class DistributionCenter {
       'manager_name': managerName,
       'is_grand_dc': isGrandDc,
       'is_hub': isHub,
+      'dc_type': isGrandDc ? 'grand_dc' : (isHub ? 'hub_dc' : 'general_dc'),
       'is_active': isActive,
       'parent_dc_id': parentDcId,
       'operating_zones': operatingZones,

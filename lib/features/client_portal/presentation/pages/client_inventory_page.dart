@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../domain/entities/client_stock_balance.dart';
 import '../../domain/entities/client_stock_invoice.dart';
 import '../../domain/entities/client_supplier_expanded.dart';
+import '../../domain/entities/stock_holder_custody.dart';
 import '../providers/client_portal_provider.dart';
 import '../widgets/client_add_supplier_modal.dart';
 import '../widgets/client_import_stock_balance_modal.dart';
@@ -46,13 +47,21 @@ class _ClientInventoryPageState extends ConsumerState<ClientInventoryPage> with 
   bool _includeZeroStockItems = false;
   bool _showDimensionWiseStock = false;
 
-  // Filters for Tab 2 (Invoices)
+  // Filters for Tab 2 (Stock Custody & Product Holders)
+  String _custodyProductFilter = 'All Products';
+  String _custodyHolderTypeFilter = 'All Types';
+  String _custodyStateFilter = 'All States';
+  String _custodyLgaFilter = 'All LGAs';
+  String _custodySearchQuery = '';
+  bool _includeZeroCustody = true;
+
+  // Filters for Tab 3 (Invoices)
   String _invoiceSearchQuery = '';
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
 
     // Calculate initial date range in Lagos Time (WAT = UTC+1)
     final lagosNow = DateTime.now().toUtc().add(const Duration(hours: 1));
@@ -61,6 +70,16 @@ class _ClientInventoryPageState extends ConsumerState<ClientInventoryPage> with 
     _pangeaStartDate = today.subtract(const Duration(days: 6));
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      final initialSubTab = ref.read(clientInventoryActiveSubTabProvider);
+      if (initialSubTab > 0 && initialSubTab < 5) {
+        _tabController.animateTo(initialSubTab);
+      }
+      final initialProduct = ref.read(clientInventoryProductFilterProvider);
+      if (initialProduct.isNotEmpty && initialProduct != 'All Products') {
+        setState(() {
+          _custodyProductFilter = initialProduct;
+        });
+      }
       ref.read(clientPortalProvider.notifier).reloadInventoryData(
         startDate: _pangeaStartDate,
         endDate: _pangeaEndDate,
@@ -138,6 +157,20 @@ class _ClientInventoryPageState extends ConsumerState<ClientInventoryPage> with 
     final screenWidth = MediaQuery.of(context).size.width;
     final isCompact = screenWidth < 900;
 
+    // Listen to external navigation commands (e.g. from Product Detail Modal)
+    ref.listen<int>(clientInventoryActiveSubTabProvider, (prev, next) {
+      if (next >= 0 && next < 5 && next != _tabController.index) {
+        _tabController.animateTo(next);
+      }
+    });
+    ref.listen<String>(clientInventoryProductFilterProvider, (prev, next) {
+      if (next.isNotEmpty && next != 'All Products' && next != _custodyProductFilter) {
+        setState(() {
+          _custodyProductFilter = next;
+        });
+      }
+    });
+
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0B1120) : const Color(0xFFF8FAFC),
       body: RefreshIndicator(
@@ -160,7 +193,7 @@ class _ClientInventoryPageState extends ConsumerState<ClientInventoryPage> with 
               _buildKpiCards(state, isDark, isCompact),
               const SizedBox(height: 24),
 
-              // Sub-navigation Tabs
+              // Sub-navigation Tabs (5 Tabs)
               Container(
                 decoration: BoxDecoration(
                   color: isDark ? const Color(0xFF1E293B) : Colors.white,
@@ -171,7 +204,8 @@ class _ClientInventoryPageState extends ConsumerState<ClientInventoryPage> with 
                 ),
                 child: TabBar(
                   controller: _tabController,
-                  isScrollable: isCompact,
+                  isScrollable: true,
+                  tabAlignment: TabAlignment.start,
                   labelColor: const Color(0xFF0D9488),
                   unselectedLabelColor: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                   indicatorColor: const Color(0xFF0D9488),
@@ -182,6 +216,10 @@ class _ClientInventoryPageState extends ConsumerState<ClientInventoryPage> with 
                     Tab(
                       icon: const Icon(Icons.table_chart_rounded, size: 18),
                       text: 'Stock Ledger (${state.stockBalances.length})',
+                    ),
+                    Tab(
+                      icon: const Icon(Icons.shield_outlined, size: 18),
+                      text: 'Custody & Holders (${state.stockHolders.length})',
                     ),
                     Tab(
                       icon: const Icon(Icons.receipt_long_rounded, size: 18),
@@ -207,6 +245,7 @@ class _ClientInventoryPageState extends ConsumerState<ClientInventoryPage> with 
                   controller: _tabController,
                   children: [
                     _buildStockLedgerTab(state, isDark),
+                    _buildCustodyHoldersTab(state, isDark),
                     _buildInvoicesTab(state, isDark),
                     _buildSuppliersTab(state, isDark),
                     _buildUnitEconomicsTab(state, isDark),
@@ -523,11 +562,1234 @@ class _ClientInventoryPageState extends ConsumerState<ClientInventoryPage> with 
               showTopToolbar: true,
               rowHeight: 60.0,
               brandPrimary: const Color(0xFF0D9488),
+              initialDateRange: DateTimeRange(start: _pangeaStartDate, end: _pangeaEndDate),
+              initialDatePreset: _pangeaPreset,
+              onDateRangeChanged: (range, preset, compare) {
+                if (range != null) {
+                  setState(() {
+                    _pangeaStartDate = range.start;
+                    _pangeaEndDate = range.end;
+                    _pangeaPreset = preset;
+                    _pangeaCompare = compare;
+                  });
+                  ref.read(clientPortalProvider.notifier).reloadInventoryData(
+                    startDate: range.start,
+                    endDate: range.end,
+                  );
+                }
+              },
               emptyMessage: 'No stock ledger positions recorded. Click "Import CSV" or "+ Raise Stock Invoice" above to add stock.',
               onRowTap: (item) => _showStockBalanceDetailModal(context, item, isDark),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // Tab 2: Stock Custody & Product Holders (DCs, PDA Riders, Central Depots)
+  // ===========================================================================
+  Widget _buildCustodyHoldersTab(ClientPortalState state, bool isDark) {
+    final clientCompany = state.clientProfile.companyName;
+
+    // Build safe dropdown lists
+    final productItems = <String>[
+      'All Products',
+      ...{
+        ...state.stockHolders.map((h) => h.productName),
+        ...state.products.map((p) => p.name),
+      }.where((n) => n.trim().isNotEmpty),
+    ];
+    final effectiveProductFilter = productItems.contains(_custodyProductFilter) ? _custodyProductFilter : 'All Products';
+
+    final stateItems = <String>[
+      'All States',
+      ...state.stockHolders.map((h) => h.state).toSet().where((s) => s.trim().isNotEmpty),
+    ];
+    final effectiveStateFilter = stateItems.contains(_custodyStateFilter) ? _custodyStateFilter : 'All States';
+
+    final lgaItems = <String>[
+      'All LGAs',
+      ...state.stockHolders
+          .where((h) => effectiveStateFilter == 'All States' || h.state.toLowerCase() == effectiveStateFilter.toLowerCase())
+          .map((h) => h.lga)
+          .toSet()
+          .where((l) => l.trim().isNotEmpty),
+    ];
+    final effectiveLgaFilter = lgaItems.contains(_custodyLgaFilter) ? _custodyLgaFilter : 'All LGAs';
+
+    final typeItems = <String>[
+      'All Types',
+      'Grand DC',
+      'Hub Distribution Center',
+      'General Distribution Center',
+      'PDA Riders',
+    ];
+    final effectiveTypeFilter = typeItems.contains(_custodyHolderTypeFilter) ? _custodyHolderTypeFilter : 'All Types';
+
+    // Apply multi-dimensional filters
+    final filtered = state.stockHolders.where((h) {
+      if (effectiveProductFilter != 'All Products') {
+        final p = effectiveProductFilter.trim().toLowerCase();
+        final matches = h.productName.toLowerCase() == p ||
+            h.productSku.toLowerCase() == p ||
+            h.productId.toLowerCase() == p;
+        if (!matches) return false;
+      }
+      if (effectiveTypeFilter != 'All Types') {
+        if (effectiveTypeFilter == 'Grand DC' && !h.isGrandDc) return false;
+        if (effectiveTypeFilter == 'Hub Distribution Center' && !h.isHubDc) return false;
+        if (effectiveTypeFilter == 'General Distribution Center' && !h.isGeneralDc) return false;
+        if (effectiveTypeFilter == 'PDA Riders' && !h.isPdaRider) return false;
+      }
+      if (effectiveStateFilter != 'All States' && h.state.toLowerCase() != effectiveStateFilter.toLowerCase()) {
+        return false;
+      }
+      if (effectiveLgaFilter != 'All LGAs' && !h.lga.toLowerCase().contains(effectiveLgaFilter.toLowerCase())) {
+        return false;
+      }
+      if (_custodySearchQuery.trim().isNotEmpty) {
+        final q = _custodySearchQuery.trim().toLowerCase();
+        final matches = h.holderName.toLowerCase().contains(q) ||
+            h.productName.toLowerCase().contains(q) ||
+            h.productSku.toLowerCase().contains(q) ||
+            h.lga.toLowerCase().contains(q) ||
+            h.city.toLowerCase().contains(q) ||
+            h.phone.toLowerCase().contains(q);
+        if (!matches) return false;
+      }
+      if (!_includeZeroCustody && h.closingQty <= 0) {
+        return false;
+      }
+      return true;
+    }).toList();
+
+    final totalCustodyUnits = filtered.fold(0, (s, h) => s + h.closingQty);
+    final totalCustodyValuation = filtered.fold(0.0, (s, h) => s + h.closingValue);
+    final grandDcUnits = filtered.where((h) => h.isGrandDc).fold(0, (s, h) => s + h.closingQty);
+    final grandDcValuation = filtered.where((h) => h.isGrandDc).fold(0.0, (s, h) => s + h.closingValue);
+    final regionalDcUnits = filtered.where((h) => h.isHubDc || h.isGeneralDc).fold(0, (s, h) => s + h.closingQty);
+    final regionalDcValuation = filtered.where((h) => h.isHubDc || h.isGeneralDc).fold(0.0, (s, h) => s + h.closingValue);
+    final pdaUnits = filtered.where((h) => h.isPdaRider).fold(0, (s, h) => s + h.closingQty);
+    final pdaValuation = filtered.where((h) => h.isPdaRider).fold(0.0, (s, h) => s + h.closingValue);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Bar with refresh & export actions
+          Row(
+            children: [
+              Flexible(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        'Stock Custody & Product Holders',
+                        style: GoogleFonts.inter(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0D9488).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '${filtered.length} custodians',
+                        style: GoogleFonts.inter(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF0D9488),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: () => ref.read(clientPortalProvider.notifier).reloadInventoryData(
+                  startDate: _pangeaStartDate,
+                  endDate: _pangeaEndDate,
+                ),
+                tooltip: 'Refresh custody balances',
+                icon: const Icon(Icons.sync_rounded, size: 18),
+                padding: const EdgeInsets.all(8),
+                constraints: const BoxConstraints(),
+                style: IconButton.styleFrom(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF0D9488),
+                  side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: () => _exportCustodyCsv(filtered),
+                icon: const Icon(Icons.download_rounded, size: 14),
+                label: const Text('Export Custody CSV', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // KPI Metric Bar across Holders (Total, Grand DC, Regional Hubs/General DCs, PDAs)
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isWide = constraints.maxWidth >= 750;
+              final isMedium = constraints.maxWidth >= 450;
+              final cardWidth = isWide
+                  ? (constraints.maxWidth - 36) / 4
+                  : (isMedium ? (constraints.maxWidth - 12) / 2 : constraints.maxWidth);
+
+              return Wrap(
+                spacing: 12,
+                runSpacing: 10,
+                children: [
+                  _buildCustodyKpiCard(
+                    title: 'Total Stock Accounted For',
+                    units: '$totalCustodyUnits units',
+                    value: '₦${_currencyFormat.format(totalCustodyValuation)}',
+                    icon: Icons.shield_rounded,
+                    accentColor: const Color(0xFF0D9488),
+                    width: cardWidth,
+                    isDark: isDark,
+                  ),
+                  _buildCustodyKpiCard(
+                    title: 'Grand DC (Central Apex)',
+                    units: '$grandDcUnits units',
+                    value: '₦${_currencyFormat.format(grandDcValuation)}',
+                    icon: Icons.domain_rounded,
+                    accentColor: const Color(0xFF7C3AED),
+                    width: cardWidth,
+                    isDark: isDark,
+                  ),
+                  _buildCustodyKpiCard(
+                    title: 'Regional Hubs & General DCs',
+                    units: '$regionalDcUnits units',
+                    value: '₦${_currencyFormat.format(regionalDcValuation)}',
+                    icon: Icons.store_mall_directory_rounded,
+                    accentColor: const Color(0xFF2563EB),
+                    width: cardWidth,
+                    isDark: isDark,
+                  ),
+                  _buildCustodyKpiCard(
+                    title: 'PDA Riders in Delivery',
+                    units: '$pdaUnits units',
+                    value: '₦${_currencyFormat.format(pdaValuation)}',
+                    icon: Icons.two_wheeler_rounded,
+                    accentColor: const Color(0xFFF59E0B),
+                    width: cardWidth,
+                    isDark: isDark,
+                  ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 14),
+
+          // Filter Controls Row 1 & 2 & 3
+          _buildCustodyFilterControls(
+            clientCompany: clientCompany,
+            productItems: productItems,
+            effectiveProductFilter: effectiveProductFilter,
+            typeItems: typeItems,
+            effectiveTypeFilter: effectiveTypeFilter,
+            stateItems: stateItems,
+            effectiveStateFilter: effectiveStateFilter,
+            lgaItems: lgaItems,
+            effectiveLgaFilter: effectiveLgaFilter,
+            isDark: isDark,
+          ),
+          const SizedBox(height: 14),
+
+          // Pangea Excel Data Table
+          Expanded(
+            child: PangeaExcelDataTable<StockHolderCustodyEntity>(
+              items: filtered,
+              columns: _buildCustodyColumns(isDark, const Color(0xFF0D9488)),
+              enablePagination: true,
+              initialPageSize: 25,
+              showTopToolbar: true,
+              rowHeight: 60.0,
+              brandPrimary: const Color(0xFF0D9488),
+              initialDateRange: DateTimeRange(start: _pangeaStartDate, end: _pangeaEndDate),
+              initialDatePreset: _pangeaPreset,
+              onDateRangeChanged: (range, preset, compare) {
+                if (range != null) {
+                  setState(() {
+                    _pangeaStartDate = range.start;
+                    _pangeaEndDate = range.end;
+                    _pangeaPreset = preset;
+                    _pangeaCompare = compare;
+                  });
+                  ref.read(clientPortalProvider.notifier).reloadInventoryData(
+                    startDate: range.start,
+                    endDate: range.end,
+                  );
+                }
+              },
+              emptyMessage: 'No stock holder custody positions found matching the selected filters.',
+              onRowTap: (item) => _showHolderCustodyDetailModal(context, item, isDark),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCustodyKpiCard({
+    required String title,
+    required String units,
+    required String value,
+    required IconData icon,
+    required Color accentColor,
+    required double width,
+    required bool isDark,
+  }) {
+    return Container(
+      width: width,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: accentColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: accentColor, size: 20),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.inter(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Text(
+                      units,
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '• $value',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: accentColor,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCustodyFilterControls({
+    required String clientCompany,
+    required List<String> productItems,
+    required String effectiveProductFilter,
+    required List<String> typeItems,
+    required String effectiveTypeFilter,
+    required List<String> stateItems,
+    required String effectiveStateFilter,
+    required List<String> lgaItems,
+    required String effectiveLgaFilter,
+    required bool isDark,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Row 1: Company, Lagos Time Date Card Button, Reset Filters
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            _buildFilterPill(
+              isDark: isDark,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.business_rounded, size: 15, color: Color(0xFF0D9488)),
+                  const SizedBox(width: 6),
+                  Text(
+                    clientCompany,
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Date Range Picker Button (Lagos Time WAT)
+            InkWell(
+              onTap: _openDateRangePicker,
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: const Color(0xFF0D9488).withValues(alpha: 0.4),
+                    width: 1.2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.calendar_month_rounded, size: 14, color: Color(0xFF0D9488)),
+                    const SizedBox(width: 7),
+                    Text(
+                      _getDateRangeDisplayText(),
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0D9488).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        _pangeaPreset.label,
+                        style: GoogleFonts.inter(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF0D9488),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            if (effectiveProductFilter != 'All Products' ||
+                effectiveTypeFilter != 'All Types' ||
+                effectiveStateFilter != 'All States' ||
+                effectiveLgaFilter != 'All LGAs' ||
+                _custodySearchQuery.isNotEmpty)
+              TextButton.icon(
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFFEF4444),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                ),
+                onPressed: () {
+                  setState(() {
+                    _custodyProductFilter = 'All Products';
+                    _custodyHolderTypeFilter = 'All Types';
+                    _custodyStateFilter = 'All States';
+                    _custodyLgaFilter = 'All LGAs';
+                    _custodySearchQuery = '';
+                    _includeZeroCustody = true;
+                  });
+                },
+                icon: const Icon(Icons.filter_alt_off_rounded, size: 14),
+                label: const Text('Reset Custody Filters', style: TextStyle(fontSize: 11)),
+              ),
+          ],
+        ),
+        const SizedBox(height: 10),
+
+        // Row 2: Product dropdown, Holder Type dropdown, State dropdown, LGA dropdown
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            // Product Dropdown
+            _buildDropdownPill<String>(
+              value: effectiveProductFilter,
+              items: productItems,
+              hint: 'Product',
+              isDark: isDark,
+              onChanged: (val) {
+                if (val != null) setState(() => _custodyProductFilter = val);
+              },
+            ),
+
+            // Holder Type Dropdown
+            _buildDropdownPill<String>(
+              value: effectiveTypeFilter,
+              items: typeItems,
+              hint: 'Custodian Type',
+              isDark: isDark,
+              onChanged: (val) {
+                if (val != null) setState(() => _custodyHolderTypeFilter = val);
+              },
+            ),
+
+            // State Dropdown
+            _buildDropdownPill<String>(
+              value: effectiveStateFilter,
+              items: stateItems,
+              hint: 'State',
+              isDark: isDark,
+              onChanged: (val) {
+                if (val != null) {
+                  setState(() {
+                    _custodyStateFilter = val;
+                    _custodyLgaFilter = 'All LGAs'; // Reset LGA when state changes
+                  });
+                }
+              },
+            ),
+
+            // LGA Dropdown
+            _buildDropdownPill<String>(
+              value: effectiveLgaFilter,
+              items: lgaItems,
+              hint: 'LGA / Operating Zone',
+              isDark: isDark,
+              onChanged: (val) {
+                if (val != null) setState(() => _custodyLgaFilter = val);
+              },
+            ),
+
+            // Include zero units checkbox
+            _buildCheckboxFilter(
+              label: 'Include Zero / Out of Stock',
+              value: _includeZeroCustody,
+              isDark: isDark,
+              onChanged: (val) => setState(() => _includeZeroCustody = val ?? true),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+
+        // Row 3: Instant Search Box
+        SizedBox(
+          height: 34,
+          width: 320,
+          child: TextField(
+            onChanged: (val) => setState(() => _custodySearchQuery = val),
+            style: GoogleFonts.inter(fontSize: 12, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+            decoration: InputDecoration(
+              hintText: 'Search holder, SKU, zone, phone...',
+              hintStyle: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF94A3B8)),
+              prefixIcon: const Icon(Icons.search_rounded, size: 16, color: Color(0xFF94A3B8)),
+              filled: true,
+              fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFF0D9488), width: 1.2),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  List<ExcelColumnDef<StockHolderCustodyEntity>> _buildCustodyColumns(bool isDark, Color brandPrimary) {
+    return [
+      ExcelColumnDef<StockHolderCustodyEntity>(
+        key: 'index',
+        label: '#',
+        defaultWidth: 44.0,
+        minWidth: 36.0,
+        align: TextAlign.center,
+        cellBuilder: (context, item, index, isDark, brandPrimary) => Text(
+          '${index + 1}',
+          textAlign: TextAlign.center,
+          style: GoogleFonts.inter(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w600,
+            color: const Color(0xFF94A3B8),
+          ),
+        ),
+      ),
+      ExcelColumnDef<StockHolderCustodyEntity>(
+        key: 'holder_name',
+        label: 'Holder / Custodian',
+        group: 'Custodian Identity',
+        defaultWidth: 230.0,
+        minWidth: 160.0,
+        searchString: (item) => '${item.holderName} ${item.holderId}',
+        sortValue: (item) => item.holderName,
+        cellBuilder: (context, item, index, isDark, brandPrimary) {
+          final IconData icon = item.isGrandDc
+              ? Icons.domain_rounded
+              : (item.isHubDc
+                  ? Icons.hub_rounded
+                  : (item.isGeneralDc
+                      ? Icons.store_mall_directory_rounded
+                      : (item.isPdaRider ? Icons.two_wheeler_rounded : Icons.warehouse_rounded)));
+          final Color iconColor = item.isGrandDc
+              ? const Color(0xFF7C3AED)
+              : (item.isHubDc
+                  ? const Color(0xFF2563EB)
+                  : (item.isGeneralDc
+                      ? const Color(0xFF0D9488)
+                      : (item.isPdaRider ? const Color(0xFFD97706) : const Color(0xFF64748B))));
+
+          return Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Icon(icon, color: iconColor, size: 16),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.holderName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
+                    ),
+                    Text(
+                      item.holderId,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 10,
+                        color: const Color(0xFF94A3B8),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+      ExcelColumnDef<StockHolderCustodyEntity>(
+        key: 'holder_type',
+        label: 'Type',
+        group: 'Custodian Identity',
+        defaultWidth: 150.0,
+        minWidth: 110.0,
+        searchString: (item) => item.holderType,
+        sortValue: (item) => item.holderType,
+        cellBuilder: (context, item, index, isDark, brandPrimary) {
+          final Color badgeColor = item.isGrandDc
+              ? const Color(0xFF7C3AED)
+              : (item.isHubDc
+                  ? const Color(0xFF2563EB)
+                  : (item.isGeneralDc
+                      ? const Color(0xFF0D9488)
+                      : (item.isPdaRider ? const Color(0xFFD97706) : const Color(0xFF64748B))));
+          final String shortLabel = item.isGrandDc
+              ? 'Grand DC (Central)'
+              : (item.isHubDc
+                  ? 'Hub DC'
+                  : (item.isGeneralDc
+                      ? 'General DC'
+                      : (item.isPdaRider ? 'PDA Rider' : item.holderType)));
+
+          return Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(
+                color: badgeColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(5),
+                border: Border.all(color: badgeColor.withValues(alpha: 0.25)),
+              ),
+              child: Text(
+                shortLabel,
+                style: GoogleFonts.inter(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w700,
+                  color: badgeColor,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+      ExcelColumnDef<StockHolderCustodyEntity>(
+        key: 'product',
+        label: 'Product & SKU',
+        group: 'Product Specification',
+        defaultWidth: 190.0,
+        minWidth: 130.0,
+        searchString: (item) => '${item.productName} ${item.productSku}',
+        sortValue: (item) => item.productName,
+        cellBuilder: (context, item, index, isDark, brandPrimary) {
+          return Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                item.productName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                ),
+              ),
+              Text(
+                item.productSku,
+                style: GoogleFonts.inter(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF0D9488),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+      ExcelColumnDef<StockHolderCustodyEntity>(
+        key: 'location',
+        label: 'Location (State & LGA)',
+        group: 'Geographic Operating Scope',
+        defaultWidth: 170.0,
+        minWidth: 120.0,
+        searchString: (item) => '${item.state} ${item.lga} ${item.city}',
+        sortValue: (item) => '${item.state} ${item.lga}',
+        cellBuilder: (context, item, index, isDark, brandPrimary) {
+          return Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                item.state,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                ),
+              ),
+              Text(
+                item.city.isNotEmpty ? '${item.lga} (${item.city})' : item.lga,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  fontSize: 10.5,
+                  color: const Color(0xFF94A3B8),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+      ExcelColumnDef<StockHolderCustodyEntity>(
+        key: 'phone',
+        label: 'Contact Phone',
+        group: 'Geographic Operating Scope',
+        defaultWidth: 140.0,
+        minWidth: 100.0,
+        searchString: (item) => item.phone,
+        cellBuilder: (context, item, index, isDark, brandPrimary) {
+          return Center(
+            child: Text(
+              item.phone.isNotEmpty ? item.phone : '—',
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                color: item.phone.isNotEmpty ? (isDark ? Colors.white70 : const Color(0xFF334155)) : const Color(0xFF94A3B8),
+              ),
+            ),
+          );
+        },
+      ),
+      ExcelColumnDef<StockHolderCustodyEntity>(
+        key: 'opening_qty',
+        label: 'Opening Qty',
+        group: 'Movement in Period',
+        defaultWidth: 105.0,
+        minWidth: 80.0,
+        align: TextAlign.right,
+        sortValue: (item) => item.openingQty,
+        cellBuilder: (context, item, index, isDark, brandPrimary) => Text(
+          '${item.openingQty}',
+          textAlign: TextAlign.right,
+          style: GoogleFonts.inter(fontSize: 12, color: isDark ? Colors.white70 : const Color(0xFF334155)),
+        ),
+      ),
+      ExcelColumnDef<StockHolderCustodyEntity>(
+        key: 'opening_val',
+        label: 'Opening Value',
+        group: 'Movement in Period',
+        defaultWidth: 125.0,
+        minWidth: 90.0,
+        align: TextAlign.right,
+        sortValue: (item) => item.openingValue,
+        cellBuilder: (context, item, index, isDark, brandPrimary) => Text(
+          '₦${_currencyFormat.format(item.openingValue)}',
+          textAlign: TextAlign.right,
+          style: GoogleFonts.inter(fontSize: 11.5, color: isDark ? Colors.white70 : const Color(0xFF334155)),
+        ),
+      ),
+      ExcelColumnDef<StockHolderCustodyEntity>(
+        key: 'in_qty',
+        label: 'In (+)',
+        group: 'Movement in Period',
+        defaultWidth: 85.0,
+        minWidth: 70.0,
+        align: TextAlign.right,
+        sortValue: (item) => item.inQty,
+        cellBuilder: (context, item, index, isDark, brandPrimary) => Text(
+          item.inQty > 0 ? '+${item.inQty}' : '0',
+          textAlign: TextAlign.right,
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            fontWeight: item.inQty > 0 ? FontWeight.w700 : FontWeight.normal,
+            color: item.inQty > 0 ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
+          ),
+        ),
+      ),
+      ExcelColumnDef<StockHolderCustodyEntity>(
+        key: 'out_qty',
+        label: 'Out (-)',
+        group: 'Movement in Period',
+        defaultWidth: 85.0,
+        minWidth: 70.0,
+        align: TextAlign.right,
+        sortValue: (item) => item.outQty,
+        cellBuilder: (context, item, index, isDark, brandPrimary) => Text(
+          item.outQty > 0 ? '-${item.outQty}' : '0',
+          textAlign: TextAlign.right,
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            fontWeight: item.outQty > 0 ? FontWeight.w700 : FontWeight.normal,
+            color: item.outQty > 0 ? const Color(0xFFEF4444) : const Color(0xFF94A3B8),
+          ),
+        ),
+      ),
+      ExcelColumnDef<StockHolderCustodyEntity>(
+        key: 'closing_qty',
+        label: 'Closing Units',
+        group: 'Live Balance in Custody',
+        defaultWidth: 115.0,
+        minWidth: 85.0,
+        align: TextAlign.right,
+        sortValue: (item) => item.closingQty,
+        cellBuilder: (context, item, index, isDark, brandPrimary) {
+          final hasUnits = item.closingQty > 0;
+          return Text(
+            '${item.closingQty}',
+            textAlign: TextAlign.right,
+            style: GoogleFonts.inter(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w800,
+              color: hasUnits ? (isDark ? Colors.white : const Color(0xFF0F172A)) : const Color(0xFF94A3B8),
+            ),
+          );
+        },
+      ),
+      ExcelColumnDef<StockHolderCustodyEntity>(
+        key: 'rate',
+        label: 'Unit Rate (₦)',
+        group: 'Live Balance in Custody',
+        defaultWidth: 110.0,
+        minWidth: 80.0,
+        align: TextAlign.right,
+        sortValue: (item) => item.valuationRate,
+        cellBuilder: (context, item, index, isDark, brandPrimary) => Text(
+          '₦${_currencyFormat.format(item.valuationRate)}',
+          textAlign: TextAlign.right,
+          style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
+        ),
+      ),
+      ExcelColumnDef<StockHolderCustodyEntity>(
+        key: 'closing_val',
+        label: 'Closing Value (₦)',
+        group: 'Live Balance in Custody',
+        defaultWidth: 140.0,
+        minWidth: 100.0,
+        align: TextAlign.right,
+        sortValue: (item) => item.closingValue,
+        cellBuilder: (context, item, index, isDark, brandPrimary) => Text(
+          '₦${_currencyFormat.format(item.closingValue)}',
+          textAlign: TextAlign.right,
+          style: GoogleFonts.inter(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w800,
+            color: const Color(0xFF10B981),
+          ),
+        ),
+      ),
+      ExcelColumnDef<StockHolderCustodyEntity>(
+        key: 'status',
+        label: 'Custody Status',
+        group: 'Live Balance in Custody',
+        defaultWidth: 120.0,
+        minWidth: 90.0,
+        align: TextAlign.center,
+        searchString: (item) => item.status,
+        sortValue: (item) => item.status,
+        cellBuilder: (context, item, index, isDark, brandPrimary) {
+          final isOos = item.closingQty <= 0;
+          final isLow = item.closingQty > 0 && item.closingQty <= 10;
+          final Color color = isOos
+              ? const Color(0xFFEF4444)
+              : (isLow ? const Color(0xFFF59E0B) : const Color(0xFF10B981));
+          final String text = isOos ? 'Out of Stock' : (isLow ? 'Low Stock' : 'Active Custody');
+
+          return Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(5),
+                border: Border.all(color: color.withValues(alpha: 0.25)),
+              ),
+              child: Text(
+                text,
+                style: GoogleFonts.inter(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    ];
+  }
+
+  void _showHolderCustodyDetailModal(BuildContext context, StockHolderCustodyEntity h, bool isDark) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Container(
+            width: 580,
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0D9488).withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  h.holderType.toUpperCase(),
+                                  style: GoogleFonts.inter(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFF0D9488),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                h.holderId,
+                                style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            h.holderName,
+                            style: GoogleFonts.inter(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 20),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Location & Contact Bar
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.location_on_rounded, size: 16, color: Color(0xFF0D9488)),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          '${h.state} • ${h.lga} ${h.city.isNotEmpty ? "(${h.city})" : ""}',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          ),
+                        ),
+                      ),
+                      if (h.phone.isNotEmpty) ...[
+                        const Icon(Icons.phone_rounded, size: 14, color: Color(0xFF2563EB)),
+                        const SizedBox(width: 4),
+                        Text(
+                          h.phone,
+                          style: GoogleFonts.inter(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF2563EB),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Product Card
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.inventory_2_rounded, size: 18, color: Color(0xFF0D9488)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              h.productName,
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                              ),
+                            ),
+                            Text(
+                              'SKU: ${h.productSku} • Valuation Rate: ₦${_currencyFormat.format(h.valuationRate)}',
+                              style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Period Movement Grid
+                Text(
+                  'Period Movement (${DateFormat("d MMM yyyy").format(_pangeaStartDate)} – ${DateFormat("d MMM yyyy").format(_pangeaEndDate)})',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF64748B),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    _buildMovementCell('Opening', '${h.openingQty}', '₦${_compactCurrency.format(h.openingValue)}', const Color(0xFF64748B), isDark),
+                    const SizedBox(width: 8),
+                    _buildMovementCell('Intake In (+)', '+${h.inQty}', '₦${_compactCurrency.format(h.inValue)}', const Color(0xFF10B981), isDark),
+                    const SizedBox(width: 8),
+                    _buildMovementCell('Dispatched (-)', '-${h.outQty}', '₦${_compactCurrency.format(h.outValue)}', const Color(0xFFEF4444), isDark),
+                    const SizedBox(width: 8),
+                    _buildMovementCell('Closing Balance', '${h.closingQty}', '₦${_compactCurrency.format(h.closingValue)}', const Color(0xFF0D9488), isDark),
+                  ],
+                ),
+                const SizedBox(height: 20),
+
+                // Total Value Highlight
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Total Asset Value in Custody:',
+                        style: GoogleFonts.inter(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                      ),
+                      Text(
+                        '₦${_currencyFormat.format(h.closingValue)}',
+                        style: GoogleFonts.inter(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFF10B981),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMovementCell(String label, String units, String value, Color color, bool isDark) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+        ),
+        child: Column(
+          children: [
+            Text(
+              label,
+              style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8)),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 3),
+            Text(
+              units,
+              style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w800, color: color),
+            ),
+            Text(
+              value,
+              style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _exportCustodyCsv(List<StockHolderCustodyEntity> holders) {
+    final buffer = StringBuffer();
+    buffer.writeln('Custodian Name,Custodian Type,Custodian ID,Product Name,Product SKU,State,LGA,City,Contact Phone,Opening Qty,Opening Value (NGN),Stock In,Stock Out,Closing Qty,Valuation Rate (NGN),Closing Value (NGN),Status');
+    for (final h in holders) {
+      buffer.writeln(
+        '"${h.holderName.replaceAll('"', '""')}","${h.holderType}","${h.holderId}","${h.productName.replaceAll('"', '""')}","${h.productSku}","${h.state}","${h.lga}","${h.city}","${h.phone}",${h.openingQty},${h.openingValue},${h.inQty},${h.outQty},${h.closingQty},${h.valuationRate},${h.closingValue},"${h.status}"',
+      );
+    }
+    Clipboard.setData(ClipboardData(text: buffer.toString()));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: const Color(0xFF0D9488),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Stock Custody & Product Holders CSV copied to clipboard (${holders.length} records)!',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: Colors.white),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1644,8 +2906,9 @@ class _ClientInventoryPageState extends ConsumerState<ClientInventoryPage> with 
               enablePagination: true,
               initialPageSize: 25,
               showTopToolbar: true,
-              rowHeight: 56.0,
+              rowHeight: 68.0,
               brandPrimary: const Color(0xFF0D9488),
+              dateExtractor: (inv) => inv.entryDate,
               emptyMessage: 'No stock intake invoices found. Click "+ New Intake Bill" to raise one.',
               onRowTap: (inv) => ClientStockInvoiceDetailModal.show(context, invoice: inv),
             ),
@@ -1681,8 +2944,10 @@ class _ClientInventoryPageState extends ConsumerState<ClientInventoryPage> with 
         minWidth: 130.0,
         searchString: (item) => '${item.invoiceNumber} ${DateFormat('dd MMM yyyy').format(item.entryDate)}',
         sortValue: (item) => item.invoiceNumber,
+        dateValue: (item) => item.entryDate,
         cellBuilder: (context, item, index, isDark, brandPrimary) {
           return Column(
+            mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1797,13 +3062,14 @@ class _ClientInventoryPageState extends ConsumerState<ClientInventoryPage> with 
         sortValue: (item) => item.totalUnits,
         cellBuilder: (context, item, index, isDark, brandPrimary) {
           return Column(
+            mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
                 '${NumberFormat('#,###').format(item.totalUnits)} units',
                 style: GoogleFonts.inter(
-                  fontSize: 12.5,
+                  fontSize: 12.0,
                   fontWeight: FontWeight.w700,
                   color: isDark ? Colors.white : const Color(0xFF0F172A),
                 ),
@@ -1811,7 +3077,7 @@ class _ClientInventoryPageState extends ConsumerState<ClientInventoryPage> with 
               Text(
                 '${item.items.length} line item${item.items.length == 1 ? '' : 's'}',
                 style: GoogleFonts.inter(
-                  fontSize: 10.5,
+                  fontSize: 10.0,
                   color: const Color(0xFF64748B),
                 ),
               ),
@@ -1831,13 +3097,14 @@ class _ClientInventoryPageState extends ConsumerState<ClientInventoryPage> with 
         cellBuilder: (context, item, index, isDark, brandPrimary) {
           final unitRate = item.totalUnits > 0 ? (item.grandTotalLandedCost / item.totalUnits) : 0.0;
           return Column(
+            mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
                 '₦${_currencyFormat.format(item.grandTotalLandedCost)}',
                 style: GoogleFonts.inter(
-                  fontSize: 12.5,
+                  fontSize: 12.0,
                   fontWeight: FontWeight.w800,
                   color: const Color(0xFF0D9488),
                 ),
@@ -1846,7 +3113,7 @@ class _ClientInventoryPageState extends ConsumerState<ClientInventoryPage> with 
                 Text(
                   '₦${_currencyFormat.format(unitRate)}/unit',
                   style: GoogleFonts.inter(
-                    fontSize: 10.5,
+                    fontSize: 10.0,
                     color: const Color(0xFF64748B),
                   ),
                 ),
@@ -1902,12 +3169,15 @@ class _ClientInventoryPageState extends ConsumerState<ClientInventoryPage> with 
                 children: [
                   const Icon(Icons.receipt_long_outlined, size: 12, color: Color(0xFFF59E0B)),
                   const SizedBox(width: 4),
-                  Text(
-                    'No Receipt',
-                    style: GoogleFonts.inter(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFFF59E0B),
+                  Flexible(
+                    child: Text(
+                      'No Receipt',
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFFF59E0B),
+                      ),
                     ),
                   ),
                 ],
@@ -1918,39 +3188,68 @@ class _ClientInventoryPageState extends ConsumerState<ClientInventoryPage> with 
       ),
       ExcelColumnDef<ClientStockInvoice>(
         key: 'status',
-        label: 'Ledger Status',
+        label: 'Intake & Reception',
         group: 'Audit Proof',
-        defaultWidth: 130.0,
-        minWidth: 100.0,
+        defaultWidth: 155.0,
+        minWidth: 120.0,
         align: TextAlign.center,
-        searchString: (item) => item.status,
+        searchString: (item) => '${item.status} ${item.isVerified ? "verified" : ""} ${item.hasDiscrepancy ? "discrepancy" : ""}',
         sortValue: (item) => item.status,
         cellBuilder: (context, item, index, isDark, brandPrimary) {
-          final isPosted = item.isProcessed;
+          final isDiscrepancy = item.hasDiscrepancy;
+          final isVerified = item.isVerified;
+          final isAwaiting = item.isAwaitingInspection;
+
+          Color badgeColor;
+          IconData badgeIcon;
+          String badgeText;
+
+          if (isDiscrepancy) {
+            badgeColor = const Color(0xFFEF4444);
+            badgeIcon = Icons.warning_amber_rounded;
+            final discUnits = item.damagedUnits + item.missingUnits;
+            badgeText = discUnits > 0 ? '$discUnits Units Flagged' : 'Discrepancy';
+          } else if (isVerified) {
+            badgeColor = const Color(0xFF10B981);
+            badgeIcon = Icons.verified_rounded;
+            badgeText = 'Verified & Credited';
+          } else if (isAwaiting) {
+            badgeColor = const Color(0xFF3B82F6);
+            badgeIcon = Icons.local_shipping_rounded;
+            badgeText = 'Awaiting DC Intake';
+          } else {
+            badgeColor = const Color(0xFFF59E0B);
+            badgeIcon = Icons.hourglass_top_rounded;
+            badgeText = 'In Transit';
+          }
+
           return Center(
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: isPosted
-                    ? const Color(0xFF10B981).withValues(alpha: 0.12)
-                    : const Color(0xFFF59E0B).withValues(alpha: 0.12),
+                color: badgeColor.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: badgeColor.withValues(alpha: 0.3), width: 0.8),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    isPosted ? Icons.check_circle_rounded : Icons.pending_rounded,
+                    badgeIcon,
                     size: 12,
-                    color: isPosted ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                    color: badgeColor,
                   ),
                   const SizedBox(width: 4),
-                  Text(
-                    isPosted ? 'Ledger Posted' : 'Draft Intake',
-                    style: GoogleFonts.inter(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w700,
-                      color: isPosted ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                  Flexible(
+                    child: Text(
+                      badgeText,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        color: badgeColor,
+                      ),
                     ),
                   ),
                 ],
@@ -2213,9 +3512,12 @@ class _ClientInventoryPageState extends ConsumerState<ClientInventoryPage> with 
                                 children: [
                                   Icon(icon, size: 12, color: fg),
                                   const SizedBox(width: 4),
-                                  Text(
-                                    e.stockHealthStatus,
-                                    style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w800, color: fg),
+                                  Flexible(
+                                    child: Text(
+                                      e.stockHealthStatus,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w800, color: fg),
+                                    ),
                                   ),
                                 ],
                               ),
@@ -2365,6 +3667,7 @@ class _ClientInventoryPageState extends ConsumerState<ClientInventoryPage> with 
                         enablePagination: true,
                         initialPageSize: 25,
                         rowHeight: 48.0,
+                        dateExtractor: (e) => e.supplier.createdAt,
                       );
                     },
                   ),

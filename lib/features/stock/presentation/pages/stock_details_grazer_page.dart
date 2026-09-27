@@ -14,6 +14,8 @@ import '../../domain/entities/stock_item.dart';
 import '../providers/stock_provider.dart';
 import '../widgets/return_stock_modal.dart';
 
+typedef StockDetailsPage = StockDetailsGrazerPage;
+
 class StockDetailsGrazerPage extends ConsumerWidget {
   final String productName;
   final StockItemEntity? stockItem;
@@ -99,7 +101,8 @@ class StockDetailsGrazerPage extends ConsumerWidget {
 
     // 3. Find active orders assigned to rider requiring this product
     final tiedOrders = ordersState.orders.where((o) {
-      final matchesProduct = o.productName.toLowerCase() == displayName.toLowerCase() ||
+      final matchesProduct = (item != null && o.productId == item.id) ||
+          o.productName.toLowerCase() == displayName.toLowerCase() ||
           o.productName.toLowerCase().contains(displayName.toLowerCase()) ||
           displayName.toLowerCase().contains(o.productName.toLowerCase());
       final isActive = o.status != 'delivered' && o.status != 'cancelled';

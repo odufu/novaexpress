@@ -277,6 +277,7 @@ class _ClientOrdersPageState extends ConsumerState<ClientOrdersPage> {
                 columns: _buildOrderColumns(context, isDark, state.clientProfile.brandPrimaryColor),
                 brandPrimary: state.clientProfile.brandPrimaryColor,
                 emptyMessage: 'No matching orders found',
+                dateExtractor: (order) => order.createdAt,
                 onRowTap: (order) => ClientOrderTrackingModal.show(context, order),
               ),
             )
@@ -489,6 +490,7 @@ class _ClientOrdersPageState extends ConsumerState<ClientOrdersPage> {
         minWidth: 130,
         searchString: (o) => '${o.orderNumber} ${o.createdAt.toLocal().toString().substring(0, 16)}',
         sortValue: (o) => o.createdAt,
+        dateValue: (o) => o.createdAt,
         cellBuilder: (context, order, row, isDark, brand) {
           return InkWell(
             onTap: () => ClientOrderTrackingModal.show(context, order),

@@ -19,10 +19,11 @@ import '../../domain/entities/dc_transaction_record.dart';
 import '../../domain/entities/distribution_center.dart';
 
 final List<DistributionCenter> defaultDistributionCenters = [
+  // 1. Grand DC (Apex Central DC - Wuse branch default)
   DistributionCenter(
     id: '22222222-2222-4222-8222-222222222222',
     companyId: '11111111-1111-4111-8111-111111111111',
-    name: 'Wuse Central Distribution Hub',
+    name: 'Wuse Grand Central Distribution Center',
     code: 'DC-WUSE-01',
     state: 'Federal Capital Territory',
     city: 'Wuse 2',
@@ -35,8 +36,76 @@ final List<DistributionCenter> defaultDistributionCenters = [
     isActive: true,
     operatingZones: const ['Abuja Municipal (AMAC)', 'AMAC', 'Wuse I', 'Wuse II', 'Maitama', 'Garki', 'Jabi', 'Utako', 'Central Area', 'Guzape'],
     storageCapacityUnits: 50000,
-    totalAssignedRiders: 0,
-    activeInventoryBatches: 0,
+    totalAssignedRiders: 2,
+    activeInventoryBatches: 12,
+    createdAt: DateTime(2026, 1, 1),
+    updatedAt: DateTime(2026, 1, 1),
+  ),
+
+  // 2. Hub Distribution Center (Regional Hub)
+  DistributionCenter(
+    id: '00000000-0000-4000-8000-789382566045',
+    companyId: '11111111-1111-4111-8111-111111111111',
+    name: 'Kaduna Main DC',
+    code: 'DC-KD-001',
+    state: 'Kaduna',
+    city: 'Birnin Gwari',
+    address: '14 Ahmadu Bello Way, Kaduna',
+    contactPhone: '+234 802 222 2222',
+    contactEmail: 'kaduna.hub@novaxpress.ng',
+    managerName: 'Grace Okon',
+    isGrandDc: false,
+    isHub: true,
+    isActive: true,
+    operatingZones: const ['Kaduna North', 'Kaduna South', 'Chikun', 'Birnin Gwari'],
+    storageCapacityUnits: 35000,
+    totalAssignedRiders: 1,
+    activeInventoryBatches: 5,
+    createdAt: DateTime(2026, 1, 1),
+    updatedAt: DateTime(2026, 1, 1),
+  ),
+
+  // 3. General Distribution Centers (Local / Station DCs)
+  DistributionCenter(
+    id: '00000000-0000-4000-8000-789334173209',
+    companyId: '11111111-1111-4111-8111-111111111111',
+    name: 'Otukpo Central Distribution',
+    code: 'DC-OTUKPO-001',
+    state: 'Benue',
+    city: 'Otukpo',
+    address: 'Federal Road, Otukpo Town',
+    contactPhone: '+234 807 333 4444',
+    contactEmail: 'otukpo.dc@novaxpress.ng',
+    managerName: 'Emmanuel Audu',
+    isGrandDc: false,
+    isHub: false,
+    isActive: true,
+    operatingZones: const ['Otukpo', 'Ogbadibo', 'Okpokwu', 'Ado'],
+    storageCapacityUnits: 35000,
+    totalAssignedRiders: 1,
+    activeInventoryBatches: 2,
+    createdAt: DateTime(2026, 1, 1),
+    updatedAt: DateTime(2026, 1, 1),
+  ),
+
+  DistributionCenter(
+    id: '00000000-0000-4000-8000-789360182886',
+    companyId: '11111111-1111-4111-8111-111111111111',
+    name: 'LAGOS MAIN DC',
+    code: 'DC-LGS-001',
+    state: 'Lagos',
+    city: 'Badagry',
+    address: 'Badagry Expressway, Lagos',
+    contactPhone: '+234 808 504 0146',
+    contactEmail: 'lagos.dc@novaxpress.ng',
+    managerName: 'Babatunde Ade',
+    isGrandDc: false,
+    isHub: false,
+    isActive: true,
+    operatingZones: const ['Agege', 'Ajeromi-Ifelodun', 'Alimosho', 'Amuwo-Odofin', 'Apapa', 'Badagry', 'Epe', 'Ibeju-Lekki', 'Ikeja', 'Ikorodu', 'Kosofe', 'Lagos Island', 'Lagos Mainland', 'Mushin', 'Ojo', 'Oshodi-Isolo', 'Somolu', 'Surulere'],
+    storageCapacityUnits: 35000,
+    totalAssignedRiders: 2,
+    activeInventoryBatches: 4,
     createdAt: DateTime(2026, 1, 1),
     updatedAt: DateTime(2026, 1, 1),
   ),
@@ -353,10 +422,12 @@ class DCConsoleState {
   List<DistributionCenter> get filteredDistributionCenters {
     var list = distributionCenters.isNotEmpty ? distributionCenters : defaultDistributionCenters;
     if (dcFilter != 'all') {
-      if (dcFilter == 'hubs') {
-        list = list.where((d) => d.isHub).toList();
-      } else if (dcFilter == 'satellites') {
-        list = list.where((d) => !d.isHub).toList();
+      if (dcFilter == 'grand') {
+        list = list.where((d) => d.isGrand).toList();
+      } else if (dcFilter == 'hubs') {
+        list = list.where((d) => d.isHubDc).toList();
+      } else if (dcFilter == 'satellites' || dcFilter == 'general') {
+        list = list.where((d) => d.isGeneralDc).toList();
       } else if (dcFilter == 'active') {
         list = list.where((d) => d.isActive).toList();
       } else if (dcFilter == 'inactive') {
@@ -1240,7 +1311,13 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
         final existingLocal = state.distributionCenters;
         final mergedDcs = <DistributionCenter>[...dcs];
         for (final local in existingLocal) {
-          if (!mergedDcs.any((d) => d.id == local.id || d.code.toUpperCase() == local.code.toUpperCase())) {
+          final isDuplicate = mergedDcs.any((d) =>
+              d.id == local.id ||
+              d.code.trim().toUpperCase() == local.code.trim().toUpperCase() ||
+              (d.state.trim().toLowerCase() == local.state.trim().toLowerCase() &&
+                  d.city.trim().toLowerCase() == local.city.trim().toLowerCase()) ||
+              d.name.trim().toLowerCase() == local.name.trim().toLowerCase());
+          if (!isDuplicate) {
             mergedDcs.add(local);
           }
         }

@@ -264,7 +264,7 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
       
       // Automatically deduct delivered physical stock units from vehicle custody
       if (orderObj != null) {
-        final prodName = orderObj.productName.isNotEmpty ? orderObj.productName : 'Respira Detox Tea';
+        final prodName = orderObj.productName.isNotEmpty ? orderObj.productName : (orderObj.productSku ?? 'Product Item');
         final physicalQty = orderObj.quantity > 0 ? orderObj.quantity : 1;
         await ref.read(stockProvider.notifier).recordDeliveredOrderStock(
               productNameOrSku: prodName,

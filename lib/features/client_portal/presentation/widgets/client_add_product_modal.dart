@@ -433,7 +433,7 @@ class _ClientAddProductModalState extends ConsumerState<ClientAddProductModal> {
                         },
                         style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : Colors.black87),
                         decoration: InputDecoration(
-                          hintText: 'e.g. Respira Detox Herbal Tea',
+                          hintText: 'e.g. Premium Wellness Formula',
                           hintStyle: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF94A3B8)),
                           filled: true,
                           fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),

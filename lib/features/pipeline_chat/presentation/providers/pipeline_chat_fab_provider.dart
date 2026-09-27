@@ -106,9 +106,11 @@ class PipelineChatDraggableFabLocation extends FloatingActionButtonLocation {
     }
 
     // Default positioning:
-    // Float at 88px from bottom on all screens so it naturally sits comfortably
-    // above sticky action bars, bottom buttons, and modals!
-    const double bottomMargin = 88.0;
+    // If a bottom navigation bar is present, scaffoldGeometry.contentBottom already sits
+    // right above the bottom nav bar, so standard margin (16.0) docks it neatly in the bottom corner.
+    // On wide desktop screens without a bottom bar, float at 84.0 to clear sticky footers.
+    final bool hasBottomBar = scaffoldGeometry.contentBottom < (maxH - 30);
+    final double bottomMargin = hasBottomBar ? 16.0 : (maxW >= 960 ? 84.0 : 16.0);
     final double defaultX = maxW - fabWidth - margin;
     final double defaultY = (scaffoldGeometry.contentBottom - fabHeight - bottomMargin)
         .clamp(margin, maxH - fabHeight - margin);

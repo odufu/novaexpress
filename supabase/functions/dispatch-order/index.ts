@@ -50,12 +50,13 @@ serve(async (req: Request) => {
       deliveryLga = (ord.delivery_lga || ord.lga || deliveryLga || "").trim();
     }
 
-    // 1. Fetch Grand DC (HQ)
+    // 1. Fetch Grand DC (Wuse Central Grand DC default)
     const { data: grandDcs } = await supabase
       .from("distribution_centers")
       .select("*")
-      .eq("is_grand_dc", true)
+      .or("is_grand_dc.eq.true,dc_type.eq.grand_dc")
       .eq("is_active", true)
+      .order("created_at", { ascending: true })
       .limit(1);
 
     const grandDc = grandDcs && grandDcs.length > 0 ? grandDcs[0] : null;

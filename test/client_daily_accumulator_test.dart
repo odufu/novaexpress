@@ -15,6 +15,7 @@ void main() {
       bankName: 'Access Bank',
       accountNumber: '0123456789',
       accountName: 'Novacare Health Ltd',
+      customPlatformFeeValue: 0.0,
     );
 
     final order1 = OrderEntity(

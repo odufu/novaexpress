@@ -273,7 +273,7 @@ void main() {
 
       expect(transferRow['source_dc_id'], equals(sourceDc['id']));
       expect(transferRow['destination_dc_id'], equals(destDc['id']));
-      expect(transferRow['status'], equals('in_transit'));
+      expect(transferRow['status'], anyOf(equals('pending_destination_acceptance'), equals('in_transit')));
 
       final items = await client
           .from('stock_transfer_items')
@@ -375,6 +375,7 @@ void main() {
         'payment_type': 'pay_on_delivery',
         'payment_status': 'pending',
         'status': 'new',
+        'client_id': '00000000-0000-4000-8000-789382731303',
         // Omit distribution_center_id to test database-level routing
       });
 

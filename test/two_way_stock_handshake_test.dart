@@ -147,6 +147,31 @@ class MockTwoWayStockRepository implements StockRepository {
   }
 
   @override
+  Future<Map<String, dynamic>> receiveSupplyConsignmentHandshake({
+    required String transferId,
+    required String receiverId,
+    required String receiverName,
+    String receiverRole = 'dc_supervisor',
+    String receiverSignatureUrl = '',
+    String carrierDriverName = '',
+    String carrierPhone = '',
+    String carrierLicensePlate = '',
+    String waybillSlipUrl = '',
+    String destinationBin = '',
+    required List<Map<String, dynamic>> verifiedItems,
+    String? notes,
+  }) async {
+    return receiveClientSupply(
+      transferId: transferId,
+      receiverId: receiverId,
+      receiverName: receiverName,
+      receiverSignatureUrl: receiverSignatureUrl,
+      verifiedItems: verifiedItems,
+      notes: notes,
+    );
+  }
+
+  @override
   Future<Map<String, dynamic>> transferStockBetweenDCs({
     required String productIdOrSku,
     required String sourceDcId,
