@@ -43,7 +43,14 @@ class PaystackService {
         baseUrl = baseUrl ?? PaystackConstants.apiBaseUrl,
         _supabaseClient = supabaseClient;
 
-  SupabaseClient get _dbClient => _supabaseClient ?? Supabase.instance.client;
+  SupabaseClient? get _dbClient {
+    if (_supabaseClient != null) return _supabaseClient;
+    try {
+      return Supabase.instance.client;
+    } catch (_) {
+      return null;
+    }
+  }
 
   /// Initializes a Paystack transaction and returns checkout/authorization URL.
   Future<Map<String, dynamic>> initializeTransaction({
@@ -68,7 +75,7 @@ class PaystackService {
           'email': email.isNotEmpty ? email : 'customer@novaxpress.ng',
           'amount': amountInKobo,
           'reference': reference,
-          'callback_url': callbackUrl ?? PaystackConstants.webhookUrl,
+          'callback_url': callbackUrl ?? 'https://standard.paystack.co/close',
           'metadata': metadata,
           'channels': ['bank_transfer', 'card', 'ussd', 'qr'],
         }),
@@ -137,8 +144,18 @@ class PaystackService {
 
   /// Fallback to check if webhook or local audit log already recorded the payment.
   Future<PaystackVerificationResult> _verifyViaSupabaseFallback(String reference) async {
+    final client = _dbClient;
+    if (client == null) {
+      return PaystackVerificationResult(
+        isSuccessful: false,
+        reference: reference,
+        amount: 0.0,
+        status: 'unverified',
+        gatewayResponse: 'Payment not yet detected or verified',
+      );
+    }
     try {
-      final res = await _dbClient
+      final res = await client
           .from(SupabaseConstants.paystackTransactionsTable)
           .select('*')
           .eq('reference', reference)
@@ -200,9 +217,14 @@ class PaystackService {
     };
 
     try {
-      await _dbClient
-          .from(SupabaseConstants.paystackTransactionsTable)
-          .upsert(payload, onConflict: 'reference');
+      final client = _dbClient;
+      if (client != null) {
+        await client
+            .from(SupabaseConstants.paystackTransactionsTable)
+            .upsert(payload, onConflict: 'reference');
+      } else {
+        throw Exception('No active client');
+      }
     } catch (e) {
       SupabaseClient? serviceClient;
       try {

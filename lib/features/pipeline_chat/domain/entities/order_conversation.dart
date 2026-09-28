@@ -19,6 +19,10 @@ class OrderConversationEntity {
   final String? closerId;
   final String? closerName;
   final String? closerAvatarUrl;
+  final String? marketerId;
+  final String? marketerName;
+  final String? marketerAvatarUrl;
+  final String? formId;
 
   // Order state snapshot
   final String orderStatus;
@@ -54,6 +58,10 @@ class OrderConversationEntity {
     this.closerId,
     this.closerName,
     this.closerAvatarUrl,
+    this.marketerId,
+    this.marketerName,
+    this.marketerAvatarUrl,
+    this.formId,
     this.orderStatus = 'pending',
     this.currentProductName,
     this.currentPackageName,
@@ -83,6 +91,10 @@ class OrderConversationEntity {
     String? closerId,
     String? closerName,
     String? closerAvatarUrl,
+    String? marketerId,
+    String? marketerName,
+    String? marketerAvatarUrl,
+    String? formId,
     String? orderStatus,
     String? currentProductName,
     String? currentPackageName,
@@ -111,6 +123,10 @@ class OrderConversationEntity {
       closerId: closerId ?? this.closerId,
       closerName: closerName ?? this.closerName,
       closerAvatarUrl: closerAvatarUrl ?? this.closerAvatarUrl,
+      marketerId: marketerId ?? this.marketerId,
+      marketerName: marketerName ?? this.marketerName,
+      marketerAvatarUrl: marketerAvatarUrl ?? this.marketerAvatarUrl,
+      formId: formId ?? this.formId,
       orderStatus: orderStatus ?? this.orderStatus,
       currentProductName: currentProductName ?? this.currentProductName,
       currentPackageName: currentPackageName ?? this.currentPackageName,

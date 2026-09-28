@@ -8,6 +8,7 @@ import '../entities/client_stock_invoice.dart';
 import '../entities/client_stock_balance.dart';
 import '../entities/stock_holder_custody.dart';
 import '../entities/client_marketer.dart';
+import '../entities/client_marketer_payout.dart';
 import '../entities/lead_form.dart';
 
 abstract class ClientPortalRepository {
@@ -75,6 +76,11 @@ abstract class ClientPortalRepository {
     double dailyAdSpendBudget = 0.0,
     double commissionRate = 0.0,
     bool isCommissionEnabled = false,
+    bool isSupervisor = false,
+    String? supervisorId,
+    String commissionModel = 'per_form_submission',
+    double commissionPerFormSubmission = 0.0,
+    double commissionPerDeliveredOrder = 0.0,
     String? bankName,
     String? accountNumber,
     String? accountName,
@@ -82,6 +88,50 @@ abstract class ClientPortalRepository {
   Future<void> toggleMarketerStatus({
     required String marketerId,
     required bool isActive,
+  });
+  Future<ClientMarketer> updateMarketerProfile({
+    required String marketerId,
+    String? fullName,
+    String? phone,
+    String? avatarUrl,
+    String? bankName,
+    String? accountNumber,
+    String? accountName,
+  });
+  Future<ClientMarketer> updateMarketerDetails({
+    required String marketerId,
+    required String fullName,
+    required String phone,
+    required String email,
+    required double dailyAdSpendBudget,
+    required String commissionModel,
+    required double commissionRate,
+    required double commissionPerFormSubmission,
+    required double commissionPerDeliveredOrder,
+    required bool isCommissionEnabled,
+    required bool isSupervisor,
+    String? supervisorId,
+    String? bankName,
+    String? accountNumber,
+    String? accountName,
+  });
+  Future<void> deleteMarketer(String marketerId);
+  Future<void> resetMarketerPassword({
+    required String marketerId,
+    required String newPassword,
+  });
+  Future<List<ClientMarketerPayout>> getMarketerPayouts(String marketerId);
+  Future<List<ClientMarketerPayout>> getClientMarketerPayouts(String clientId);
+  Future<ClientMarketerPayout> disburseMarketerPayout({
+    required String marketerId,
+    required String clientId,
+    required double amount,
+    required String bankName,
+    required String accountNumber,
+    required String accountName,
+    String? disbursementRef,
+    String? proofOfPaymentUrl,
+    String? notes,
   });
 
   Future<List<LeadForm>> getLeadForms(String clientId, {String? marketerId});
@@ -125,6 +175,18 @@ abstract class ClientPortalRepository {
     String? deliveryState,
     String? deliveryLga,
     String? notes,
+    String action = 'confirm',
+    String? customerName,
+    String? customerPhone,
+    String? customerAltPhone,
+    String? packageDealName,
+    String? packageDealId,
+    int? quantity,
+    int? paidQuantity,
+    int? freeQuantity,
+    double? totalAmount,
+    DateTime? scheduledDeliveryDate,
+    String? cancellationReason,
   });
 
   /// Closer Payout Management

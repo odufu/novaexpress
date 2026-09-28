@@ -11,6 +11,9 @@ import '../providers/client_portal_provider.dart';
 import '../widgets/client_form_builder_modal.dart';
 import '../widgets/client_form_embed_modal.dart';
 import '../widgets/client_onboard_marketer_modal.dart';
+import '../widgets/client_edit_marketer_profile_modal.dart';
+import '../widgets/client_marketer_detail_modal.dart';
+import '../../../../core/widgets/user_avatar_widget.dart';
 
 class ClientMarketingSuitePage extends ConsumerStatefulWidget {
   const ClientMarketingSuitePage({super.key});
@@ -502,83 +505,147 @@ class _ClientMarketingSuitePageState extends ConsumerState<ClientMarketingSuiteP
             ? ((marketer.totalOrdersDelivered / marketer.totalLeadsGenerated) * 100).toStringAsFixed(1)
             : '0.0';
 
-        return Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => ClientMarketerDetailModal.show(context, marketer: marketer),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0)),
-          ),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: const Color(0xFF10B981).withValues(alpha: 0.15),
-                child: Text(
-                  marketer.fullName.isNotEmpty ? marketer.fullName[0].toUpperCase() : 'M',
-                  style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF10B981)),
-                ),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0)),
               ),
-              const SizedBox(width: 14),
+              child: Row(
+                children: [
+                  UserAvatarWidget(
+                    avatarUrl: marketer.avatarUrl,
+                    fullName: marketer.fullName,
+                    radius: 20,
+                  ),
+                  const SizedBox(width: 14),
 
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        Row(
+                          children: [
+                            Text(
+                              marketer.fullName,
+                              style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                            ),
+                            const SizedBox(width: 8),
+                            if (marketer.isSupervisor)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF6366F1).withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.shield_rounded, size: 10, color: Color(0xFF6366F1)),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      'SUPERVISOR',
+                                      style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w800, color: const Color(0xFF6366F1)),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            else
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  marketer.marketerCode,
+                                  style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: const Color(0xFF10B981)),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
                         Text(
-                          marketer.fullName,
-                          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                          '${marketer.email} • ${marketer.phone}',
+                          style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
                         ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF10B981).withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(4),
+                        if (!marketer.isSupervisor && marketer.supervisorName != null && marketer.supervisorName!.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              const Icon(Icons.subdirectory_arrow_right_rounded, size: 12, color: Color(0xFF6366F1)),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Supervised by ${marketer.supervisorName}',
+                                style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w600, color: const Color(0xFF6366F1)),
+                              ),
+                            ],
                           ),
-                          child: Text(
-                            marketer.marketerCode,
-                            style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: const Color(0xFF10B981)),
-                          ),
-                        ),
+                        ],
                       ],
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${marketer.email} • ${marketer.phone}',
-                      style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
-                    ),
-                  ],
-                ),
-              ),
+                  ),
 
-              // Stats
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    'Budget: ${currencyFormatter.format(marketer.dailyAdSpendBudget)}/day',
-                    style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF0EA5E9)),
+                  // Stats
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        marketer.commissionModel == 'per_form_submission'
+                            ? 'Comm: ${currencyFormatter.format(marketer.effectiveCommissionPerSubmission)}/Form'
+                            : 'Comm: ${currencyFormatter.format(marketer.effectiveCommissionPerDelivery)}/Delivery',
+                        style: GoogleFonts.inter(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: marketer.commissionModel == 'per_form_submission' ? const Color(0xFF10B981) : const Color(0xFF0284C7),
+                        ),
+                      ),
+                      Text(
+                        'Budget: ${currencyFormatter.format(marketer.dailyAdSpendBudget)}/day',
+                        style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF0EA5E9)),
+                      ),
+                      Text(
+                        '${marketer.totalLeadsGenerated} Leads • ${marketer.totalOrdersDelivered} dlvd ($conversion%)',
+                        style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                      ),
+                      if (marketer.totalCommissionEarned > 0)
+                        Text(
+                          'Earned: ${currencyFormatter.format(marketer.totalCommissionEarned)}',
+                          style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF10B981)),
+                        ),
+                    ],
                   ),
-                  Text(
-                    '${marketer.totalLeadsGenerated} Leads • ${marketer.totalOrdersDelivered} dlvd ($conversion%)',
-                    style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                  const SizedBox(width: 12),
+
+                  // Edit profile icon
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF6366F1)),
+                    tooltip: 'Edit Profile & Details',
+                    onPressed: () => ClientEditMarketerProfileModal.show(context, marketer: marketer),
                   ),
+                  const SizedBox(width: 4),
+
+                  // Status switch
+                  Switch.adaptive(
+                    value: marketer.isActive,
+                    activeColor: const Color(0xFF10B981),
+                    onChanged: (val) async {
+                      await ref.read(clientPortalProvider.notifier).updateMarketerStatus(marketer.id, val);
+                    },
+                  ),
+                  const SizedBox(width: 4),
+
+                  // Navigation Chevron
+                  const Icon(Icons.chevron_right_rounded, size: 20, color: Color(0xFF94A3B8)),
                 ],
               ),
-              const SizedBox(width: 12),
-
-              // Status switch
-              Switch.adaptive(
-                value: marketer.isActive,
-                activeColor: const Color(0xFF10B981),
-                onChanged: (val) async {
-                  await ref.read(clientPortalProvider.notifier).updateMarketerStatus(marketer.id, val);
-                },
-              ),
-            ],
+            ),
           ),
         );
       },

@@ -25,6 +25,8 @@ class OrderConversationMessageModel extends OrderConversationMessageEntity {
       role = ChatSenderRole.client;
     } else if (rStr == 'closer' || rStr == 'client_closer') {
       role = ChatSenderRole.closer;
+    } else if (rStr == 'marketer' || rStr == 'digital_marketer' || rStr == 'client_marketer') {
+      role = ChatSenderRole.marketer;
     } else if (rStr == 'dc_manager' || rStr == 'dc') {
       role = ChatSenderRole.dcManager;
     } else if (rStr == 'delivery_agent' || rStr == 'rider') {
@@ -113,6 +115,9 @@ class OrderConversationMessageModel extends OrderConversationMessageEntity {
         break;
       case ChatSenderRole.closer:
         rStr = 'closer';
+        break;
+      case ChatSenderRole.marketer:
+        rStr = 'marketer';
         break;
       case ChatSenderRole.dcManager:
         rStr = 'dc_manager';

@@ -30,6 +30,7 @@ import '../../domain/entities/client_stock_balance.dart';
 import '../../domain/entities/client_unit_economics.dart';
 import '../../domain/entities/stock_holder_custody.dart';
 import '../../domain/entities/client_marketer.dart';
+import '../../domain/entities/client_marketer_payout.dart';
 import '../../domain/entities/lead_form.dart';
 
 /// Financial metrics summary per product or aggregate
@@ -195,6 +196,7 @@ class ClientPortalState {
   final List<ClientStockBalance> stockBalances;
   final List<StockHolderCustodyEntity> stockHolders;
   final List<ClientCloserPayout> closerPayouts;
+  final List<ClientMarketerPayout> marketerPayouts;
   final List<ClientMarketer> marketers;
   final List<LeadForm> leadForms;
   final String selectedInventoryWarehouseFilter; // 'all' or specific warehouse
@@ -212,6 +214,7 @@ class ClientPortalState {
     this.leads = const [],
     this.settlements = const [],
     this.closerPayouts = const [],
+    this.marketerPayouts = const [],
     this.marketers = const [],
     this.leadForms = const [],
     this.assetCustodyData = const {},
@@ -244,6 +247,7 @@ class ClientPortalState {
     List<CustomerLead>? leads,
     List<ClientSettlement>? settlements,
     List<ClientCloserPayout>? closerPayouts,
+    List<ClientMarketerPayout>? marketerPayouts,
     List<ClientMarketer>? marketers,
     List<LeadForm>? leadForms,
     Map<String, dynamic>? assetCustodyData,
@@ -275,6 +279,7 @@ class ClientPortalState {
       leads: leads ?? this.leads,
       settlements: settlements ?? this.settlements,
       closerPayouts: closerPayouts ?? this.closerPayouts,
+      marketerPayouts: marketerPayouts ?? this.marketerPayouts,
       marketers: marketers ?? this.marketers,
       leadForms: leadForms ?? this.leadForms,
       assetCustodyData: assetCustodyData ?? this.assetCustodyData,
@@ -1499,11 +1504,14 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         debugPrint('[CLIENT_PORTAL] ⚠️ Error loading inventory / custody / closer payouts data: $e');
       }
 
+      List<ClientMarketerPayout> marketerPayouts = [];
+
       try {
         clientMarketers = await _repository.getMarketers(clientId);
         clientForms = await _repository.getLeadForms(clientId);
+        marketerPayouts = await _repository.getClientMarketerPayouts(clientId);
       } catch (mktErr) {
-        debugPrint('[CLIENT_PORTAL] ℹ️ Marketers/forms sync notice: $mktErr');
+        debugPrint('[CLIENT_PORTAL] ℹ️ Marketers/forms/payouts sync notice: $mktErr');
       }
 
       if (!mounted) return;
@@ -1516,6 +1524,7 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         leads: clientLeads,
         settlements: clientSettlements,
         closerPayouts: closerPayouts,
+        marketerPayouts: marketerPayouts,
         marketers: clientMarketers,
         leadForms: clientForms,
         assetCustodyData: custodyData,
@@ -1543,9 +1552,11 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
     String? accountName,
     String? email,
     String? closerId,
+    String? marketerId,
   }) {
     final cleanEmail = email?.trim().toLowerCase() ?? '';
     final cleanCloserId = closerId?.trim() ?? '';
+    final cleanMarketerId = marketerId?.trim() ?? '';
 
     // 1. Update matching closer in the closers list
     final updatedClosers = state.closers.map((c) {
@@ -1562,7 +1573,25 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
       return c;
     }).toList();
 
-    // 2. Update merchant profile if applicable
+    // 2. Update matching marketer in the marketers list
+    final updatedMarketers = state.marketers.map((m) {
+      final matchById = cleanMarketerId.isNotEmpty && (m.id == cleanMarketerId || m.userId == cleanMarketerId);
+      final matchByEmail = cleanEmail.isNotEmpty && m.email.trim().toLowerCase() == cleanEmail;
+
+      if (matchById || matchByEmail) {
+        return m.copyWith(
+          fullName: fullName.isNotEmpty ? fullName : m.fullName,
+          avatarUrl: avatarUrl ?? m.avatarUrl,
+          phone: (phone != null && phone.isNotEmpty) ? phone : m.phone,
+          bankName: (bankName != null && bankName.isNotEmpty) ? bankName : m.bankName,
+          accountNumber: (accountNumber != null && accountNumber.isNotEmpty) ? accountNumber : m.accountNumber,
+          accountName: (accountName != null && accountName.isNotEmpty) ? accountName : m.accountName,
+        );
+      }
+      return m;
+    }).toList();
+
+    // 3. Update merchant profile if applicable
     final updatedProfile = state.clientProfile.copyWith(
       contactPerson: fullName.isNotEmpty ? fullName : state.clientProfile.contactPerson,
       phone: (phone != null && phone.isNotEmpty) ? phone : state.clientProfile.phone,
@@ -1573,6 +1602,7 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
 
     state = state.copyWith(
       closers: updatedClosers,
+      marketers: updatedMarketers,
       clientProfile: updatedProfile,
     );
     debugPrint('[CLIENT_PORTAL] 🔄 Synchronized profile across portal state for: "$fullName" (Avatar: $avatarUrl)');
@@ -1742,6 +1772,11 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
     double dailyAdSpendBudget = 0.0,
     double commissionRate = 0.0,
     bool isCommissionEnabled = false,
+    bool isSupervisor = false,
+    String? supervisorId,
+    String commissionModel = 'per_form_submission',
+    double commissionPerFormSubmission = 0.0,
+    double commissionPerDeliveredOrder = 0.0,
     String? bankName,
     String? accountNumber,
     String? accountName,
@@ -1758,6 +1793,11 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         dailyAdSpendBudget: dailyAdSpendBudget,
         commissionRate: commissionRate,
         isCommissionEnabled: isCommissionEnabled,
+        isSupervisor: isSupervisor,
+        supervisorId: supervisorId,
+        commissionModel: commissionModel,
+        commissionPerFormSubmission: commissionPerFormSubmission,
+        commissionPerDeliveredOrder: commissionPerDeliveredOrder,
         bankName: bankName,
         accountNumber: accountNumber,
         accountName: accountName,
@@ -1790,6 +1830,196 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
 
   Future<void> updateMarketerStatus(String marketerId, bool isActive) =>
       toggleMarketerStatus(marketerId: marketerId, isActive: isActive);
+
+  /// Update digital marketer profile (Avatar, Phone, Bank details)
+  Future<ClientMarketer> updateMarketerProfile({
+    required String marketerId,
+    String? fullName,
+    String? phone,
+    String? avatarUrl,
+    String? bankName,
+    String? accountNumber,
+    String? accountName,
+  }) async {
+    state = state.copyWith(isLoading: true);
+    try {
+      final updated = await _repository.updateMarketerProfile(
+        marketerId: marketerId,
+        fullName: fullName,
+        phone: phone,
+        avatarUrl: avatarUrl,
+        bankName: bankName,
+        accountNumber: accountNumber,
+        accountName: accountName,
+      );
+
+      final updatedList = state.marketers.map((m) => m.id == marketerId ? updated : m).toList();
+      state = state.copyWith(marketers: updatedList, isLoading: false);
+
+      // Synchronize with authProvider if currently logged in user is this marketer
+      final authUser = _ref.read(authProvider).user;
+      if (authUser != null && (authUser.marketerId == marketerId || authUser.id == marketerId)) {
+        final nameParts = (fullName ?? authUser.fullName).trim().split(' ');
+        final fName = nameParts.isNotEmpty ? nameParts.first : '';
+        final lName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+        await _ref.read(authProvider.notifier).updateProfile(
+          firstName: fName,
+          lastName: lName,
+          phone: phone ?? authUser.phone,
+          avatarUrl: avatarUrl ?? authUser.avatarUrl,
+          bankName: bankName ?? authUser.bankName,
+          bankAccountNumber: accountNumber ?? authUser.bankAccountNumber,
+          bankAccountName: accountName ?? authUser.bankAccountName,
+        );
+      }
+
+      return updated;
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] ❌ Error updating marketer profile: $e');
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      rethrow;
+    }
+  }
+
+  /// Update comprehensive Digital Marketer details
+  Future<ClientMarketer> updateMarketerDetails({
+    required String marketerId,
+    required String fullName,
+    required String phone,
+    required String email,
+    required double dailyAdSpendBudget,
+    required String commissionModel,
+    required double commissionRate,
+    required double commissionPerFormSubmission,
+    required double commissionPerDeliveredOrder,
+    required bool isCommissionEnabled,
+    required bool isSupervisor,
+    String? supervisorId,
+    String? bankName,
+    String? accountNumber,
+    String? accountName,
+  }) async {
+    state = state.copyWith(isLoading: true);
+    try {
+      final updated = await _repository.updateMarketerDetails(
+        marketerId: marketerId,
+        fullName: fullName,
+        phone: phone,
+        email: email,
+        dailyAdSpendBudget: dailyAdSpendBudget,
+        commissionModel: commissionModel,
+        commissionRate: commissionRate,
+        commissionPerFormSubmission: commissionPerFormSubmission,
+        commissionPerDeliveredOrder: commissionPerDeliveredOrder,
+        isCommissionEnabled: isCommissionEnabled,
+        isSupervisor: isSupervisor,
+        supervisorId: supervisorId,
+        bankName: bankName,
+        accountNumber: accountNumber,
+        accountName: accountName,
+      );
+
+      final updatedList = state.marketers.map((m) => m.id == marketerId ? updated : m).toList();
+      state = state.copyWith(marketers: updatedList, isLoading: false);
+      return updated;
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] ❌ Error updating marketer details: $e');
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      rethrow;
+    }
+  }
+
+  /// Delete a Digital Marketer
+  Future<void> deleteMarketer(String marketerId) async {
+    state = state.copyWith(isLoading: true);
+    try {
+      await _repository.deleteMarketer(marketerId);
+      final updatedList = state.marketers.where((m) => m.id != marketerId).toList();
+      state = state.copyWith(marketers: updatedList, isLoading: false);
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] ❌ Error deleting marketer: $e');
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      rethrow;
+    }
+  }
+
+  /// Reset Digital Marketer Portal Password
+  Future<void> resetMarketerPassword({
+    required String marketerId,
+    required String newPassword,
+  }) async {
+    try {
+      await _repository.resetMarketerPassword(
+        marketerId: marketerId,
+        newPassword: newPassword,
+      );
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] ❌ Error resetting marketer password: $e');
+      rethrow;
+    }
+  }
+
+  /// Load Payouts for a specific Marketer
+  Future<List<ClientMarketerPayout>> loadMarketerPayouts(String marketerId) async {
+    try {
+      final payouts = await _repository.getMarketerPayouts(marketerId);
+      final existingIds = payouts.map((p) => p.id).toSet();
+      final updatedPayouts = [...payouts, ...state.marketerPayouts.where((p) => !existingIds.contains(p.id))];
+      state = state.copyWith(marketerPayouts: updatedPayouts);
+      return payouts;
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] ❌ Error loading marketer payouts: $e');
+      return [];
+    }
+  }
+
+  /// Disburse Commission Payout to a Digital Marketer
+  Future<ClientMarketerPayout> disburseMarketerPayout({
+    required String marketerId,
+    required double amount,
+    required String bankName,
+    required String accountNumber,
+    required String accountName,
+    String? disbursementRef,
+    String? proofOfPaymentUrl,
+    String? notes,
+  }) async {
+    state = state.copyWith(isLoading: true);
+    try {
+      final payout = await _repository.disburseMarketerPayout(
+        marketerId: marketerId,
+        clientId: state.clientProfile.id,
+        amount: amount,
+        bankName: bankName,
+        accountNumber: accountNumber,
+        accountName: accountName,
+        disbursementRef: disbursementRef,
+        proofOfPaymentUrl: proofOfPaymentUrl,
+        notes: notes,
+      );
+
+      final updatedPayouts = [payout, ...state.marketerPayouts.where((p) => p.id != payout.id)];
+      final updatedMarketers = state.marketers.map((m) {
+        if (m.id == marketerId) {
+          return m.copyWith(
+            totalPaidCommission: m.totalPaidCommission + amount,
+            unpaidCommissionBalance: math.max(0.0, m.unpaidCommissionBalance - amount),
+          );
+        }
+        return m;
+      }).toList();
+
+      state = state.copyWith(
+        marketerPayouts: updatedPayouts,
+        marketers: updatedMarketers,
+        isLoading: false,
+      );
+      return payout;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      rethrow;
+    }
+  }
 
   /// Create a Lead Form for a product
   Future<LeadForm> createLeadForm({
@@ -1920,6 +2150,18 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
     String? deliveryState,
     String? deliveryLga,
     String? notes,
+    String action = 'confirm',
+    String? customerName,
+    String? customerPhone,
+    String? customerAltPhone,
+    String? packageDealName,
+    String? packageDealId,
+    int? quantity,
+    int? paidQuantity,
+    int? freeQuantity,
+    double? totalAmount,
+    DateTime? scheduledDeliveryDate,
+    String? cancellationReason,
   }) async {
     try {
       final result = await _repository.confirmCloserOrder(
@@ -1929,6 +2171,18 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
         deliveryState: deliveryState,
         deliveryLga: deliveryLga,
         notes: notes,
+        action: action,
+        customerName: customerName,
+        customerPhone: customerPhone,
+        customerAltPhone: customerAltPhone,
+        packageDealName: packageDealName,
+        packageDealId: packageDealId,
+        quantity: quantity,
+        paidQuantity: paidQuantity,
+        freeQuantity: freeQuantity,
+        totalAmount: totalAmount,
+        scheduledDeliveryDate: scheduledDeliveryDate,
+        cancellationReason: cancellationReason,
       );
       await loadClientData();
       return result;

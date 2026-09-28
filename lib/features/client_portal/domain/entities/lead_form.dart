@@ -17,6 +17,7 @@ class LeadForm {
   final bool isActive;
   final int totalViews;
   final int totalSubmissions;
+  final int? actualDeliveredCount;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -39,6 +40,7 @@ class LeadForm {
     this.isActive = true,
     this.totalViews = 0,
     this.totalSubmissions = 0,
+    this.actualDeliveredCount,
     this.createdAt,
     this.updatedAt,
   });
@@ -49,7 +51,7 @@ class LeadForm {
 
   String get title => formTitle;
   int get totalOrdersBooked => totalSubmissions;
-  int get totalOrdersDelivered => (totalSubmissions * 0.7).toInt();
+  int get totalOrdersDelivered => actualDeliveredCount ?? (totalSubmissions * 0.7).toInt();
   String get buttonText => appearance['button_text']?.toString() ?? 'CLAIM YOUR ORDER (PAY ON DELIVERY)';
 
   factory LeadForm.fromJson(Map<String, dynamic> json) {
@@ -72,6 +74,7 @@ class LeadForm {
       isActive: json['is_active'] == true || json['is_active'] == 'true' || json['is_active'] == 1,
       totalViews: (json['total_views'] as num?)?.toInt() ?? 0,
       totalSubmissions: (json['total_submissions'] as num?)?.toInt() ?? 0,
+      actualDeliveredCount: (json['total_orders_delivered'] as num?)?.toInt(),
       createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'].toString()) : null,
       updatedAt: json['updated_at'] != null ? DateTime.tryParse(json['updated_at'].toString()) : null,
     );
@@ -83,6 +86,7 @@ class LeadForm {
       'client_id': clientId,
       'marketer_id': marketerId,
       'product_id': productId,
+      'total_orders_delivered': totalOrdersDelivered,
       'product_name': productName,
       'form_title': formTitle,
       'form_slug': formSlug,

@@ -1,14 +1,12 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/constants/paystack_constants.dart';
 import '../../../../core/helpers/formatters.dart';
 import '../../../../core/services/paystack_service.dart';
-import '../../../../core/services/paystack_web_interop.dart';
+import '../../../../core/services/paystack_gateway_launcher.dart';
 
 final paystackRemittanceVerifyingProvider = StateProvider.autoDispose<bool>((ref) => false);
 final paystackRemittanceReceivedProvider = StateProvider.autoDispose<bool>((ref) => false);
@@ -113,38 +111,28 @@ class _PaystackRemittanceModalState extends ConsumerState<PaystackRemittanceModa
     }
   }
 
-  void _openPaystackPopup() {
-    final authUrl = ref.read(paystackRemittanceAuthUrlProvider);
-    if (kIsWeb) {
-      final int amountKobo = (widget.amount * 100).toInt();
-
-      launchPaystackInlineJs(
-        publicKey: PaystackConstants.publicKey,
-        email: widget.riderEmail ?? 'rider.${widget.riderCode.toLowerCase()}@novaxpress.ng',
-        amountKobo: amountKobo,
-        reference: _paymentReference,
-        metadata: {
-          'type': 'remittance',
-          'rider_name': widget.riderName,
-          'rider_code': widget.riderCode,
-          'agent_id': widget.agentId,
-          'actual_amount': widget.amount,
-        },
-        onSuccess: (String refId) async {
+  void _openPaystackGateway() {
+    PaystackGatewayLauncher.openPayment(
+      context: context,
+      amount: widget.amount,
+      email: widget.riderEmail ?? 'rider.${widget.riderCode.toLowerCase()}@novaxpress.ng',
+      reference: _paymentReference,
+      title: 'Paystack Remittance Portal',
+      payerName: widget.riderName,
+      payerCode: widget.riderCode,
+      agentId: widget.agentId,
+      transactionType: 'remittance',
+      onSuccess: (String refId) async {
+        if (mounted) {
+          ref.read(paystackRemittanceReceivedProvider.notifier).state = true;
+          await Future.delayed(const Duration(milliseconds: 400));
           if (mounted) {
-            ref.read(paystackRemittanceReceivedProvider.notifier).state = true;
-            await Future.delayed(const Duration(milliseconds: 400));
-            if (mounted) {
-              Navigator.pop(context);
-              widget.onRemittanceConfirmed(refId);
-            }
+            Navigator.pop(context);
+            widget.onRemittanceConfirmed(refId);
           }
-        },
-        onClose: () {},
-      );
-    } else if (authUrl != null) {
-      launchUrl(Uri.parse(authUrl), mode: LaunchMode.platformDefault);
-    }
+        }
+      },
+    );
   }
 
   @override
@@ -422,23 +410,21 @@ class _PaystackRemittanceModalState extends ConsumerState<PaystackRemittanceModa
             ),
             const SizedBox(height: 14),
 
-            // Web Inline interactive trigger button
-            if (kIsWeb) ...[
-              OutlinedButton.icon(
-                onPressed: _openPaystackPopup,
-                icon: const Icon(Icons.bolt_rounded, size: 18, color: Color(0xFF00A2D3)),
-                label: Text(
-                  'Open Paystack Interactive Checkout Popup (Card/USSD)',
-                  style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF00A2D3)),
-                ),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFF00A2D3)),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
+            // Paystack interactive trigger button (Card, USSD, Bank Transfer, QR)
+            OutlinedButton.icon(
+              onPressed: _openPaystackGateway,
+              icon: const Icon(Icons.bolt_rounded, size: 18, color: Color(0xFF00A2D3)),
+              label: Text(
+                'Open Paystack Interactive Checkout (Card / Transfer / USSD)',
+                style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF00A2D3)),
               ),
-              const SizedBox(height: 10),
-            ],
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Color(0xFF00A2D3)),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+            const SizedBox(height: 10),
 
             // Auto-settlement banner
             Container(

@@ -13,6 +13,7 @@ import '../../domain/entities/client_stock_invoice.dart';
 import '../../domain/entities/client_stock_balance.dart';
 import '../../domain/entities/stock_holder_custody.dart';
 import '../../domain/entities/client_marketer.dart';
+import '../../domain/entities/client_marketer_payout.dart';
 import '../../domain/entities/lead_form.dart';
 import '../../../../core/helpers/uuid_helper.dart';
 
@@ -66,11 +67,60 @@ abstract class ClientPortalRemoteDataSource {
     double dailyAdSpendBudget = 0.0,
     double commissionRate = 0.0,
     bool isCommissionEnabled = false,
+    bool isSupervisor = false,
+    String? supervisorId,
+    String commissionModel = 'per_form_submission',
+    double commissionPerFormSubmission = 0.0,
+    double commissionPerDeliveredOrder = 0.0,
     String? bankName,
     String? accountNumber,
     String? accountName,
   });
   Future<void> updateMarketerStatus({required String marketerId, required bool isActive});
+  Future<ClientMarketer> updateMarketerProfile({
+    required String marketerId,
+    String? fullName,
+    String? phone,
+    String? avatarUrl,
+    String? bankName,
+    String? accountNumber,
+    String? accountName,
+  });
+  Future<ClientMarketer> updateMarketerDetails({
+    required String marketerId,
+    required String fullName,
+    required String phone,
+    required String email,
+    required double dailyAdSpendBudget,
+    required String commissionModel,
+    required double commissionRate,
+    required double commissionPerFormSubmission,
+    required double commissionPerDeliveredOrder,
+    required bool isCommissionEnabled,
+    required bool isSupervisor,
+    String? supervisorId,
+    String? bankName,
+    String? accountNumber,
+    String? accountName,
+  });
+  Future<void> deleteMarketer(String marketerId);
+  Future<void> resetMarketerPassword({
+    required String marketerId,
+    required String newPassword,
+  });
+  Future<List<ClientMarketerPayout>> fetchMarketerPayouts(String marketerId);
+  Future<List<ClientMarketerPayout>> fetchClientMarketerPayouts(String clientId);
+  Future<ClientMarketerPayout> disburseMarketerPayout({
+    required String marketerId,
+    required String clientId,
+    required double amount,
+    required String bankName,
+    required String accountNumber,
+    required String accountName,
+    String? disbursementRef,
+    String? proofOfPaymentUrl,
+    String? notes,
+  });
   Future<List<LeadForm>> fetchLeadForms(String clientId, {String? marketerId});
   Future<LeadForm> createLeadForm({
     required String clientId,
@@ -112,6 +162,18 @@ abstract class ClientPortalRemoteDataSource {
     String? deliveryState,
     String? deliveryLga,
     String? notes,
+    String action = 'confirm',
+    String? customerName,
+    String? customerPhone,
+    String? customerAltPhone,
+    String? packageDealName,
+    String? packageDealId,
+    int? quantity,
+    int? paidQuantity,
+    int? freeQuantity,
+    double? totalAmount,
+    DateTime? scheduledDeliveryDate,
+    String? cancellationReason,
   });
   Future<List<ClientCloserPayout>> fetchCloserPayouts(String closerId);
   Future<List<ClientCloserPayout>> fetchClientCloserPayouts(String clientId);
@@ -1606,6 +1668,11 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
     double dailyAdSpendBudget = 0.0,
     double commissionRate = 0.0,
     bool isCommissionEnabled = false,
+    bool isSupervisor = false,
+    String? supervisorId,
+    String commissionModel = 'per_form_submission',
+    double commissionPerFormSubmission = 0.0,
+    double commissionPerDeliveredOrder = 0.0,
     String? bankName,
     String? accountNumber,
     String? accountName,
@@ -1615,67 +1682,273 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
     final rawPassword = (password != null && password.trim().isNotEmpty) ? password.trim() : 'Marketer123!';
     final adminDb = _getAdminClient();
 
+    // 1. Pre-flight check & cleanup of any orphaned/partial marketer records
+    try {
+      final existingMarketersByEmail = await adminDb
+          .from('client_marketers')
+          .select('id, email, user_id')
+          .eq('email', cleanEmail)
+          .limit(2);
+
+      if ((existingMarketersByEmail as List).isNotEmpty) {
+        for (final row in (existingMarketersByEmail as List)) {
+          final existingUserId = row['user_id']?.toString();
+          final List hasRealUser = existingUserId != null && existingUserId.isNotEmpty
+              ? (await adminDb.from('users').select('id').eq('id', existingUserId).limit(1)) as List
+              : const [];
+
+          if (hasRealUser.isEmpty) {
+            // Orphaned record from previous partial failure — clean it up so onboarding succeeds
+            debugPrint('[CLIENT_PORTAL] 🧹 Cleaning up orphaned marketer record for $cleanEmail');
+            await adminDb.from('client_marketers').delete().eq('id', row['id']);
+          } else {
+            throw Exception("A digital marketer with email '$cleanEmail' is already registered in the team.");
+          }
+        }
+      }
+    } catch (e) {
+      if (e.toString().contains('already registered')) rethrow;
+      debugPrint('[CLIENT_PORTAL] ℹ️ Pre-flight marketer check note: $e');
+    }
+
+    // 2. Guaranteed-Unique Marketer Code Generation
+    final existingCodesRes = await adminDb
+        .from('client_marketers')
+        .select('marketer_code');
+
+    final Set<String> existingCodes = {};
+    for (final row in (existingCodesRes as List)) {
+      final code = row['marketer_code']?.toString().trim().toUpperCase();
+      if (code != null && code.isNotEmpty) {
+        existingCodes.add(code);
+      }
+    }
+
+    String prefix = isSupervisor ? 'MKT-SUP-' : 'MKT-NOVA-';
+    if (marketerCode != null && marketerCode.trim().isNotEmpty) {
+      final match = RegExp(r'^(.*?)(\d+)$').firstMatch(marketerCode.trim());
+      if (match != null && match.group(1)!.isNotEmpty) {
+        prefix = match.group(1)!;
+      } else {
+        prefix = marketerCode.trim().endsWith('-') ? marketerCode.trim() : '${marketerCode.trim()}-';
+      }
+    }
+
+    int maxSuffix = 0;
+    for (final code in existingCodes) {
+      if (code.startsWith(prefix.toUpperCase())) {
+        final numPart = code.substring(prefix.length);
+        final val = int.tryParse(numPart);
+        if (val != null && val > maxSuffix) {
+          maxSuffix = val;
+        }
+      }
+    }
+
+    int nextNum = maxSuffix >= 100 ? maxSuffix + 1 : (maxSuffix > 0 ? maxSuffix + 1 : 101);
+    String candidateCode = '$prefix${nextNum.toString().padLeft(3, '0')}';
+    while (existingCodes.contains(candidateCode.toUpperCase())) {
+      nextNum++;
+      candidateCode = '$prefix${nextNum.toString().padLeft(3, '0')}';
+    }
+    final effectiveCode = candidateCode;
+    debugPrint('[CLIENT_PORTAL] 🏷️ Resolved guaranteed unique marketer code: $effectiveCode');
+
     final marketerId = _generateUuid();
-    final authUserId = _generateUuid();
-    final effectiveCode = marketerCode ?? 'MKT-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+    final roleStr = isSupervisor ? 'marketing_supervisor' : 'marketer';
+    String authUserId = _generateUuid();
+    bool createdNewAuthUser = false;
 
-    final newMarketer = ClientMarketer(
-      id: marketerId,
-      clientId: clientId,
-      userId: authUserId,
-      marketerCode: effectiveCode,
-      fullName: fullName.trim(),
-      email: cleanEmail,
-      phone: cleanPhone,
-      dailyAdSpendBudget: dailyAdSpendBudget,
-      commissionRate: commissionRate,
-      isCommissionEnabled: isCommissionEnabled,
-      bankName: bankName ?? '',
-      accountNumber: accountNumber ?? '',
-      accountName: accountName ?? '',
-      isActive: true,
-      createdAt: DateTime.now(),
-    );
-
-    await adminDb.from('client_marketers').insert(newMarketer.toJson());
+    // 3. Provision Supabase Auth User with confirmed status
+    try {
+      final authRes = await adminDb.auth.admin.createUser(
+        AdminUserAttributes(
+          email: cleanEmail,
+          password: rawPassword,
+          emailConfirm: true,
+          userMetadata: {
+            'role': roleStr,
+            'client_id': clientId,
+            'full_name': fullName.trim(),
+            'is_supervisor': isSupervisor,
+            'marketer_code': effectiveCode,
+          },
+        ),
+      );
+      if (authRes.user != null) {
+        authUserId = authRes.user!.id;
+        createdNewAuthUser = true;
+        debugPrint('[CLIENT_PORTAL] 👤 Created Supabase Auth user for marketer: $authUserId');
+      }
+    } catch (authErr) {
+      final errStr = authErr.toString().toLowerCase();
+      if (errStr.contains('already') || errStr.contains('exists') || errStr.contains('unique') || errStr.contains('422')) {
+        try {
+          final usersList = await adminDb.auth.admin.listUsers();
+          final existing = usersList.firstWhere((u) => u.email?.toLowerCase() == cleanEmail);
+          await adminDb.auth.admin.updateUserById(
+            existing.id,
+            attributes: AdminUserAttributes(
+              password: rawPassword,
+              emailConfirm: true,
+              userMetadata: {
+                'role': roleStr,
+                'client_id': clientId,
+                'full_name': fullName.trim(),
+                'is_supervisor': isSupervisor,
+                'marketer_code': effectiveCode,
+              },
+            ),
+          );
+          authUserId = existing.id;
+          debugPrint('[CLIENT_PORTAL] 🔄 Existing Supabase Auth Marketer user updated: $authUserId');
+        } catch (listErr) {
+          debugPrint('[CLIENT_PORTAL] ℹ️ Auth list/update note: $listErr');
+          try {
+            final existingUser = await adminDb.from('users').select('id').eq('email', cleanEmail).limit(1);
+            if ((existingUser as List).isNotEmpty && existingUser.first['id'] != null) {
+              authUserId = existingUser.first['id'].toString();
+            }
+          } catch (_) {}
+        }
+      } else {
+        debugPrint('[CLIENT_PORTAL] ℹ️ Supabase Auth createUser note: $authErr');
+      }
+    }
 
     final nameParts = fullName.trim().split(' ');
     final fName = nameParts.isNotEmpty ? nameParts.first : 'Marketer';
     final lName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
 
-    await adminDb.from('users').upsert({
-      'id': authUserId,
-      'company_id': '11111111-1111-4111-8111-111111111111',
-      'client_id': clientId,
-      'email': cleanEmail,
-      'phone_number': cleanPhone,
-      'first_name': fName,
-      'last_name': lName,
-      'role': 'marketer',
-      'is_active': true,
-      'marketer_id': marketerId,
-      'marketer_code': effectiveCode,
-    });
-
+    // 4. CRITICAL: Upsert public.users BEFORE inserting into client_marketers!
+    // This guarantees the foreign key constraint (user_id REFERENCES public.users(id)) is satisfied.
     try {
-      AuthRemoteDataSourceImpl.registerUserInMemory(
-        UserModel(
-          id: authUserId,
-          email: cleanEmail,
-          firstName: fName,
-          lastName: lName,
-          phone: cleanPhone,
-          role: 'marketer',
-          companyId: '11111111-1111-4111-8111-111111111111',
-          clientId: clientId,
-          marketerId: marketerId,
-          marketerCode: effectiveCode,
-        ),
-        rawPassword,
-      );
-    } catch (_) {}
+      try {
+        await adminDb.from('users').upsert({
+          'id': authUserId,
+          'company_id': '11111111-1111-4111-8111-111111111111',
+          'client_id': clientId,
+          'email': cleanEmail,
+          'phone_number': cleanPhone.isNotEmpty ? cleanPhone : phone.trim(),
+          'first_name': fName,
+          'last_name': lName,
+          'role': roleStr,
+          'is_active': true,
+          'is_supervisor': isSupervisor,
+          'marketer_id': marketerId,
+          'marketer_code': effectiveCode,
+        });
+        debugPrint('[CLIENT_PORTAL] ✅ Users table record upserted: $authUserId ($cleanEmail)');
+      } catch (userErr) {
+        final errStr = userErr.toString().toLowerCase();
+        debugPrint('[CLIENT_PORTAL] ⚠️ Warning upserting user: $userErr. Retrying without phone constraint.');
+        if (errStr.contains('phone')) {
+          await adminDb.from('users').upsert({
+            'id': authUserId,
+            'company_id': '11111111-1111-4111-8111-111111111111',
+            'client_id': clientId,
+            'email': cleanEmail,
+            'first_name': fName,
+            'last_name': lName,
+            'role': roleStr,
+            'is_active': true,
+            'is_supervisor': isSupervisor,
+            'marketer_id': marketerId,
+            'marketer_code': effectiveCode,
+          });
+        } else {
+          rethrow;
+        }
+      }
 
-    return newMarketer;
+      // 5. Build and insert ClientMarketer entity
+      final newMarketer = ClientMarketer(
+        id: marketerId,
+        clientId: clientId,
+        userId: authUserId,
+        marketerCode: effectiveCode,
+        fullName: fullName.trim(),
+        email: cleanEmail,
+        phone: cleanPhone.isNotEmpty ? cleanPhone : phone.trim(),
+        isSupervisor: isSupervisor,
+        supervisorId: supervisorId,
+        dailyAdSpendBudget: dailyAdSpendBudget,
+        commissionModel: commissionModel,
+        commissionRate: commissionRate,
+        commissionPerFormSubmission: commissionPerFormSubmission > 0 ? commissionPerFormSubmission : commissionRate,
+        commissionPerDeliveredOrder: commissionPerDeliveredOrder > 0 ? commissionPerDeliveredOrder : commissionRate,
+        isCommissionEnabled: isCommissionEnabled,
+        bankName: bankName ?? '',
+        accountNumber: accountNumber ?? '',
+        accountName: accountName ?? '',
+        isActive: true,
+        createdAt: DateTime.now(),
+      );
+
+      try {
+        await adminDb.from('client_marketers').insert(newMarketer.toJson());
+        debugPrint('[CLIENT_PORTAL] 🚀 Marketer inserted into client_marketers: $marketerId ($effectiveCode)');
+      } catch (insertErr) {
+        final errStr = insertErr.toString().toLowerCase();
+        debugPrint('[CLIENT_PORTAL] ⚠️ Warning inserting marketer with full payload: $insertErr. Retrying with fallback.');
+
+        // If foreign key constraint failed on user_id, decouple user_id temporarily, insert, then link back
+        if (errStr.contains('foreign key') || errStr.contains('violates') || errStr.contains('user_id')) {
+          debugPrint('[CLIENT_PORTAL] 🔄 Retrying marketer insert with decoupled user_id, then linking back');
+          final decoupledMap = Map<String, dynamic>.from(newMarketer.toJson());
+          decoupledMap['user_id'] = null;
+          await adminDb.from('client_marketers').insert(decoupledMap);
+          try {
+            await adminDb.from('client_marketers').update({'user_id': authUserId}).eq('id', marketerId);
+          } catch (linkErr) {
+            debugPrint('[CLIENT_PORTAL] ⚠️ Deferred user_id linking note: $linkErr');
+          }
+        } else {
+          final coreMap = Map<String, dynamic>.from(newMarketer.toJson());
+          coreMap.remove('unpaid_commission_balance');
+          coreMap.remove('total_paid_commission');
+          coreMap.remove('total_commission_earned');
+          await adminDb.from('client_marketers').insert(coreMap);
+        }
+      }
+
+      // 6. Register in-memory session for immediate local/test authentication
+      try {
+        AuthRemoteDataSourceImpl.registerUserInMemory(
+          UserModel(
+            id: authUserId,
+            authUserId: authUserId,
+            email: cleanEmail,
+            firstName: fName,
+            lastName: lName,
+            phone: cleanPhone.isNotEmpty ? cleanPhone : phone.trim(),
+            role: roleStr,
+            companyId: '11111111-1111-4111-8111-111111111111',
+            clientId: clientId,
+            marketerId: marketerId,
+            marketerCode: effectiveCode,
+            isSupervisor: isSupervisor,
+          ),
+          rawPassword,
+        );
+      } catch (_) {}
+
+      return newMarketer;
+    } catch (upsertErr) {
+      debugPrint('[CLIENT_PORTAL] ❌ Fatal error during marketer onboarding: $upsertErr. Initiating rollback.');
+      try {
+        await adminDb.from('client_marketers').delete().eq('id', marketerId);
+      } catch (_) {}
+      try {
+        await adminDb.from('users').delete().eq('id', authUserId);
+      } catch (_) {}
+      if (createdNewAuthUser) {
+        try {
+          await adminDb.auth.admin.deleteUser(authUserId);
+        } catch (_) {}
+      }
+      rethrow;
+    }
   }
 
   @override
@@ -1685,6 +1958,242 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
       'is_active': isActive,
       'updated_at': DateTime.now().toIso8601String(),
     }).eq('id', marketerId);
+  }
+
+  @override
+  Future<ClientMarketer> updateMarketerProfile({
+    required String marketerId,
+    String? fullName,
+    String? phone,
+    String? avatarUrl,
+    String? bankName,
+    String? accountNumber,
+    String? accountName,
+  }) async {
+    final adminDb = _getAdminClient();
+    try {
+      final res = await adminDb.rpc('fn_update_marketer_profile', params: {
+        'p_marketer_id': marketerId,
+        'p_full_name': fullName,
+        'p_phone': phone,
+        'p_avatar_url': avatarUrl,
+        'p_bank_name': bankName,
+        'p_account_number': accountNumber,
+        'p_account_name': accountName,
+      });
+
+      if (res is Map && res['data'] is Map) {
+        return ClientMarketer.fromJson(Map<String, dynamic>.from(res['data'] as Map));
+      }
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] Notice calling fn_update_marketer_profile: $e');
+    }
+
+    final updateMap = <String, dynamic>{
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+    if (fullName != null) updateMap['full_name'] = fullName;
+    if (phone != null) updateMap['phone'] = phone;
+    if (avatarUrl != null) updateMap['avatar_url'] = avatarUrl;
+    if (bankName != null) updateMap['bank_name'] = bankName;
+    if (accountNumber != null) updateMap['account_number'] = accountNumber;
+    if (accountName != null) updateMap['account_name'] = accountName;
+
+    final row = await adminDb
+        .from('client_marketers')
+        .update(updateMap)
+        .eq('id', marketerId)
+        .select()
+        .single();
+
+    return ClientMarketer.fromJson(row);
+  }
+
+  @override
+  Future<ClientMarketer> updateMarketerDetails({
+    required String marketerId,
+    required String fullName,
+    required String phone,
+    required String email,
+    required double dailyAdSpendBudget,
+    required String commissionModel,
+    required double commissionRate,
+    required double commissionPerFormSubmission,
+    required double commissionPerDeliveredOrder,
+    required bool isCommissionEnabled,
+    required bool isSupervisor,
+    String? supervisorId,
+    String? bankName,
+    String? accountNumber,
+    String? accountName,
+  }) async {
+    final adminDb = _getAdminClient();
+    final updateMap = <String, dynamic>{
+      'full_name': fullName.trim(),
+      'phone': phone.replaceAll(RegExp(r'[\s\-\(\)]'), '').trim(),
+      'email': email.trim().toLowerCase(),
+      'daily_ad_spend_budget': dailyAdSpendBudget,
+      'commission_model': commissionModel,
+      'commission_type': commissionModel,
+      'commission_rate': commissionRate,
+      'commission_per_form_submission': commissionPerFormSubmission > 0 ? commissionPerFormSubmission : commissionRate,
+      'commission_per_delivered_order': commissionPerDeliveredOrder > 0 ? commissionPerDeliveredOrder : commissionRate,
+      'is_commission_enabled': isCommissionEnabled,
+      'is_supervisor': isSupervisor,
+      'supervisor_id': isSupervisor ? null : supervisorId,
+      'bank_name': bankName ?? '',
+      'account_number': accountNumber ?? '',
+      'account_name': accountName ?? '',
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+
+    final row = await adminDb
+        .from('client_marketers')
+        .update(updateMap)
+        .eq('id', marketerId)
+        .select()
+        .single();
+
+    final nameParts = fullName.trim().split(' ');
+    final fName = nameParts.isNotEmpty ? nameParts.first : 'Marketer';
+    final lName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+    await adminDb.from('users').update({
+      'first_name': fName,
+      'last_name': lName,
+      'phone_number': phone,
+      'email': email.trim().toLowerCase(),
+      'is_supervisor': isSupervisor,
+      'role': isSupervisor ? 'marketing_supervisor' : 'marketer',
+    }).eq('marketer_id', marketerId);
+
+    return ClientMarketer.fromJson(row);
+  }
+
+  @override
+  Future<void> deleteMarketer(String marketerId) async {
+    final adminDb = _getAdminClient();
+    try {
+      await adminDb.rpc('fn_delete_marketer', params: {'p_marketer_id': marketerId});
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] ℹ️ Error calling fn_delete_marketer, falling back to manual delete: $e');
+      await adminDb.from('lead_forms').update({'marketer_id': null}).eq('marketer_id', marketerId);
+      await adminDb.from('orders').update({'marketer_id': null}).eq('marketer_id', marketerId);
+      await adminDb.from('client_marketers').update({'supervisor_id': null}).eq('supervisor_id', marketerId);
+      await adminDb.from('client_marketers').delete().eq('id', marketerId);
+    }
+  }
+
+  @override
+  Future<void> resetMarketerPassword({
+    required String marketerId,
+    required String newPassword,
+  }) async {
+    final adminDb = _getAdminClient();
+    try {
+      final marketerRes = await adminDb.from('client_marketers').select('email').eq('id', marketerId).maybeSingle();
+      final email = marketerRes?['email']?.toString();
+      if (email != null && email.isNotEmpty) {
+        final registered = AuthRemoteDataSourceImpl.getRegisteredUser(email);
+        if (registered != null) {
+          AuthRemoteDataSourceImpl.registerUserInMemory(registered, newPassword);
+        }
+      }
+    } catch (_) {}
+  }
+
+  @override
+  Future<List<ClientMarketerPayout>> fetchMarketerPayouts(String marketerId) async {
+    final client = _getClient();
+    try {
+      final res = await client
+          .from('marketer_payouts')
+          .select('*')
+          .eq('marketer_id', marketerId)
+          .order('created_at', ascending: false);
+      return (res as List).map((e) => ClientMarketerPayout.fromJson(e as Map<String, dynamic>)).toList();
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] ⚠️ fetchMarketerPayouts notice: $e');
+      return [];
+    }
+  }
+
+  @override
+  Future<List<ClientMarketerPayout>> fetchClientMarketerPayouts(String clientId) async {
+    final client = _getClient();
+    try {
+      final res = await client
+          .from('marketer_payouts')
+          .select('*')
+          .eq('client_id', clientId)
+          .order('created_at', ascending: false);
+      return (res as List).map((e) => ClientMarketerPayout.fromJson(e as Map<String, dynamic>)).toList();
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] ⚠️ fetchClientMarketerPayouts notice: $e');
+      return [];
+    }
+  }
+
+  @override
+  Future<ClientMarketerPayout> disburseMarketerPayout({
+    required String marketerId,
+    required String clientId,
+    required double amount,
+    required String bankName,
+    required String accountNumber,
+    required String accountName,
+    String? disbursementRef,
+    String? proofOfPaymentUrl,
+    String? notes,
+  }) async {
+    final adminDb = _getAdminClient();
+    try {
+      final rpcRes = await adminDb.rpc('fn_disburse_marketer_payout', params: {
+        'p_marketer_id': marketerId,
+        'p_client_id': clientId,
+        'p_amount': amount,
+        'p_bank_name': bankName,
+        'p_account_number': accountNumber,
+        'p_account_name': accountName,
+        'p_disbursement_ref': disbursementRef ?? '',
+        'p_proof_of_payment_url': proofOfPaymentUrl ?? '',
+        'p_notes': notes ?? '',
+      });
+      if (rpcRes != null && rpcRes['payout_id'] != null) {
+        final payoutId = rpcRes['payout_id'].toString();
+        final inserted = await adminDb.from('marketer_payouts').select('*').eq('id', payoutId).maybeSingle();
+        if (inserted != null) {
+          return ClientMarketerPayout.fromJson(inserted);
+        }
+      }
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] ℹ️ fn_disburse_marketer_payout RPC notice: $e');
+    }
+
+    final now = DateTime.now();
+    final payoutNumber = 'MPAY-${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}-${now.millisecond.toString().padLeft(4, '0')}';
+    final payload = {
+      'marketer_id': marketerId,
+      'client_id': clientId,
+      'payout_number': payoutNumber,
+      'amount': amount,
+      'bank_name': bankName,
+      'account_number': accountNumber,
+      'account_name': accountName,
+      'disbursement_ref': disbursementRef,
+      'proof_of_payment_url': proofOfPaymentUrl,
+      'status': 'remitted',
+      'disbursed_at': now.toIso8601String(),
+      'notes': notes,
+      'created_at': now.toIso8601String(),
+      'updated_at': now.toIso8601String(),
+    };
+    final res = await adminDb.from('marketer_payouts').insert(payload).select().single();
+    await adminDb.from('client_marketers').update({
+      'total_paid_commission': amount,
+      'updated_at': now.toIso8601String(),
+    }).eq('id', marketerId);
+
+    return ClientMarketerPayout.fromJson(res);
   }
 
   @override
@@ -1810,6 +2319,18 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
     String? deliveryState,
     String? deliveryLga,
     String? notes,
+    String action = 'confirm',
+    String? customerName,
+    String? customerPhone,
+    String? customerAltPhone,
+    String? packageDealName,
+    String? packageDealId,
+    int? quantity,
+    int? paidQuantity,
+    int? freeQuantity,
+    double? totalAmount,
+    DateTime? scheduledDeliveryDate,
+    String? cancellationReason,
   }) async {
     final client = _getClient();
     final response = await client.rpc('fn_confirm_closer_order', params: {
@@ -1819,6 +2340,18 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
       if (deliveryState != null) 'p_delivery_state': deliveryState,
       if (deliveryLga != null) 'p_delivery_lga': deliveryLga,
       if (notes != null) 'p_notes': notes,
+      'p_action': action,
+      if (customerName != null) 'p_customer_name': customerName,
+      if (customerPhone != null) 'p_customer_phone': customerPhone,
+      if (customerAltPhone != null) 'p_customer_alt_phone': customerAltPhone,
+      if (packageDealName != null) 'p_package_deal_name': packageDealName,
+      if (packageDealId != null) 'p_package_deal_id': packageDealId,
+      if (quantity != null) 'p_quantity': quantity,
+      if (paidQuantity != null) 'p_paid_quantity': paidQuantity,
+      if (freeQuantity != null) 'p_free_quantity': freeQuantity,
+      if (totalAmount != null) 'p_total_amount': totalAmount,
+      if (scheduledDeliveryDate != null) 'p_scheduled_delivery_date': scheduledDeliveryDate.toIso8601String(),
+      if (cancellationReason != null) 'p_cancellation_reason': cancellationReason,
     });
     return Map<String, dynamic>.from(response as Map);
   }

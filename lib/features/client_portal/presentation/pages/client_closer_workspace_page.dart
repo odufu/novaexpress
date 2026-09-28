@@ -11,6 +11,7 @@ import '../../../dc_console/presentation/providers/product_catalog_provider.dart
 import '../../domain/entities/client_closer.dart';
 import '../../domain/entities/customer_lead.dart';
 import '../providers/client_portal_provider.dart';
+import '../widgets/client_confirm_order_modal.dart';
 import '../widgets/client_convert_lead_modal.dart';
 
 class ClientCloserWorkspacePage extends ConsumerWidget {
@@ -676,47 +677,78 @@ class ClientCloserWorkspacePage extends ConsumerWidget {
                   ),
                 ),
 
-              // Convert to Order / Dispatched Pill
-              if (lead.isOrderCreated)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF10B981).withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 15),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Order Dispatched',
-                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: const Color(0xFF10B981)),
+              // Convert to Order / Confirm Order / Dispatched
+              Builder(
+                builder: (context) {
+                  final portalState = ref.watch(clientPortalProvider);
+                  final matchingOrder = portalState.orders.where((o) =>
+                    (lead.convertedOrderId != null && (o.id == lead.convertedOrderId || o.orderNumber == lead.convertedOrderId)) ||
+                    o.leadId == lead.id
+                  ).firstOrNull;
+
+                  final isPendingConfirmation = matchingOrder != null &&
+                      (matchingOrder.status.toLowerCase() == 'new' ||
+                       matchingOrder.status.toLowerCase() == 'pending' ||
+                       matchingOrder.status.toLowerCase() == 'unconfirmed');
+
+                  if (isPendingConfirmation) {
+                    return ElevatedButton.icon(
+                      onPressed: () => ClientConfirmOrderModal.show(context, matchingOrder),
+                      icon: const Icon(Icons.verified_rounded, size: 15, color: Colors.white),
+                      label: Text(
+                        'Confirm & Edit Order',
+                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white),
                       ),
-                    ],
-                  ),
-                )
-              else
-                ElevatedButton.icon(
-                  onPressed: () {
-                    showDialog(
-                      context: context,
-                      builder: (ctx) => ClientConvertLeadModal(lead: lead),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFF37021),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        elevation: 0,
+                      ),
                     );
-                  },
-                  icon: const Icon(Icons.flash_on_rounded, size: 15, color: Colors.white),
-                  label: Text(
-                    'Convert to Order',
-                    style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF10B981),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    elevation: 0,
-                  ),
-                ),
+                  } else if (lead.isOrderCreated || (matchingOrder != null && matchingOrder.status.toLowerCase() == 'confirmed')) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 15),
+                          const SizedBox(width: 6),
+                          Text(
+                            matchingOrder?.isAssignedInTransit == true ? 'In Transit' : 'Confirmed & Routed',
+                            style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: const Color(0xFF10B981)),
+                          ),
+                        ],
+                      ),
+                    );
+                  } else {
+                    return ElevatedButton.icon(
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (ctx) => ClientConvertLeadModal(lead: lead),
+                        );
+                      },
+                      icon: const Icon(Icons.flash_on_rounded, size: 15, color: Colors.white),
+                      label: Text(
+                        'Convert to Order',
+                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF10B981),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        elevation: 0,
+                      ),
+                    );
+                  }
+                },
+              ),
             ],
           ),
         ],

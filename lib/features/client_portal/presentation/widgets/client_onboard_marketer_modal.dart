@@ -26,12 +26,15 @@ class _ClientOnboardMarketerModalState extends ConsumerState<ClientOnboardMarket
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _budgetController = TextEditingController(text: '50000');
-  final _commissionController = TextEditingController(text: '1000');
+  final _commissionController = TextEditingController(text: '500');
   final _passwordController = TextEditingController(text: 'Marketer123!');
   final _bankNameController = TextEditingController();
   final _accountNumberController = TextEditingController();
   final _accountNameController = TextEditingController();
   bool _obscurePassword = true;
+  bool _isSupervisor = false;
+  String? _selectedSupervisorId;
+  String _commissionModel = 'per_form_submission'; // 'per_form_submission' | 'per_delivered_order'
 
   @override
   void dispose() {
@@ -54,7 +57,7 @@ class _ClientOnboardMarketerModalState extends ConsumerState<ClientOnboardMarket
     final email = _emailController.text.trim();
     final phone = _phoneController.text.trim();
     final budget = double.tryParse(_budgetController.text.trim()) ?? 50000.0;
-    final commission = double.tryParse(_commissionController.text.trim()) ?? 1000.0;
+    final commission = double.tryParse(_commissionController.text.trim()) ?? 0.0;
     final password = _passwordController.text.trim().isNotEmpty ? _passwordController.text.trim() : 'Marketer123!';
     final bankName = _bankNameController.text.trim();
     final accountNumber = _accountNumberController.text.trim();
@@ -70,6 +73,12 @@ class _ClientOnboardMarketerModalState extends ConsumerState<ClientOnboardMarket
         password: password,
         dailyAdSpendBudget: budget,
         commissionRate: commission,
+        isCommissionEnabled: commission > 0,
+        isSupervisor: _isSupervisor,
+        supervisorId: _isSupervisor ? null : _selectedSupervisorId,
+        commissionModel: _commissionModel,
+        commissionPerFormSubmission: _commissionModel == 'per_form_submission' ? commission : 0.0,
+        commissionPerDeliveredOrder: _commissionModel == 'per_delivered_order' ? commission : 0.0,
         bankName: bankName,
         accountNumber: accountNumber,
         accountName: accountName,
@@ -87,7 +96,7 @@ class _ClientOnboardMarketerModalState extends ConsumerState<ClientOnboardMarket
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Digital Marketer "${marketer.fullName}" onboarded successfully! Code: ${marketer.marketerCode}',
+                    '${_isSupervisor ? "Supervisor" : "Digital"} Marketer "${marketer.fullName}" onboarded successfully! Code: ${marketer.marketerCode}',
                     style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: Colors.white),
                   ),
                 ),
@@ -185,7 +194,131 @@ class _ClientOnboardMarketerModalState extends ConsumerState<ClientOnboardMarket
                     ),
                   ],
                 ),
-                const SizedBox(height: 20),
+                // Account Role
+                Text('Account Role & Hierarchy', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF334155))),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => setState(() {
+                          _isSupervisor = false;
+                        }),
+                        borderRadius: BorderRadius.circular(12),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: !_isSupervisor ? const Color(0xFF10B981).withValues(alpha: 0.08) : const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: !_isSupervisor ? const Color(0xFF10B981) : const Color(0xFFE2E8F0), width: !_isSupervisor ? 1.5 : 1),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.person_rounded, size: 18, color: !_isSupervisor ? const Color(0xFF10B981) : const Color(0xFF64748B)),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Standard Marketer', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A))),
+                                    Text('Sees only own ad orders', style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B))),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => setState(() {
+                          _isSupervisor = true;
+                          _selectedSupervisorId = null;
+                        }),
+                        borderRadius: BorderRadius.circular(12),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: _isSupervisor ? const Color(0xFF6366F1).withValues(alpha: 0.08) : const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: _isSupervisor ? const Color(0xFF6366F1) : const Color(0xFFE2E8F0), width: _isSupervisor ? 1.5 : 1),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.shield_rounded, size: 18, color: _isSupervisor ? const Color(0xFF6366F1) : const Color(0xFF64748B)),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Supervisor Marketer', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A))),
+                                    Text('Can view supervisees', style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B))),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (!_isSupervisor) ...[
+                  const SizedBox(height: 12),
+                  Builder(
+                    builder: (context) {
+                      final supervisorMarketers = clientState.marketers.where((m) => m.isSupervisor).toList();
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Reporting Supervisor (Optional)', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF475569))),
+                          const SizedBox(height: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String?>(
+                                value: _selectedSupervisorId,
+                                isExpanded: true,
+                                icon: const Icon(Icons.arrow_drop_down_rounded, color: Color(0xFF64748B)),
+                                hint: Text(
+                                  supervisorMarketers.isEmpty ? 'No Supervisors Available (Reports to Merchant)' : 'Select Supervising Marketer (Optional)',
+                                  style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF94A3B8)),
+                                ),
+                                items: [
+                                  DropdownMenuItem<String?>(
+                                    value: null,
+                                    child: Text('Direct Merchant / No Supervisor', style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF0F172A))),
+                                  ),
+                                  ...supervisorMarketers.map((s) => DropdownMenuItem<String?>(
+                                        value: s.id,
+                                        child: Text('${s.fullName} (${s.marketerCode})', style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF0F172A), fontWeight: FontWeight.w600)),
+                                      )),
+                                ],
+                                onChanged: supervisorMarketers.isEmpty
+                                    ? null
+                                    : (val) {
+                                        setState(() {
+                                          _selectedSupervisorId = val;
+                                        });
+                                      },
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ],
+                const SizedBox(height: 16),
 
                 // Full Name
                 Text('Full Name', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF334155))),
@@ -269,14 +402,110 @@ class _ClientOnboardMarketerModalState extends ConsumerState<ClientOnboardMarket
                 ),
                 const SizedBox(height: 16),
 
-                // Daily Ad Budget & Commission
+                // Commission Model & Rate
+                Text('Commission Model per Form/Order', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF334155))),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => setState(() {
+                          _commissionModel = 'per_form_submission';
+                          if (_commissionController.text == '1000' || _commissionController.text.isEmpty) {
+                            _commissionController.text = '500';
+                          }
+                        }),
+                        borderRadius: BorderRadius.circular(10),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: _commissionModel == 'per_form_submission' ? const Color(0xFF10B981).withValues(alpha: 0.1) : const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: _commissionModel == 'per_form_submission' ? const Color(0xFF10B981) : const Color(0xFFE2E8F0),
+                              width: _commissionModel == 'per_form_submission' ? 1.5 : 1,
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.dynamic_form_rounded, size: 16, color: _commissionModel == 'per_form_submission' ? const Color(0xFF10B981) : const Color(0xFF64748B)),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      'Pay-per-Form (Ads)',
+                                      style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A)),
+                                      maxLines: 1,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 2),
+                              Text('Earn per ad lead submitted', style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B))),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => setState(() {
+                          _commissionModel = 'per_delivered_order';
+                          if (_commissionController.text == '500' || _commissionController.text.isEmpty) {
+                            _commissionController.text = '1000';
+                          }
+                        }),
+                        borderRadius: BorderRadius.circular(10),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: _commissionModel == 'per_delivered_order' ? const Color(0xFF0284C7).withValues(alpha: 0.1) : const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: _commissionModel == 'per_delivered_order' ? const Color(0xFF0284C7) : const Color(0xFFE2E8F0),
+                              width: _commissionModel == 'per_delivered_order' ? 1.5 : 1,
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.local_shipping_rounded, size: 16, color: _commissionModel == 'per_delivered_order' ? const Color(0xFF0284C7) : const Color(0xFF64748B)),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      'Pay-per-Delivery',
+                                      style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A)),
+                                      maxLines: 1,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 2),
+                              Text('Earn per delivered order', style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B))),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                // Daily Ad Budget & Commission Amount
                 LayoutBuilder(
                   builder: (context, constraints) {
                     final isRow = constraints.maxWidth >= 450;
                     final budgetField = Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Daily Ad Spend Budget (₦)', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF334155))),
+                        Text('Daily Ad Budget (₦)', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF334155))),
                         const SizedBox(height: 6),
                         TextFormField(
                           controller: _budgetController,
@@ -296,13 +525,18 @@ class _ClientOnboardMarketerModalState extends ConsumerState<ClientOnboardMarket
                     final commissionField = Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Commission per Delivered Order (₦)', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF334155))),
+                        Text(
+                          _commissionModel == 'per_form_submission'
+                              ? 'Commission / Form Submission (₦)'
+                              : 'Commission / Delivered Order (₦)',
+                          style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF334155)),
+                        ),
                         const SizedBox(height: 6),
                         TextFormField(
                           controller: _commissionController,
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           decoration: InputDecoration(
-                            hintText: '1,000',
+                            hintText: _commissionModel == 'per_form_submission' ? '500' : '1,000',
                             prefixIcon: const Icon(Icons.monetization_on_outlined, size: 20, color: Color(0xFF94A3B8)),
                             filled: true,
                             fillColor: const Color(0xFFF8FAFC),

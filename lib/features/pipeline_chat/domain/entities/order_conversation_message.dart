@@ -2,6 +2,7 @@
 enum ChatSenderRole {
   client,
   closer,
+  marketer,
   dcManager,
   deliveryAgent,
   system,

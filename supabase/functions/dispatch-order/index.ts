@@ -33,33 +33,29 @@ serve(async (req: Request) => {
     let orderRecord: any = null;
 
     if (orderId) {
-      const { data: ord, error: ordErr } = await supabase
-        .from("orders")
-        .select("*")
-        .eq("id", orderId)
-        .single();
+      // Execute authoritative stored procedure
+      const { data: rpcResult, error: rpcErr } = await supabase.rpc("auto_dispatch_order_by_state_lga", {
+        p_order_id: orderId,
+      });
 
-      if (ordErr || !ord) {
+      if (!rpcErr && rpcResult) {
         return new Response(
-          JSON.stringify({ success: false, error: `Order not found: ${ordErr?.message}` }),
-          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          JSON.stringify(rpcResult),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      orderRecord = ord;
-      deliveryState = (ord.delivery_state || ord.destination_state || deliveryState || "").trim();
-      deliveryLga = (ord.delivery_lga || ord.lga || deliveryLga || "").trim();
     }
 
-    // 1. Fetch Grand DC (Wuse Central Grand DC default)
-    const { data: grandDcs } = await supabase
+    // 1. Fetch Main DC (Fallback for uncovered LGAs)
+    const { data: mainDcs } = await supabase
       .from("distribution_centers")
       .select("*")
-      .or("is_grand_dc.eq.true,dc_type.eq.grand_dc")
+      .or("is_main_dc.eq.true,is_grand_dc.eq.true,code.eq.DC-WUSE-01")
       .eq("is_active", true)
-      .order("created_at", { ascending: true })
+      .order("is_grand_dc", { ascending: false })
       .limit(1);
 
-    const grandDc = grandDcs && grandDcs.length > 0 ? grandDcs[0] : null;
+    const mainDc = mainDcs && mainDcs.length > 0 ? mainDcs[0] : null;
 
     // 2. Fetch all active DCs
     const { data: allDcs, error: dcErr } = await supabase
@@ -76,61 +72,36 @@ serve(async (req: Request) => {
 
     let matchedDc: any = null;
     const cleanLga = normalize(deliveryLga);
-    const cleanState = normalize(deliveryState);
 
-    if (allDcs && allDcs.length > 0) {
-      // Priority 1: Match by state + LGA
+    if (allDcs && allDcs.length > 0 && cleanLga) {
+      // Match strictly by LGA handling in operating_zones
       matchedDc = allDcs.find((dc: any) => {
-        const dcState = normalize(dc.state || "");
-        if (dcState !== cleanState && !cleanState.includes(dcState) && !dcState.includes(cleanState)) {
-          return false;
-        }
         const zones: string[] = Array.isArray(dc.operating_zones) ? dc.operating_zones : [];
         return zones.some((z: string) => {
           const cz = normalize(z);
           return cz === cleanLga || cleanLga.includes(cz) || cz.includes(cleanLga);
         });
       });
-
-      // Priority 2: Fallback to State matching DC
-      if (!matchedDc) {
-        matchedDc = allDcs.find((dc: any) => {
-          const dcState = normalize(dc.state || "");
-          return dcState === cleanState || cleanState.includes(dcState) || dcState.includes(cleanState);
-        });
-      }
     }
 
-    // FALLBACK A: No DC matches State/LGA -> Escalate to Grand DC
+    // FALLBACK: No DC handles this LGA -> Route to Main DC
+    const isFallbackToMain = !matchedDc;
+    const targetDc = matchedDc || mainDc || (allDcs && allDcs.length > 0 ? allDcs[0] : null);
+    const targetDcId = targetDc ? targetDc.id : null;
+    const targetDcName = targetDc ? targetDc.name : "Main Distribution Center";
+    const dispatchNotes = isFallbackToMain
+      ? `🚨 Auto-routed to Main DC (${targetDcName}): LGA [${deliveryLga}] (${deliveryState}) is not handled by any regional DC.`
+      : `✅ Routed to Regional DC [${targetDcName}] handling LGA: "${deliveryLga}".`;
+
     if (!matchedDc) {
-      const targetDc = grandDc || (allDcs && allDcs.length > 0 ? allDcs[0] : null);
-      const targetDcId = targetDc ? targetDc.id : null;
-      const targetDcName = targetDc ? targetDc.name : "Grand Distribution Hub";
-      const dispatchNotes = targetDc
-        ? `🚨 Escalated to Grand DC (${targetDcName}). No DC configured for State: "${deliveryState}", LGA: "${deliveryLga}".`
-        : `🚨 Unrouted. No Distribution Centers configured in system.`;
-
-      if (orderId && targetDcId) {
-        await supabase
-          .from("orders")
-          .update({
-            distribution_center_id: targetDcId,
-            assigned_agent_id: null,
-            status: "pending_dispatch",
-            assignment_status: "pending_dc_assignment",
-            routing_notes: dispatchNotes,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", orderId);
-      }
-
       return new Response(
         JSON.stringify({
           success: true,
-          status: "pending_dc_assignment",
+          status: "assigned_to_main_dc",
+          isFallbackToMain: true,
           distributionCenterId: targetDcId,
           distributionCenterName: targetDcName,
-          isGrandDc: true,
+          isMainDc: true,
           assignedAgentId: null,
           routingNotes: dispatchNotes,
         }),

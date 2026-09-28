@@ -256,18 +256,33 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
             const SizedBox(width: 8),
           ],
 
-          // Creator of the order / Closer that owns the order avatar
-          UserAvatarWidget(
-            fullName: (conv?.closerName != null && conv!.closerName!.trim().isNotEmpty)
-                ? conv.closerName!.trim()
-                : (conv?.clientName != null && conv!.clientName.trim().isNotEmpty
-                    ? conv.clientName.trim()
-                    : widget.customerName),
-            avatarUrl: conv?.closerAvatarUrl,
-            radius: 18,
-            backgroundColor: const Color(0xFF4F46E5),
-            textColor: Colors.white,
-          ),
+          // Creator of the order avatar (Marketer for marketer lead form orders, Closer for closer orders)
+          () {
+            final isFromMarketer = (conv?.marketerName != null && conv!.marketerName!.trim().isNotEmpty) ||
+                (conv?.marketerAvatarUrl != null && conv!.marketerAvatarUrl!.trim().isNotEmpty) ||
+                conv?.marketerId != null;
+            final headerName = isFromMarketer
+                ? (conv?.marketerName?.trim().isNotEmpty == true ? conv!.marketerName!.trim() : 'Digital Marketer')
+                : (conv?.closerName != null && conv!.closerName!.trim().isNotEmpty
+                    ? conv.closerName!.trim()
+                    : (conv?.clientName != null && conv!.clientName.trim().isNotEmpty
+                        ? conv.clientName.trim()
+                        : widget.customerName));
+            final headerAvatar = isFromMarketer
+                ? conv?.marketerAvatarUrl
+                : conv?.closerAvatarUrl;
+            final headerBg = isFromMarketer
+                ? const Color(0xFF10B981)
+                : const Color(0xFF4F46E5);
+
+            return UserAvatarWidget(
+              fullName: headerName,
+              avatarUrl: headerAvatar,
+              radius: 18,
+              backgroundColor: headerBg,
+              textColor: Colors.white,
+            );
+          }(),
           const SizedBox(width: 10),
 
           // Order Number & Customer Name
@@ -397,10 +412,19 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
             Container(width: 1, height: 12, color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
             const SizedBox(width: 10),
             _buildParticipantPill('Client', conv.clientName, const Color(0xFF0D9488)),
+            if (conv.marketerName != null && conv.marketerName!.trim().isNotEmpty) ...[
+              const SizedBox(width: 5),
+              _buildParticipantPill(
+                'Marketer',
+                conv.marketerName!,
+                const Color(0xFF10B981),
+                avatarUrl: conv.marketerAvatarUrl,
+              ),
+            ],
             if (conv.closerName != null && conv.closerName!.trim().isNotEmpty) ...[
               const SizedBox(width: 5),
               _buildParticipantPill(
-                'Creator (Closer)',
+                'Closer',
                 conv.closerName!,
                 const Color(0xFF7C3AED),
                 avatarUrl: conv.closerAvatarUrl,
@@ -458,6 +482,7 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
     final currentUserId = authUser?.id;
     final isMyMessage = (currentUserId != null && msg.senderId == currentUserId);
 
+    final isMarketer = msg.senderRole == ChatSenderRole.marketer;
     final isCloser = msg.senderRole == ChatSenderRole.closer;
     final isClient = msg.senderRole == ChatSenderRole.client;
     final isDc = msg.senderRole == ChatSenderRole.dcManager;
@@ -465,7 +490,10 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
 
     Color roleColor = const Color(0xFF64748B);
     String roleLabel = 'Member';
-    if (isCloser) {
+    if (isMarketer) {
+      roleColor = const Color(0xFF10B981); // Emerald
+      roleLabel = 'Marketer';
+    } else if (isCloser) {
       roleColor = const Color(0xFF7C3AED); // Vibrant Purple
       roleLabel = 'Closer';
     } else if (isClient) {
@@ -573,7 +601,10 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
     // 2. Left-aligned with role-based color differentiation for other accounts
     Color otherBg;
     Color otherBorder;
-    if (isCloser) {
+    if (isMarketer) {
+      otherBg = isDark ? const Color(0xFF064E3B).withValues(alpha: 0.35) : const Color(0xFFECFDF5);
+      otherBorder = const Color(0xFF10B981).withValues(alpha: 0.3);
+    } else if (isCloser) {
       otherBg = isDark ? const Color(0xFF3B0764).withValues(alpha: 0.3) : const Color(0xFFF5F3FF);
       otherBorder = const Color(0xFF7C3AED).withValues(alpha: 0.25);
     } else if (isDc) {

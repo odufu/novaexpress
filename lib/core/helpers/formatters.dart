@@ -54,3 +54,55 @@ class Formatters {
   }
 }
 
+class NigerianPhoneHelper {
+  /// Normalizes a Nigerian phone number to its canonical 11-digit local format: 080XXXXXXXX.
+  /// Handles:
+  /// - Country code with +: `+234 801 234 5678` -> `08012345678`
+  /// - Country code without +: `2348012345678` -> `08012345678`
+  /// - International exit prefix: `002348012345678` -> `08012345678`
+  /// - Leading 0 after country code: `+234 (0) 801 234 5678` -> `08012345678`
+  /// - Standard local: `08012345678` -> `08012345678`
+  /// - Missing leading 0: `8012345678` -> `08012345678`
+  /// - Spaces, dashes, parentheses: `080-1234-5678` -> `08012345678`
+  static String normalize(String? raw) {
+    if (raw == null) return '';
+    var clean = raw.replaceAll(RegExp(r'\D'), '');
+    if (clean.isEmpty) return '';
+
+    if (clean.startsWith('00234')) {
+      clean = clean.substring(5);
+    } else if (clean.startsWith('234')) {
+      clean = clean.substring(3);
+    }
+
+    if (clean.startsWith('0')) {
+      clean = clean.substring(1);
+    }
+
+    if (clean.length >= 10) {
+      clean = clean.substring(clean.length - 10);
+      return '0$clean';
+    }
+
+    return '0$clean';
+  }
+
+  /// Returns the core 10 significant digits for deduplication: e.g. `8012345678`
+  static String core10Digits(String? raw) {
+    final norm = normalize(raw);
+    if (norm.length >= 11) {
+      return norm.substring(1);
+    }
+    return norm;
+  }
+
+  /// Formats for display: e.g. `0801 234 5678`
+  static String formatDisplay(String? raw) {
+    final norm = normalize(raw);
+    if (norm.length == 11) {
+      return '${norm.substring(0, 4)} ${norm.substring(4, 7)} ${norm.substring(7)}';
+    }
+    return norm;
+  }
+}
+

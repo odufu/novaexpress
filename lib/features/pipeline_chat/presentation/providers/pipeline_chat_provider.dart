@@ -36,13 +36,15 @@ class PipelineChatState {
     final r = role.toLowerCase().trim();
     if (r.contains('rider') || r.contains('delivery_agent') || r.contains('pda') || r.contains('driver')) {
       return recentConversations.where((c) => c.unreadRiderCount > 0).length;
-    } else if (r.contains('client') || r.contains('merchant') || r.contains('closer')) {
+    } else if (r.contains('client') || r.contains('merchant') || r.contains('closer') || r.contains('marketer')) {
       return recentConversations.where((c) => c.unreadClientCount > 0).length;
     } else if (r.contains('dc') || r.contains('manager') || r.contains('operations')) {
       return recentConversations.where((c) => c.unreadDcCount > 0).length;
     }
     return 0;
   }
+
+  int get totalUnreadCount => recentConversations.fold<int>(0, (sum, c) => sum + c.unreadClientCount);
 
   PipelineChatState copyWith({
     OrderConversationEntity? activeConversation,
@@ -156,10 +158,14 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
       return;
     }
 
-    final localStorage = _ref.read(localStorageServiceProvider);
+    final isMarketer = authUser.role.toLowerCase().contains('marketer');
     final scopeKey = authUser.isCloser
         ? 'closer_${authUser.closerId ?? authUser.id}'
-        : (authUser.clientId ?? authUser.distributionCenterId ?? authUser.id);
+        : (isMarketer
+            ? 'marketer_${authUser.marketerId ?? authUser.id}'
+            : (authUser.clientId ?? authUser.distributionCenterId ?? authUser.id));
+
+    final localStorage = _ref.read(localStorageServiceProvider);
 
     // Fast-path: Load cached conversations instantly
     try {
@@ -181,9 +187,10 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
         distributionCenterId: authUser.distributionCenterId,
         deliveryAgentId: authUser.deliveryAgentId,
         closerId: authUser.closerId ?? (authUser.isCloser ? authUser.id : null),
+        marketerId: isMarketer ? (authUser.marketerId ?? authUser.id) : null,
       );
 
-      // Defense-in-depth: If user is a closer, strictly filter to their conversations
+      // Defense-in-depth: Filter by closer or marketer ownership
       final filteredConvs = authUser.isCloser
           ? convs.where((c) {
               final closerId = authUser.closerId ?? authUser.id;
@@ -192,7 +199,15 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
               final matchName = closerName.isNotEmpty && c.closerName != null && c.closerName!.trim().toLowerCase() == closerName;
               return matchId || matchName;
             }).toList()
-          : convs;
+          : (isMarketer
+              ? convs.where((c) {
+                  final mId = authUser.marketerId ?? authUser.id;
+                  final mName = authUser.fullName.trim().toLowerCase();
+                  final matchId = c.marketerId != null && (c.marketerId == mId || c.marketerId == authUser.id);
+                  final matchName = mName.isNotEmpty && c.marketerName != null && c.marketerName!.trim().toLowerCase() == mName;
+                  return matchId || matchName;
+                }).toList()
+              : convs);
 
       if (mounted) {
         state = state.copyWith(
@@ -259,6 +274,25 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
             activeConversation: null,
             messages: const [],
             errorMessage: 'Access Restricted: Closers only have access to chat pipelines for their own assigned orders.',
+          );
+          return;
+        }
+      }
+
+      // STRICT MARKETER ACCESS CONTROL: Digital Marketers can ONLY access conversations for their lead form orders
+      if (authUser != null && authUser.role.toLowerCase().contains('marketer')) {
+        final mId = authUser.marketerId ?? authUser.id;
+        final mName = authUser.fullName.trim().toLowerCase();
+        final matchId = conv.marketerId != null && (conv.marketerId == mId || conv.marketerId == authUser.id);
+        final matchName = mName.isNotEmpty && conv.marketerName != null && conv.marketerName!.trim().toLowerCase() == mName;
+
+        if (conv.marketerId != null && !matchId && !matchName) {
+          debugPrint('[PIPELINE_CHAT] ⛔ Access Denied: Marketer ${authUser.email} attempted to open conversation for order ${conv.orderNumber} belonging to "${conv.marketerName ?? "Other"}"');
+          state = state.copyWith(
+            isLoading: false,
+            activeConversation: null,
+            messages: const [],
+            errorMessage: 'Access Restricted: Digital Marketers only have access to chat pipelines for orders from their forms.',
           );
           return;
         }
@@ -366,6 +400,8 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
         final rStr = user.role.toLowerCase();
         if (user.isCloser || rStr.contains('closer')) {
           role = ChatSenderRole.closer;
+        } else if (rStr.contains('marketer')) {
+          role = ChatSenderRole.marketer;
         } else if (rStr.contains('client')) {
           role = ChatSenderRole.client;
         } else if (rStr.contains('dc') || rStr.contains('admin') || rStr.contains('manager')) {

@@ -8,6 +8,7 @@ import '../../domain/entities/client_stock_invoice.dart';
 import '../../domain/entities/client_stock_balance.dart';
 import '../../domain/entities/stock_holder_custody.dart';
 import '../../domain/entities/client_marketer.dart';
+import '../../domain/entities/client_marketer_payout.dart';
 import '../../domain/entities/lead_form.dart';
 import '../../domain/repositories/client_portal_repository.dart';
 import '../datasources/client_portal_remote_datasource.dart';
@@ -138,6 +139,11 @@ class ClientPortalRepositoryImpl implements ClientPortalRepository {
     double dailyAdSpendBudget = 0.0,
     double commissionRate = 0.0,
     bool isCommissionEnabled = false,
+    bool isSupervisor = false,
+    String? supervisorId,
+    String commissionModel = 'per_form_submission',
+    double commissionPerFormSubmission = 0.0,
+    double commissionPerDeliveredOrder = 0.0,
     String? bankName,
     String? accountNumber,
     String? accountName,
@@ -152,6 +158,11 @@ class ClientPortalRepositoryImpl implements ClientPortalRepository {
       dailyAdSpendBudget: dailyAdSpendBudget,
       commissionRate: commissionRate,
       isCommissionEnabled: isCommissionEnabled,
+      isSupervisor: isSupervisor,
+      supervisorId: supervisorId,
+      commissionModel: commissionModel,
+      commissionPerFormSubmission: commissionPerFormSubmission,
+      commissionPerDeliveredOrder: commissionPerDeliveredOrder,
       bankName: bankName,
       accountNumber: accountNumber,
       accountName: accountName,
@@ -164,6 +175,115 @@ class ClientPortalRepositoryImpl implements ClientPortalRepository {
     required bool isActive,
   }) async {
     await _remoteDataSource.updateMarketerStatus(marketerId: marketerId, isActive: isActive);
+  }
+
+  @override
+  Future<ClientMarketer> updateMarketerProfile({
+    required String marketerId,
+    String? fullName,
+    String? phone,
+    String? avatarUrl,
+    String? bankName,
+    String? accountNumber,
+    String? accountName,
+  }) async {
+    return await _remoteDataSource.updateMarketerProfile(
+      marketerId: marketerId,
+      fullName: fullName,
+      phone: phone,
+      avatarUrl: avatarUrl,
+      bankName: bankName,
+      accountNumber: accountNumber,
+      accountName: accountName,
+    );
+  }
+
+  @override
+  Future<ClientMarketer> updateMarketerDetails({
+    required String marketerId,
+    required String fullName,
+    required String phone,
+    required String email,
+    required double dailyAdSpendBudget,
+    required String commissionModel,
+    required double commissionRate,
+    required double commissionPerFormSubmission,
+    required double commissionPerDeliveredOrder,
+    required bool isCommissionEnabled,
+    required bool isSupervisor,
+    String? supervisorId,
+    String? bankName,
+    String? accountNumber,
+    String? accountName,
+  }) async {
+    return await _remoteDataSource.updateMarketerDetails(
+      marketerId: marketerId,
+      fullName: fullName,
+      phone: phone,
+      email: email,
+      dailyAdSpendBudget: dailyAdSpendBudget,
+      commissionModel: commissionModel,
+      commissionRate: commissionRate,
+      commissionPerFormSubmission: commissionPerFormSubmission,
+      commissionPerDeliveredOrder: commissionPerDeliveredOrder,
+      isCommissionEnabled: isCommissionEnabled,
+      isSupervisor: isSupervisor,
+      supervisorId: supervisorId,
+      bankName: bankName,
+      accountNumber: accountNumber,
+      accountName: accountName,
+    );
+  }
+
+  @override
+  Future<void> deleteMarketer(String marketerId) async {
+    await _remoteDataSource.deleteMarketer(marketerId);
+  }
+
+  @override
+  Future<void> resetMarketerPassword({
+    required String marketerId,
+    required String newPassword,
+  }) async {
+    await _remoteDataSource.resetMarketerPassword(
+      marketerId: marketerId,
+      newPassword: newPassword,
+    );
+  }
+
+  @override
+  Future<List<ClientMarketerPayout>> getMarketerPayouts(String marketerId) async {
+    return await _remoteDataSource.fetchMarketerPayouts(marketerId);
+  }
+
+  @override
+  Future<List<ClientMarketerPayout>> getClientMarketerPayouts(String clientId) async {
+    return await _remoteDataSource.fetchClientMarketerPayouts(clientId);
+  }
+
+  @override
+  Future<ClientMarketerPayout> disburseMarketerPayout({
+    required String marketerId,
+    required String clientId,
+    required double amount,
+    required String bankName,
+    required String accountNumber,
+    required String accountName,
+    String? disbursementRef,
+    String? proofOfPaymentUrl,
+    String? notes,
+  }) async {
+    return await _remoteDataSource.disburseMarketerPayout(
+      marketerId: marketerId,
+      clientId: clientId,
+      amount: amount,
+      bankName: bankName,
+      accountNumber: accountNumber,
+      accountName: accountName,
+      disbursementRef: disbursementRef,
+      proofOfPaymentUrl: proofOfPaymentUrl,
+      notes: notes,
+    );
   }
 
   @override
@@ -258,6 +378,18 @@ class ClientPortalRepositoryImpl implements ClientPortalRepository {
     String? deliveryState,
     String? deliveryLga,
     String? notes,
+    String action = 'confirm',
+    String? customerName,
+    String? customerPhone,
+    String? customerAltPhone,
+    String? packageDealName,
+    String? packageDealId,
+    int? quantity,
+    int? paidQuantity,
+    int? freeQuantity,
+    double? totalAmount,
+    DateTime? scheduledDeliveryDate,
+    String? cancellationReason,
   }) async {
     return await _remoteDataSource.confirmCloserOrder(
       orderId: orderId,
@@ -266,6 +398,18 @@ class ClientPortalRepositoryImpl implements ClientPortalRepository {
       deliveryState: deliveryState,
       deliveryLga: deliveryLga,
       notes: notes,
+      action: action,
+      customerName: customerName,
+      customerPhone: customerPhone,
+      customerAltPhone: customerAltPhone,
+      packageDealName: packageDealName,
+      packageDealId: packageDealId,
+      quantity: quantity,
+      paidQuantity: paidQuantity,
+      freeQuantity: freeQuantity,
+      totalAmount: totalAmount,
+      scheduledDeliveryDate: scheduledDeliveryDate,
+      cancellationReason: cancellationReason,
     );
   }
 

@@ -438,13 +438,35 @@ class _ConversationListModalState extends ConsumerState<ConversationListModal> {
     final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
     final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
 
-    // Creator of the order / Closer that owns the order
-    final creatorName = (conv.closerName != null && conv.closerName!.trim().isNotEmpty)
-        ? conv.closerName!.trim()
-        : (conv.clientName.trim().isNotEmpty ? conv.clientName.trim() : conv.customerName);
-    final creatorAvatar = (conv.closerAvatarUrl != null && conv.closerAvatarUrl!.trim().isNotEmpty)
-        ? conv.closerAvatarUrl!.trim()
-        : null;
+    // Creator of the order:
+    // When the order comes from a digital marketer's form, the DP must be that of the digital marketer!
+    final bool isFromMarketer = (conv.marketerName != null && conv.marketerName!.trim().isNotEmpty) ||
+        (conv.marketerAvatarUrl != null && conv.marketerAvatarUrl!.trim().isNotEmpty) ||
+        conv.marketerId != null;
+
+    final String creatorName;
+    final String? creatorAvatar;
+    final Color avatarBg;
+
+    if (isFromMarketer) {
+      creatorName = (conv.marketerName != null && conv.marketerName!.trim().isNotEmpty)
+          ? conv.marketerName!.trim()
+          : 'Digital Marketer';
+      creatorAvatar = (conv.marketerAvatarUrl != null && conv.marketerAvatarUrl!.trim().isNotEmpty)
+          ? conv.marketerAvatarUrl!.trim()
+          : null;
+      avatarBg = const Color(0xFF10B981); // Digital Marketer Emerald
+    } else if (conv.closerName != null && conv.closerName!.trim().isNotEmpty) {
+      creatorName = conv.closerName!.trim();
+      creatorAvatar = (conv.closerAvatarUrl != null && conv.closerAvatarUrl!.trim().isNotEmpty)
+          ? conv.closerAvatarUrl!.trim()
+          : null;
+      avatarBg = const Color(0xFF4F46E5); // Closer Indigo
+    } else {
+      creatorName = conv.clientName.trim().isNotEmpty ? conv.clientName.trim() : conv.customerName;
+      creatorAvatar = null;
+      avatarBg = const Color(0xFF0284C7); // Merchant Sky Blue
+    }
 
     return InkWell(
       onTap: () {
@@ -471,12 +493,12 @@ class _ConversationListModalState extends ConsumerState<ConversationListModal> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Profile Picture / DP of the creator of the order / closer that owns the order
+            // Profile Picture / DP of the creator of the order (Marketer for marketing orders, Closer for sales closer orders)
             UserAvatarWidget(
               fullName: creatorName,
               avatarUrl: creatorAvatar,
               radius: 24,
-              backgroundColor: const Color(0xFF4F46E5), // Closer/Creator Indigo
+              backgroundColor: avatarBg,
               textColor: Colors.white,
             ),
             const SizedBox(width: 12),
@@ -550,6 +572,40 @@ class _ConversationListModalState extends ConsumerState<ConversationListModal> {
                           ),
                         ),
                       ),
+                      if (isFromMarketer && conv.marketerName != null && conv.marketerName!.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (conv.marketerAvatarUrl != null && conv.marketerAvatarUrl!.isNotEmpty) ...[
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: Image.network(
+                                    conv.marketerAvatarUrl!,
+                                    width: 12,
+                                    height: 12,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                                  ),
+                                ),
+                                const SizedBox(width: 3),
+                              ],
+                              Text(
+                                'Marketer: ${conv.marketerName!.split(' ').first}',
+                                style: GoogleFonts.inter(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF10B981),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       if (conv.closerName != null && conv.closerName!.isNotEmpty)
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),

@@ -272,6 +272,7 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> with Single
                 accountName: _bankAccountNameController.text.trim(),
                 email: widget.user.email,
                 closerId: widget.user.closerId,
+                marketerId: widget.user.marketerId ?? (widget.user.isMarketer ? widget.user.id : null),
               );
         } catch (e) {
           debugPrint('[EDIT_PROFILE] Notice on clientPortalProvider sync: $e');
@@ -465,7 +466,9 @@ class _EditProfileModalState extends ConsumerState<EditProfileModal> with Single
                           ? 'EDIT DC SUPERVISOR PROFILE'
                           : (widget.user.isCloser
                               ? 'EDIT TELESALES CLOSER PROFILE'
-                              : (widget.user.isClientAdmin ? 'EDIT MERCHANT PROFILE' : 'EDIT RIDER PROFILE')),
+                              : (widget.user.isMarketer
+                                  ? 'EDIT DIGITAL MARKETER PROFILE'
+                                  : (widget.user.isClientAdmin ? 'EDIT MERCHANT PROFILE' : 'EDIT RIDER PROFILE'))),
                       style: GoogleFonts.inter(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,

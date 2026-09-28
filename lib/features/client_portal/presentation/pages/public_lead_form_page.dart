@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/constants/nigeria_locations.dart';
+import '../../../../core/helpers/formatters.dart';
 import '../../domain/entities/lead_form.dart';
 import '../providers/client_portal_provider.dart';
 
@@ -122,11 +123,20 @@ class _PublicLeadFormPageState extends ConsumerState<PublicLeadFormPage> {
       final pkgName = _selectedPackage!['name']?.toString() ?? 'Standard Package';
       final pkgPrice = (_selectedPackage!['price'] as num?)?.toDouble() ?? 25000.0;
       final pkgQty = (_selectedPackage!['quantity'] as num?)?.toInt() ?? 1;
+      final paidQty = (_selectedPackage!['paid_quantity'] as num?)?.toInt() ?? pkgQty;
+      final freeQty = (_selectedPackage!['free_quantity'] as num?)?.toInt() ?? 0;
+      final pkgId = _selectedPackage!['id']?.toString();
+      final actualPrice = (_selectedPackage!['actual_price'] as num?)?.toDouble();
+
+      final rawPhone = _phoneController.text.trim();
+      final normalizedPhone = NigerianPhoneHelper.normalize(rawPhone);
+      final rawAltPhone = _altPhoneController.text.trim();
+      final normalizedAltPhone = rawAltPhone.isNotEmpty ? NigerianPhoneHelper.normalize(rawAltPhone) : null;
 
       final result = await ref.read(clientPortalProvider.notifier).submitMarketingLeadOrder({
         'form_id': _leadForm!.id,
         'customer_name': _nameController.text.trim(),
-        'customer_phone': _phoneController.text.trim(),
+        'customer_phone': normalizedPhone.isNotEmpty ? normalizedPhone : rawPhone,
         'delivery_address': _addressController.text.trim(),
         'delivery_state': _selectedState,
         'delivery_lga': _selectedLga.isNotEmpty ? _selectedLga : NigeriaLocations.getCitiesForState(_selectedState).first,
@@ -134,13 +144,20 @@ class _PublicLeadFormPageState extends ConsumerState<PublicLeadFormPage> {
         'package_selected': pkgName,
         'package_quantity': pkgQty,
         'order_amount': pkgPrice,
+        'paid_quantity': paidQty,
+        'free_quantity': freeQty,
+        if (pkgId != null) 'package_deal_id': pkgId,
+        if (actualPrice != null) 'actual_price': actualPrice,
         'utm_source': utmSource,
         'utm_medium': utmMedium,
         if (utmCampaign != null) 'utm_campaign': utmCampaign,
         if (utmContent != null) 'utm_content': utmContent,
         if (adId != null) 'ad_id': adId,
         'metadata': {
-          if (_altPhoneController.text.trim().isNotEmpty) 'alt_phone': _altPhoneController.text.trim(),
+          if (normalizedAltPhone != null) 'alt_phone': normalizedAltPhone,
+          'raw_phone_submitted': rawPhone,
+          if (freeQty > 0) 'free_bonus_units': freeQty,
+          if (actualPrice != null) 'retail_price': actualPrice,
         },
       });
 
@@ -150,15 +167,18 @@ class _PublicLeadFormPageState extends ConsumerState<PublicLeadFormPage> {
         _submissionResult = result;
       });
 
-      // Handle Thank You Page Redirect
-      final redirectUrl = result['redirect_url']?.toString();
-      if (redirectUrl != null && redirectUrl.isNotEmpty && redirectUrl.startsWith('http')) {
-        Future.delayed(const Duration(milliseconds: 1500), () async {
-          final targetUri = Uri.parse(redirectUrl);
-          if (await canLaunchUrl(targetUri)) {
-            await launchUrl(targetUri, mode: LaunchMode.platformDefault);
-          }
-        });
+      // Handle Thank You Page Redirect (only for fresh orders)
+      final isDuplicate = result['is_duplicate'] == true;
+      if (!isDuplicate) {
+        final redirectUrl = result['redirect_url']?.toString();
+        if (redirectUrl != null && redirectUrl.isNotEmpty && redirectUrl.startsWith('http')) {
+          Future.delayed(const Duration(milliseconds: 1500), () async {
+            final targetUri = Uri.parse(redirectUrl);
+            if (await canLaunchUrl(targetUri)) {
+              await launchUrl(targetUri, mode: LaunchMode.platformDefault);
+            }
+          });
+        }
       }
     } catch (e) {
       setState(() => _isSubmitting = false);
@@ -231,34 +251,89 @@ class _PublicLeadFormPageState extends ConsumerState<PublicLeadFormPage> {
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                        color: _submissionResult?['is_duplicate'] == true
+                            ? const Color(0xFFF59E0B).withValues(alpha: 0.14)
+                            : const Color(0xFF10B981).withValues(alpha: 0.12),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 48),
+                      child: Icon(
+                        _submissionResult?['is_duplicate'] == true
+                            ? Icons.verified_outlined
+                            : Icons.check_circle_rounded,
+                        color: _submissionResult?['is_duplicate'] == true
+                            ? const Color(0xFFD97706)
+                            : const Color(0xFF10B981),
+                        size: 48,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Order Successfully Received!',
-                      style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A)),
+                      _submissionResult?['is_duplicate'] == true
+                          ? 'Order Already On File!'
+                          : 'Order Successfully Received!',
+                      style: GoogleFonts.inter(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF0F172A),
+                      ),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Thank you, ${_nameController.text.trim()}. Your order for ${form.productName} has been booked.',
+                      _submissionResult?['is_duplicate'] == true
+                          ? 'Hello ${_nameController.text.trim()}, we already have an active order for this phone number currently queued for delivery.'
+                          : 'Thank you, ${_nameController.text.trim()}. Your order for ${form.productName} has been booked.',
                       style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B)),
                       textAlign: TextAlign.center,
                     ),
                     if (_submissionResult?['order_number'] != null) ...[
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF10B981).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
+                          color: _submissionResult?['is_duplicate'] == true
+                              ? const Color(0xFFF59E0B).withValues(alpha: 0.12)
+                              : const Color(0xFF10B981).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: _submissionResult?['is_duplicate'] == true
+                                ? const Color(0xFFF59E0B).withValues(alpha: 0.3)
+                                : Colors.transparent,
+                          ),
                         ),
                         child: Text(
                           'Order Ref: #${_submissionResult!["order_number"]}',
-                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: const Color(0xFF10B981)),
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: _submissionResult?['is_duplicate'] == true
+                                ? const Color(0xFFB45309)
+                                : const Color(0xFF10B981),
+                          ),
+                        ),
+                      ),
+                    ],
+                    if (_submissionResult?['is_duplicate'] == true) ...[
+                      const SizedBox(height: 14),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFFBEB),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFFDE68A)),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.shield_outlined, size: 18, color: Color(0xFFD97706)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'To protect you from duplicate charges and multiple deliveries, existing active orders are not duplicated. Our customer service agent will contact you shortly.',
+                                style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF92400E), height: 1.4),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -279,6 +354,19 @@ class _PublicLeadFormPageState extends ConsumerState<PublicLeadFormPage> {
                               Text(_selectedPackage?['name']?.toString() ?? '', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700)),
                             ],
                           ),
+                          if ((_selectedPackage?['free_quantity'] as num? ?? 0) > 0) ...[
+                            const SizedBox(height: 6),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text('Deal Details', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF059669), fontWeight: FontWeight.w600)),
+                                Text(
+                                  '${_selectedPackage?['paid_quantity'] ?? _selectedPackage?['quantity']} Paid + ${_selectedPackage?['free_quantity']} FREE (${_selectedPackage?['quantity']} Total)',
+                                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: const Color(0xFF059669)),
+                                ),
+                              ],
+                            ),
+                          ],
                           const Divider(height: 14),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -405,7 +493,13 @@ class _PublicLeadFormPageState extends ConsumerState<PublicLeadFormPage> {
                     ...form.packages.map((pkg) {
                       final isSelected = _selectedPackage?['id'] == pkg['id'];
                       final price = (pkg['price'] as num?)?.toDouble() ?? 0.0;
+                      final actualPrice = (pkg['actual_price'] as num?)?.toDouble();
                       final badge = pkg['badge']?.toString() ?? '';
+                      final paidQty = (pkg['paid_quantity'] as num?)?.toInt() ?? (pkg['quantity'] as num?)?.toInt() ?? 1;
+                      final freeQty = (pkg['free_quantity'] as num?)?.toInt() ?? 0;
+                      final totalUnits = (pkg['quantity'] as num?)?.toInt() ?? (paidQty + freeQty);
+                      final hasDiscount = actualPrice != null && actualPrice > price;
+                      final discountPercent = hasDiscount ? (((actualPrice - price) / actualPrice) * 100).round() : 0;
 
                       return GestureDetector(
                         onTap: () => setState(() => _selectedPackage = pkg),
@@ -421,6 +515,7 @@ class _PublicLeadFormPageState extends ConsumerState<PublicLeadFormPage> {
                             ),
                           ),
                           child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               Radio<String>(
                                 value: pkg['id']?.toString() ?? '',
@@ -433,14 +528,16 @@ class _PublicLeadFormPageState extends ConsumerState<PublicLeadFormPage> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Row(
+                                    Wrap(
+                                      crossAxisAlignment: WrapCrossAlignment.center,
+                                      spacing: 6,
+                                      runSpacing: 4,
                                       children: [
                                         Text(
                                           pkg['name']?.toString() ?? 'Deal',
                                           style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A)),
                                         ),
-                                        if (badge.isNotEmpty) ...[
-                                          const SizedBox(width: 6),
+                                        if (badge.isNotEmpty)
                                           Container(
                                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                             decoration: BoxDecoration(
@@ -452,19 +549,73 @@ class _PublicLeadFormPageState extends ConsumerState<PublicLeadFormPage> {
                                               style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w700, color: Colors.white),
                                             ),
                                           ),
-                                        ],
+                                        if (freeQty > 0)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF10B981),
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              '🎁 +$freeQty FREE Bonus',
+                                              style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.white),
+                                            ),
+                                          ),
                                       ],
                                     ),
-                                    Text(
-                                      'Quantity: ${pkg['quantity'] ?? 1} unit(s)',
-                                      style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
-                                    ),
+                                    const SizedBox(height: 3),
+                                    if (freeQty > 0)
+                                      Text(
+                                        '$paidQty Paid + $freeQty FREE Bonus = $totalUnits Total Units',
+                                        style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF059669)),
+                                      )
+                                    else
+                                      Text(
+                                        'Quantity: $totalUnits unit(s)',
+                                        style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                                      ),
                                   ],
                                 ),
                               ),
-                              Text(
-                                currencyFormatter.format(price),
-                                style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800, color: const Color(0xFF10B981)),
+                              const SizedBox(width: 8),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (hasDiscount) ...[
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          currencyFormatter.format(actualPrice),
+                                          style: GoogleFonts.inter(
+                                            fontSize: 11,
+                                            color: const Color(0xFF94A3B8),
+                                            decoration: TextDecoration.lineThrough,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFDC2626).withValues(alpha: 0.1),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            '-$discountPercent%',
+                                            style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w800, color: const Color(0xFFDC2626)),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 2),
+                                  ],
+                                  Text(
+                                    currencyFormatter.format(price),
+                                    style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800, color: const Color(0xFF10B981)),
+                                  ),
+                                ],
                               ),
                             ],
                           ),

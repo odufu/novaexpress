@@ -38,6 +38,7 @@ class UserModel extends UserEntity {
     super.marketerId,
     super.marketerCode,
     super.avatarUrl,
+    super.isSupervisor,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json, {String? deliveryAgentId}) {
@@ -90,6 +91,7 @@ class UserModel extends UserEntity {
           json['profile_photo_url']?.toString() ??
           json['avatar']?.toString() ??
           json['image_url']?.toString(),
+      isSupervisor: json['is_supervisor'] == true || json['is_supervisor'] == 'true' || json['role'] == 'marketing_supervisor' || json['role'] == 'supervisor_marketer',
     );
   }
 
