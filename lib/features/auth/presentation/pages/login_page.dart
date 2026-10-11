@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../widgets/login_form.dart';
 
 class LoginPage extends StatelessWidget {
@@ -179,47 +178,6 @@ class LoginPage extends StatelessWidget {
 
                             // The Unified Login Form with QuickAccountDropdown
                             const LoginForm(),
-                            const SizedBox(height: 18),
-
-                            // Interactive Presentation Launcher Button
-                            SizedBox(
-                              width: double.infinity,
-                              child: OutlinedButton(
-                                onPressed: () async {
-                                  final uri = Uri.parse('presentation/index.html');
-                                  if (await canLaunchUrl(uri)) {
-                                    await launchUrl(uri);
-                                  }
-                                },
-                                style: OutlinedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                  side: BorderSide(
-                                    color: const Color(0xFF006C4C).withValues(alpha: 0.4),
-                                    width: 1.2,
-                                  ),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  backgroundColor: const Color(0xFF006C4C).withValues(alpha: 0.04),
-                                ),
-                                child: FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const Icon(Icons.slideshow_rounded, size: 18, color: Color(0xFF006C4C)),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'Open Interactive System Presentation',
-                                        style: GoogleFonts.inter(
-                                          color: const Color(0xFF006C4C),
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 12.5,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
                           ],
                         ),
                       ),

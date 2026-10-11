@@ -35,6 +35,7 @@ class DCConsoleLayout extends ConsumerStatefulWidget {
 class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final TextEditingController _searchController = TextEditingController();
+  bool _hasSyncedUser = false;
 
   @override
   void initState() {
@@ -66,13 +67,12 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
     final authState = ref.watch(authProvider);
     final user = authState.user;
 
-    // Automatically synchronize active hub with logged-in supervisor's DC
-    if (user != null && user.distributionCenterId != null && user.distributionCenterId!.isNotEmpty) {
-      if (dcState.activeHubId != user.distributionCenterId && dcState.activeHubCode != user.deliveryAgentCode) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          ref.read(dcConsoleProvider.notifier).syncWithUser(user);
-        });
-      }
+    // Automatically synchronize active hub with logged-in supervisor's DC on initial load
+    if (!_hasSyncedUser && user != null && user.distributionCenterId != null && user.distributionCenterId!.isNotEmpty) {
+      _hasSyncedUser = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(dcConsoleProvider.notifier).syncWithUser(user);
+      });
     }
 
     return Scaffold(
@@ -498,54 +498,73 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
               onPressed: () => _scaffoldKey.currentState?.openDrawer(),
             ),
 
-          // Active DC Hub Indicator Badge (Locked to logged-in supervisor account's DC)
+          // Interactive Distribution Center Selector Dropdown
           Container(
             padding: EdgeInsets.symmetric(
-              horizontal: isVeryCompact ? 5 : (isCompact ? 7 : 10),
-              vertical: isCompact ? 4 : 6,
+              horizontal: isVeryCompact ? 6 : (isCompact ? 8 : 10),
+              vertical: isCompact ? 2 : 4,
             ),
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(10),
               border: Border.all(
                 color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
               ),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 7,
-                  height: 7,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF10B981),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: isVeryCompact ? 55 : (isCompact ? 80 : 160)),
-                  child: Text(
-                    isCompact ? dcState.activeHubCode : dcState.activeHubName,
-                    style: GoogleFonts.inter(
-                      fontSize: isVeryCompact ? 10.5 : (isCompact ? 11 : 12),
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : const Color(0xFF0F172A),
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                if (!isCompact) ...[
-                  const SizedBox(width: 4),
-                  Text(
-                    '(${dcState.activeHubCode})',
-                    style: GoogleFonts.firaCode(
-                      fontSize: 11,
-                      color: const Color(0xFF64748B),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String?>(
+                value: dcState.selectedDcId,
+                dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                icon: const Icon(Icons.arrow_drop_down_rounded, size: 20, color: Color(0xFF10B981)),
+                isDense: true,
+                items: [
+                  DropdownMenuItem<String?>(
+                    value: null,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.public_rounded, size: 15, color: Color(0xFF38BDF8)),
+                        const SizedBox(width: 6),
+                        Text(
+                          isVeryCompact ? 'All' : (isCompact ? 'All DCs' : '🌐 Cumulative Network (All DCs)'),
+                          style: GoogleFonts.inter(
+                            fontSize: isVeryCompact ? 10.5 : (isCompact ? 11 : 12),
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
+                  ...dcState.distributionCenters.map((dc) {
+                    return DropdownMenuItem<String?>(
+                      value: dc.id,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            dc.isGrandDc ? Icons.stars_rounded : Icons.warehouse_rounded,
+                            size: 15,
+                            color: dc.isGrandDc ? const Color(0xFFF59E0B) : const Color(0xFF10B981),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            isVeryCompact ? dc.code : (isCompact ? dc.code : '${dc.name} (${dc.code})'),
+                            style: GoogleFonts.inter(
+                              fontSize: isVeryCompact ? 10.5 : (isCompact ? 11 : 12),
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
                 ],
-              ],
+                onChanged: (newDcId) {
+                  dcNotifier.selectDistributionCenter(newDcId);
+                },
+              ),
             ),
           ),
 

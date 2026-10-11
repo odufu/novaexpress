@@ -65,6 +65,28 @@ CREATE TABLE IF NOT EXISTS public.lead_forms (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Ensure all required columns exist in case lead_forms pre-existed
+ALTER TABLE public.lead_forms
+  ADD COLUMN IF NOT EXISTS client_id UUID REFERENCES public.clients(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS marketer_id UUID REFERENCES public.client_marketers(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS product_id UUID REFERENCES public.products(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS product_name TEXT,
+  ADD COLUMN IF NOT EXISTS form_title TEXT,
+  ADD COLUMN IF NOT EXISTS form_slug TEXT,
+  ADD COLUMN IF NOT EXISTS description TEXT DEFAULT '',
+  ADD COLUMN IF NOT EXISTS packages JSONB DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS redirect_url TEXT DEFAULT '',
+  ADD COLUMN IF NOT EXISTS pixel_id TEXT DEFAULT '',
+  ADD COLUMN IF NOT EXISTS capi_token TEXT DEFAULT '',
+  ADD COLUMN IF NOT EXISTS test_event_code TEXT DEFAULT '',
+  ADD COLUMN IF NOT EXISTS field_options JSONB DEFAULT '{"require_email": false, "require_alt_phone": false, "require_city": false, "require_notes": false}'::jsonb,
+  ADD COLUMN IF NOT EXISTS appearance JSONB DEFAULT '{"primary_color": "#F37021", "button_text": "Complete Order Now", "badge_text": "Pay On Delivery + Fast Delivery"}'::jsonb,
+  ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true,
+  ADD COLUMN IF NOT EXISTS total_views INT DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS total_submissions INT DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW(),
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
 CREATE INDEX IF NOT EXISTS idx_lead_forms_client_id ON public.lead_forms(client_id);
 CREATE INDEX IF NOT EXISTS idx_lead_forms_marketer_id ON public.lead_forms(marketer_id);
 CREATE INDEX IF NOT EXISTS idx_lead_forms_product_id ON public.lead_forms(product_id);

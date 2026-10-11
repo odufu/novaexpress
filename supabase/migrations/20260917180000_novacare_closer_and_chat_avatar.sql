@@ -204,6 +204,17 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- 4. Seed Novacare Closer into client_closers and users
+INSERT INTO public.clients (id, company_id, name, company_name, email, phone, code)
+VALUES (
+    '00000000-0000-4000-8000-789382731303',
+    '11111111-1111-4111-8111-111111111111',
+    'Novacare Health & Wellness Ltd',
+    'Novacare Health & Wellness Ltd',
+    'admin@novacare.com',
+    '08000000001',
+    'NOVA-001'
+) ON CONFLICT (id) DO NOTHING;
+
 INSERT INTO public.client_closers (
     id,
     client_id,
@@ -247,6 +258,7 @@ ON CONFLICT (id) DO UPDATE SET
 -- Also ensure user record in public.users
 INSERT INTO public.users (
     id,
+    company_id,
     email,
     role,
     first_name,
@@ -259,6 +271,7 @@ INSERT INTO public.users (
     updated_at
 ) VALUES (
     '44444444-4444-4444-8444-444444444444',
+    '11111111-1111-4111-8111-111111111111',
     'closer@novacare.com',
     'closer',
     'Amaka',

@@ -11,6 +11,7 @@ import '../widgets/client_daily_accumulator_modal.dart';
 import '../widgets/client_add_package_modal.dart';
 import '../widgets/client_raise_stock_invoice_modal.dart';
 import '../widgets/client_supply_stock_modal.dart';
+import '../widgets/merchant_financial_intelligence_view.dart';
 
 class ClientDashboardPage extends ConsumerWidget {
   final VoidCallback onNavigateToOrders;
@@ -46,6 +47,12 @@ class ClientDashboardPage extends ConsumerWidget {
             _buildLowStockAlertBanner(context, state, isDark),
             const SizedBox(height: 18),
           ],
+
+          // Core Merchant Financial Intelligence, Expenditures & Analytics (Legacy Parity + Product Filter)
+          MerchantFinancialIntelligenceView(
+            clientId: state.clientProfile.id,
+          ),
+          const SizedBox(height: 24),
 
           // Today's Live Cash Accumulator & 10:00 PM Closeout Card
           _buildDailyCashAccumulatorCard(context, state),

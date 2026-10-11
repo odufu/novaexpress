@@ -22,7 +22,6 @@
   <!-- Preconnect & Preload Official Paystack Inline SDK -->
   <link rel="preconnect" href="https://js.paystack.co">
   <link rel="dns-prefetch" href="https://js.paystack.co">
-  <script src="https://js.paystack.co/v2/inline.js" defer></script>
 
   <!-- Branded Web Splash Styling -->
   <style>
@@ -53,6 +52,10 @@
       z-index: 99999;
       pointer-events: none;
       transition: opacity 0.4s ease-out;
+    }
+
+    #splash-container a {
+      pointer-events: auto;
     }
 
     .logo-wrapper {
@@ -279,6 +282,17 @@
 
     window.addEventListener('flutter-first-frame', removeSplashScreen);
 
+    // Catch bootstrap network errors (e.g., ERR_NETWORK_CHANGED, CDN drop)
+    window.addEventListener('unhandledrejection', function (e) {
+      var reason = (e && e.reason) ? (e.reason.message || String(e.reason)) : '';
+      if (reason.indexOf('canvaskit') !== -1 || reason.indexOf('Failed to fetch') !== -1) {
+        var statusEl = document.querySelector('.system-status');
+        if (statusEl) {
+          statusEl.innerHTML = '<span style="color:#EF4444;font-weight:600;">Network blip interrupted engine load.</span><br/><a href="javascript:location.reload()" style="color:#F37021;text-decoration:underline;margin-top:8px;display:inline-block;cursor:pointer;font-weight:700;">Click to Reload App</a>';
+        }
+      }
+    });
+
     // Continuous check in case first-frame event fired before listener or was missed
     var checkFlutterLoadedInterval = setInterval(function () {
       if (document.querySelector('flutter-view') || document.querySelector('flt-glass-pane') || document.querySelector('canvas')) {
@@ -287,10 +301,12 @@
       }
     }, 150);
 
-    // Guaranteed safety fallback: never trap user on splash screen
+    // Safety fallback: only dismiss splash if flutter actually mounted
     setTimeout(function () {
-      clearInterval(checkFlutterLoadedInterval);
-      removeSplashScreen();
+      if (document.querySelector('flutter-view') || document.querySelector('flt-glass-pane') || document.querySelector('canvas')) {
+        clearInterval(checkFlutterLoadedInterval);
+        removeSplashScreen();
+      }
     }, 5000);
   </script>
 </body>

@@ -14,6 +14,7 @@ import '../providers/orders_provider.dart';
 import '../widgets/pda_navigation_card.dart';
 import '../widgets/reschedule_callback_modal.dart';
 import '../widgets/upsell_selector_modal.dart';
+import '../widgets/multi_stop_pickup_manifest_card.dart';
 
 class OrderDetailPage extends ConsumerWidget {
   final String orderId;
@@ -70,8 +71,9 @@ class OrderDetailPage extends ConsumerWidget {
         : 0;
 
     final int requiredQty = order.totalPhysicalQuantity > 0 ? order.totalPhysicalQuantity : 1;
+    final bool isClientPackage = order.fulfillmentType == 'client_package';
 
-    if (availableInCustody < requiredQty) {
+    if (!isClientPackage && availableInCustody < requiredQty) {
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -538,6 +540,15 @@ class OrderDetailPage extends ConsumerWidget {
                     ),
                   ],
                 ),
+              ),
+              const SizedBox(height: 14),
+            ],
+
+            // B2B Multi-Stop Pickup Manifest Card (Dispensary pickups, Barcode scan, OTP delivery)
+            if (order.fulfillmentType == 'client_package') ...[
+              MultiStopPickupManifestCard(
+                order: order,
+                onOrderDelivered: () => ref.read(ordersProvider.notifier).loadOrders(),
               ),
               const SizedBox(height: 14),
             ],

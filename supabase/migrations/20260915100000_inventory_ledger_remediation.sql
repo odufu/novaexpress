@@ -28,12 +28,14 @@ ALTER TABLE public.stock_returns
     ADD COLUMN IF NOT EXISTS received_by UUID;
 
 -- 3. Stored Procedure: fn_receive_client_supply (Synchronize dc_stocks JSONB)
+DROP FUNCTION IF EXISTS public.fn_receive_client_supply(UUID, UUID, TEXT, TEXT, JSONB, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS public.fn_receive_client_supply CASCADE;
 CREATE OR REPLACE FUNCTION public.fn_receive_client_supply(
     p_transfer_id UUID,
     p_receiver_id UUID,
     p_receiver_name TEXT,
-    p_receiver_signature_url TEXT,
-    p_verified_items JSONB, -- Array of {item_id, quantity_received, quantity_damaged, quantity_missing, notes}
+    p_receiver_signature_url TEXT DEFAULT '',
+    p_verified_items JSONB DEFAULT '[]'::JSONB, -- Array of {item_id, quantity_received, quantity_damaged, quantity_missing, notes}
     p_notes TEXT DEFAULT ''
 ) RETURNS JSONB
 LANGUAGE plpgsql
@@ -132,13 +134,15 @@ END;
 $$;
 
 -- 4. Stored Procedure: fn_issue_dc_stock_to_rider (Synchronize dc_stocks JSONB)
+DROP FUNCTION IF EXISTS public.fn_issue_dc_stock_to_rider(UUID, UUID, JSONB, UUID, TEXT, TEXT, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS public.fn_issue_dc_stock_to_rider CASCADE;
 CREATE OR REPLACE FUNCTION public.fn_issue_dc_stock_to_rider(
     p_dc_id UUID,
     p_rider_id UUID,
     p_items JSONB, -- Array of {product_id, quantity}
-    p_sender_id UUID,
-    p_sender_name TEXT,
-    p_sender_signature_url TEXT,
+    p_sender_id UUID DEFAULT NULL,
+    p_sender_name TEXT DEFAULT '',
+    p_sender_signature_url TEXT DEFAULT '',
     p_notes TEXT DEFAULT ''
 ) RETURNS JSONB
 LANGUAGE plpgsql
@@ -263,11 +267,13 @@ END;
 $$;
 
 -- 5. Stored Procedure: fn_rider_accept_stock_handover (Restore DC stock on discrepancy)
+DROP FUNCTION IF EXISTS public.fn_rider_accept_stock_handover(UUID, UUID, TEXT, TEXT, JSONB, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS public.fn_rider_accept_stock_handover CASCADE;
 CREATE OR REPLACE FUNCTION public.fn_rider_accept_stock_handover(
     p_transfer_id UUID,
     p_rider_id UUID,
     p_rider_name TEXT,
-    p_rider_signature_url TEXT,
+    p_rider_signature_url TEXT DEFAULT '',
     p_verified_items JSONB DEFAULT NULL, -- Optional array of {item_id, quantity_received}
     p_notes TEXT DEFAULT ''
 ) RETURNS JSONB
@@ -371,6 +377,7 @@ $$;
 -- 6. Stored Procedure: fn_confirm_order_delivery_stock
 -- Eliminates double stock deduction on POD delivery!
 -- Decrements agent_inventory and increments products.delivered_count WITHOUT touching products.stock_quantity.
+DROP FUNCTION IF EXISTS public.fn_confirm_order_delivery_stock CASCADE;
 CREATE OR REPLACE FUNCTION public.fn_confirm_order_delivery_stock(
     p_order_id UUID,
     p_agent_id UUID,
@@ -414,6 +421,7 @@ $$;
 
 -- 7. Stored Procedure: fn_receive_rider_stock_return
 -- Enables DC supervisor to receive returned items, credit warehouse inventory, and deduct rider custody.
+DROP FUNCTION IF EXISTS public.fn_receive_rider_stock_return CASCADE;
 CREATE OR REPLACE FUNCTION public.fn_receive_rider_stock_return(
     p_return_id UUID,
     p_dc_id UUID,
@@ -495,6 +503,7 @@ END;
 $$;
 
 -- 8. Stored Procedure: fn_calculate_merchant_asset_custody (Remove hardcoded 25000)
+DROP FUNCTION IF EXISTS public.fn_calculate_merchant_asset_custody CASCADE;
 CREATE OR REPLACE FUNCTION public.fn_calculate_merchant_asset_custody(
     p_client_id UUID,
     p_dc_id UUID DEFAULT NULL

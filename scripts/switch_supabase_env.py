@@ -64,14 +64,16 @@ def switch_to_environment(target_url, target_anon, target_service, env_name="Cus
         code
     )
     code = re.sub(
-        r"static const String _defaultAnonKey = [^;]+;",
+        r"static const String _defaultAnonKey =\s*[^;]+;",
         f"static const String _defaultAnonKey =\n      '{target_anon}';",
-        code
+        code,
+        flags=re.DOTALL
     )
     code = re.sub(
-        r"static const String _defaultServiceRoleKey = [^;]+;",
+        r"static const String _defaultServiceRoleKey =\s*[^;]+;",
         f"static const String _defaultServiceRoleKey =\n      '{target_service}';",
-        code
+        code,
+        flags=re.DOTALL
     )
 
     with open(CONSTANTS_FILE, "w", encoding="utf-8") as f:

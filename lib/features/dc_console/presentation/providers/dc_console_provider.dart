@@ -19,121 +19,31 @@ import '../../domain/entities/dc_transaction_record.dart';
 import '../../domain/entities/distribution_center.dart';
 
 final List<DistributionCenter> defaultDistributionCenters = [
-  // 1. Grand DC (Apex Central DC - Wuse branch default)
+  // 1. Grand DC (Apex Central DC - Wuse Grand Central Hub)
   DistributionCenter(
     id: '22222222-2222-4222-8222-222222222222',
     companyId: '11111111-1111-4111-8111-111111111111',
     name: 'Wuse Grand Central Distribution Center',
     code: 'DC-WUSE-01',
-    state: 'Federal Capital Territory',
+    state: 'Abuja (FCT)',
     city: 'Wuse 2',
     address: 'Plot 402 Aminu Kano Crescent, Wuse 2, Abuja',
-    contactPhone: '+234 802 345 6789',
+    contactPhone: '+2348023456789',
     contactEmail: 'dc.supervisor@novaxpress.ng',
-    managerName: 'Adekunle Supervisor',
+    managerName: 'Ahmed Bello',
     isGrandDc: true,
     isHub: true,
     isActive: true,
     operatingZones: const ['Abuja Municipal (AMAC)', 'AMAC', 'Wuse I', 'Wuse II', 'Maitama', 'Garki', 'Jabi', 'Utako', 'Central Area', 'Guzape'],
-    storageCapacityUnits: 50000,
-    totalAssignedRiders: 2,
-    activeInventoryBatches: 12,
-    createdAt: DateTime(2026, 1, 1),
-    updatedAt: DateTime(2026, 1, 1),
-  ),
-
-  // 2. Hub Distribution Center (Regional Hub)
-  DistributionCenter(
-    id: '00000000-0000-4000-8000-789382566045',
-    companyId: '11111111-1111-4111-8111-111111111111',
-    name: 'Kaduna Main DC',
-    code: 'DC-KD-001',
-    state: 'Kaduna',
-    city: 'Birnin Gwari',
-    address: '14 Ahmadu Bello Way, Kaduna',
-    contactPhone: '+234 802 222 2222',
-    contactEmail: 'kaduna.hub@novaxpress.ng',
-    managerName: 'Grace Okon',
-    isGrandDc: false,
-    isHub: true,
-    isActive: true,
-    operatingZones: const ['Kaduna North', 'Kaduna South', 'Chikun', 'Birnin Gwari'],
-    storageCapacityUnits: 35000,
-    totalAssignedRiders: 1,
-    activeInventoryBatches: 5,
-    createdAt: DateTime(2026, 1, 1),
-    updatedAt: DateTime(2026, 1, 1),
-  ),
-
-  // 3. General Distribution Centers (Local / Station DCs)
-  DistributionCenter(
-    id: '00000000-0000-4000-8000-789334173209',
-    companyId: '11111111-1111-4111-8111-111111111111',
-    name: 'Otukpo Central Distribution',
-    code: 'DC-OTUKPO-001',
-    state: 'Benue',
-    city: 'Otukpo',
-    address: 'Federal Road, Otukpo Town',
-    contactPhone: '+234 807 333 4444',
-    contactEmail: 'otukpo.dc@novaxpress.ng',
-    managerName: 'Emmanuel Audu',
-    isGrandDc: false,
-    isHub: false,
-    isActive: true,
-    operatingZones: const ['Otukpo', 'Ogbadibo', 'Okpokwu', 'Ado'],
-    storageCapacityUnits: 35000,
-    totalAssignedRiders: 1,
-    activeInventoryBatches: 2,
-    createdAt: DateTime(2026, 1, 1),
-    updatedAt: DateTime(2026, 1, 1),
-  ),
-
-  DistributionCenter(
-    id: '00000000-0000-4000-8000-789360182886',
-    companyId: '11111111-1111-4111-8111-111111111111',
-    name: 'LAGOS MAIN DC',
-    code: 'DC-LGS-001',
-    state: 'Lagos',
-    city: 'Badagry',
-    address: 'Badagry Expressway, Lagos',
-    contactPhone: '+234 808 504 0146',
-    contactEmail: 'lagos.dc@novaxpress.ng',
-    managerName: 'Babatunde Ade',
-    isGrandDc: false,
-    isHub: false,
-    isActive: true,
-    operatingZones: const ['Agege', 'Ajeromi-Ifelodun', 'Alimosho', 'Amuwo-Odofin', 'Apapa', 'Badagry', 'Epe', 'Ibeju-Lekki', 'Ikeja', 'Ikorodu', 'Kosofe', 'Lagos Island', 'Lagos Mainland', 'Mushin', 'Ojo', 'Oshodi-Isolo', 'Somolu', 'Surulere'],
-    storageCapacityUnits: 35000,
-    totalAssignedRiders: 2,
-    activeInventoryBatches: 4,
+    storageCapacityUnits: 25000,
+    totalAssignedRiders: 0,
+    activeInventoryBatches: 0,
     createdAt: DateTime(2026, 1, 1),
     updatedAt: DateTime(2026, 1, 1),
   ),
 ];
 
-final List<DCFleetDriver> defaultFleetDrivers = [
-  DCFleetDriver(
-    id: 'b1111111-1111-4111-8111-111111111111',
-    driverCode: 'PDA-7000',
-    name: 'Emeka Rider',
-    phone: '08012345678',
-    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-    vehicleModel: 'Honda Ace 125',
-    vehiclePlate: 'ABJ-789-XY',
-    vehicleType: 'Motorcycle',
-    status: 'active',
-    assignedZone: 'Abuja Municipal (AMAC)',
-    distributionCenterId: '22222222-2222-4222-8222-222222222222',
-    coveredLgas: const ['Abuja Municipal (AMAC)', 'Bwari', 'Gwagwalada', 'Kuje', 'Kwali'],
-    totalAssignedOrders: 0,
-    completedOrders: 0,
-    routeProgressPercent: 0.0,
-    efficiencyRating: 98.4,
-    cashInCustody: 0.0,
-    itemsInCustody: 0,
-    personnelType: 'pda',
-  ),
-];
+const List<DCFleetDriver> defaultFleetDrivers = [];
 
 const List<ClientProfile> defaultRegisteredClients = [];
 
@@ -367,6 +277,7 @@ class DCConsoleState {
     String? fleetFilter,
     List<DistributionCenter>? distributionCenters,
     String? selectedDcId,
+    bool clearSelectedDcId = false,
     String? dcFilter,
     String? selectedStateFilter,
     List<DCFleetDriver>? drivers,
@@ -395,7 +306,7 @@ class DCConsoleState {
       searchQuery: searchQuery ?? this.searchQuery,
       fleetFilter: fleetFilter ?? this.fleetFilter,
       distributionCenters: distributionCenters ?? this.distributionCenters,
-      selectedDcId: selectedDcId ?? this.selectedDcId,
+      selectedDcId: clearSelectedDcId ? null : (selectedDcId ?? this.selectedDcId),
       dcFilter: dcFilter ?? this.dcFilter,
       selectedStateFilter: selectedStateFilter ?? this.selectedStateFilter,
       drivers: drivers ?? this.drivers,
@@ -736,7 +647,15 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
   }
 
   void selectDistributionCenter(String? dcId) {
-    state = state.copyWith(selectedDcId: dcId);
+    if (dcId == null) {
+      state = state.copyWith(clearSelectedDcId: true);
+    } else {
+      state = state.copyWith(selectedDcId: dcId);
+      final match = state.distributionCenters.where((d) => d.id == dcId).firstOrNull;
+      if (match != null) {
+        switchActiveHub(match);
+      }
+    }
   }
 
   Future<void> loadClientsFromDatabase() async {
