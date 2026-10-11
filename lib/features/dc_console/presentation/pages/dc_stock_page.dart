@@ -353,11 +353,16 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                         children: [
                           Expanded(
                             child: ElevatedButton.icon(
-                              onPressed: () => _showReceiveStockDialog(context, isDark, stockState),
-                              icon: const Icon(Icons.arrow_downward_rounded, size: 15, color: Colors.white),
-                              label: const Text('Receive Stock', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                              onPressed: () => _tabController.animateTo(2),
+                              icon: const Icon(Icons.mark_email_unread_rounded, size: 15, color: Colors.white),
+                              label: Text(
+                                (stockState.pendingClientSupplies.length + stockState.pendingInterDcTransfers.length) > 0
+                                    ? 'Inbound (${stockState.pendingClientSupplies.length + stockState.pendingInterDcTransfers.length})'
+                                    : 'Inbound',
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                              ),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF10B981),
+                                backgroundColor: const Color(0xFF0D9488),
                                 padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
                               ),
                             ),
@@ -422,10 +427,15 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                               ),
                               const SizedBox(width: 4),
                               ElevatedButton.icon(
-                                onPressed: () => _showReceiveStockDialog(context, isDark, stockState),
-                                icon: const Icon(Icons.arrow_downward_rounded, size: 16, color: Colors.white),
-                                label: const Text('Receive Stock', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
+                                onPressed: () => _tabController.animateTo(2),
+                                icon: const Icon(Icons.mark_email_unread_rounded, size: 16, color: Colors.white),
+                                label: Text(
+                                  (stockState.pendingClientSupplies.length + stockState.pendingInterDcTransfers.length) > 0
+                                      ? 'Inbound Consignments (${stockState.pendingClientSupplies.length + stockState.pendingInterDcTransfers.length})'
+                                      : 'Inbound Consignments',
+                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                ),
+                                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0D9488)),
                               ),
                               const SizedBox(width: 8),
                               ElevatedButton.icon(
@@ -854,14 +864,6 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                           visualDensity: VisualDensity.compact,
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                          onPressed: () => _showReceiveStockDialog(context, isDark, ref.read(stockProvider), preselectedItem: item),
-                          icon: const Icon(Icons.arrow_downward_rounded, size: 16, color: Color(0xFF10B981)),
-                          tooltip: 'Receive More Stock',
-                        ),
-                        IconButton(
-                          visualDensity: VisualDensity.compact,
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
                           onPressed: item.availableCount > 0
                               ? () => _showAssignToRiderDialog(context, isDark, item, dcState.drivers)
                               : null,
@@ -1007,9 +1009,9 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () => _showReceiveStockDialog(context, isDark, ref.read(stockProvider), preselectedItem: item),
-                    icon: const Icon(Icons.arrow_downward_rounded, size: 14),
-                    label: const Text('Add / Restock', style: TextStyle(fontSize: 11.5)),
+                    onPressed: () => _showProductDetailsModal(context, isDark, item, dcState.drivers, stockState.riderAllocations),
+                    icon: const Icon(Icons.info_outline_rounded, size: 14),
+                    label: const Text('View Details', style: TextStyle(fontSize: 11.5)),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -1097,14 +1099,12 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
     List<DCFleetDriver> drivers,
     List<RiderStockAllocation> allAllocations,
   ) {
-    final stockState = ref.read(stockProvider);
-
     DCProductDetailModal.show(
       context,
       item: item,
       drivers: drivers,
       allocations: allAllocations,
-      onReceiveMoreStock: () => _showReceiveStockDialog(context, isDark, stockState, preselectedItem: item),
+      onReceiveMoreStock: () => _tabController.animateTo(2),
       onAssignToRider: () => _showAssignToRiderDialog(context, isDark, item, drivers),
       onTransferToDc: () => _showTransferStockToDcDialog(context, isDark, item),
       onReportDamage: () => _showRecordDamageModal(context, isDark, item, drivers),
@@ -2002,278 +2002,7 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
     );
   }
 
-  void _showReceiveStockDialog(BuildContext context, bool isDark, StockState stockState, {StockItemEntity? preselectedItem}) {
-    // Deduplicate stock items and ensure preselectedItem is registered
-    final Map<String, StockItemEntity> uniqueMap = {};
-    for (final it in stockState.stockItems) {
-      uniqueMap[it.id] = it;
-    }
-    if (preselectedItem != null) {
-      uniqueMap[preselectedItem.id] = preselectedItem;
-    }
-    final itemsList = uniqueMap.values.toList();
 
-    String? selectedProdId;
-    if (preselectedItem != null && uniqueMap.containsKey(preselectedItem.id)) {
-      selectedProdId = preselectedItem.id;
-    } else if (itemsList.isNotEmpty) {
-      selectedProdId = itemsList.first.id;
-    }
-
-    final qtyCtrl = TextEditingController(text: '50');
-    final waybillCtrl = TextEditingController(text: 'WB-${DateTime.now().year}-${(DateTime.now().millisecondsSinceEpoch % 10000)}');
-    final binCtrl = TextEditingController(text: preselectedItem?.binLocation ?? 'BIN-A1-02');
-    final messenger = ScaffoldMessenger.of(context);
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Row(
-            children: [
-              const Icon(Icons.arrow_downward_rounded, color: Color(0xFF10B981), size: 22),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text('Receive Incoming Stock', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 17), overflow: TextOverflow.ellipsis),
-              ),
-            ],
-          ),
-          content: Container(
-            constraints: const BoxConstraints(maxWidth: 480),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (itemsList.isNotEmpty)
-                    DropdownButtonFormField<String>(
-                      value: (selectedProdId != null && uniqueMap.containsKey(selectedProdId)) ? selectedProdId : itemsList.first.id,
-                      isExpanded: true,
-                      decoration: const InputDecoration(labelText: 'Select Product to Restock *'),
-                      items: itemsList.map((p) {
-                        return DropdownMenuItem(
-                          value: p.id,
-                          child: Text(
-                            '${p.name} (${p.sku}) • Avail: ${p.availableCount}',
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: (val) {
-                        if (val != null) {
-                          setDialogState(() => selectedProdId = val);
-                        }
-                      },
-                    ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: qtyCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Quantity Received (Units) *', hintText: 'e.g. 50'),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(controller: waybillCtrl, decoration: const InputDecoration(labelText: 'Inbound Waybill Reference *')),
-                  const SizedBox(height: 12),
-                  TextField(controller: binCtrl, decoration: const InputDecoration(labelText: 'Target Warehouse Storage Bin Tag')),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
-            ElevatedButton(
-              onPressed: () async {
-                final qty = int.tryParse(qtyCtrl.text) ?? 0;
-                if (qty <= 0) {
-                  messenger.showSnackBar(
-                    const SnackBar(content: Text('⚠️ Please enter a valid quantity greater than 0.'), backgroundColor: Color(0xFFEF4444)),
-                  );
-                  return;
-                }
-
-                final targetProd = (selectedProdId != null ? uniqueMap[selectedProdId] : null) ?? (itemsList.isNotEmpty ? itemsList.first : null);
-                if (targetProd == null) {
-                  messenger.showSnackBar(
-                    const SnackBar(content: Text('⚠️ No product selected to restock.'), backgroundColor: Color(0xFFEF4444)),
-                  );
-                  return;
-                }
-
-                // Explicit secondary confirmation dialog with double-tap protection
-                showDialog<void>(
-                  context: context,
-                  barrierDismissible: false,
-                  builder: (confirmCtx) {
-                    bool isSubmitting = false;
-                    return StatefulBuilder(
-                      builder: (confirmCtx, setConfirmState) => AlertDialog(
-                        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                        title: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF10B981).withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Icon(Icons.verified_outlined, color: Color(0xFF10B981), size: 20),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                'Confirm Stock Intake',
-                                style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ],
-                        ),
-                        content: Container(
-                          constraints: const BoxConstraints(maxWidth: 420),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Please verify incoming pallet details to prevent accidental duplicate entries:',
-                                style: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF64748B)),
-                              ),
-                              const SizedBox(height: 12),
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                                ),
-                                child: Column(
-                                  children: [
-                                    _buildConfirmationRow('Product:', targetProd.name, isDark),
-                                    const SizedBox(height: 6),
-                                    _buildConfirmationRow('SKU / Code:', targetProd.sku, isDark),
-                                    const SizedBox(height: 6),
-                                    _buildConfirmationRow('Inbound Waybill:', waybillCtrl.text.trim().isNotEmpty ? waybillCtrl.text.trim() : 'N/A', isDark),
-                                    const SizedBox(height: 6),
-                                    _buildConfirmationRow('Target Bin Tag:', binCtrl.text.trim().isNotEmpty ? binCtrl.text.trim() : 'BIN-A1-02', isDark),
-                                    const Divider(height: 16),
-                                    _buildConfirmationRow(
-                                      'Units to Receive:',
-                                      '+$qty Units',
-                                      isDark,
-                                      isBold: true,
-                                      valueColor: const Color(0xFF10B981),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    _buildConfirmationRow(
-                                      'New Shelf Balance:',
-                                      '${targetProd.availableCount + qty} Units',
-                                      isDark,
-                                      valueColor: const Color(0xFF2563EB),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              Text(
-                                '⚠️ Double-tap protection enabled. Once confirmed, this will immediately register into DC warehouse batches.',
-                                style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
-                              ),
-                            ],
-                          ),
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: isSubmitting ? null : () => Navigator.of(confirmCtx).pop(),
-                            child: const Text('Go Back / Edit'),
-                          ),
-                          ElevatedButton.icon(
-                            onPressed: isSubmitting
-                                ? null
-                                : () async {
-                                    setConfirmState(() => isSubmitting = true);
-                                    final success = await showAppLoadingDialog(
-                                      context: confirmCtx,
-                                      message: 'Recording Inbound Stock Intake...',
-                                      subMessage: 'Registering $qty units into warehouse shelf & batch logs...',
-                                      isDark: isDark,
-                                      task: () async {
-                                        final ok = await ref.read(stockProvider.notifier).receiveStock(
-                                              productIdOrSku: targetProd.id,
-                                              quantity: qty,
-                                              waybillNumber: waybillCtrl.text.trim(),
-                                              binLocation: binCtrl.text.trim(),
-                                              distributionCenterId: ref.read(dcConsoleProvider).activeHubId,
-                                            );
-                                        if (ok) {
-                                          ref.read(dcConsoleProvider.notifier).addBatch(
-                                                DCWarehouseBatch(
-                                                  id: 'batch_${DateTime.now().millisecondsSinceEpoch}',
-                                                  batchCode: 'LOT-${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}',
-                                                  productName: targetProd.name,
-                                                  sku: targetProd.sku,
-                                                  clientName: targetProd.ownerName,
-                                                  waybillNumber: waybillCtrl.text.trim(),
-                                                  initialQuantity: qty,
-                                                  currentQuantity: qty,
-                                                  allocatedQuantity: 0,
-                                                  binLocation: binCtrl.text.trim().isNotEmpty ? binCtrl.text.trim() : 'BIN-A1-02',
-                                                  manufactureDate: DateTime.now(),
-                                                  expiryDate: DateTime.now().add(const Duration(days: 365)),
-                                                ),
-                                              );
-                                        }
-                                        return ok;
-                                      },
-                                    );
-
-                                    if (success == true) {
-                                      if (confirmCtx.mounted) Navigator.of(confirmCtx).pop();
-                                      if (ctx.mounted) Navigator.of(ctx).pop();
-                                      messenger.showSnackBar(
-                                        SnackBar(
-                                          content: Text('✅ Successfully received $qty units of ${targetProd.name} into warehouse!'),
-                                          backgroundColor: const Color(0xFF10B981),
-                                        ),
-                                      );
-                                    } else {
-                                      setConfirmState(() => isSubmitting = false);
-                                      messenger.showSnackBar(
-                                        const SnackBar(
-                                          content: Text('❌ Failed to record incoming stock. Please check network connection.'),
-                                          backgroundColor: Color(0xFFEF4444),
-                                        ),
-                                      );
-                                    }
-                                  },
-                            icon: isSubmitting
-                                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                : const Icon(Icons.check_circle_rounded, size: 16, color: Colors.white),
-                            label: Text(
-                              isSubmitting ? 'Receiving...' : 'Yes, Confirm & Add $qty Units',
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF10B981),
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                );
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
-              child: const Text('Confirm Inbound Receipt', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   void _showAssignToRiderDialog(BuildContext context, bool isDark, StockItemEntity item, List<DCFleetDriver> drivers) {
     final Map<String, DCFleetDriver> uniqueDrivers = {};
@@ -3743,25 +3472,7 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
               );
             },
           ),
-          const SizedBox(height: 32),
-          const Divider(),
           const SizedBox(height: 24),
-
-          // Section 2: Ad-Hoc Pallet Receiving (Fallback)
-          Text('Manual / Ad-Hoc Pallet Receiving', style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 4),
-          Text('Use this for incoming shipments not pre-dispatched via the merchant portal', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-            onPressed: () => _showReceiveStockDialog(context, isDark, stockState),
-            icon: const Icon(Icons.add_box_rounded, size: 18, color: Colors.white),
-            label: const Text('Receive Ad-Hoc Pallet', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2563EB),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-          ),
         ],
       ),
     );

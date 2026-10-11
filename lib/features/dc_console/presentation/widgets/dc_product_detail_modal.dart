@@ -809,10 +809,10 @@ class _DCProductDetailModalState extends ConsumerState<DCProductDetailModal> {
                             Navigator.of(context).pop();
                             widget.onReceiveMoreStock!();
                           },
-                          icon: const Icon(Icons.arrow_downward_rounded, size: 15, color: Colors.white),
-                          label: const Text('Receive Stock', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                          icon: const Icon(Icons.mark_email_unread_rounded, size: 15, color: Colors.white),
+                          label: const Text('Inbound Consignments', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF10B981),
+                            backgroundColor: const Color(0xFF0D9488),
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             elevation: 1,

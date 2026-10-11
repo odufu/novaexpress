@@ -179,7 +179,11 @@ class StockTransferRecord {
 
   String get waybillNumber => transferNumber;
 
-  bool get isClientSupply => transferType == 'client_supply' || transferType == 'client_to_dc';
+  bool get isClientSupply =>
+      transferType == 'client_supply' ||
+      transferType == 'client_to_dc' ||
+      transferType == 'supplier_intake' ||
+      transferType == 'supplier_supply';
   bool get isDcToRider => transferType == 'dc_to_rider';
   bool get isRiderReturn => transferType == 'rider_return';
   bool get isInterDc => transferType == 'inter_dc';

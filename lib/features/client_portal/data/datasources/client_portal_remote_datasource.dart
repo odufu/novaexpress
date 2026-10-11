@@ -1167,6 +1167,9 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
     try {
       final invoicePayload = withId.toJson();
       invoicePayload.remove('client_stock_invoice_items');
+      if (invoicePayload['supplier_name'] == null || invoicePayload['supplier_name'].toString().trim().isEmpty) {
+        invoicePayload['supplier_name'] = 'Direct Procurement Partner';
+      }
 
       final invRes = await adminDb
           .from('client_stock_invoices')
