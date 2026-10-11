@@ -19,6 +19,7 @@ class DCProductDetailModal extends ConsumerStatefulWidget {
   final VoidCallback? onAssignToRider;
   final VoidCallback? onTransferToDc;
   final VoidCallback? onReportDamage;
+  final VoidCallback? onNotifyMerchant;
 
   const DCProductDetailModal({
     super.key,
@@ -29,6 +30,7 @@ class DCProductDetailModal extends ConsumerStatefulWidget {
     this.onAssignToRider,
     this.onTransferToDc,
     this.onReportDamage,
+    this.onNotifyMerchant,
   });
 
   static Future<void> show(
@@ -40,6 +42,7 @@ class DCProductDetailModal extends ConsumerStatefulWidget {
     VoidCallback? onAssignToRider,
     VoidCallback? onTransferToDc,
     VoidCallback? onReportDamage,
+    VoidCallback? onNotifyMerchant,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final size = MediaQuery.of(context).size;
@@ -74,6 +77,7 @@ class DCProductDetailModal extends ConsumerStatefulWidget {
             onAssignToRider: onAssignToRider,
             onTransferToDc: onTransferToDc,
             onReportDamage: onReportDamage,
+            onNotifyMerchant: onNotifyMerchant,
           ),
         ),
       ),
@@ -301,6 +305,61 @@ class _DCProductDetailModalState extends ConsumerState<DCProductDetailModal> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (item.availableCount <= 0) ...[
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEF4444).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.5)),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEF4444).withValues(alpha: 0.2),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.campaign_rounded, color: Color(0xFFDC2626), size: 20),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'CRITICAL: Warehouse Shelf Stock is 0 Units!',
+                                    style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: const Color(0xFFDC2626)),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Couriers hold ${item.assignedCount} in transit, but DC shelf balance is depleted. Notify merchant immediately for restock.',
+                                    style: GoogleFonts.inter(fontSize: 11.5, color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (widget.onNotifyMerchant != null)
+                              ElevatedButton.icon(
+                                onPressed: () {
+                                  Navigator.of(context).pop();
+                                  widget.onNotifyMerchant!();
+                                },
+                                icon: const Icon(Icons.campaign_rounded, size: 14, color: Colors.white),
+                                label: const Text('Notify Merchant', style: TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.bold)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFDC2626),
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                    ],
+
                     // A. INVENTORY & CUSTODY STATS (4-CARD GRID)
                     Row(
                       children: [
@@ -850,6 +909,21 @@ class _DCProductDetailModalState extends ConsumerState<DCProductDetailModal> {
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             elevation: 1,
+                          ),
+                        ),
+                      if (item.availableCount <= 0 && widget.onNotifyMerchant != null)
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            widget.onNotifyMerchant!();
+                          },
+                          icon: const Icon(Icons.campaign_rounded, size: 15, color: Colors.white),
+                          label: const Text('🚨 Notify Merchant for Restock', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFDC2626),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            elevation: 2,
                           ),
                         ),
                     ],

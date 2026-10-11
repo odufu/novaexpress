@@ -20,6 +20,8 @@ import 'closer_mobile_portal_page.dart';
 import '../../../pipeline_chat/presentation/widgets/pipeline_chat_floating_action_button.dart';
 import '../../../pipeline_chat/presentation/providers/pipeline_chat_fab_provider.dart';
 import '../../../users/presentation/widgets/edit_profile_modal.dart';
+import '../../../notifications/presentation/providers/notifications_provider.dart';
+import '../../../notifications/domain/entities/app_notification.dart';
 
 final clientActiveTabProvider = StateProvider<String>((ref) {
   final user = ref.watch(authProvider).user;
@@ -624,6 +626,55 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
             ),
           ),
 
+          // Notifications Bell with Alert Badge
+          Consumer(
+            builder: (context, ref, _) {
+              final notifState = ref.watch(notificationsProvider);
+              final portalState = ref.watch(clientPortalProvider);
+              final outOfStockCount = portalState.stockBalances.where((b) => b.balanceQty <= 0).length +
+                  portalState.products.where((p) => p.stockQuantity <= 0).length;
+              final totalAlerts = notifState.unreadCount + outOfStockCount;
+
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      totalAlerts > 0 ? Icons.notifications_active_rounded : Icons.notifications_none_rounded,
+                      color: totalAlerts > 0 ? const Color(0xFFEF4444) : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                      size: 21,
+                    ),
+                    tooltip: 'Notifications & Alerts (${totalAlerts > 0 ? "$totalAlerts new" : "No alerts"})',
+                    onPressed: () => _showNotificationsDialog(context, isDark),
+                  ),
+                  if (totalAlerts > 0)
+                    Positioned(
+                      top: 6,
+                      right: 6,
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFEF4444),
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                        child: Center(
+                          child: Text(
+                            totalAlerts > 9 ? '9+' : '$totalAlerts',
+                            style: GoogleFonts.inter(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+
           // Theme Toggle Button
           IconButton(
             icon: Icon(
@@ -791,6 +842,168 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
             child: const Text('Sign Out'),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showNotificationsDialog(BuildContext context, bool isDark) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Consumer(
+        builder: (ctx, ref, _) {
+          final notifState = ref.watch(notificationsProvider);
+          final portalState = ref.watch(clientPortalProvider);
+          final outOfStockBalances = portalState.stockBalances.where((b) => b.balanceQty <= 0).toList();
+          final outOfStockProducts = portalState.products.where((p) => p.stockQuantity <= 0).toList();
+          final notifications = notifState.notifications;
+
+          return Dialog(
+            backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: Container(
+              width: 520,
+              constraints: const BoxConstraints(maxHeight: 640),
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.notifications_active_rounded, color: Color(0xFF0D9488), size: 22),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Alerts & Notifications',
+                            style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, size: 20),
+                        onPressed: () => Navigator.of(ctx).pop(),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 24),
+                  Expanded(
+                    child: ListView(
+                      shrinkWrap: true,
+                      children: [
+                        if (outOfStockBalances.isNotEmpty || outOfStockProducts.isNotEmpty) ...[
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            margin: const EdgeInsets.only(bottom: 12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEF4444).withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.4)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(Icons.error_outline_rounded, color: Color(0xFFDC2626), size: 18),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'URGENT: Stock Exhaustion at DC',
+                                      style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: const Color(0xFFDC2626)),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                ...outOfStockBalances.map((b) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 4),
+                                  child: Text(
+                                    '• "${b.itemName}" has 0 units at ${b.warehouse.isNotEmpty ? b.warehouse : "Distribution Center"}.',
+                                    style: GoogleFonts.inter(fontSize: 12, color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B)),
+                                  ),
+                                )),
+                                if (outOfStockBalances.isEmpty)
+                                  ...outOfStockProducts.map((p) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 4),
+                                    child: Text(
+                                      '• "${p.name}" has 0 units available.',
+                                      style: GoogleFonts.inter(fontSize: 12, color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B)),
+                                    ),
+                                  )),
+                                const SizedBox(height: 8),
+                                ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFFDC2626),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    elevation: 0,
+                                  ),
+                                  onPressed: () {
+                                    Navigator.of(ctx).pop();
+                                    ref.read(clientActiveTabProvider.notifier).state = 'inventory';
+                                  },
+                                  icon: const Icon(Icons.local_shipping_rounded, size: 14),
+                                  label: Text('Open Inventory Ledger & Supply', style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        if (notifications.isEmpty && outOfStockBalances.isEmpty && outOfStockProducts.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 32),
+                            child: Center(
+                              child: Column(
+                                children: [
+                                  Icon(Icons.check_circle_outline_rounded, size: 40, color: Colors.grey.shade400),
+                                  const SizedBox(height: 8),
+                                  Text('All caught up! No active alerts.', style: GoogleFonts.inter(color: Colors.grey.shade500, fontSize: 13)),
+                                ],
+                              ),
+                            ),
+                          )
+                        else
+                          ...notifications.map((n) => Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(
+                                  n.category == NotificationCategory.stock
+                                      ? Icons.inventory_2_outlined
+                                      : (n.category == NotificationCategory.delivery ? Icons.two_wheeler_rounded : Icons.info_outline_rounded),
+                                  size: 18,
+                                  color: const Color(0xFF0D9488),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(n.title, style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 12.5)),
+                                      const SizedBox(height: 2),
+                                      Text(n.message, style: GoogleFonts.inter(fontSize: 11.5, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }

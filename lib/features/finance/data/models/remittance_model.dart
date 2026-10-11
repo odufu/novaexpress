@@ -125,19 +125,23 @@ class RemittanceModel extends RemittanceEntity {
       final notesStr = json['notes']?.toString() ?? '';
       final ordersMatch = RegExp(r'\[Orders:\s*([^\]]+)\]', caseSensitive: false).firstMatch(notesStr);
       if (ordersMatch != null) {
-        final orderTokens = ordersMatch.group(1)!.split(',');
+        final orderTokens = ordersMatch.group(1)!.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+        final count = orderTokens.length;
+        final perOrderCash = count > 0 ? (grossCollections / count) : grossCollections;
+        final perOrderComm = count > 0 ? (commissionDeducted / count) : commissionDeducted;
+        final perOrderTrans = count > 0 ? (transportAllowanceDeducted / count) : transportAllowanceDeducted;
+        final perOrderPos = count > 0 ? (posFee / count) : posFee;
         orders = orderTokens
-            .map((s) => s.trim())
-            .where((s) => s.isNotEmpty)
             .map((orderNum) => RemittanceOrderItem(
                   orderId: '',
                   orderNumber: orderNum,
-                  customerName: '',
+                  customerName: 'Customer ($orderNum)',
                   status: 'delivered',
                   paymentType: 'pay_on_delivery',
-                  cashCollected: 0.0,
-                  riderCommission: 0.0,
-                  transportAllowance: 0.0,
+                  cashCollected: perOrderCash,
+                  riderCommission: perOrderComm,
+                  transportAllowance: perOrderTrans,
+                  posFee: perOrderPos,
                   date: parsedCreated,
                 ))
             .toList();

@@ -153,44 +153,67 @@ class _RemittanceDetailsPageState extends ConsumerState<RemittanceDetailsPage> {
   }
 
   List<RemittanceOrderItem> _resolveOrdersList(RemittanceEntity remit, List<OrderEntity> riderOrders) {
+    List<RemittanceOrderItem> baseOrders = [];
     if (remit.associatedOrders.isNotEmpty) {
-      return remit.associatedOrders;
+      baseOrders = remit.associatedOrders;
+    } else {
+      // 1. Search for orders linked by remittance reference in delivery notes or notes string
+      final linkedOrders = riderOrders.where((o) {
+        return o.deliveryNotes?.contains(remit.referenceNumber) == true ||
+            remit.notes?.contains(o.orderNumber) == true ||
+            remit.referenceNumber.contains(o.orderNumber);
+      }).toList();
+
+      if (linkedOrders.isNotEmpty) {
+        baseOrders = linkedOrders.map((o) {
+          final cash = o.totalAmount > 0
+              ? o.totalAmount
+              : (remit.grossCollections > 0 ? (remit.grossCollections / linkedOrders.length) : remit.amount);
+          final comm = o.agentEntitlement > 0
+              ? o.agentEntitlement
+              : (remit.commissionDeducted > 0 ? (remit.commissionDeducted / linkedOrders.length) : 1000.0);
+          final trans = o.transportFee > 0
+              ? o.transportFee
+              : (remit.transportAllowanceDeducted > 0 ? (remit.transportAllowanceDeducted / linkedOrders.length) : 1500.0);
+          final pos = remit.posFee > 0 ? (remit.posFee / linkedOrders.length) : 0.0;
+          return RemittanceOrderItem(
+            orderId: o.id,
+            orderNumber: o.orderNumber,
+            customerName: o.customerName,
+            status: o.status,
+            paymentType: o.paymentType,
+            cashCollected: cash,
+            riderCommission: comm,
+            transportAllowance: trans,
+            failedStipend: 0.0,
+            posFee: pos,
+            date: o.deliveredAt ?? o.createdAt,
+          );
+        }).toList();
+      }
     }
 
-    // 1. Search for orders linked by remittance reference in delivery notes or notes string
-    final linkedOrders = riderOrders.where((o) {
-      return o.deliveryNotes?.contains(remit.referenceNumber) == true ||
-          remit.notes?.contains(o.orderNumber) == true ||
-          remit.referenceNumber.contains(o.orderNumber);
-    }).toList();
-
-    if (linkedOrders.isNotEmpty) {
-      return linkedOrders.map((o) {
-        final cash = o.isCashPod ? o.totalAmount : 0.0;
-        final comm = o.agentEntitlement > 0
-            ? o.agentEntitlement
-            : (remit.commissionDeducted > 0 ? (remit.commissionDeducted / linkedOrders.length) : 1000.0);
-        final trans = o.transportFee > 0
-            ? o.transportFee
-            : (remit.transportAllowanceDeducted > 0 ? (remit.transportAllowanceDeducted / linkedOrders.length) : 1500.0);
+    // Enrich baseOrders with riderOrders metadata if available
+    return baseOrders.map((item) {
+      final match = riderOrders.where((o) => o.orderNumber.trim() == item.orderNumber.trim() || (item.orderId.isNotEmpty && o.id == item.orderId)).toList();
+      if (match.isNotEmpty) {
+        final o = match.first;
         return RemittanceOrderItem(
           orderId: o.id,
           orderNumber: o.orderNumber,
-          customerName: o.customerName,
-          status: o.status,
-          paymentType: o.paymentType,
-          cashCollected: cash,
-          riderCommission: comm,
-          transportAllowance: trans,
-          failedStipend: 0.0,
-          posFee: 0.0,
-          date: o.deliveredAt ?? o.createdAt,
+          customerName: o.customerName.isNotEmpty ? o.customerName : item.customerName,
+          status: o.status.isNotEmpty ? o.status : item.status,
+          paymentType: o.paymentType.isNotEmpty ? o.paymentType : item.paymentType,
+          cashCollected: item.cashCollected > 0 ? item.cashCollected : (o.totalAmount > 0 ? o.totalAmount : remit.grossCollections),
+          riderCommission: item.riderCommission > 0 ? item.riderCommission : (o.agentEntitlement > 0 ? o.agentEntitlement : remit.commissionDeducted),
+          transportAllowance: item.transportAllowance > 0 ? item.transportAllowance : (o.transportFee > 0 ? o.transportFee : remit.transportAllowanceDeducted),
+          failedStipend: item.failedStipend,
+          posFee: item.posFee > 0 ? item.posFee : remit.posFee,
+          date: item.date,
         );
-      }).toList();
-    }
-
-    // 2. If no individual orders are directly linked, return empty list
-    return const <RemittanceOrderItem>[];
+      }
+      return item;
+    }).toList();
   }
 
   Future<void> _downloadReceiptAsImage(RemittanceEntity remit) async {
@@ -375,27 +398,26 @@ Thank you for your timely settlement!
     final failedCount = orders.where((o) => o.isFailed).length;
 
     // Instance-only financial figures
-    final gross = orders.isNotEmpty
-        ? orders.fold<double>(0.0, (acc, o) => acc + o.cashCollected)
+    final computedGross = orders.fold<double>(0.0, (acc, o) => acc + o.cashCollected);
+    final gross = computedGross > 0
+        ? computedGross
         : (remit.grossCollections > 0 ? remit.grossCollections : remit.amount);
 
-    final comm = orders.isNotEmpty
-        ? orders.fold<double>(0.0, (acc, o) => acc + o.riderCommission)
-        : remit.commissionDeducted;
+    final computedComm = orders.fold<double>(0.0, (acc, o) => acc + o.riderCommission);
+    final comm = computedComm > 0 ? computedComm : remit.commissionDeducted;
 
-    final transport = orders.isNotEmpty
-        ? orders.fold<double>(0.0, (acc, o) => acc + o.transportAllowance)
-        : remit.transportAllowanceDeducted;
+    final computedTransport = orders.fold<double>(0.0, (acc, o) => acc + o.transportAllowance);
+    final transport = computedTransport > 0 ? computedTransport : remit.transportAllowanceDeducted;
 
-    final failedStipends = orders.isNotEmpty
-        ? orders.fold<double>(0.0, (acc, o) => acc + o.failedStipend)
-        : remit.failedStipendsDeducted;
+    final computedFailed = orders.fold<double>(0.0, (acc, o) => acc + o.failedStipend);
+    final failedStipends = computedFailed > 0 ? computedFailed : remit.failedStipendsDeducted;
 
-    final posFees = orders.isNotEmpty
-        ? orders.fold<double>(0.0, (acc, o) => acc + o.posFee)
-        : remit.posFee;
+    final computedPos = orders.fold<double>(0.0, (acc, o) => acc + o.posFee);
+    final posFees = computedPos > 0 ? computedPos : remit.posFee;
 
-    final double expectedHandover = (gross - comm - transport - failedStipends - posFees).clamp(0.0, double.infinity);
+    final double expectedHandover = (remit.expectedAmount != null && remit.expectedAmount! > 0)
+        ? remit.expectedAmount!
+        : (gross - comm - transport - failedStipends - posFees).clamp(0.0, double.infinity);
 
     final isPartial = remit.isPartialRemittance;
     final double remainingShortage = (expectedHandover - remit.amount).clamp(0.0, double.infinity);

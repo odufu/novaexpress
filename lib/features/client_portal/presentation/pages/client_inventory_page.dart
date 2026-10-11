@@ -11,6 +11,7 @@ import '../providers/client_portal_provider.dart';
 import '../widgets/client_add_supplier_modal.dart';
 import '../widgets/client_import_stock_balance_modal.dart';
 import '../widgets/client_raise_stock_invoice_modal.dart';
+import '../widgets/client_supply_stock_modal.dart';
 import '../widgets/pangea_date_range_picker_modal.dart';
 import '../../domain/entities/client_unit_economics.dart';
 import '../widgets/pangea_excel_data_table.dart';
@@ -191,7 +192,12 @@ class _ClientInventoryPageState extends ConsumerState<ClientInventoryPage> with 
 
               // KPI Metric Cards
               _buildKpiCards(state, isDark, isCompact),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
+
+              // Critical Out-of-Stock Alert Banner (When any balance is exhausted)
+              if (state.stockBalances.any((b) => b.balanceQty <= 0) || state.products.any((p) => p.stockQuantity <= 0)) ...[
+                _buildCriticalStockAlertBanner(context, state, isDark),
+              ],
 
               // Sub-navigation Tabs (5 Tabs)
               Container(
@@ -4000,6 +4006,120 @@ class _ClientInventoryPageState extends ConsumerState<ClientInventoryPage> with 
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCriticalStockAlertBanner(BuildContext context, ClientPortalState state, bool isDark) {
+    final zeroBalances = state.stockBalances.where((b) => b.balanceQty <= 0).toList();
+    final zeroProducts = state.products.where((p) => p.stockQuantity <= 0).toList();
+    final firstOutName = zeroBalances.isNotEmpty
+        ? zeroBalances.first.itemName
+        : (zeroProducts.isNotEmpty ? zeroProducts.first.name : 'Inventory SKU');
+    final outCount = zeroBalances.isNotEmpty ? zeroBalances.length : zeroProducts.length;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF450A0A).withValues(alpha: 0.7) : const Color(0xFFFEF2F2),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? const Color(0xFFDC2626) : const Color(0xFFFCA5A5),
+          width: 1.5,
+        ),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isNarrow = constraints.maxWidth < 650;
+          final content = Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDC2626).withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.campaign_rounded, color: Color(0xFFDC2626), size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            '🚨 CRITICAL: $outCount PRODUCT(S) COMPLETELY DEPLETED AT DISTRIBUTION CENTERS',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
+                              color: const Color(0xFFDC2626),
+                              letterSpacing: 0.5,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '"$firstOutName" has 0 units available on DC warehouse shelves. Regional delivery operations are blocked for this SKU. Please dispatch an inbound restocking consignment immediately.',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B),
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+
+          final ctaBtn = ElevatedButton.icon(
+            onPressed: () {
+              if (state.clientProfile.hasInventoryManagement) {
+                ClientRaiseStockInvoiceModal.show(context);
+              } else {
+                final p = state.products.firstOrNull;
+                if (p != null) ClientSupplyStockModal.show(context, p);
+              }
+            },
+            icon: const Icon(Icons.local_shipping_rounded, size: 15, color: Colors.white),
+            label: Text(
+              state.clientProfile.hasInventoryManagement ? '+ Raise Stock Intake Invoice' : '+ Supply Stock to Hub',
+              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          );
+
+          if (isNarrow) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                content,
+                const SizedBox(height: 12),
+                Align(alignment: Alignment.centerRight, child: ctaBtn),
+              ],
+            );
+          }
+
+          return Row(
+            children: [
+              Expanded(child: content),
+              const SizedBox(width: 16),
+              ctaBtn,
+            ],
+          );
+        },
       ),
     );
   }

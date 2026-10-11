@@ -127,7 +127,9 @@ class _MerchantFinancialIntelligenceViewState extends ConsumerState<MerchantFina
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final clientState = ref.watch(clientPortalProvider);
     final products = clientState.products;
     final screenWidth = MediaQuery.of(context).size.width;
@@ -135,16 +137,26 @@ class _MerchantFinancialIntelligenceViewState extends ConsumerState<MerchantFina
 
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF0F172A),
+        color: isDark ? const Color(0xFF0F172A) : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF1E293B), width: 1.5),
+        border: Border.all(
+          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       padding: EdgeInsets.all(isCompact ? 16 : 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 1. HEADER WITH CONTROLS (Product Filter, Date Range & Record Action)
-          _buildFilterControlBar(context, products, isCompact),
+          _buildFilterControlBar(context, products, isCompact, isDark),
           const SizedBox(height: 20),
 
           // 2. LOADING OR DASHBOARD CONTENT
@@ -158,33 +170,35 @@ class _MerchantFinancialIntelligenceViewState extends ConsumerState<MerchantFina
           else ...[
             // 3. PRODUCT UNIT ECONOMICS BANNER (When a specific product is filtered)
             if (_selectedProductId != null && _metrics?.productEconomics != null) ...[
-              _buildProductEconomicsBanner(_metrics!.productEconomics!),
+              _buildProductEconomicsBanner(_metrics!.productEconomics!, isDark),
               const SizedBox(height: 20),
             ],
 
             // 4. THE 8 CORE BUSINESS METRICS KPI GRID
-            _buildLegacyEightMetricsGrid(isCompact),
+            _buildLegacyEightMetricsGrid(isCompact, isDark),
             const SizedBox(height: 24),
 
             // 5. CHARTS: DUAL-SERIES COMPARISON & STATE BREAKDOWN
-            _buildChartsSection(isCompact),
+            _buildChartsSection(isCompact, isDark),
             const SizedBox(height: 24),
 
             // 6. RECENT EXPENDITURES TABLE
-            _buildExpendituresLedgerTable(isCompact),
+            _buildExpendituresLedgerTable(isCompact, isDark),
           ],
         ],
       ),
     );
   }
 
-  Widget _buildFilterControlBar(BuildContext context, List<dynamic> products, bool isCompact) {
+  Widget _buildFilterControlBar(BuildContext context, List<dynamic> products, bool isCompact, bool isDark) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E293B).withValues(alpha: 0.7),
+        color: isDark ? const Color(0xFF1E293B).withValues(alpha: 0.7) : const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF334155)),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        ),
       ),
       child: Wrap(
         spacing: 16,
@@ -202,7 +216,11 @@ class _MerchantFinancialIntelligenceViewState extends ConsumerState<MerchantFina
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.filter_list_rounded, size: 14, color: Color(0xFF38BDF8)),
+                    Icon(
+                      Icons.filter_list_rounded,
+                      size: 14,
+                      color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7),
+                    ),
                     const SizedBox(width: 6),
                     Text(
                       'PRODUCT FILTER',
@@ -210,7 +228,7 @@ class _MerchantFinancialIntelligenceViewState extends ConsumerState<MerchantFina
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 0.8,
-                        color: const Color(0xFF38BDF8),
+                        color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7),
                       ),
                     ),
                   ],
@@ -219,23 +237,28 @@ class _MerchantFinancialIntelligenceViewState extends ConsumerState<MerchantFina
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0F172A),
+                    color: isDark ? const Color(0xFF0F172A) : Colors.white,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFF334155)),
+                    border: Border.all(
+                      color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                    ),
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String?>(
                       value: _selectedProductId,
                       isExpanded: true,
-                      dropdownColor: const Color(0xFF0F172A),
-                      icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF94A3B8)),
+                      dropdownColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+                      icon: Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      ),
                       items: [
                         DropdownMenuItem<String?>(
                           value: null,
                           child: Text(
                             '🌟 All Products (Consolidated Business)',
                             style: GoogleFonts.inter(
-                              color: Colors.white,
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
                             ),
@@ -247,7 +270,7 @@ class _MerchantFinancialIntelligenceViewState extends ConsumerState<MerchantFina
                             child: Text(
                               '📦 ${p.name} (${p.sku ?? 'SKU'})',
                               style: GoogleFonts.inter(
-                                color: Colors.white,
+                                color: isDark ? Colors.white : const Color(0xFF0F172A),
                                 fontSize: 13,
                               ),
                               overflow: TextOverflow.ellipsis,
@@ -272,11 +295,11 @@ class _MerchantFinancialIntelligenceViewState extends ConsumerState<MerchantFina
             runSpacing: 8,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              _buildRangeChip('Today', 'today'),
-              _buildRangeChip('7 Days', '7d'),
-              _buildRangeChip('30 Days', '30d'),
-              _buildRangeChip('This Month', 'this_month'),
-              _buildRangeChip('All Time', 'all_time'),
+              _buildRangeChip('Today', 'today', isDark),
+              _buildRangeChip('7 Days', '7d', isDark),
+              _buildRangeChip('30 Days', '30d', isDark),
+              _buildRangeChip('This Month', 'this_month', isDark),
+              _buildRangeChip('All Time', 'all_time', isDark),
               InkWell(
                 onTap: _pickCustomDateRange,
                 borderRadius: BorderRadius.circular(8),
@@ -285,12 +308,12 @@ class _MerchantFinancialIntelligenceViewState extends ConsumerState<MerchantFina
                   decoration: BoxDecoration(
                     color: _selectedQuickRange == 'custom'
                         ? const Color(0xFF10B981).withValues(alpha: 0.2)
-                        : const Color(0xFF0F172A),
+                        : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9)),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
                       color: _selectedQuickRange == 'custom'
                           ? const Color(0xFF10B981)
-                          : const Color(0xFF334155),
+                          : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                     ),
                   ),
                   child: Row(
@@ -300,7 +323,11 @@ class _MerchantFinancialIntelligenceViewState extends ConsumerState<MerchantFina
                       const SizedBox(width: 6),
                       Text(
                         '${DateFormat('dd MMM').format(_startDate)} - ${DateFormat('dd MMM').format(_endDate)}',
-                        style: GoogleFonts.inter(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w500),
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ],
                   ),
@@ -336,7 +363,7 @@ class _MerchantFinancialIntelligenceViewState extends ConsumerState<MerchantFina
     );
   }
 
-  Widget _buildRangeChip(String label, String key) {
+  Widget _buildRangeChip(String label, String key, bool isDark) {
     final isSelected = _selectedQuickRange == key;
     return InkWell(
       onTap: () => _applyQuickRange(key),
@@ -344,10 +371,14 @@ class _MerchantFinancialIntelligenceViewState extends ConsumerState<MerchantFina
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF10B981) : const Color(0xFF0F172A),
+          color: isSelected
+              ? const Color(0xFF10B981)
+              : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9)),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isSelected ? const Color(0xFF10B981) : const Color(0xFF334155),
+            color: isSelected
+                ? const Color(0xFF10B981)
+                : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
           ),
         ),
         child: Text(
@@ -355,24 +386,30 @@ class _MerchantFinancialIntelligenceViewState extends ConsumerState<MerchantFina
           style: GoogleFonts.inter(
             fontSize: 12,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-            color: isSelected ? Colors.white : const Color(0xFF94A3B8),
+            color: isSelected
+                ? Colors.white
+                : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildProductEconomicsBanner(ProductEconomicsEntity econ) {
+  Widget _buildProductEconomicsBanner(ProductEconomicsEntity econ, bool isDark) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [const Color(0xFF1E3A8A).withValues(alpha: 0.3), const Color(0xFF0F172A)],
+          colors: isDark
+              ? [const Color(0xFF1E3A8A).withValues(alpha: 0.3), const Color(0xFF0F172A)]
+              : [const Color(0xFFEFF6FF), Colors.white],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF3B82F6).withValues(alpha: 0.4)),
+        border: Border.all(
+          color: isDark ? const Color(0xFF3B82F6).withValues(alpha: 0.4) : const Color(0xFFBFDBFE),
+        ),
       ),
       child: Row(
         children: [
@@ -391,18 +428,22 @@ class _MerchantFinancialIntelligenceViewState extends ConsumerState<MerchantFina
               children: [
                 Text(
                   'SKU Unit Economics: ${econ.productName} (${econ.sku ?? 'SKU'})',
-                  style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                  style: GoogleFonts.outfit(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Wrap(
                   spacing: 16,
                   runSpacing: 4,
                   children: [
-                    _subMeta('Units Sold', '${econ.unitsSold} pcs'),
-                    _subMeta('Selling Price', '₦${currencyFormat.format(econ.basePrice)}'),
-                    _subMeta('Cost Price', '₦${currencyFormat.format(econ.costPrice)}'),
-                    _subMeta('Direct Ad Spend', '₦${currencyFormat.format(econ.directAdvertising)}'),
-                    _subMeta('Direct Net Margin', '₦${currencyFormat.format(econ.directProfit)}', highlight: true),
+                    _subMeta('Units Sold', '${econ.unitsSold} pcs', isDark),
+                    _subMeta('Selling Price', '₦${currencyFormat.format(econ.basePrice)}', isDark),
+                    _subMeta('Cost Price', '₦${currencyFormat.format(econ.costPrice)}', isDark),
+                    _subMeta('Direct Ad Spend', '₦${currencyFormat.format(econ.directAdvertising)}', isDark),
+                    _subMeta('Direct Net Margin', '₦${currencyFormat.format(econ.directProfit)}', isDark, highlight: true),
                   ],
                 ),
               ],
@@ -413,18 +454,23 @@ class _MerchantFinancialIntelligenceViewState extends ConsumerState<MerchantFina
     );
   }
 
-  Widget _subMeta(String label, String value, {bool highlight = false}) {
+  Widget _subMeta(String label, String value, bool isDark, {bool highlight = false}) {
     return RichText(
       text: TextSpan(
         text: '$label: ',
-        style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
+        style: GoogleFonts.inter(
+          fontSize: 11,
+          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+        ),
         children: [
           TextSpan(
             text: value,
             style: GoogleFonts.inter(
               fontSize: 12,
               fontWeight: FontWeight.bold,
-              color: highlight ? const Color(0xFF10B981) : Colors.white,
+              color: highlight
+                  ? const Color(0xFF10B981)
+                  : (isDark ? Colors.white : const Color(0xFF0F172A)),
             ),
           ),
         ],
@@ -432,7 +478,7 @@ class _MerchantFinancialIntelligenceViewState extends ConsumerState<MerchantFina
     );
   }
 
-  Widget _buildLegacyEightMetricsGrid(bool isCompact) {
+  Widget _buildLegacyEightMetricsGrid(bool isCompact, bool isDark) {
     final m = _metrics ?? MerchantFinancialMetrics.empty();
 
     final cards = [
@@ -519,9 +565,20 @@ class _MerchantFinancialIntelligenceViewState extends ConsumerState<MerchantFina
             return Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFF1E293B).withValues(alpha: 0.5),
+                color: isDark ? const Color(0xFF1E293B).withValues(alpha: 0.5) : Colors.white,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFF334155)),
+                border: Border.all(
+                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                ),
+                boxShadow: isDark
+                    ? null
+                    : [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.03),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -562,7 +619,7 @@ class _MerchantFinancialIntelligenceViewState extends ConsumerState<MerchantFina
                         card.title,
                         style: GoogleFonts.inter(
                           fontSize: 12,
-                          color: const Color(0xFF94A3B8),
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -572,7 +629,7 @@ class _MerchantFinancialIntelligenceViewState extends ConsumerState<MerchantFina
                         style: GoogleFonts.outfit(
                           fontSize: 19,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -588,16 +645,16 @@ class _MerchantFinancialIntelligenceViewState extends ConsumerState<MerchantFina
     );
   }
 
-  Widget _buildChartsSection(bool isCompact) {
+  Widget _buildChartsSection(bool isCompact, bool isDark) {
     final dailyTrends = _metrics?.dailyTrends ?? [];
     final stateDist = _metrics?.stateDistribution ?? [];
 
     if (isCompact) {
       return Column(
         children: [
-          _buildDailyTrendCard(dailyTrends),
+          _buildDailyTrendCard(dailyTrends, isDark),
           const SizedBox(height: 16),
-          _buildStateDistributionCard(stateDist),
+          _buildStateDistributionCard(stateDist, isDark),
         ],
       );
     }
@@ -605,22 +662,33 @@ class _MerchantFinancialIntelligenceViewState extends ConsumerState<MerchantFina
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(flex: 3, child: _buildDailyTrendCard(dailyTrends)),
+        Expanded(flex: 3, child: _buildDailyTrendCard(dailyTrends, isDark)),
         const SizedBox(width: 16),
-        Expanded(flex: 2, child: _buildStateDistributionCard(stateDist)),
+        Expanded(flex: 2, child: _buildStateDistributionCard(stateDist, isDark)),
       ],
     );
   }
 
-  Widget _buildDailyTrendCard(List<DailyTrendPoint> trends) {
+  Widget _buildDailyTrendCard(List<DailyTrendPoint> trends, bool isDark) {
     final hasData = trends.any((t) => t.sales > 0 || t.expenditure > 0);
 
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E293B).withValues(alpha: 0.5),
+        color: isDark ? const Color(0xFF1E293B).withValues(alpha: 0.5) : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF334155)),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        ),
+        boxShadow: isDark
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -630,13 +698,17 @@ class _MerchantFinancialIntelligenceViewState extends ConsumerState<MerchantFina
             children: [
               Text(
                 'Revenue vs. Expenditures Trend',
-                style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                style: GoogleFonts.outfit(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                ),
               ),
               Row(
                 children: [
-                  _legendDot('Sales', const Color(0xFF10B981)),
+                  _legendDot('Sales', const Color(0xFF10B981), isDark),
                   const SizedBox(width: 12),
-                  _legendDot('Expenditure', const Color(0xFFF43F5E)),
+                  _legendDot('Expenditure', const Color(0xFFF43F5E), isDark),
                 ],
               ),
             ],
@@ -648,7 +720,10 @@ class _MerchantFinancialIntelligenceViewState extends ConsumerState<MerchantFina
               alignment: Alignment.center,
               child: Text(
                 'No transactions recorded in this date range.',
-                style: GoogleFonts.inter(color: const Color(0xFF64748B), fontSize: 13),
+                style: GoogleFonts.inter(
+                  color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                  fontSize: 13,
+                ),
               ),
             )
           else
@@ -695,7 +770,10 @@ class _MerchantFinancialIntelligenceViewState extends ConsumerState<MerchantFina
                         const SizedBox(height: 8),
                         Text(
                           pt.date.split('-').last,
-                          style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8)),
+                          style: GoogleFonts.inter(
+                            fontSize: 10,
+                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                          ),
                         ),
                       ],
                     ),
@@ -708,33 +786,54 @@ class _MerchantFinancialIntelligenceViewState extends ConsumerState<MerchantFina
     );
   }
 
-  Widget _legendDot(String label, Color color) {
+  Widget _legendDot(String label, Color color, bool isDark) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
         const SizedBox(width: 6),
-        Text(label, style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFFCBD5E1))),
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 11,
+            color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildStateDistributionCard(List<StateRevenuePoint> states) {
+  Widget _buildStateDistributionCard(List<StateRevenuePoint> states, bool isDark) {
     final totalStateRev = states.fold<double>(0.0, (prev, s) => prev + s.revenue);
 
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E293B).withValues(alpha: 0.5),
+        color: isDark ? const Color(0xFF1E293B).withValues(alpha: 0.5) : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF334155)),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        ),
+        boxShadow: isDark
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             'Revenue by States',
-            style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+            style: GoogleFonts.outfit(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : const Color(0xFF0F172A),
+            ),
           ),
           const SizedBox(height: 16),
           if (states.isEmpty)
@@ -743,7 +842,10 @@ class _MerchantFinancialIntelligenceViewState extends ConsumerState<MerchantFina
               alignment: Alignment.center,
               child: Text(
                 'No regional orders delivered yet.',
-                style: GoogleFonts.inter(color: const Color(0xFF64748B), fontSize: 13),
+                style: GoogleFonts.inter(
+                  color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                  fontSize: 13,
+                ),
               ),
             )
           else
@@ -758,8 +860,22 @@ class _MerchantFinancialIntelligenceViewState extends ConsumerState<MerchantFina
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(st.state, style: GoogleFonts.inter(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w500)),
-                          Text('₦${currencyFormat.format(st.revenue)} (${(pct * 100).toStringAsFixed(1)}%)', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF38BDF8))),
+                          Text(
+                            st.state,
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Text(
+                            '₦${currencyFormat.format(st.revenue)} (${(pct * 100).toStringAsFixed(1)}%)',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 4),
@@ -768,8 +884,8 @@ class _MerchantFinancialIntelligenceViewState extends ConsumerState<MerchantFina
                         child: LinearProgressIndicator(
                           value: pct,
                           minHeight: 5,
-                          backgroundColor: const Color(0xFF334155),
-                          color: const Color(0xFF38BDF8),
+                          backgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                          color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7),
                         ),
                       ),
                     ],
@@ -782,13 +898,24 @@ class _MerchantFinancialIntelligenceViewState extends ConsumerState<MerchantFina
     );
   }
 
-  Widget _buildExpendituresLedgerTable(bool isCompact) {
+  Widget _buildExpendituresLedgerTable(bool isCompact, bool isDark) {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E293B).withValues(alpha: 0.5),
+        color: isDark ? const Color(0xFF1E293B).withValues(alpha: 0.5) : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF334155)),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        ),
+        boxShadow: isDark
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -798,11 +925,18 @@ class _MerchantFinancialIntelligenceViewState extends ConsumerState<MerchantFina
             children: [
               Text(
                 'Recent Operating Expenditures Ledger',
-                style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                style: GoogleFonts.outfit(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                ),
               ),
               Text(
                 '${_expenditures.length} Recorded Entries',
-                style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)),
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                ),
               ),
             ],
           ),
@@ -813,11 +947,18 @@ class _MerchantFinancialIntelligenceViewState extends ConsumerState<MerchantFina
               alignment: Alignment.center,
               child: Column(
                 children: [
-                  const Icon(Icons.receipt_long_outlined, size: 36, color: Color(0xFF64748B)),
+                  Icon(
+                    Icons.receipt_long_outlined,
+                    size: 36,
+                    color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                  ),
                   const SizedBox(height: 8),
                   Text(
                     'No expenditures recorded in this period.',
-                    style: GoogleFonts.inter(color: const Color(0xFF94A3B8), fontSize: 13),
+                    style: GoogleFonts.inter(
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      fontSize: 13,
+                    ),
                   ),
                 ],
               ),
@@ -827,7 +968,10 @@ class _MerchantFinancialIntelligenceViewState extends ConsumerState<MerchantFina
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: _expenditures.length,
-              separatorBuilder: (context, index) => const Divider(color: Color(0xFF334155), height: 1),
+              separatorBuilder: (context, index) => Divider(
+                color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                height: 1,
+              ),
               itemBuilder: (context, index) {
                 final exp = _expenditures[index];
                 return Padding(
@@ -849,19 +993,30 @@ class _MerchantFinancialIntelligenceViewState extends ConsumerState<MerchantFina
                           children: [
                             Text(
                               exp.title,
-                              style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                              ),
                             ),
                             const SizedBox(height: 2),
                             Text(
                               '${DateFormat('dd MMM yyyy').format(exp.expenditureDate)} • ${exp.category.label}',
-                              style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                              ),
                             ),
                           ],
                         ),
                       ),
                       Text(
                         '₦${currencyFormat.format(exp.amount)}',
-                        style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.bold, color: const Color(0xFFF43F5E)),
+                        style: GoogleFonts.outfit(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFFF43F5E),
+                        ),
                       ),
                       if (exp.hasReceipt) ...[
                         const SizedBox(width: 12),
@@ -869,7 +1024,7 @@ class _MerchantFinancialIntelligenceViewState extends ConsumerState<MerchantFina
                           icon: Icon(
                             exp.isPdfReceipt ? Icons.picture_as_pdf_rounded : Icons.image_rounded,
                             size: 18,
-                            color: const Color(0xFF38BDF8),
+                            color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7),
                           ),
                           tooltip: 'View Attached Receipt',
                           onPressed: () async {

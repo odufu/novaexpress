@@ -39,7 +39,7 @@ class ClientDashboardPage extends ConsumerWidget {
         padding: EdgeInsets.symmetric(horizontal: isCompact ? 14 : 24, vertical: isCompact ? 14 : 20),
         children: [
           // Welcome & Quick Action Header
-          _buildWelcomeBanner(context, ref, state),
+          _buildWelcomeBanner(context, ref, state, isDark),
           const SizedBox(height: 18),
 
           // Dynamic Low-Stock & Replenishment Alert Banner
@@ -85,22 +85,27 @@ class ClientDashboardPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildWelcomeBanner(BuildContext context, WidgetRef ref, ClientPortalState state) {
+  Widget _buildWelcomeBanner(BuildContext context, WidgetRef ref, ClientPortalState state, bool isDark) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isCompact = screenWidth < 650;
 
     return Container(
       padding: EdgeInsets.all(isCompact ? 16 : 22),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+        gradient: LinearGradient(
+          colors: isDark
+              ? const [Color(0xFF0F172A), Color(0xFF1E293B)]
+              : const [Colors.white, Color(0xFFF8FAFC)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -124,25 +129,42 @@ class ClientDashboardPage extends ConsumerWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF0D9488).withValues(alpha: 0.25),
+                            color: isDark
+                                ? const Color(0xFF0D9488).withValues(alpha: 0.25)
+                                : const Color(0xFF0D9488).withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: const Color(0xFF2DD4BF).withValues(alpha: 0.4)),
+                            border: Border.all(
+                              color: isDark
+                                  ? const Color(0xFF2DD4BF).withValues(alpha: 0.4)
+                                  : const Color(0xFF0D9488).withValues(alpha: 0.3),
+                            ),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.verified_rounded, color: Color(0xFF2DD4BF), size: 14),
+                              Icon(
+                                Icons.verified_rounded,
+                                color: isDark ? const Color(0xFF2DD4BF) : const Color(0xFF0D9488),
+                                size: 14,
+                              ),
                               const SizedBox(width: 6),
                               Text(
                                 state.clientProfile.code,
-                                style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF2DD4BF)),
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? const Color(0xFF2DD4BF) : const Color(0xFF0D9488),
+                                ),
                               ),
                             ],
                           ),
                         ),
                         Text(
                           'Live Merchant Console',
-                          style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)),
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                          ),
                         ),
                       ],
                     ),
@@ -152,7 +174,7 @@ class ClientDashboardPage extends ConsumerWidget {
                       style: GoogleFonts.inter(
                         fontSize: isCompact ? 19 : 22,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -161,7 +183,7 @@ class ClientDashboardPage extends ConsumerWidget {
                       'Managing Director: ${state.clientProfile.contactPerson} • ${state.clientProfile.city}, ${state.clientProfile.state}',
                       style: GoogleFonts.inter(
                         fontSize: 12,
-                        color: const Color(0xFF94A3B8),
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -190,8 +212,10 @@ class ClientDashboardPage extends ConsumerWidget {
                     const SizedBox(width: 10),
                     OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
+                        foregroundColor: isDark ? Colors.white : const Color(0xFF0F172A),
+                        side: BorderSide(
+                          color: isDark ? Colors.white.withValues(alpha: 0.3) : const Color(0xFFCBD5E1),
+                        ),
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
@@ -284,25 +308,40 @@ class ClientDashboardPage extends ConsumerWidget {
 
   bool _hasLowStock(ClientPortalState state) {
     final hasLowProduct = state.products.any((p) => p.stockQuantity <= p.lowStockThreshold);
-    final hasLowBalance = state.stockBalances.any((b) => b.balanceQty <= 15 && b.balanceQty > 0);
-    return hasLowProduct || hasLowBalance;
+    final hasLowBalance = state.stockBalances.any((b) => b.balanceQty <= 15);
+    final hasZeroProduct = state.products.any((p) => p.stockQuantity <= 0);
+    final hasZeroBalance = state.stockBalances.any((b) => b.balanceQty <= 0);
+    return hasLowProduct || hasLowBalance || hasZeroProduct || hasZeroBalance;
   }
 
   Widget _buildLowStockAlertBanner(BuildContext context, ClientPortalState state, bool isDark) {
+    final zeroProducts = state.products.where((p) => p.stockQuantity <= 0).toList();
+    final zeroBalances = state.stockBalances.where((b) => b.balanceQty <= 0).toList();
+    final isZeroStock = zeroProducts.isNotEmpty || zeroBalances.isNotEmpty;
+
     final lowProducts = state.products.where((p) => p.stockQuantity <= p.lowStockThreshold).toList();
-    final firstProduct = lowProducts.isNotEmpty ? lowProducts.first : null;
-    final lowName = firstProduct?.name ?? 'Inventory SKU';
-    final lowQty = firstProduct?.stockQuantity ?? 0;
+    final firstProduct = zeroProducts.isNotEmpty
+        ? zeroProducts.first
+        : (lowProducts.isNotEmpty ? lowProducts.first : null);
+
+    final lowName = firstProduct?.name ?? (zeroBalances.isNotEmpty ? zeroBalances.first.itemName : 'Inventory SKU');
+    final lowQty = firstProduct?.stockQuantity ?? (zeroBalances.isNotEmpty ? zeroBalances.first.balanceQty.toInt() : 0);
     final threshold = firstProduct?.lowStockThreshold ?? 10;
-    final extraCount = lowProducts.length > 1 ? ' (+${lowProducts.length - 1} more)' : '';
+    final totalDepletedCount = zeroProducts.length + zeroBalances.length;
+    final extraCount = totalDepletedCount > 1 ? ' (+${totalDepletedCount - 1} more)' : '';
 
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF450A0A).withValues(alpha: 0.6) : const Color(0xFFFEF2F2),
+        color: isZeroStock
+            ? (isDark ? const Color(0xFF450A0A).withValues(alpha: 0.75) : const Color(0xFFFEF2F2))
+            : (isDark ? const Color(0xFF451A03).withValues(alpha: 0.6) : const Color(0xFFFFFBEB)),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isDark ? const Color(0xFF991B1B) : const Color(0xFFFCA5A5),
+          color: isZeroStock
+              ? (isDark ? const Color(0xFFDC2626) : const Color(0xFFFCA5A5))
+              : (isDark ? const Color(0xFFD97706) : const Color(0xFFFDE68A)),
+          width: isZeroStock ? 1.5 : 1.0,
         ),
       ),
       child: LayoutBuilder(
@@ -315,7 +354,7 @@ class ClientDashboardPage extends ConsumerWidget {
             children: [
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFDC2626),
+                  backgroundColor: isZeroStock ? const Color(0xFFDC2626) : const Color(0xFFD97706),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   elevation: 0,
@@ -328,9 +367,11 @@ class ClientDashboardPage extends ConsumerWidget {
                     ClientSupplyStockModal.show(context, firstProduct);
                   }
                 },
-                icon: const Icon(Icons.receipt_long_rounded, size: 14),
+                icon: Icon(isZeroStock ? Icons.local_shipping_rounded : Icons.receipt_long_rounded, size: 14),
                 label: Text(
-                  state.clientProfile.hasInventoryManagement ? 'Raise Stock Intake' : 'Supply Stock',
+                  isZeroStock
+                      ? '+ Dispatch Consignment to Hub Now'
+                      : (state.clientProfile.hasInventoryManagement ? 'Raise Stock Intake' : 'Supply Stock'),
                   style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w700),
                 ),
               ),
@@ -344,7 +385,7 @@ class ClientDashboardPage extends ConsumerWidget {
                   ),
                   onPressed: onNavigateToInventory,
                   child: Text(
-                    'View Ledger',
+                    'View Inventory Ledger',
                     style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w700),
                   ),
                 ),
@@ -360,10 +401,14 @@ class ClientDashboardPage extends ConsumerWidget {
                     Container(
                       padding: const EdgeInsets.all(7),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFDC2626).withValues(alpha: 0.15),
+                        color: (isZeroStock ? const Color(0xFFDC2626) : const Color(0xFFD97706)).withValues(alpha: 0.15),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 18),
+                      child: Icon(
+                        isZeroStock ? Icons.error_outline_rounded : Icons.warning_amber_rounded,
+                        color: isZeroStock ? const Color(0xFFDC2626) : const Color(0xFFD97706),
+                        size: 18,
+                      ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -371,11 +416,11 @@ class ClientDashboardPage extends ConsumerWidget {
                         children: [
                           Flexible(
                             child: Text(
-                              'CRITICAL REORDER ALERT',
+                              isZeroStock ? '🚨 OUT OF STOCK AT DC' : '⚠️ LOW STOCK REORDER ALERT',
                               style: GoogleFonts.inter(
                                 fontSize: 11.5,
                                 fontWeight: FontWeight.w800,
-                                color: const Color(0xFFDC2626),
+                                color: isZeroStock ? const Color(0xFFDC2626) : const Color(0xFFD97706),
                                 letterSpacing: 0.5,
                               ),
                               overflow: TextOverflow.ellipsis,
@@ -385,11 +430,11 @@ class ClientDashboardPage extends ConsumerWidget {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFDC2626),
+                              color: isZeroStock ? const Color(0xFFDC2626) : const Color(0xFFD97706),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
-                              '$lowQty units left',
+                              isZeroStock ? '0 units left' : '$lowQty units left',
                               style: GoogleFonts.jetBrainsMono(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w700,
@@ -404,7 +449,9 @@ class ClientDashboardPage extends ConsumerWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '$lowName$extraCount has dropped to or below safe threshold ($threshold units). Immediate replenishment recommended to prevent regional stock-outs.',
+                  isZeroStock
+                      ? '$lowName$extraCount is completely exhausted on DC warehouse shelves (0 units). New customer orders cannot be picked or fulfilled until you dispatch a fresh consignment.'
+                      : '$lowName$extraCount has dropped to or below safe threshold ($threshold units). Immediate replenishment recommended to prevent regional stock-outs.',
                   style: GoogleFonts.inter(
                     fontSize: 12,
                     color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
@@ -422,10 +469,14 @@ class ClientDashboardPage extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFDC2626).withValues(alpha: 0.15),
+                  color: (isZeroStock ? const Color(0xFFDC2626) : const Color(0xFFD97706)).withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 20),
+                child: Icon(
+                  isZeroStock ? Icons.error_outline_rounded : Icons.warning_amber_rounded,
+                  color: isZeroStock ? const Color(0xFFDC2626) : const Color(0xFFD97706),
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -435,11 +486,11 @@ class ClientDashboardPage extends ConsumerWidget {
                     Row(
                       children: [
                         Text(
-                          'CRITICAL REORDER ALERT',
+                          isZeroStock ? '🚨 CRITICAL: OUT OF STOCK AT DISTRIBUTION CENTER' : '⚠️ LOW STOCK REORDER ALERT',
                           style: GoogleFonts.inter(
                             fontSize: 11.5,
                             fontWeight: FontWeight.w800,
-                            color: const Color(0xFFDC2626),
+                            color: isZeroStock ? const Color(0xFFDC2626) : const Color(0xFFD97706),
                             letterSpacing: 0.5,
                           ),
                         ),
@@ -447,11 +498,11 @@ class ClientDashboardPage extends ConsumerWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFDC2626),
+                            color: isZeroStock ? const Color(0xFFDC2626) : const Color(0xFFD97706),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
-                            '$lowQty units left',
+                            isZeroStock ? '0 units left' : '$lowQty units left',
                             style: GoogleFonts.jetBrainsMono(
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
@@ -463,7 +514,9 @@ class ClientDashboardPage extends ConsumerWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '$lowName$extraCount has dropped to or below safe threshold ($threshold units). Immediate replenishment recommended to prevent regional stock-outs.',
+                      isZeroStock
+                          ? '$lowName$extraCount is completely exhausted on DC warehouse shelves (0 units available for picking). Couriers cannot dispatch or fulfill new orders until you supply fresh stock.'
+                          : '$lowName$extraCount has dropped to or below safe threshold ($threshold units). Immediate replenishment recommended to prevent regional stock-outs.',
                       style: GoogleFonts.inter(
                         fontSize: 11.5,
                         color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),

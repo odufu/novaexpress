@@ -19,6 +19,7 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../client_portal/domain/entities/client_profile.dart';
 import '../widgets/dc_product_detail_modal.dart';
 import '../widgets/dc_receive_supply_modal.dart';
+import '../widgets/dc_notify_merchant_restock_modal.dart';
 import '../../../client_portal/presentation/widgets/pangea_excel_data_table.dart';
 
 class DCStockPage extends ConsumerStatefulWidget {
@@ -282,14 +283,22 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                       ),
                     ),
 
-                    // KPI 4: Low Stock Alerts
+                    // KPI 4: Critical & Low Stock Alerts
                     SizedBox(
                       width: cardWidth,
                       child: _buildStockKpiCard(
-                        '⚠️ Low Stock Alerts',
-                        '${stockState.lowStockCountFiltered} Products',
-                        stockState.lowStockCountFiltered > 0 ? 'Requires warehouse restock' : 'All stock levels healthy ✓',
-                        stockState.lowStockCountFiltered > 0 ? const Color(0xFFF59E0B) : const Color(0xFF059669),
+                        stockState.outOfStockCountFiltered > 0
+                            ? '🚨 Critical Depletion Alerts'
+                            : (stockState.lowStockCountFiltered > 0 ? '⚠️ Low Stock Alerts' : '✓ Stock Health Alerts'),
+                        stockState.outOfStockCountFiltered > 0
+                            ? '${stockState.outOfStockCountFiltered} Out of Stock'
+                            : (stockState.lowStockCountFiltered > 0 ? '${stockState.lowStockCountFiltered} Products Low' : '0 Alerts'),
+                        stockState.outOfStockCountFiltered > 0
+                            ? '${stockState.outOfStockCountFiltered} product(s) exhausted on shelf!'
+                            : (stockState.lowStockCountFiltered > 0 ? 'Requires warehouse restock' : 'All stock levels healthy ✓'),
+                        stockState.outOfStockCountFiltered > 0
+                            ? const Color(0xFFDC2626)
+                            : (stockState.lowStockCountFiltered > 0 ? const Color(0xFFF59E0B) : const Color(0xFF059669)),
                         isDark,
                       ),
                     ),
@@ -299,6 +308,12 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
             ),
 
             const SizedBox(height: 20),
+
+            // High-Visibility Critical Depletion Alert Banner (When any product has 0 shelf units)
+            if (stockState.outOfStockCountFiltered > 0) ...[
+              _buildCriticalOutOfStockBanner(isDark, stockState),
+              const SizedBox(height: 16),
+            ],
 
             // 2. Action Header: Search, Filters & Primary CTA Buttons
             LayoutBuilder(
@@ -844,10 +859,12 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                   key: 'actions',
                   group: 'Actions',
                   label: 'ACTIONS',
-                  defaultWidth: 165,
-                  minWidth: 135,
+                  defaultWidth: 195,
+                  minWidth: 160,
                   align: TextAlign.center,
                   cellBuilder: (context, item, row, isDark, brand) {
+                    final isZeroStock = item.availableCount <= 0;
+
                     return Row(
                       mainAxisSize: MainAxisSize.min,
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -860,16 +877,31 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                           icon: const Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFF64748B)),
                           tooltip: 'Product Details',
                         ),
-                        IconButton(
-                          visualDensity: VisualDensity.compact,
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                          onPressed: item.availableCount > 0
-                              ? () => _showAssignToRiderDialog(context, isDark, item, dcState.drivers)
-                              : null,
-                          icon: const Icon(Icons.person_add_alt_1_rounded, size: 16, color: Color(0xFF2563EB)),
-                          tooltip: 'Assign to Rider',
-                        ),
+                        if (isZeroStock) ...[
+                          const SizedBox(width: 4),
+                          ElevatedButton.icon(
+                            onPressed: () => _showNotifyMerchantRestockDialog(context, isDark, item),
+                            icon: const Icon(Icons.campaign_rounded, size: 13, color: Colors.white),
+                            label: const Text('Notify Merchant', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFDC2626),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              visualDensity: VisualDensity.compact,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              elevation: 0,
+                            ),
+                          ),
+                        ] else ...[
+                          IconButton(
+                            visualDensity: VisualDensity.compact,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                            onPressed: () => _showAssignToRiderDialog(context, isDark, item, dcState.drivers),
+                            icon: const Icon(Icons.person_add_alt_1_rounded, size: 16, color: Color(0xFF2563EB)),
+                            tooltip: 'Assign to Rider',
+                          ),
+                        ],
                       ],
                     );
                   },
@@ -1016,14 +1048,19 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: item.availableCount > 0
-                        ? () => _showAssignToRiderDialog(context, isDark, item, dcState.drivers)
-                        : null,
-                    icon: const Icon(Icons.person_add_alt_1_rounded, size: 14, color: Colors.white),
-                    label: const Text('Assign to Rider', style: TextStyle(fontSize: 11.5, color: Colors.white)),
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
-                  ),
+                  child: item.availableCount > 0
+                      ? ElevatedButton.icon(
+                          onPressed: () => _showAssignToRiderDialog(context, isDark, item, dcState.drivers),
+                          icon: const Icon(Icons.person_add_alt_1_rounded, size: 14, color: Colors.white),
+                          label: const Text('Assign to Rider', style: TextStyle(fontSize: 11.5, color: Colors.white)),
+                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
+                        )
+                      : ElevatedButton.icon(
+                          onPressed: () => _showNotifyMerchantRestockDialog(context, isDark, item),
+                          icon: const Icon(Icons.campaign_rounded, size: 14, color: Colors.white),
+                          label: const Text('Notify Merchant', style: TextStyle(fontSize: 11.5, color: Colors.white, fontWeight: FontWeight.bold)),
+                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+                        ),
                 ),
               ],
             ),
@@ -1055,38 +1092,62 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
   Widget _buildStatusBadge(StockItemEntity item) {
     if (item.availableCount <= 0) {
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
         decoration: BoxDecoration(
-          color: const Color(0xFFEF4444).withValues(alpha: 0.12),
+          color: const Color(0xFFEF4444).withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.45)),
         ),
-        child: Text(
-          'OUT OF STOCK',
-          style: GoogleFonts.inter(fontSize: 9.5, fontWeight: FontWeight.w800, color: const Color(0xFFDC2626)),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline_rounded, size: 11, color: Color(0xFFDC2626)),
+            const SizedBox(width: 3.5),
+            Text(
+              'OUT OF STOCK',
+              style: GoogleFonts.inter(fontSize: 9.5, fontWeight: FontWeight.w900, color: const Color(0xFFDC2626), letterSpacing: 0.3),
+            ),
+          ],
         ),
       );
     } else if (item.isLowStock || (item.availableCount <= item.lowStockThreshold)) {
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
         decoration: BoxDecoration(
           color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.4)),
         ),
-        child: Text(
-          '⚠️ LOW STOCK (${item.availableCount} LEFT)',
-          style: GoogleFonts.inter(fontSize: 9.5, fontWeight: FontWeight.w800, color: const Color(0xFFD97706)),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.warning_amber_rounded, size: 11, color: Color(0xFFD97706)),
+            const SizedBox(width: 3.5),
+            Text(
+              'LOW STOCK (${item.availableCount} LEFT)',
+              style: GoogleFonts.inter(fontSize: 9.5, fontWeight: FontWeight.w800, color: const Color(0xFFD97706)),
+            ),
+          ],
         ),
       );
     } else {
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
         decoration: BoxDecoration(
           color: const Color(0xFF10B981).withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
         ),
-        child: Text(
-          'AVAILABLE',
-          style: GoogleFonts.inter(fontSize: 9.5, fontWeight: FontWeight.w800, color: const Color(0xFF059669)),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.check_circle_outline_rounded, size: 11, color: Color(0xFF059669)),
+            const SizedBox(width: 3.5),
+            Text(
+              'AVAILABLE',
+              style: GoogleFonts.inter(fontSize: 9.5, fontWeight: FontWeight.w800, color: const Color(0xFF059669)),
+            ),
+          ],
         ),
       );
     }
@@ -1108,6 +1169,119 @@ class _DCStockPageState extends ConsumerState<DCStockPage> with SingleTickerProv
       onAssignToRider: () => _showAssignToRiderDialog(context, isDark, item, drivers),
       onTransferToDc: () => _showTransferStockToDcDialog(context, isDark, item),
       onReportDamage: () => _showRecordDamageModal(context, isDark, item, drivers),
+      onNotifyMerchant: () => _showNotifyMerchantRestockDialog(context, isDark, item),
+    );
+  }
+
+  void _showNotifyMerchantRestockDialog(BuildContext context, bool isDark, StockItemEntity item) {
+    final dcState = ref.read(dcConsoleProvider);
+    final activeDc = dcState.distributionCenters.where((d) => d.id == dcState.activeHubId).firstOrNull;
+    final dcName = activeDc?.name ?? 'Wuse Grand Central Distribution Center';
+
+    DCNotifyMerchantRestockModal.show(
+      context,
+      item: item,
+      dcName: dcName,
+    );
+  }
+
+  Widget _buildCriticalOutOfStockBanner(bool isDark, StockState stockState) {
+    final outOfStockItems = stockState.stockItems.where((it) => it.availableCount <= 0).toList();
+    final firstOut = outOfStockItems.isNotEmpty ? outOfStockItems.first : null;
+    final count = outOfStockItems.length;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF450A0A).withValues(alpha: 0.6) : const Color(0xFFFEF2F2),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? const Color(0xFF991B1B) : const Color(0xFFFCA5A5),
+          width: 1.5,
+        ),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isNarrow = constraints.maxWidth < 650;
+          final content = Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEF4444).withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.campaign_rounded, color: Color(0xFFDC2626), size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '🚨 CRITICAL: $count Product(s) Completely Out of Stock on DC Warehouse Shelves!',
+                      style: GoogleFonts.inter(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: const Color(0xFFDC2626),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      firstOut != null
+                          ? '"${firstOut.name}" (${firstOut.ownerName}) has 0 units available for picking (${firstOut.assignedCount} in rider transit). New customer orders cannot be fulfilled from this DC.'
+                          : 'Warehouse shelf inventory is exhausted. Urgent inbound consignment required.',
+                      style: GoogleFonts.inter(
+                        fontSize: 11.5,
+                        color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+
+          final actionBtn = ElevatedButton.icon(
+            onPressed: () {
+              if (firstOut != null) {
+                _showNotifyMerchantRestockDialog(context, isDark, firstOut);
+              }
+            },
+            icon: const Icon(Icons.campaign_rounded, size: 15, color: Colors.white),
+            label: Text(
+              count > 1 ? 'Notify Merchants ($count)' : 'Notify Merchant (${firstOut?.ownerName ?? "Client"})',
+              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+          );
+
+          if (isNarrow) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                content,
+                const SizedBox(height: 10),
+                Align(alignment: Alignment.centerRight, child: actionBtn),
+              ],
+            );
+          }
+
+          return Row(
+            children: [
+              Expanded(child: content),
+              const SizedBox(width: 12),
+              actionBtn,
+            ],
+          );
+        },
+      ),
     );
   }
 
