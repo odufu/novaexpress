@@ -27,6 +27,7 @@ import '../../features/stock/presentation/pages/stock_handover_page.dart';
 import '../../features/stock/presentation/pages/stock_history_page.dart';
 import '../../features/users/presentation/pages/user_profile_page.dart';
 import '../../features/dc_console/presentation/pages/dc_console_layout.dart';
+import '../../features/dc_console/presentation/pages/dc_operations_mobile_portal_page.dart';
 import '../../features/client_portal/presentation/pages/client_portal_layout.dart';
 import '../../features/client_portal/presentation/pages/closer_mobile_portal_page.dart';
 import '../../features/client_portal/presentation/pages/marketer_mobile_portal_page.dart';
@@ -46,6 +47,7 @@ class RouterRefreshNotifier extends ChangeNotifier {
             previous?.user?.role != next.user?.role ||
             previous?.user?.isClient != next.user?.isClient ||
             previous?.user?.isDcManager != next.user?.isDcManager ||
+            previous?.user?.isDcOperations != next.user?.isDcOperations ||
             previous?.user?.isCloser != next.user?.isCloser ||
             previous?.user?.isMarketer != next.user?.isMarketer ||
             previous?.user?.isClientAdmin != next.user?.isClientAdmin) {
@@ -94,6 +96,7 @@ String? appRouteRedirect({
     }
 
     final isDc = user.isDcManager;
+    final isDcOps = user.isDcOperations;
     final isCloser = user.isCloser;
     final isMarketer = user.isMarketer;
     final isClientAdmin = user.isClientAdmin;
@@ -116,7 +119,21 @@ String? appRouteRedirect({
       }
     }
 
-    // 3. Strict Console Isolation: Client Merchant Portal (/client/**)
+    // 3. Strict Console Isolation: DC Operations Strictly Mobile Portal (/ops/**)
+    if (matchedLocation.startsWith('/ops')) {
+      if (!isDcOps) {
+        debugPrint('[AUTH_ROUTER] 🛑 Access Denied: User role "${user.role}" cannot access Operations Portal -> Redirecting to $homePath');
+        return homePath;
+      }
+    }
+
+    // Operations personnel are strictly confined to /ops
+    if (isDcOps && !matchedLocation.startsWith('/ops')) {
+      debugPrint('[AUTH_ROUTER] 🛑 Confining DC Operations Officer "${user.role}" strictly to mobile portal /ops');
+      return '/ops';
+    }
+
+    // 4. Strict Console Isolation: Client Merchant Portal (/client/**)
     if (matchedLocation.startsWith('/client')) {
       if (!isClientAdmin) {
         debugPrint('[AUTH_ROUTER] 🛑 Access Denied: User role "${user.role}" cannot access Client Merchant Portal -> Redirecting to $homePath');
@@ -124,7 +141,7 @@ String? appRouteRedirect({
       }
     }
 
-    // 4. Strict Console Isolation: Telesales Closer Portal (/closer/**)
+    // 5. Strict Console Isolation: Telesales Closer Portal (/closer/**)
     if (matchedLocation.startsWith('/closer')) {
       if (!isCloser) {
         debugPrint('[AUTH_ROUTER] 🛑 Access Denied: User role "${user.role}" cannot access Closer Portal -> Redirecting to $homePath');
@@ -132,7 +149,7 @@ String? appRouteRedirect({
       }
     }
 
-    // 5. Strict Console Isolation: Digital Marketer Portal (/marketer/**)
+    // 6. Strict Console Isolation: Digital Marketer Portal (/marketer/**)
     if (matchedLocation.startsWith('/marketer')) {
       if (!isMarketer) {
         debugPrint('[AUTH_ROUTER] 🛑 Access Denied: User role "${user.role}" cannot access Marketer Portal -> Redirecting to $homePath');
@@ -140,7 +157,7 @@ String? appRouteRedirect({
       }
     }
 
-    // 5. Strict Console Isolation: Field Delivery Agent (Rider) Routes
+    // 7. Strict Console Isolation: Field Delivery Agent (Rider) Routes
     // Only confirmed Riders can access root ('/'), rider orders list ('/orders'), scanner, POD confirmation, failure reporting, stock, and remittance
     final isRiderOnlyPath = matchedLocation == '/' ||
         matchedLocation == '/orders' ||
@@ -207,6 +224,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const MarketerMobilePortalPage(),
       ),
       GoRoute(
+        path: '/ops',
+        builder: (context, state) => const DCOperationsMobilePortalPage(),
+        routes: [
+          GoRoute(path: 'orders', builder: (context, state) => const DCOperationsMobilePortalPage()),
+          GoRoute(path: 'riders', builder: (context, state) => const DCOperationsMobilePortalPage()),
+          GoRoute(path: 'logs', builder: (context, state) => const DCOperationsMobilePortalPage()),
+          GoRoute(path: 'profile', builder: (context, state) => const DCOperationsMobilePortalPage()),
+        ],
+      ),
+      GoRoute(
         path: '/f/:formId',
         builder: (context, state) {
           final formId = state.pathParameters['formId'] ?? '';
@@ -240,6 +267,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(path: 'returns', builder: (context, state) => const DCConsoleLayout()),
           GoRoute(path: 'payouts', builder: (context, state) => const DCConsoleLayout()),
           GoRoute(path: 'riders', builder: (context, state) => const DCConsoleLayout()),
+          GoRoute(path: 'operations', builder: (context, state) => const DCConsoleLayout()),
           // Aliases for seamless backward compatibility
           GoRoute(path: 'fleet', builder: (context, state) => const DCConsoleLayout()),
           GoRoute(path: 'stock', builder: (context, state) => const DCConsoleLayout()),

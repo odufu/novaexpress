@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../features/dc_console/domain/entities/dc_operations_officer.dart';
 import '../../features/dc_console/domain/entities/distribution_center.dart';
 import '../../features/dc_console/domain/entities/dc_fleet_driver.dart';
 import '../../features/dc_console/domain/entities/dc_finance_settings.dart';
@@ -38,6 +39,8 @@ abstract class LocalStorageService {
   Future<List<DistributionCenter>?> getCachedDistributionCenters();
   Future<void> cacheFleetDrivers(List<DCFleetDriver> drivers);
   Future<List<DCFleetDriver>?> getCachedFleetDrivers();
+  Future<void> cacheOperationsOfficers(List<DCOperationsOfficer> officers);
+  Future<List<DCOperationsOfficer>?> getCachedOperationsOfficers();
 
   Future<void> cacheDriverCompensationTerms(String driverKey, Map<String, dynamic> terms);
   Future<Map<String, Map<String, dynamic>>?> getCachedDriverCompensationTerms();
@@ -95,6 +98,7 @@ abstract class LocalStorageService {
 class LocalStorageServiceImpl implements LocalStorageService {
   static const String _distributionCentersKey = 'novexps_cache_distribution_centers';
   static const String _fleetDriversKey = 'novexps_cache_fleet_drivers';
+  static const String _operationsOfficersKey = 'novexps_cache_operations_officers';
   static const String _driverTermsKey = 'novexps_cache_driver_terms_registry';
   static const String _financeSettingsKey = 'novexps_cache_dc_finance_settings';
   static const String _payoutClaimsKey = 'novexps_cache_payout_claims';
@@ -243,6 +247,32 @@ class LocalStorageServiceImpl implements LocalStorageService {
       }
     }
     return drivers.isNotEmpty ? drivers : null;
+  }
+
+  // --- DC Operations Officers Caching ---
+
+  @override
+  Future<void> cacheOperationsOfficers(List<DCOperationsOfficer> officers) async {
+    final list = officers.map((o) => o.toJson()).toList();
+    await saveJsonList(_operationsOfficersKey, list);
+    await setLastSyncTime('operations_officers');
+    debugPrint('[LOCAL_STORAGE] 💾 Cached ${officers.length} operations officers to local storage.');
+  }
+
+  @override
+  Future<List<DCOperationsOfficer>?> getCachedOperationsOfficers() async {
+    final rawList = await getJsonList(_operationsOfficersKey);
+    if (rawList == null || rawList.isEmpty) return null;
+
+    final officers = <DCOperationsOfficer>[];
+    for (final map in rawList) {
+      try {
+        officers.add(DCOperationsOfficer.fromJson(map));
+      } catch (e) {
+        debugPrint('[LOCAL_STORAGE] ⚠️ Error parsing cached operations officer: $e');
+      }
+    }
+    return officers.isNotEmpty ? officers : null;
   }
 
   // --- Driver Compensation Terms Registry Caching ---

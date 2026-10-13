@@ -93,6 +93,29 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
+  Future<UserEntity> registerDcOperationsOfficer({
+    required String email,
+    required String password,
+    required String firstName,
+    required String lastName,
+    required String phone,
+    required String distributionCenterId,
+    required String distributionCenterName,
+    String? staffCode,
+  }) async {
+    return await remoteDataSource.registerDcOperationsOfficer(
+      email: email,
+      password: password,
+      firstName: firstName,
+      lastName: lastName,
+      phone: phone,
+      distributionCenterId: distributionCenterId,
+      distributionCenterName: distributionCenterName,
+      staffCode: staffCode,
+    );
+  }
+
+  @override
   Future<UserEntity> registerClientAccount({
     required String email,
     required String password,

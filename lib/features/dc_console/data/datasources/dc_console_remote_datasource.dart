@@ -2,12 +2,14 @@ import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/supabase_constants.dart';
+import '../../../../core/services/local_storage_service.dart';
 import '../../../auth/data/datasources/auth_remote_datasource.dart';
 import '../../../auth/data/models/user_model.dart';
 import '../../../client_portal/domain/entities/client_profile.dart';
 import '../../../client_portal/domain/entities/client_settlement.dart';
 import '../../domain/entities/dc_finance_settings.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
+import '../../domain/entities/dc_operations_officer.dart';
 import '../../domain/entities/dc_payout_claim.dart';
 import '../../domain/entities/dc_transaction_record.dart';
 import '../../domain/entities/distribution_center.dart';
@@ -37,6 +39,20 @@ abstract class DCConsoleRemoteDataSource {
   Future<void> deleteDistributionCenter(String dcId);
   Future<List<DCFleetDriver>> fetchDrivers();
   Future<void> updateDriverCompensationTerms(DCFleetDriver driver);
+  Future<List<DCOperationsOfficer>> fetchOperationsOfficers({String? distributionCenterId});
+  Future<DCOperationsOfficer> createOperationsOfficer({
+    required String firstName,
+    required String lastName,
+    required String email,
+    required String phone,
+    required String distributionCenterId,
+    required String distributionCenterName,
+    String? password,
+    String? staffCode,
+    dynamic authDataSource,
+  });
+  Future<void> toggleOperationsOfficerStatus(String officerId, bool isActive);
+  Future<void> deleteOperationsOfficer(String officerId);
   Future<DCFinanceSettings?> fetchFinanceSettings();
   Future<void> updateFinanceSettings(DCFinanceSettings settings);
   Future<List<DCPayoutClaim>> fetchPayoutClaims();
@@ -413,6 +429,148 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
       } else {
         await adminDb.from('delivery_agents').update(extendedPayload).eq('agent_code', driver.driverCode);
       }
+  }
+
+  @override
+  Future<List<DCOperationsOfficer>> fetchOperationsOfficers({String? distributionCenterId}) async {
+    final client = _getAdminClient();
+    try {
+      final response = await client
+          .from('users')
+          .select()
+          .or('role.eq.dc_operations,role.eq.operations_officer,role.eq.dispatcher,role.eq.ops_officer')
+          .order('created_at', ascending: false);
+
+      // Separate lookup for distribution centers to avoid Postgres foreign key relation errors
+      Map<String, String> dcMap = {};
+      try {
+        final dcs = await client.from('distribution_centers').select('id, name');
+        for (final dc in dcs as List) {
+          if (dc is Map && dc['id'] != null && dc['name'] != null) {
+            dcMap[dc['id'].toString()] = dc['name'].toString();
+          }
+        }
+      } catch (_) {}
+
+      final List<DCOperationsOfficer> list = [];
+      for (final item in response as List) {
+        try {
+          final map = Map<String, dynamic>.from(item as Map);
+          final dcId = map['distribution_center_id']?.toString() ?? '';
+          if (dcMap.containsKey(dcId)) {
+            map['distribution_center_name'] = dcMap[dcId];
+          }
+          final officer = DCOperationsOfficer.fromJson(map);
+          if (distributionCenterId != null && distributionCenterId.isNotEmpty) {
+            if (officer.distributionCenterId != distributionCenterId) {
+              continue;
+            }
+          }
+          list.add(officer);
+        } catch (e) {
+          debugPrint('[DC_DATASOURCE] ⚠️ Parse notice for operations officer: $e');
+        }
+      }
+      return list;
+    } catch (e) {
+      debugPrint('[DC_DATASOURCE] ⚠️ fetchOperationsOfficers error ($e)');
+      return [];
+    }
+  }
+
+  @override
+  Future<DCOperationsOfficer> createOperationsOfficer({
+    required String firstName,
+    required String lastName,
+    required String email,
+    required String phone,
+    required String distributionCenterId,
+    required String distributionCenterName,
+    String? password,
+    String? staffCode,
+    dynamic authDataSource,
+  }) async {
+    final supPass = (password != null && password.trim().isNotEmpty)
+        ? password.trim()
+        : 'OpsPass123!';
+    final cleanEmail = email.trim().toLowerCase();
+    final effectiveCode = staffCode?.trim().toUpperCase().isNotEmpty == true
+        ? staffCode!.trim().toUpperCase()
+        : 'OPS-${100 + (DateTime.now().millisecondsSinceEpoch % 900)}';
+
+    UserModel createdUser;
+    if (authDataSource != null) {
+      createdUser = await authDataSource.registerDcOperationsOfficer(
+        email: cleanEmail,
+        password: supPass,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        phone: phone.trim(),
+        distributionCenterId: distributionCenterId,
+        distributionCenterName: distributionCenterName,
+        staffCode: effectiveCode,
+      );
+    } else {
+      final authDs = AuthRemoteDataSourceImpl(_getAdminClient());
+      createdUser = await authDs.registerDcOperationsOfficer(
+        email: cleanEmail,
+        password: supPass,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        phone: phone.trim(),
+        distributionCenterId: distributionCenterId,
+        distributionCenterName: distributionCenterName,
+        staffCode: effectiveCode,
+      );
+    }
+
+    final officer = DCOperationsOfficer(
+      id: createdUser.id,
+      authUserId: createdUser.authUserId,
+      email: cleanEmail,
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      phone: phone.trim(),
+      staffCode: effectiveCode,
+      distributionCenterId: distributionCenterId,
+      distributionCenterName: distributionCenterName,
+      isActive: true,
+      rawPassword: supPass,
+      createdAt: DateTime.now(),
+    );
+
+    // Cache locally to LocalStorageService
+    try {
+      final storage = LocalStorageServiceImpl();
+      final cached = (await storage.getCachedOperationsOfficers()) ?? [];
+      final updated = <DCOperationsOfficer>[
+        officer,
+        ...cached.where((o) => o.email.toLowerCase() != cleanEmail && o.id != officer.id),
+      ];
+      await storage.cacheOperationsOfficers(updated);
+    } catch (_) {}
+
+    return officer;
+  }
+
+  @override
+  Future<void> toggleOperationsOfficerStatus(String officerId, bool isActive) async {
+    final adminDb = _getAdminClient();
+    try {
+      await adminDb.from('users').update({'is_active': isActive}).eq('id', officerId);
+    } catch (e) {
+      debugPrint('[DC_DATASOURCE] ⚠️ toggleOperationsOfficerStatus notice ($e)');
+    }
+  }
+
+  @override
+  Future<void> deleteOperationsOfficer(String officerId) async {
+    final adminDb = _getAdminClient();
+    try {
+      await adminDb.from('users').delete().eq('id', officerId);
+    } catch (e) {
+      debugPrint('[DC_DATASOURCE] ⚠️ deleteOperationsOfficer notice ($e)');
+    }
   }
 
   @override

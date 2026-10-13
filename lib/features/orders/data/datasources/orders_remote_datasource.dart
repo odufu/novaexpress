@@ -17,6 +17,12 @@ abstract class OrdersRemoteDataSource {
   Future<void> unassignOrderFromRider({
     required String orderId,
   });
+  Future<void> rerouteOrderToDc({
+    required String orderId,
+    required String targetDcId,
+    required String targetDcName,
+    String? reason,
+  });
   Future<OrderModel> getOrderById(String orderId);
   Future<void> updateOrderStatus(
     String orderId,
@@ -725,6 +731,58 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
   }
 
   @override
+  Future<void> rerouteOrderToDc({
+    required String orderId,
+    required String targetDcId,
+    required String targetDcName,
+    String? reason,
+  }) async {
+    _assignedRidersByOrderId.remove(orderId);
+    _assignedRiderNamesByOrderId.remove(orderId);
+    _assignedRiderCodesByOrderId.remove(orderId);
+
+    SupabaseClient? dbClient;
+    try {
+      dbClient = SupabaseClient(
+        SupabaseConstants.supabaseUrl,
+        SupabaseConstants.supabaseServiceRoleKey,
+        authOptions: const AuthClientOptions(autoRefreshToken: false),
+      );
+
+      final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
+      final isUuid = uuidRegex.hasMatch(orderId.trim());
+
+      final updatePayload = {
+        'distribution_center_id': targetDcId,
+        'distribution_center_name': targetDcName,
+        'delivery_agent_id': null,
+        'assigned_agent_id': null,
+        'status': 'pending',
+        if (reason != null && reason.trim().isNotEmpty) 'notes': 'Rerouted to $targetDcName: $reason',
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+
+      if (isUuid) {
+        await dbClient
+            .from(SupabaseConstants.ordersTable)
+            .update(updatePayload)
+            .eq('id', orderId.trim());
+      } else {
+        await dbClient
+            .from(SupabaseConstants.ordersTable)
+            .update(updatePayload)
+            .eq('order_number', orderId.trim());
+      }
+
+      debugPrint('[ORDERS_DATASOURCE] ✅ Order $orderId rerouted to DC $targetDcName ($targetDcId). Reason: $reason');
+    } catch (e) {
+      debugPrint('[ORDERS_DATASOURCE] ℹ️ Reroute notice ($e).');
+    } finally {
+      dbClient?.dispose();
+    }
+  }
+
+  @override
   Future<OrderModel> getOrderById(String orderId) async {
     try {
       final isUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(orderId.trim());
@@ -1050,6 +1108,14 @@ class MockOrdersRemoteDataSource implements OrdersRemoteDataSource {
   @override
   Future<void> unassignOrderFromRider({
     required String orderId,
+  }) async {}
+
+  @override
+  Future<void> rerouteOrderToDc({
+    required String orderId,
+    required String targetDcId,
+    required String targetDcName,
+    String? reason,
   }) async {}
 
   @override

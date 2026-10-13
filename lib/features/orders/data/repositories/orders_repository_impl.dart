@@ -47,6 +47,21 @@ class OrdersRepositoryImpl implements OrdersRepository {
   }
 
   @override
+  Future<void> rerouteOrderToDc({
+    required String orderId,
+    required String targetDcId,
+    required String targetDcName,
+    String? reason,
+  }) async {
+    await remoteDataSource.rerouteOrderToDc(
+      orderId: orderId,
+      targetDcId: targetDcId,
+      targetDcName: targetDcName,
+      reason: reason,
+    );
+  }
+
+  @override
   Future<OrderEntity> getOrderById(String orderId) async {
     return await remoteDataSource.getOrderById(orderId);
   }

@@ -13,6 +13,12 @@ abstract class OrdersRepository {
   Future<void> unassignOrderFromRider({
     required String orderId,
   });
+  Future<void> rerouteOrderToDc({
+    required String orderId,
+    required String targetDcId,
+    required String targetDcName,
+    String? reason,
+  });
   Future<OrderEntity> getOrderById(String orderId);
   Future<void> updateOrderStatus(
     String orderId,

@@ -52,3 +52,7 @@ supabase/.temp/
 supabase_environments.md
 *.secret
 
+# Android APK and Bundle Builds
+*.apk
+*.aab
+

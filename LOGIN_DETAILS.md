@@ -23,6 +23,36 @@
 
 ---
 
+## 📱 Distribution Center Operations Department (Strictly Mobile)
+
+| Credential Field | Value | Notes |
+| :--- | :--- | :--- |
+| **Login Portal URL** | `/login` | Mobile Web or Android App |
+| **Primary Email** | `abigail@novaxpress.ng` | Live Onboarded Operations Officer |
+| **Password** | `bG5y2mZdrW` | Dedicated Officer Password |
+| **Account Name** | Abigail Operations | Incoming Order Routing & Dispatch Officer |
+| **Staff Code** | `OPS-WUSE-01-748` | Official badge code |
+| **Role Key** | `dc_operations` | Operations Staff |
+| **Designated Portal** | `/ops` | **Strictly Mobile Portal** (Automatically routed upon sign-in) |
+| **Assigned Distribution Center** | Wuse Grand Central Hub | Scoped to: `22222222-2222-4222-8222-222222222222` |
+| **Operational Scope** | Live Order Dispatch & Routing | Scoped strictly to Wuse DC orders & riders |
+
+### Additional Demo Officer:
+| Credential Field | Value | Notes |
+| :--- | :--- | :--- |
+| **Email** | `ops.wuse@novaxpress.ng` | Demo Operations Officer |
+| **Password** | `Password123!` | Standard password |
+| **Account Name** | Ibrahim Garba | Operations & Dispatch Officer (`OPS-WUSE-01`) |
+
+### Operations Officer Capabilities:
+1. **Live DC Orders**: View live incoming orders targeting their assigned DC only.
+2. **Dispatch to Available Riders**: Assign unrouted orders to active riders registered at this DC, with rider stock custody validation and active order load balancing.
+3. **Reroute across DCs**: Transfer misrouted orders to another distribution center with notes.
+4. **Order Pipeline Chat**: Communicate directly with merchant closers and supervisors on any order.
+5. **Zero Financial Access**: Strict security isolation from DC ledger, cash vaults, payouts, or settings.
+
+---
+
 ## 🔐 Sign-In Instructions for DC Personnel
 
 1. **Navigate to the Login Screen**: Open the web application at the root or `/login`.
@@ -52,3 +82,20 @@
 * **Supabase Project ID**: `oygtaeriljuelhshfvkv`
 * **Public User ID**: `a2222222-2222-4222-8222-222222222222`
 * **RPC Endpoint**: `public.fn_get_dc_logistics_dashboard`
+
+---
+
+## 📱 Mobile APK for Field Testing (Sales Reps / Riders / Station Agents)
+
+* **Root APK Location**: [`NovaXpress-Release.apk`](file:///c:/PROJECT/NoveXPS/NovaXpress-Release.apk)
+* **Build Artifact Location**: [`build/app/outputs/flutter-apk/app-release.apk`](file:///c:/PROJECT/NoveXPS/build/app/outputs/flutter-apk/app-release.apk)
+* **File Size**: ~111.9 MB
+* **App Label**: `NovaXpress`
+* **Compatibility**: Android 5.0+ (ARM64 & ARMv7 devices)
+* **Permissions Included**: Internet, Network State, Camera (for receipt & proof intake), Geo/Map Navigation, WhatsApp integration.
+
+### How to Install on Sales Rep Phones:
+1. Send `NovaXpress-Release.apk` to the phone via USB cable, Google Drive, WhatsApp, or Telegram.
+2. Open the file on the phone and tap **Install** (enable "Allow from this source" if prompted by Android security).
+3. Open the app, and log in with the designated field account or DC supervisor credentials.
+

@@ -83,6 +83,7 @@ class UserEntity {
   bool get isPda => isRider && personnelType == 'pda';
   bool get isInHouseRider => isRider && personnelType == 'in_house_rider';
   bool get isDcManager => role == 'dc_manager' || role == 'dc_supervisor' || role == 'super_admin';
+  bool get isDcOperations => role == 'dc_operations' || role == 'operations_officer' || role == 'dispatcher' || role == 'ops_officer';
   bool get isCloser => role == 'closer' || role == 'client_closer';
   bool get isMarketerSupervisor => isSupervisor || role == 'marketing_supervisor' || role == 'supervisor_marketer';
   bool get isMarketer => role == 'marketer' || role == 'digital_marketer' || isMarketerSupervisor;
@@ -91,6 +92,7 @@ class UserEntity {
 
   String get roleDescription {
     if (isDcManager) return 'DC Operations Supervisor';
+    if (isDcOperations) return 'DC Operations & Dispatch Officer';
     if (isCloser) return 'Telesales Closer';
     if (isMarketerSupervisor) return 'Marketing Supervisor';
     if (isMarketer) return 'Digital Marketer';
@@ -102,6 +104,7 @@ class UserEntity {
   /// Canonical console route strictly governed by the user's operational role
   String get homeConsoleRoute {
     if (isDcManager) return '/dc';
+    if (isDcOperations) return '/ops';
     if (isCloser) return '/closer';
     if (isMarketer) return '/marketer';
     if (isClientAdmin) return '/client';

@@ -14,6 +14,7 @@ import '../../../client_portal/domain/entities/client_profile.dart';
 import '../../../client_portal/domain/entities/client_settlement.dart';
 import '../../domain/entities/dc_finance_settings.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
+import '../../domain/entities/dc_operations_officer.dart';
 import '../../domain/entities/dc_payout_claim.dart';
 import '../../domain/entities/dc_transaction_record.dart';
 import '../../domain/entities/distribution_center.dart';
@@ -220,6 +221,7 @@ class DCConsoleState {
   final String dcFilter; // 'all', 'hubs', 'satellites', 'active', 'inactive'
   final String selectedStateFilter; // 'all', 'Abuja FCT', 'Lagos State', etc.
   final List<DCFleetDriver> drivers;
+  final List<DCOperationsOfficer> operationsOfficers;
   final List<DCWarehouseBatch> warehouseBatches;
   final List<DCReturnItem> returnItems;
   final List<DCPayoutClaim> payoutClaims;
@@ -246,6 +248,7 @@ class DCConsoleState {
     this.dcFilter = 'all',
     this.selectedStateFilter = 'all',
     this.drivers = const [],
+    this.operationsOfficers = const [],
     this.warehouseBatches = const [],
     this.returnItems = const [],
     this.payoutClaims = const [],
@@ -281,6 +284,7 @@ class DCConsoleState {
     String? dcFilter,
     String? selectedStateFilter,
     List<DCFleetDriver>? drivers,
+    List<DCOperationsOfficer>? operationsOfficers,
     List<DCWarehouseBatch>? warehouseBatches,
     List<DCReturnItem>? returnItems,
     List<DCPayoutClaim>? payoutClaims,
@@ -310,6 +314,7 @@ class DCConsoleState {
       dcFilter: dcFilter ?? this.dcFilter,
       selectedStateFilter: selectedStateFilter ?? this.selectedStateFilter,
       drivers: drivers ?? this.drivers,
+      operationsOfficers: operationsOfficers ?? this.operationsOfficers,
       warehouseBatches: warehouseBatches ?? this.warehouseBatches,
       returnItems: returnItems ?? this.returnItems,
       payoutClaims: payoutClaims ?? this.payoutClaims,
@@ -436,6 +441,32 @@ class DCConsoleState {
     return list;
   }
 
+  List<DCOperationsOfficer> get dcOperationsOfficers {
+    return operationsOfficers.where((o) {
+      if (isCurrentHubGrandDc) {
+        return o.distributionCenterId == activeHubId ||
+               o.distributionCenterId == activeHubCode ||
+               o.distributionCenterId == '22222222-2222-4222-8222-222222222222' ||
+               o.distributionCenterId.isEmpty;
+      }
+      return o.distributionCenterId == activeHubId || o.distributionCenterId == activeHubCode;
+    }).toList();
+  }
+
+  List<DCOperationsOfficer> get filteredOperationsOfficers {
+    var list = dcOperationsOfficers;
+    if (searchQuery.trim().isNotEmpty) {
+      final q = searchQuery.toLowerCase().trim();
+      list = list.where((o) =>
+          o.name.toLowerCase().contains(q) ||
+          o.email.toLowerCase().contains(q) ||
+          o.phone.contains(q) ||
+          o.staffCode.toLowerCase().contains(q) ||
+          (o.assignedZone != null && o.assignedZone!.toLowerCase().contains(q))).toList();
+    }
+    return list;
+  }
+
   List<ClientProfile> get filteredClients {
     var list = clients.isNotEmpty ? clients : defaultRegisteredClients;
     if (clientFilter != 'all') {
@@ -507,6 +538,7 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     // 1. Instant hydration from persistent local cache
     final cachedDcs = await _storageService.getCachedDistributionCenters();
     final cached = await _storageService.getCachedFleetDrivers();
+    final cachedOps = await _storageService.getCachedOperationsOfficers();
     final cachedFinance = await _storageService.getCachedFinanceSettings();
     final cachedBatches = await _storageService.getCachedWarehouseBatches();
     final cachedReturns = await _storageService.getCachedReturnItems();
@@ -520,6 +552,7 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     state = state.copyWith(
       distributionCenters: (cachedDcs != null && cachedDcs.isNotEmpty) ? cachedDcs : defaultDistributionCenters,
       drivers: cached ?? state.drivers,
+      operationsOfficers: cachedOps ?? state.operationsOfficers,
       financeSettings: cachedFinance ?? state.financeSettings,
       warehouseBatches: cachedBatches ?? state.warehouseBatches,
       returnItems: cachedReturns ?? state.returnItems,
@@ -562,11 +595,38 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
       }
     }
 
+    // Register cached operations officers into AuthRemoteDataSource in-memory store
+    if (cachedOps != null && cachedOps.isNotEmpty) {
+      for (final o in cachedOps) {
+        final nameParts = o.name.trim().split(' ');
+        final fName = nameParts.first;
+        final lName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+        AuthRemoteDataSourceImpl.registerUserInMemory(
+          UserModel(
+            id: o.id,
+            email: o.email,
+            firstName: fName,
+            lastName: lName,
+            phone: o.phone,
+            role: 'dc_operations',
+            deliveryAgentId: null,
+            deliveryAgentCode: o.staffCode,
+            distributionCenterId: o.distributionCenterId,
+            operatingCity: o.assignedZone ?? state.activeHubName,
+          ),
+          o.rawPassword,
+        );
+      }
+    }
+
     if (cachedDcs != null && cachedDcs.isNotEmpty) {
       debugPrint('[DC_CONSOLE_PROVIDER] ⚡ Hydrated ${cachedDcs.length} distribution centers from local storage cache.');
     }
     if (cached != null && cached.isNotEmpty) {
       debugPrint('[DC_CONSOLE_PROVIDER] ⚡ Hydrated ${cached.length} drivers from local storage cache.');
+    }
+    if (cachedOps != null && cachedOps.isNotEmpty) {
+      debugPrint('[DC_CONSOLE_PROVIDER] ⚡ Hydrated ${cachedOps.length} operations officers from local storage cache.');
     }
     if (cachedFinance != null) {
       debugPrint('[DC_CONSOLE_PROVIDER] ⚡ Hydrated finance & POS settings from local storage cache.');
@@ -583,6 +643,7 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
       await loadDistributionCentersFromDatabase();
       await loadFinanceSettingsFromDatabase();
       await loadDriversFromDatabase();
+      await loadOperationsOfficersFromDatabase();
       await loadPayoutClaimsFromDatabase();
       await loadTransactionsFromDatabase();
       await loadClientsFromDatabase();
@@ -592,6 +653,7 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
 
   List<DistributionCenter> get distributionCenters => state.distributionCenters.isNotEmpty ? state.distributionCenters : defaultDistributionCenters;
   List<DCFleetDriver> get drivers => state.drivers;
+  List<DCOperationsOfficer> get operationsOfficers => state.operationsOfficers;
   List<DCWarehouseBatch> get warehouseBatches => state.warehouseBatches;
   List<ClientProfile> get clients => state.clients.isNotEmpty ? state.clients : defaultRegisteredClients;
 
@@ -1699,6 +1761,172 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
       }
     } catch (e) {
       debugPrint('[DC_CONSOLE_PROVIDER] ℹ️ Fleet fetch notice ($e). Local cached drivers retained.');
+    }
+  }
+
+  Future<void> loadOperationsOfficersFromDatabase() async {
+    if (isTestEnvironment) return;
+
+    try {
+      final dbOfficers = await _repository.getOperationsOfficers(distributionCenterId: state.activeHubId);
+      if (dbOfficers.isNotEmpty) {
+        final Map<String, String> localPasswords = {};
+        for (final o in state.operationsOfficers) {
+          if (o.rawPassword != null && o.rawPassword!.isNotEmpty) {
+            localPasswords[o.id] = o.rawPassword!;
+            localPasswords[o.email.toLowerCase()] = o.rawPassword!;
+          }
+        }
+
+        final mergedList = dbOfficers.map((o) {
+          final pw = localPasswords[o.id] ?? localPasswords[o.email.toLowerCase()];
+          return pw != null ? o.copyWith(rawPassword: pw) : o;
+        }).toList();
+
+        state = state.copyWith(operationsOfficers: mergedList, isLoading: false);
+        await _storageService.cacheOperationsOfficers(mergedList);
+
+        for (final o in mergedList) {
+          final nameParts = o.name.trim().split(' ');
+          final fName = nameParts.first;
+          final lName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+          AuthRemoteDataSourceImpl.registerUserInMemory(
+            UserModel(
+              id: o.id,
+              email: o.email,
+              firstName: fName,
+              lastName: lName,
+              phone: o.phone,
+              role: 'dc_operations',
+              deliveryAgentId: null,
+              deliveryAgentCode: o.staffCode,
+              distributionCenterId: o.distributionCenterId,
+              operatingCity: o.assignedZone ?? state.activeHubName,
+            ),
+            o.rawPassword,
+          );
+        }
+        debugPrint('[DC_CONSOLE_PROVIDER] 👷 Loaded ${mergedList.length} operations officers via repository.');
+      }
+    } catch (e) {
+      debugPrint('[DC_CONSOLE_PROVIDER] ℹ️ Operations officers fetch notice ($e). Local cached retained.');
+    }
+  }
+
+  Future<DCOperationsOfficer> addOperationsOfficer({
+    required String name,
+    required String email,
+    required String phone,
+    required String password,
+    String? staffCode,
+    String? distributionCenterId,
+    String? assignedZone,
+  }) async {
+    final cleanEmail = email.trim().toLowerCase();
+    final cleanName = name.trim();
+    final cleanPhone = phone.trim();
+    final cleanPass = password.trim();
+    final targetDcId = (distributionCenterId != null && distributionCenterId.isNotEmpty)
+        ? distributionCenterId
+        : state.activeHubId;
+
+    final existingLocal = state.operationsOfficers.where(
+      (o) => o.email.toLowerCase() == cleanEmail,
+    ).firstOrNull;
+    if (existingLocal != null) {
+      throw Exception("An operations officer with email '$cleanEmail' already exists.");
+    }
+
+    String effectiveCode = staffCode?.trim() ?? '';
+    if (effectiveCode.isEmpty) {
+      final randSuffix = Random().nextInt(900) + 100;
+      effectiveCode = 'OPS-$randSuffix';
+    }
+
+    final nameParts = cleanName.split(' ');
+    final fName = nameParts.first;
+    final lName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+    final targetDc = state.distributionCenters.where((d) => d.id == targetDcId).firstOrNull ??
+        state.distributionCenters.firstOrNull;
+    final targetDcName = targetDc?.name ?? state.activeHubName;
+
+    final newOfficer = await _repository.createOperationsOfficer(
+      firstName: fName,
+      lastName: lName,
+      email: cleanEmail,
+      phone: cleanPhone,
+      password: cleanPass,
+      staffCode: effectiveCode,
+      distributionCenterId: targetDcId,
+      distributionCenterName: targetDcName,
+    );
+
+    final officerWithPass = newOfficer.copyWith(
+      rawPassword: cleanPass,
+      assignedZone: assignedZone ?? state.activeHubName,
+    );
+
+    final updated = [
+      officerWithPass,
+      ...state.operationsOfficers.where((o) => o.id != newOfficer.id && o.email.toLowerCase() != cleanEmail),
+    ];
+    state = state.copyWith(operationsOfficers: updated);
+    await _storageService.cacheOperationsOfficers(updated);
+
+    AuthRemoteDataSourceImpl.registerUserInMemory(
+      UserModel(
+        id: newOfficer.id,
+        email: cleanEmail,
+        firstName: fName,
+        lastName: lName,
+        phone: cleanPhone,
+        role: 'dc_operations',
+        deliveryAgentId: null,
+        deliveryAgentCode: effectiveCode,
+        distributionCenterId: targetDcId,
+        operatingCity: assignedZone ?? state.activeHubName,
+      ),
+      cleanPass,
+    );
+
+    debugPrint('[DC_CONSOLE_PROVIDER] 👷 Successfully onboarded Operations Officer: ${newOfficer.name} ($cleanEmail)');
+    return officerWithPass;
+  }
+
+  Future<bool> toggleOperationsOfficerStatus(String officerId, bool isActive) async {
+    final updatedList = state.operationsOfficers.map((o) {
+      if (o.id == officerId) return o.copyWith(isActive: isActive);
+      return o;
+    }).toList();
+    state = state.copyWith(operationsOfficers: updatedList);
+    await _storageService.cacheOperationsOfficers(updatedList);
+
+    if (isTestEnvironment) return true;
+
+    try {
+      await _repository.toggleOperationsOfficerStatus(officerId, isActive);
+      debugPrint('[DC_CONSOLE_PROVIDER] 👷 Toggled Operations Officer "$officerId" status to $isActive');
+      return true;
+    } catch (e) {
+      debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ toggleOperationsOfficerStatus notice: $e');
+      return false;
+    }
+  }
+
+  Future<bool> deleteOperationsOfficer(String officerId) async {
+    final updatedList = state.operationsOfficers.where((o) => o.id != officerId).toList();
+    state = state.copyWith(operationsOfficers: updatedList);
+    await _storageService.cacheOperationsOfficers(updatedList);
+
+    if (isTestEnvironment) return true;
+
+    try {
+      await _repository.deleteOperationsOfficer(officerId);
+      debugPrint('[DC_CONSOLE_PROVIDER] 🗑️ Deleted Operations Officer "$officerId"');
+      return true;
+    } catch (e) {
+      debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ deleteOperationsOfficer notice: $e');
+      return false;
     }
   }
 

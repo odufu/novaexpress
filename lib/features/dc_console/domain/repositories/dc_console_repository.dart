@@ -2,6 +2,7 @@ import '../../../client_portal/domain/entities/client_profile.dart';
 import '../../../client_portal/domain/entities/client_settlement.dart';
 import '../entities/dc_finance_settings.dart';
 import '../entities/dc_fleet_driver.dart';
+import '../entities/dc_operations_officer.dart';
 import '../entities/dc_payout_claim.dart';
 import '../entities/dc_transaction_record.dart';
 import '../entities/distribution_center.dart';
@@ -46,6 +47,28 @@ abstract class DCConsoleRepository {
 
   /// Updates custom compensation terms for a fleet driver
   Future<void> updateDriverCompensationTerms(DCFleetDriver driver);
+
+  /// Fetches operations officers for the specified DC (or all if omitted)
+  Future<List<DCOperationsOfficer>> getOperationsOfficers({String? distributionCenterId});
+
+  /// Onboards a new operations officer
+  Future<DCOperationsOfficer> createOperationsOfficer({
+    required String firstName,
+    required String lastName,
+    required String email,
+    required String phone,
+    required String distributionCenterId,
+    required String distributionCenterName,
+    String? password,
+    String? staffCode,
+    dynamic authDataSource,
+  });
+
+  /// Toggles active status of an operations officer
+  Future<void> toggleOperationsOfficerStatus(String officerId, bool isActive);
+
+  /// Deletes an operations officer
+  Future<void> deleteOperationsOfficer(String officerId);
 
   /// Fetches finance and settlement settings for the active DC
   Future<DCFinanceSettings?> getFinanceSettings();

@@ -678,6 +678,48 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     }
   }
 
+  Future<bool> rerouteOrderToDc({
+    required String orderId,
+    required String targetDcId,
+    required String targetDcName,
+    String? reason,
+  }) async {
+    try {
+      await _repository.rerouteOrderToDc(
+        orderId: orderId,
+        targetDcId: targetDcId,
+        targetDcName: targetDcName,
+        reason: reason,
+      );
+
+      final updatedList = state.orders.map((o) {
+        if (o.id == orderId || o.orderNumber == orderId) {
+          return OrderModel.fromEntity(
+            o.copyWith(
+              clearAssignment: true,
+              distributionCenterId: targetDcId,
+              distributionCenterName: targetDcName,
+              status: 'pending',
+              deliveryNotes: reason != null && reason.isNotEmpty
+                  ? (o.deliveryNotes != null && o.deliveryNotes!.isNotEmpty ? '${o.deliveryNotes} | Transfer: $reason' : 'Transfer: $reason')
+                  : o.deliveryNotes,
+            ),
+          );
+        }
+        return o;
+      }).toList();
+
+      final sortedList = _sortOrdersByOperationalPriority(updatedList);
+      state = state.copyWith(orders: sortedList);
+      await _storageService.cacheOrders(sortedList, _getScopeKey());
+      debugPrint('[ORDERS_NOTIFIER] ✅ Order $orderId rerouted to DC $targetDcName');
+      return true;
+    } catch (e) {
+      debugPrint('[ORDERS_NOTIFIER] ❌ Error rerouting order $orderId: $e');
+      return false;
+    }
+  }
+
   Future<void> updateOrderStatus(
     String orderId,
     String newStatus, {

@@ -14,6 +14,7 @@ import 'dc_clients_page.dart';
 import 'dc_dashboard_page.dart';
 import 'dc_distribution_centers_page.dart';
 import 'dc_finance_page.dart';
+import 'dc_operations_page.dart';
 import 'dc_order_payment_matching_page.dart';
 import 'dc_orders_page.dart';
 import 'dc_payouts_page.dart';
@@ -44,6 +45,7 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
       ref.read(stockProvider.notifier).fetchStockItems();
       ref.read(dcConsoleProvider.notifier).loadDistributionCentersFromDatabase();
       ref.read(dcConsoleProvider.notifier).loadDriversFromDatabase();
+      ref.read(dcConsoleProvider.notifier).loadOperationsOfficersFromDatabase();
       ref.read(dcConsoleProvider.notifier).loadTransactionsFromDatabase();
     });
   }
@@ -135,6 +137,8 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
         return const DCSettingsPage();
       case 11:
         return const DCClientsPage();
+      case 12:
+        return const DCOperationsPage();
       default:
         return const DCDashboardPage();
     }
@@ -246,6 +250,7 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
                 _buildNavItem(6, 'Returns & QC Desk', Icons.assignment_return_rounded, state.activeTabIndex == 6, isCollapsed, isDrawer),
                 _buildNavItem(7, 'Rider Payout Claims', Icons.payments_rounded, state.activeTabIndex == 7, isCollapsed, isDrawer),
                 _buildNavItem(8, 'Riders & Fleet', Icons.badge_rounded, state.activeTabIndex == 8, isCollapsed, isDrawer),
+                _buildNavItem(12, 'Operations Team', Icons.support_agent_rounded, state.activeTabIndex == 12, isCollapsed, isDrawer),
                 if (isPrimaryDc)
                   _buildNavItem(9, 'Distribution Centers', Icons.apartment_rounded, state.activeTabIndex == 9, isCollapsed, isDrawer),
                 _buildNavItem(11, 'Clients & Merchants', Icons.storefront_rounded, state.activeTabIndex == 11, isCollapsed, isDrawer),

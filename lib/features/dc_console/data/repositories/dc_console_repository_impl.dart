@@ -3,6 +3,7 @@ import '../../../client_portal/domain/entities/client_profile.dart';
 import '../../../client_portal/domain/entities/client_settlement.dart';
 import '../../domain/entities/dc_finance_settings.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
+import '../../domain/entities/dc_operations_officer.dart';
 import '../../domain/entities/dc_payout_claim.dart';
 import '../../domain/entities/dc_transaction_record.dart';
 import '../../domain/entities/distribution_center.dart';
@@ -130,6 +131,81 @@ class DCConsoleRepositoryImpl implements DCConsoleRepository {
     final cached = await _storageService.getCachedFleetDrivers() ?? [];
     final updatedList = cached.map((d) => d.id == driver.id ? driver : d).toList();
     await _storageService.cacheFleetDrivers(updatedList);
+  }
+
+  @override
+  Future<List<DCOperationsOfficer>> getOperationsOfficers({String? distributionCenterId}) async {
+    try {
+      final remote = await _remoteDataSource.fetchOperationsOfficers(distributionCenterId: distributionCenterId);
+      if (remote.isNotEmpty) {
+        await _storageService.cacheOperationsOfficers(remote);
+        return remote;
+      }
+      final cached = await _storageService.getCachedOperationsOfficers();
+      if (cached != null && cached.isNotEmpty) {
+        if (distributionCenterId != null && distributionCenterId.isNotEmpty) {
+          return cached.where((o) => o.distributionCenterId == distributionCenterId).toList();
+        }
+        return cached;
+      }
+      return remote;
+    } catch (_) {
+      final cached = await _storageService.getCachedOperationsOfficers();
+      if (cached != null) {
+        if (distributionCenterId != null && distributionCenterId.isNotEmpty) {
+          return cached.where((o) => o.distributionCenterId == distributionCenterId).toList();
+        }
+        return cached;
+      }
+      return [];
+    }
+  }
+
+  @override
+  Future<DCOperationsOfficer> createOperationsOfficer({
+    required String firstName,
+    required String lastName,
+    required String email,
+    required String phone,
+    required String distributionCenterId,
+    required String distributionCenterName,
+    String? password,
+    String? staffCode,
+    dynamic authDataSource,
+  }) async {
+    final created = await _remoteDataSource.createOperationsOfficer(
+      firstName: firstName,
+      lastName: lastName,
+      email: email,
+      phone: phone,
+      distributionCenterId: distributionCenterId,
+      distributionCenterName: distributionCenterName,
+      password: password,
+      staffCode: staffCode,
+      authDataSource: authDataSource,
+    );
+
+    final cached = await _storageService.getCachedOperationsOfficers() ?? [];
+    final updated = [created, ...cached.where((o) => o.id != created.id && o.email != created.email)];
+    await _storageService.cacheOperationsOfficers(updated);
+
+    return created;
+  }
+
+  @override
+  Future<void> toggleOperationsOfficerStatus(String officerId, bool isActive) async {
+    await _remoteDataSource.toggleOperationsOfficerStatus(officerId, isActive);
+    final cached = await _storageService.getCachedOperationsOfficers() ?? [];
+    final updated = cached.map((o) => o.id == officerId ? o.copyWith(isActive: isActive) : o).toList();
+    await _storageService.cacheOperationsOfficers(updated);
+  }
+
+  @override
+  Future<void> deleteOperationsOfficer(String officerId) async {
+    await _remoteDataSource.deleteOperationsOfficer(officerId);
+    final cached = await _storageService.getCachedOperationsOfficers() ?? [];
+    final updated = cached.where((o) => o.id != officerId).toList();
+    await _storageService.cacheOperationsOfficers(updated);
   }
 
   @override
