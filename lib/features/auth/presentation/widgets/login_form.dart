@@ -5,8 +5,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../providers/auth_provider.dart';
 
-import './quick_account_dropdown.dart';
-
 final loginObscurePasswordProvider = StateProvider.autoDispose<bool>((ref) => true);
 final loginRememberMeProvider = StateProvider.autoDispose<bool>((ref) => true);
 
@@ -19,51 +17,14 @@ class LoginForm extends ConsumerStatefulWidget {
 
 class _LoginFormState extends ConsumerState<LoginForm> {
   final _formKey = GlobalKey<FormState>();
-  final _agentIdController = TextEditingController(text: 'dc.supervisor@novaxpress.ng');
-  final _passwordController = TextEditingController(text: 'Password123!');
-  String? _selectedDemoRole = 'dc_manager';
-
-  @override
-  void initState() {
-    super.initState();
-    _agentIdController.addListener(_onEmailChanged);
-  }
-
-  void _onEmailChanged() {
-    final text = _agentIdController.text.trim().toLowerCase();
-    final matchingAcc = QuickAccountDropdown.allAccounts.where((a) => a.email.toLowerCase() == text).firstOrNull;
-    if (matchingAcc != null) {
-      if (_selectedDemoRole != matchingAcc.roleKey) {
-        setState(() => _selectedDemoRole = matchingAcc.roleKey);
-      }
-    } else {
-      if (_selectedDemoRole != null) {
-        setState(() => _selectedDemoRole = null);
-      }
-    }
-  }
+  final _agentIdController = TextEditingController();
+  final _passwordController = TextEditingController();
 
   @override
   void dispose() {
-    _agentIdController.removeListener(_onEmailChanged);
     _agentIdController.dispose();
     _passwordController.dispose();
     super.dispose();
-  }
-
-  void _quickFill(String roleKey, String email, String password) {
-    setState(() {
-      _selectedDemoRole = roleKey;
-      _agentIdController.text = email;
-      _passwordController.text = password;
-    });
-  }
-
-  void _instantLogin(String roleKey, String email, String password) {
-    _quickFill(roleKey, email, password);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _submit();
-    });
   }
 
   void _submit() async {
@@ -111,17 +72,6 @@ class _LoginFormState extends ConsumerState<LoginForm> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Custom Quick Account Selector Dropdown
-          QuickAccountDropdown(
-            selectedRoleKey: _selectedDemoRole,
-            onAccountSelected: (acc) {
-              _quickFill(acc.roleKey, acc.email, acc.password);
-            },
-            onInstantLogin: (acc) {
-              _instantLogin(acc.roleKey, acc.email, acc.password);
-            },
-          ),
-          const SizedBox(height: 18),
 
           if (authState.errorMessage != null) ...[
             Container(
@@ -295,53 +245,45 @@ class _LoginFormState extends ConsumerState<LoginForm> {
           const SizedBox(height: 22),
 
           // Single Unified Sign In Button
-          Builder(
-            builder: (context) {
-              final selectedAcc = QuickAccountDropdown.allAccounts.where((a) => a.roleKey == _selectedDemoRole).firstOrNull;
-              final btnColor = selectedAcc?.themeColor ?? const Color(0xFF0F172A);
-              final btnTitle = selectedAcc != null ? 'Sign In as ${selectedAcc.title}' : 'Sign In to Assigned Workspace';
-
-              return SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: btnColor,
-                    foregroundColor: Colors.white,
-                    elevation: 2,
-                    shadowColor: btnColor.withValues(alpha: 0.3),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  onPressed: authState.isLoading ? null : _submit,
-                  child: authState.isLoading
-                      ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                        )
-                      : FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                btnTitle,
-                                style: GoogleFonts.inter(
-                                  fontSize: 14.5,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 0.3,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              const Icon(Icons.arrow_forward_rounded, size: 18),
-                            ],
-                          ),
-                        ),
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0F172A),
+                foregroundColor: Colors.white,
+                elevation: 2,
+                shadowColor: const Color(0xFF0F172A).withValues(alpha: 0.3),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-              );
-            },
+              ),
+              onPressed: authState.isLoading ? null : _submit,
+              child: authState.isLoading
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    )
+                  : FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'Sign In to Assigned Workspace',
+                            style: GoogleFonts.inter(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          const Icon(Icons.arrow_forward_rounded, size: 18),
+                        ],
+                      ),
+                    ),
+            ),
           ),
         ],
       ),

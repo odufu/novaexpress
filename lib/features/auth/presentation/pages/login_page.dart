@@ -176,7 +176,7 @@ class LoginPage extends StatelessWidget {
                             ),
                             SizedBox(height: isCompact ? 18 : 22),
 
-                            // The Unified Login Form with QuickAccountDropdown
+                            // The Unified Multi-Tenant Login Form
                             const LoginForm(),
                           ],
                         ),
