@@ -8,6 +8,7 @@ import '../../domain/entities/order_conversation.dart';
 import '../../domain/entities/order_conversation_message.dart';
 import '../../data/datasources/pipeline_chat_remote_datasource.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../dc_console/presentation/providers/dc_console_provider.dart';
 import '../../../../core/services/audio_service.dart';
 import '../../../../core/services/local_storage_service.dart';
 
@@ -38,7 +39,7 @@ class PipelineChatState {
       return recentConversations.where((c) => c.unreadRiderCount > 0).length;
     } else if (r.contains('client') || r.contains('merchant') || r.contains('closer') || r.contains('marketer')) {
       return recentConversations.where((c) => c.unreadClientCount > 0).length;
-    } else if (r.contains('dc') || r.contains('manager') || r.contains('operations')) {
+    } else if (r.contains('dc') || r.contains('manager') || r.contains('operations') || r.contains('dispatcher')) {
       return recentConversations.where((c) => c.unreadDcCount > 0).length;
     }
     return 0;
@@ -159,11 +160,22 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
     }
 
     final isMarketer = authUser.role.toLowerCase().contains('marketer');
+    String? targetDcId = authUser.distributionCenterId;
+    if ((targetDcId == null || targetDcId.isEmpty) && (authUser.isDcOperations || authUser.isDcManager)) {
+      try {
+        final dcState = _ref.read(dcConsoleProvider);
+        targetDcId = dcState.activeHubId;
+        if (targetDcId.isEmpty) {
+          targetDcId = dcState.distributionCenters.firstOrNull?.id;
+        }
+      } catch (_) {}
+    }
+
     final scopeKey = authUser.isCloser
         ? 'closer_${authUser.closerId ?? authUser.id}'
         : (isMarketer
             ? 'marketer_${authUser.marketerId ?? authUser.id}'
-            : (authUser.clientId ?? authUser.distributionCenterId ?? authUser.id));
+            : (authUser.clientId ?? targetDcId ?? authUser.id));
 
     final localStorage = _ref.read(localStorageServiceProvider);
 
@@ -184,7 +196,7 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
         userRole: authUser.role,
         userId: authUser.id,
         clientId: authUser.clientId,
-        distributionCenterId: authUser.distributionCenterId,
+        distributionCenterId: targetDcId,
         deliveryAgentId: authUser.deliveryAgentId,
         closerId: authUser.closerId ?? (authUser.isCloser ? authUser.id : null),
         marketerId: isMarketer ? (authUser.marketerId ?? authUser.id) : null,
@@ -404,7 +416,7 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
           role = ChatSenderRole.marketer;
         } else if (rStr.contains('client')) {
           role = ChatSenderRole.client;
-        } else if (rStr.contains('dc') || rStr.contains('admin') || rStr.contains('manager')) {
+        } else if (rStr.contains('dc') || rStr.contains('admin') || rStr.contains('manager') || rStr.contains('operations') || rStr.contains('dispatcher') || user.isDcOperations || user.isDcManager) {
           role = ChatSenderRole.dcManager;
         } else if (rStr.contains('agent') || rStr.contains('rider')) {
           role = ChatSenderRole.deliveryAgent;

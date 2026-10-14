@@ -26,7 +26,15 @@ class FakePipelineChatRemoteDataSource implements PipelineChatRemoteDataSource {
   }
 
   @override
-  Future<List<OrderConversationEntity>> fetchConversationsScoped({required String userRole, required String userId, String? clientId, String? distributionCenterId, String? deliveryAgentId, String? closerId}) async {
+  Future<List<OrderConversationEntity>> fetchConversationsScoped({
+    required String userRole,
+    required String userId,
+    String? clientId,
+    String? distributionCenterId,
+    String? deliveryAgentId,
+    String? closerId,
+    String? marketerId,
+  }) async {
     return [conversation];
   }
 

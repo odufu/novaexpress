@@ -420,6 +420,35 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
         } catch (_) {}
       }
 
+      // Auto-initialize order_conversations record for pipeline chat
+      try {
+        await dbClient.from('order_conversations').upsert({
+          'order_id': createdModel.id,
+          'order_number': createdModel.orderNumber,
+          'customer_name': createdModel.customerName,
+          'customer_phone': createdModel.customerPhone,
+          'client_id': (rawClientId != null && uuidRegex.hasMatch(rawClientId)) ? rawClientId : '11111111-1111-4111-8111-111111111111',
+          'client_name': resolvedClientName.isNotEmpty ? resolvedClientName : 'Merchant',
+          'distribution_center_id': dcId,
+          'distribution_center_name': insertPayload['distribution_center_name']?.toString() ?? 'Wuse Grand Central Distribution Center',
+          'delivery_agent_id': validRiderId,
+          'delivery_agent_name': insertPayload['delivery_agent_name']?.toString(),
+          'closer_id': (insertPayload['closer_id'] != null && uuidRegex.hasMatch(insertPayload['closer_id'].toString())) ? insertPayload['closer_id'].toString() : null,
+          'closer_name': insertPayload['closer_name']?.toString(),
+          'marketer_id': (insertPayload['marketer_id'] != null && uuidRegex.hasMatch(insertPayload['marketer_id'].toString())) ? insertPayload['marketer_id'].toString() : null,
+          'form_id': insertPayload['form_id']?.toString(),
+          'order_status': resolvedStatus,
+          'current_product_name': insertPayload['product_name']?.toString() ?? '',
+          'current_package_name': pkgDealName,
+          'current_total_amount': totalAmount,
+          'last_message_text': 'Order chat pipeline initialized.',
+          'last_message_sender_name': 'System',
+          'last_message_at': DateTime.now().toIso8601String(),
+        }, onConflict: 'order_id');
+      } catch (convErr) {
+        debugPrint('[ORDERS_DATASOURCE] ℹ️ order_conversations init notice: $convErr');
+      }
+
       // Ensure createdModel is fully enriched with all client, DC, and rider attributes
       createdModel = OrderModel.fromEntity(
         createdModel.copyWith(
@@ -659,7 +688,17 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
         }
       }
 
-      // 4. Immediately insert real notification in database for rider
+      // 4. Synchronize order_conversations record with assigned rider
+      try {
+        await dbClient.from('order_conversations').update({
+          'delivery_agent_id': validRiderUuid,
+          'delivery_agent_name': riderName,
+        }).eq('order_id', matchedOrderUuid ?? orderId.trim());
+      } catch (convErr) {
+        debugPrint('[ORDERS_DATASOURCE] ℹ️ order_conversations assign sync notice: $convErr');
+      }
+
+      // 5. Immediately insert real notification in database for rider
       try {
         await dbClient.from('notifications').insert({
           if (orderCompanyId != null) 'company_id': orderCompanyId,
@@ -722,6 +761,14 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
             .eq('order_number', orderId.trim());
       }
 
+      // Synchronize order_conversations
+      try {
+        await dbClient.from('order_conversations').update({
+          'delivery_agent_id': null,
+          'delivery_agent_name': null,
+        }).eq('order_id', orderId.trim());
+      } catch (_) {}
+
       debugPrint('[ORDERS_DATASOURCE] ✅ Order $orderId unassigned back to DC pool.');
     } catch (e) {
       debugPrint('[ORDERS_DATASOURCE] ℹ️ Unassign notice ($e).');
@@ -773,6 +820,16 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
             .update(updatePayload)
             .eq('order_number', orderId.trim());
       }
+
+      // Synchronize order_conversations
+      try {
+        await dbClient.from('order_conversations').update({
+          'distribution_center_id': targetDcId,
+          'distribution_center_name': targetDcName,
+          'delivery_agent_id': null,
+          'delivery_agent_name': null,
+        }).eq('order_id', orderId.trim());
+      } catch (_) {}
 
       debugPrint('[ORDERS_DATASOURCE] ✅ Order $orderId rerouted to DC $targetDcName ($targetDcId). Reason: $reason');
     } catch (e) {

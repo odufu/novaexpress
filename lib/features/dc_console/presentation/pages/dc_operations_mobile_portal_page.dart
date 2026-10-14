@@ -10,7 +10,11 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../../../orders/domain/services/order_routing_service.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
+import '../../../pipeline_chat/domain/entities/order_conversation.dart';
+import '../../../pipeline_chat/presentation/providers/pipeline_chat_provider.dart';
+import '../../../pipeline_chat/presentation/widgets/conversation_list_modal.dart';
 import '../../../pipeline_chat/presentation/widgets/order_pipeline_chat_sheet.dart';
+import '../../../pipeline_chat/presentation/widgets/pipeline_chat_floating_action_button.dart';
 import '../../../stock/presentation/providers/stock_provider.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
 import '../../domain/entities/distribution_center.dart';
@@ -55,6 +59,7 @@ class _DCOperationsMobilePortalPageState
     ref.read(dcConsoleProvider.notifier).loadDriversFromDatabase();
     ref.read(stockProvider.notifier).fetchStockItems();
     ref.read(stockProvider.notifier).fetchStockTransfers();
+    ref.read(pipelineChatProvider.notifier).loadScopedConversations(silent: true);
     if (dcId != null && dcId.isNotEmpty) {
       await ref.read(ordersProvider.notifier).loadDcOrders(dcId);
     } else {
@@ -1221,6 +1226,30 @@ class _DCOperationsMobilePortalPageState
             ],
           ),
           actions: [
+            Consumer(
+              builder: (context, ref, _) {
+                final authUser = ref.watch(authProvider).user;
+                final role = authUser?.role ?? 'dc_operations';
+                final unreadCount = ref.watch(
+                  pipelineChatProvider.select((s) => s.getUnreadCountForRole(role)),
+                );
+                return IconButton(
+                  icon: Badge(
+                    isLabelVisible: unreadCount > 0,
+                    label: Text(
+                      '$unreadCount',
+                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                    ),
+                    backgroundColor: const Color(0xFFEF4444),
+                    child: const Icon(Icons.chat_bubble_outline_rounded, size: 20),
+                  ),
+                  tooltip: unreadCount > 0
+                      ? 'Order Pipeline Chats ($unreadCount unread)'
+                      : 'Order Pipeline Chats',
+                  onPressed: () => ConversationListModal.show(context),
+                );
+              },
+            ),
             IconButton(
               icon: const Icon(Icons.refresh_rounded, size: 20),
               tooltip: 'Refresh live orders',
@@ -1234,6 +1263,7 @@ class _DCOperationsMobilePortalPageState
           ],
         ),
       ),
+      floatingActionButton: const PipelineChatFloatingActionButton(),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF031632) : Colors.white,
@@ -1547,20 +1577,26 @@ class _DCOperationsMobilePortalPageState
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Text(
-                    '#${order.orderNumber}',
-                    style: GoogleFonts.inter(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+              Expanded(
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        '#${order.orderNumber}',
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  _buildOrderStatusBadge(order.status),
-                ],
+                    const SizedBox(width: 8),
+                    _buildOrderStatusBadge(order.status),
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               Text(
                 currencyFormat.format(order.totalAmount),
                 style: GoogleFonts.inter(
@@ -1731,15 +1767,45 @@ class _DCOperationsMobilePortalPageState
 
               const SizedBox(width: 8),
 
-              // Pipeline Chat Sheet
-              IconButton(
-                icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18, color: Color(0xFF0D9488)),
-                tooltip: 'Order Pipeline Chat',
-                style: IconButton.styleFrom(
-                  backgroundColor: const Color(0xFF0D9488).withValues(alpha: 0.1),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                onPressed: () => OrderPipelineChatSheet.showForOrder(context, order),
+              // Pipeline Chat Sheet with Real-time Order Unread Badge
+              Consumer(
+                builder: (context, ref, _) {
+                  final conv = ref.watch(
+                    pipelineChatProvider.select(
+                      (s) => s.recentConversations.cast<OrderConversationEntity?>().firstWhere(
+                            (c) => c?.orderId == order.id || (order.id.isNotEmpty && c?.orderNumber == order.orderNumber),
+                            orElse: () => null,
+                          ),
+                    ),
+                  );
+                  final unreadCount = conv?.unreadDcCount ?? 0;
+                  final hasUnread = unreadCount > 0;
+
+                  return IconButton(
+                    icon: Badge(
+                      isLabelVisible: hasUnread,
+                      label: Text(
+                        '$unreadCount',
+                        style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold),
+                      ),
+                      backgroundColor: const Color(0xFFEF4444),
+                      child: Icon(
+                        hasUnread ? Icons.chat_bubble_rounded : Icons.chat_bubble_outline_rounded,
+                        size: 18,
+                        color: hasUnread ? const Color(0xFFEF4444) : const Color(0xFF0D9488),
+                      ),
+                    ),
+                    tooltip: hasUnread
+                        ? 'Order Pipeline Chat ($unreadCount unread)'
+                        : 'Order Pipeline Chat',
+                    style: IconButton.styleFrom(
+                      backgroundColor: (hasUnread ? const Color(0xFFEF4444) : const Color(0xFF0D9488))
+                          .withValues(alpha: 0.1),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: () => OrderPipelineChatSheet.showForOrder(context, order),
+                  );
+                },
               ),
             ],
           ),

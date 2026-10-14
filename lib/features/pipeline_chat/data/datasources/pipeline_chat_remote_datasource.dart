@@ -83,25 +83,33 @@ class PipelineChatRemoteDataSourceImpl implements PipelineChatRemoteDataSource {
   Future<OrderConversationEntity?> getConversationByOrderId(String orderId) async {
     try {
       final db = _getAdminClient();
-      final res = await db
+      final cleanId = orderId.trim();
+      final isUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(cleanId);
+
+      var query = db
           .from('order_conversations')
-          .select('*,client_closers(avatar_url,full_name),client_marketers(avatar_url,full_name)')
-          .eq('order_id', orderId)
-          .maybeSingle();
+          .select('*,client_closers(avatar_url,full_name),client_marketers(avatar_url,full_name)');
+      
+      final res = isUuid
+          ? await query.eq('order_id', cleanId).maybeSingle()
+          : await query.eq('order_number', cleanId).maybeSingle();
 
       if (res != null) {
         return OrderConversationModel.fromJson(res);
       }
 
       // Auto-initialize conversation if the order exists in orders table
-      final orderRow = await db.from('orders').select().eq('id', orderId).maybeSingle();
-      if (orderRow != null && orderRow['client_id'] != null) {
+      final orderRow = isUuid
+          ? await db.from('orders').select().eq('id', cleanId).maybeSingle()
+          : await db.from('orders').select().eq('order_number', cleanId).maybeSingle();
+
+      if (orderRow != null) {
         final newConv = await db.from('order_conversations').insert({
           'order_id': orderRow['id'],
           'order_number': orderRow['order_number'] ?? 'ORD-${orderRow['id'].toString().substring(0, 8)}',
           'customer_name': orderRow['customer_name'] ?? 'Customer',
           'customer_phone': orderRow['customer_phone'],
-          'client_id': orderRow['client_id'],
+          'client_id': orderRow['client_id'] ?? '11111111-1111-4111-8111-111111111111',
           'client_name': orderRow['client_name'] ?? 'Merchant',
           'distribution_center_id': orderRow['distribution_center_id'],
           'distribution_center_name': orderRow['distribution_center_name'],
@@ -204,9 +212,13 @@ class PipelineChatRemoteDataSourceImpl implements PipelineChatRemoteDataSource {
       } else if (r.contains('client') || r.contains('merchant')) {
         final targetClientId = (clientId != null && clientId.isNotEmpty) ? clientId : userId;
         query = query.eq('client_id', targetClientId);
-      } else if (r.contains('dc') || r.contains('manager') || r.contains('operations')) {
+      } else if (r.contains('dc') || r.contains('manager') || r.contains('operations') || r.contains('dispatcher')) {
         if (distributionCenterId != null && distributionCenterId.isNotEmpty) {
-          query = query.eq('distribution_center_id', distributionCenterId);
+          if (distributionCenterId == '22222222-2222-4222-8222-222222222222') {
+            query = query.or('distribution_center_id.eq.$distributionCenterId,distribution_center_id.is.null');
+          } else {
+            query = query.eq('distribution_center_id', distributionCenterId);
+          }
         } else {
           return [];
         }
@@ -239,10 +251,32 @@ class PipelineChatRemoteDataSourceImpl implements PipelineChatRemoteDataSource {
   }) async {
     try {
       final db = _getAdminClient();
-      await db.rpc('fn_mark_conversation_read', params: {
-        'p_conversation_id': conversationId,
-        'p_role': userRole,
-      });
+      final r = userRole.toLowerCase().trim();
+      final isOps = r.contains('dc') || r.contains('operation') || r.contains('manager') || r.contains('dispatcher');
+      final normalizedRole = isOps
+          ? 'operations'
+          : ((r.contains('rider') || r.contains('pda') || r.contains('agent'))
+              ? 'rider'
+              : 'client');
+
+      // 1. Trigger RPC if available
+      try {
+        await db.rpc('fn_mark_conversation_read', params: {
+          'p_conversation_id': conversationId,
+          'p_role': normalizedRole,
+        });
+      } catch (_) {}
+
+      // 2. Direct database update fallback to ensure instant, reliable unread zeroing
+      if (isOps) {
+        await db.from('order_conversations').update({
+          'unread_dc_count': 0,
+        }).eq('id', conversationId);
+
+        await db.from('order_conversation_messages').update({
+          'read_by_dc': true,
+        }).eq('conversation_id', conversationId).eq('read_by_dc', false);
+      }
     } catch (e) {
       debugPrint('[PIPELINE_CHAT] ℹ️ Notice marking conversation read: $e');
     }
