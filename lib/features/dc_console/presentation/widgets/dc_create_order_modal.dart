@@ -587,7 +587,7 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                                 SmartOrderPasteModal.show(context);
                               },
                               icon: const Icon(Icons.flash_on_rounded, size: 14, color: Colors.white),
-                              label: const Text('Paste WhatsApp', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Colors.white)),
+                              label: const Text('Paste Orders', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Colors.white)),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF0D9488),
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),

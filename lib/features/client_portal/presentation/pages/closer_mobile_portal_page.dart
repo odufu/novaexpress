@@ -714,7 +714,7 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                               onPressed: () => SmartOrderPasteModal.show(context),
                               icon: const Icon(Icons.paste_rounded, size: 14, color: Colors.white),
                               label: Text(
-                                'Paste WhatsApp Order',
+                                'Paste Orders',
                                 style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w700, color: Colors.white),
                               ),
                               style: ElevatedButton.styleFrom(
@@ -1128,7 +1128,7 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                   ElevatedButton.icon(
                     onPressed: () => SmartOrderPasteModal.show(context),
                     icon: const Icon(Icons.paste_rounded, size: 16, color: Colors.white),
-                    label: Text('Paste WhatsApp Order', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white)),
+                    label: Text('Paste Orders', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF0D9488),
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
@@ -1178,7 +1178,7 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                     child: ElevatedButton.icon(
                       onPressed: () => SmartOrderPasteModal.show(context),
                       icon: const Icon(Icons.paste_rounded, size: 16, color: Colors.white),
-                      label: Text('⚡ Paste WhatsApp / CRM Order', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700, color: Colors.white)),
+                      label: Text('Paste Orders', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700, color: Colors.white)),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF0D9488),
                         padding: const EdgeInsets.symmetric(vertical: 12),
@@ -1493,7 +1493,7 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                       onPressed: () => SmartOrderPasteModal.show(context),
                       icon: const Icon(Icons.paste_rounded, size: 16, color: Color(0xFF0D9488)),
                       label: Text(
-                        'Paste WhatsApp',
+                        'Paste Orders',
                         style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700, color: const Color(0xFF0D9488)),
                       ),
                       style: OutlinedButton.styleFrom(
@@ -1567,7 +1567,7 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
-                      tooltip: 'Paste WhatsApp Order',
+                      tooltip: 'Paste Orders',
                       onPressed: () => SmartOrderPasteModal.show(context),
                       icon: const Icon(Icons.paste_rounded, size: 18, color: Color(0xFF0D9488)),
                       style: IconButton.styleFrom(

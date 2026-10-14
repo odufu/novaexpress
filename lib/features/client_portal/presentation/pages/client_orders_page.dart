@@ -163,7 +163,7 @@ class _ClientOrdersPageState extends ConsumerState<ClientOrdersPage> {
                     ),
                     onPressed: () => SmartOrderPasteModal.show(context),
                     icon: const Icon(Icons.paste_rounded, size: 16),
-                    label: Text('Paste WhatsApp', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
+                    label: Text('Paste Orders', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
                   ),
                   ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(

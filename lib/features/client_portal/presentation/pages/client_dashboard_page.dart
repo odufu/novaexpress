@@ -221,7 +221,7 @@ class ClientDashboardPage extends ConsumerWidget {
                       onPressed: () => SmartOrderPasteModal.show(context),
                       icon: const Icon(Icons.paste_rounded, size: 18),
                       label: Text(
-                        'Paste WhatsApp Order',
+                        'Paste Orders',
                         style: GoogleFonts.inter(fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -297,7 +297,7 @@ class ClientDashboardPage extends ConsumerWidget {
                     label: FittedBox(
                       fit: BoxFit.scaleDown,
                       child: Text(
-                        'Paste WhatsApp',
+                        'Paste Orders',
                         style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12.5),
                       ),
                     ),

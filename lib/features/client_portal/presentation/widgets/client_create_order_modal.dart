@@ -367,7 +367,7 @@ class _ClientCreateOrderModalState extends ConsumerState<ClientCreateOrderModal>
                     },
                     icon: const Icon(Icons.paste_rounded, size: 14),
                     label: Text(
-                      isCompact ? 'Paste' : 'Paste WhatsApp',
+                      isCompact ? 'Paste' : 'Paste Orders',
                       style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold),
                     ),
                     style: FilledButton.styleFrom(
