@@ -57,14 +57,19 @@ class OrderCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    order.orderNumber,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: AppColors.primary,
+                  Flexible(
+                    child: Text(
+                      order.orderNumber,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: AppColors.primary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
@@ -88,12 +93,16 @@ class OrderCard extends StatelessWidget {
                 children: [
                   const Icon(Icons.person_outline, size: 18, color: AppColors.textSecondaryDark),
                   const SizedBox(width: 8),
-                  Text(
-                    order.customerName,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
-                      color: AppColors.textPrimaryDark,
+                  Expanded(
+                    child: Text(
+                      order.customerName,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                        color: AppColors.textPrimaryDark,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
@@ -121,7 +130,7 @@ class OrderCard extends StatelessWidget {
                       color: order.isLocationVerified || order.locationConfidence == 'high'
                           ? const Color(0xFFDCFCE7)
                           : (order.locationConfidence == 'medium' ? const Color(0xFFFEF3C7) : const Color(0xFFFEE2E2)),
-                      borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
                       order.isLocationVerified
@@ -144,14 +153,19 @@ class OrderCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    order.isPod ? 'Pay on Delivery (POD)' : 'Prepaid',
-                    style: TextStyle(
-                      color: order.isPod ? AppColors.warning : AppColors.success,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
+                  Flexible(
+                    child: Text(
+                      order.isPod ? 'Pay on Delivery (POD)' : 'Prepaid',
+                      style: TextStyle(
+                        color: order.isPod ? AppColors.warning : AppColors.success,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  const SizedBox(width: 8),
                   Text(
                     CurrencyFormatter.formatNaira(order.totalAmount),
                     style: const TextStyle(

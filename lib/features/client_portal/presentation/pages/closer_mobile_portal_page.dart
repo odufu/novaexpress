@@ -1740,34 +1740,48 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
           // Order Header
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      order.orderNumber,
-                      style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w800, color: const Color(0xFFF37021)),
+                    Expanded(
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          ConstrainedBox(
+                            constraints: BoxConstraints(maxWidth: constraints.maxWidth - 85),
+                            child: Text(
+                              order.orderNumber,
+                              style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w800, color: const Color(0xFFF37021)),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: statusColor.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              statusLabel,
+                              style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w800, color: statusColor),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        statusLabel,
-                        style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w800, color: statusColor),
-                      ),
+                    Text(
+                      currencyFormatter.format(order.totalAmount),
+                      style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A)),
                     ),
                   ],
-                ),
-                Text(
-                  currencyFormatter.format(order.totalAmount),
-                  style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A)),
-                ),
-              ],
+                );
+              },
             ),
           ),
           Divider(height: 1, color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFF1F5F9)),
@@ -1814,7 +1828,10 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                 const SizedBox(height: 8),
 
                 // Product & Package Deal Badge
-                Row(
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -1834,24 +1851,20 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                         ],
                       ),
                     ),
-                    if (order.packageDealName != null && order.packageDealName!.isNotEmpty) ...[
-                      const SizedBox(width: 6),
-                      Flexible(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF10B981).withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            order.packageDealName!,
-                            style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: const Color(0xFF10B981)),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                    if (order.packageDealName != null && order.packageDealName!.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          order.packageDealName!,
+                          style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: const Color(0xFF10B981)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                    ],
                   ],
                 ),
 
@@ -1883,9 +1896,13 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                           const Icon(Icons.headset_mic_rounded, size: 14, color: Color(0xFF7C3AED)),
                           const SizedBox(width: 6),
                         ],
-                        Text(
-                          'Created by: ${order.closerName}',
-                          style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF7C3AED)),
+                        Flexible(
+                          child: Text(
+                            'Created by: ${order.closerName}',
+                            style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF7C3AED)),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ],
                     ),
