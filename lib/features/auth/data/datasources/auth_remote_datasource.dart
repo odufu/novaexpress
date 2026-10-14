@@ -191,7 +191,9 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
     if (clean == 'ops.wuse@novaxpress.ng' ||
         clean == 'ops@novaxpress.ng' ||
         clean == 'operations@novaxpress.ng' ||
-        clean == 'abigail@novaxpress.ng') {
+        clean == 'abigail@novaxpress.ng' ||
+        clean == 'ops-wuse-01-748' ||
+        clean == 'ops-wuse-01') {
       if (password != 'Password123!' &&
           password != 'OpsPass123!' &&
           password != 'bG5y2mZdrW') {
@@ -667,6 +669,27 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
               .eq('id', agentRes['user_id'])
               .maybeSingle();
         }
+      }
+
+      // If not found in users table, check local cached operations officers
+      if (userRes == null) {
+        try {
+          final cachedOps =
+              await LocalStorageServiceImpl().getCachedOperationsOfficers();
+          if (cachedOps != null) {
+            final match = cachedOps
+                .where((o) =>
+                    o.email.toLowerCase() == lookupEmail ||
+                    (resolvedAgentCode != null &&
+                        o.staffCode.toUpperCase() == resolvedAgentCode))
+                .firstOrNull;
+            if (match != null) {
+              debugPrint(
+                  '[AUTH_DATASOURCE] ⚡ Found officer in local storage cache: ${match.email} (${match.staffCode})');
+              return await _fetchUserProfile(match.id, match.email);
+            }
+          }
+        } catch (_) {}
       }
 
       if (userRes != null) {
