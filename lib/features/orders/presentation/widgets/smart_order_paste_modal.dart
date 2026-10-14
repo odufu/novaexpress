@@ -427,7 +427,10 @@ Closer phone: 08160322891''';
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Quick Action Bar
-                    Row(
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         FilledButton.icon(
                           onPressed: _pasteFromClipboard,
@@ -436,11 +439,10 @@ Closer phone: 08160322891''';
                           style: FilledButton.styleFrom(
                             backgroundColor: const Color(0xFF0D9488),
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            padding: EdgeInsets.symmetric(horizontal: isCompact ? 12 : 14, vertical: 10),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           ),
                         ),
-                        const SizedBox(width: 8),
                         OutlinedButton.icon(
                           onPressed: _loadSampleText,
                           icon: const Icon(Icons.auto_awesome_rounded, size: 16, color: Color(0xFFF37021)),
@@ -450,11 +452,10 @@ Closer phone: 08160322891''';
                           ),
                           style: OutlinedButton.styleFrom(
                             side: const BorderSide(color: Color(0xFFF37021)),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            padding: EdgeInsets.symmetric(horizontal: isCompact ? 10 : 12, vertical: 8),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           ),
                         ),
-                        const Spacer(),
                         if (_textController.text.isNotEmpty)
                           TextButton.icon(
                             onPressed: () {
@@ -528,12 +529,14 @@ Closer phone: 08160322891''';
                                 children: [
                                   const Icon(Icons.warning_amber_rounded, color: Color(0xFFB45309), size: 20),
                                   const SizedBox(width: 8),
-                                  Text(
-                                    'Review Required Notice',
-                                    style: GoogleFonts.inter(
-                                      fontWeight: FontWeight.bold,
-                                      color: const Color(0xFFB45309),
-                                      fontSize: 13,
+                                  Expanded(
+                                    child: Text(
+                                      'Review Required Notice',
+                                      style: GoogleFonts.inter(
+                                        fontWeight: FontWeight.bold,
+                                        color: const Color(0xFFB45309),
+                                        fontSize: 13,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -572,41 +575,51 @@ Closer phone: 08160322891''';
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF0D9488).withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    'Parsed Order Summary',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      color: const Color(0xFF0D9488),
-                                    ),
-                                  ),
-                                ),
-                                const Spacer(),
-                                if (_parsedOrder!.orderNumber != null)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFF1F5F9),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      'CRM ID: ${_parsedOrder!.orderNumber}',
-                                      style: GoogleFonts.firaCode(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                        color: const Color(0xFF475569),
+                            LayoutBuilder(
+                              builder: (context, constraints) {
+                                return Wrap(
+                                  spacing: 8,
+                                  runSpacing: 6,
+                                  alignment: WrapAlignment.spaceBetween,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF0D9488).withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        'Parsed Order Summary',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: const Color(0xFF0D9488),
+                                        ),
                                       ),
                                     ),
-                                  ),
-                              ],
+                                    if (_parsedOrder!.orderNumber != null)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        constraints: BoxConstraints(maxWidth: constraints.maxWidth),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF1F5F9),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          'CRM ID: ${_parsedOrder!.orderNumber}',
+                                          style: GoogleFonts.firaCode(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                            color: const Color(0xFF475569),
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                  ],
+                                );
+                              },
                             ),
                             const SizedBox(height: 16),
 
@@ -853,9 +866,13 @@ Closer phone: 08160322891''';
                                   children: [
                                     const Icon(Icons.badge_outlined, size: 16, color: Color(0xFF475569)),
                                     const SizedBox(width: 8),
-                                    Text(
-                                      'Closer: ${_parsedOrder!.closerName ?? "N/A"} (${_parsedOrder!.closerPhone ?? "N/A"})',
-                                      style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF334155), fontWeight: FontWeight.w500),
+                                    Expanded(
+                                      child: Text(
+                                        'Closer: ${_parsedOrder!.closerName ?? "N/A"} (${_parsedOrder!.closerPhone ?? "N/A"})',
+                                        style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF334155), fontWeight: FontWeight.w500),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -924,50 +941,111 @@ Closer phone: 08160322891''';
                   bottomRight: Radius.circular(16),
                 ),
               ),
-              child: Row(
-                children: [
-                  OutlinedButton(
-                    onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFFCBD5E1)),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              child: isCompact
+                  ? Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        FilledButton.icon(
+                          onPressed: (_isSubmitting || _parsedOrder == null) ? null : _submitParsedOrder,
+                          icon: _isSubmitting
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                )
+                              : const Icon(Icons.check_circle_rounded, size: 18),
+                          label: Text(
+                            _isSubmitting ? 'Creating Order...' : 'Confirm & Create Order',
+                            style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF0D9488),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
+                                style: OutlinedButton.styleFrom(
+                                  side: const BorderSide(color: Color(0xFFCBD5E1)),
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                child: Text('Cancel', style: GoogleFonts.inter(color: const Color(0xFF64748B), fontSize: 12)),
+                              ),
+                            ),
+                            if (_parsedOrder != null) ...[
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: _isSubmitting ? null : _openInFullForm,
+                                  icon: const Icon(Icons.edit_note_rounded, size: 16, color: Color(0xFF0D9488)),
+                                  label: Text(
+                                    'Full Form',
+                                    style: GoogleFonts.inter(color: const Color(0xFF0D9488), fontSize: 12, fontWeight: FontWeight.w600),
+                                  ),
+                                  style: OutlinedButton.styleFrom(
+                                    side: const BorderSide(color: Color(0xFF0D9488)),
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 11),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        OutlinedButton(
+                          onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFFCBD5E1)),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          child: Text('Cancel', style: GoogleFonts.inter(color: const Color(0xFF64748B))),
+                        ),
+                        const SizedBox(width: 8),
+                        if (_parsedOrder != null)
+                          TextButton.icon(
+                            onPressed: _isSubmitting ? null : _openInFullForm,
+                            icon: const Icon(Icons.edit_note_rounded, size: 18, color: Color(0xFF0D9488)),
+                            label: Text(
+                              'Open in Full Form',
+                              style: GoogleFonts.inter(color: const Color(0xFF0D9488), fontSize: 13, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        const Spacer(),
+                        FilledButton.icon(
+                          onPressed: (_isSubmitting || _parsedOrder == null) ? null : _submitParsedOrder,
+                          icon: _isSubmitting
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                )
+                              : const Icon(Icons.check_circle_rounded, size: 18),
+                          label: Text(
+                            _isSubmitting ? 'Creating Order...' : 'Confirm & Create Order',
+                            style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF0D9488),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                        ),
+                      ],
                     ),
-                    child: Text('Cancel', style: GoogleFonts.inter(color: const Color(0xFF64748B))),
-                  ),
-                  const SizedBox(width: 8),
-                  if (_parsedOrder != null)
-                    TextButton.icon(
-                      onPressed: _isSubmitting ? null : _openInFullForm,
-                      icon: const Icon(Icons.edit_note_rounded, size: 18, color: Color(0xFF0D9488)),
-                      label: Text(
-                        'Open in Full Form',
-                        style: GoogleFonts.inter(color: const Color(0xFF0D9488), fontSize: 13, fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  const Spacer(),
-                  FilledButton.icon(
-                    onPressed: (_isSubmitting || _parsedOrder == null) ? null : _submitParsedOrder,
-                    icon: _isSubmitting
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                          )
-                        : const Icon(Icons.check_circle_rounded, size: 18),
-                    label: Text(
-                      _isSubmitting ? 'Creating Order...' : 'Confirm & Create Order',
-                      style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13),
-                    ),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF0D9488),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                  ),
-                ],
-              ),
             ),
           ],
         ),
