@@ -7,6 +7,7 @@ import '../../../dc_console/domain/entities/product_package.dart';
 import '../providers/client_portal_provider.dart';
 import '../widgets/client_create_order_modal.dart';
 import '../widgets/client_order_tracking_modal.dart';
+import '../../../orders/presentation/widgets/smart_order_paste_modal.dart';
 import '../widgets/client_daily_accumulator_modal.dart';
 import '../widgets/client_add_package_modal.dart';
 import '../widgets/client_raise_stock_invoice_modal.dart';
@@ -210,6 +211,21 @@ class ClientDashboardPage extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(width: 10),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0F766E),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: () => SmartOrderPasteModal.show(context),
+                      icon: const Icon(Icons.paste_rounded, size: 18),
+                      label: Text(
+                        'Paste WhatsApp Order',
+                        style: GoogleFonts.inter(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
                     OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(
                         foregroundColor: isDark ? Colors.white : const Color(0xFF0F172A),
@@ -262,6 +278,26 @@ class ClientDashboardPage extends ConsumerWidget {
                       fit: BoxFit.scaleDown,
                       child: Text(
                         'Create Order',
+                        style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12.5),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0F766E),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: () => SmartOrderPasteModal.show(context),
+                    icon: const Icon(Icons.paste_rounded, size: 16),
+                    label: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'Paste WhatsApp',
                         style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12.5),
                       ),
                     ),

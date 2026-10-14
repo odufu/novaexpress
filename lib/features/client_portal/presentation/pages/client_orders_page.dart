@@ -10,6 +10,7 @@ import '../../../../core/helpers/formatters.dart';
 import '../widgets/client_daily_accumulator_modal.dart';
 import '../widgets/client_create_order_modal.dart';
 import '../widgets/pangea_excel_data_table.dart';
+import '../../../orders/presentation/widgets/smart_order_paste_modal.dart';
 import '../../../pipeline_chat/presentation/widgets/order_pipeline_chat_sheet.dart';
 
 class ClientOrdersPage extends ConsumerStatefulWidget {
@@ -152,6 +153,17 @@ class _ClientOrdersPageState extends ConsumerState<ClientOrdersPage> {
                       'Bulk CSV',
                       style: GoogleFonts.inter(fontSize: 12, color: isDark ? Colors.white : const Color(0xFF475569)),
                     ),
+                  ),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF0D9488),
+                      side: const BorderSide(color: Color(0xFF0D9488)),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onPressed: () => SmartOrderPasteModal.show(context),
+                    icon: const Icon(Icons.paste_rounded, size: 16),
+                    label: Text('Paste WhatsApp', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
                   ),
                   ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(

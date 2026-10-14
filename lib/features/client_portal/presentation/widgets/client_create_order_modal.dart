@@ -9,6 +9,7 @@ import '../../../dc_console/presentation/providers/dc_console_provider.dart';
 import '../../../dc_console/presentation/providers/product_catalog_provider.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../../../orders/domain/services/order_routing_service.dart';
+import '../../../orders/presentation/widgets/smart_order_paste_modal.dart';
 import '../providers/client_portal_provider.dart';
 
 class ClientCreateOrderModal extends ConsumerStatefulWidget {
@@ -356,6 +357,25 @@ class _ClientCreateOrderModalState extends ConsumerState<ClientCreateOrderModal>
                           ),
                         ),
                       ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      SmartOrderPasteModal.show(context);
+                    },
+                    icon: const Icon(Icons.paste_rounded, size: 14),
+                    label: Text(
+                      isCompact ? 'Paste' : 'Paste WhatsApp',
+                      style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold),
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF0D9488),
+                      foregroundColor: Colors.white,
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
                   ),
                   IconButton(

@@ -19,6 +19,7 @@ import '../widgets/client_convert_lead_modal.dart';
 import '../widgets/client_create_order_modal.dart';
 import '../widgets/client_order_tracking_modal.dart';
 import '../widgets/closer_create_package_modal.dart';
+import '../../../orders/presentation/widgets/smart_order_paste_modal.dart';
 import '../../../dc_console/domain/entities/product_package.dart';
 import '../../../dc_console/presentation/providers/product_catalog_provider.dart';
 import '../../../pipeline_chat/presentation/widgets/order_pipeline_chat_sheet.dart';
@@ -687,19 +688,44 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                     )
                   : SizedBox(
                       width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: () => ClientCreateOrderModal.show(context),
-                        icon: const Icon(Icons.add_shopping_cart_rounded, size: 15, color: Colors.white),
-                        label: Text(
-                          'Book New Order',
-                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: brandPrimary,
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          elevation: 0,
-                        ),
+                      child: Column(
+                        children: [
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: () => ClientCreateOrderModal.show(context),
+                              icon: const Icon(Icons.add_shopping_cart_rounded, size: 15, color: Colors.white),
+                              label: Text(
+                                'Book New Order',
+                                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: brandPrimary,
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                elevation: 0,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: () => SmartOrderPasteModal.show(context),
+                              icon: const Icon(Icons.paste_rounded, size: 14, color: Colors.white),
+                              label: Text(
+                                'Paste WhatsApp Order',
+                                style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w700, color: Colors.white),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF0D9488),
+                                padding: const EdgeInsets.symmetric(vertical: 9),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                elevation: 0,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
             ),
@@ -1100,6 +1126,17 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                 runSpacing: 10,
                 children: [
                   ElevatedButton.icon(
+                    onPressed: () => SmartOrderPasteModal.show(context),
+                    icon: const Icon(Icons.paste_rounded, size: 16, color: Colors.white),
+                    label: Text('Paste WhatsApp Order', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0D9488),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      elevation: 0,
+                    ),
+                  ),
+                  ElevatedButton.icon(
                     onPressed: () => ClientCreateOrderModal.show(context),
                     icon: const Icon(Icons.add_shopping_cart_rounded, size: 16, color: Colors.white),
                     label: Text('Book New Order', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white)),
@@ -1134,43 +1171,62 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                 ],
               )
             else
-              Row(
+              Column(
                 children: [
-                  Expanded(
+                  SizedBox(
+                    width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: () => ClientCreateOrderModal.show(context),
-                      icon: const Icon(Icons.add_shopping_cart_rounded, size: 16, color: Colors.white),
-                      label: Text('Book Order', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
+                      onPressed: () => SmartOrderPasteModal.show(context),
+                      icon: const Icon(Icons.paste_rounded, size: 16, color: Colors.white),
+                      label: Text('⚡ Paste WhatsApp / CRM Order', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700, color: Colors.white)),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFF37021),
+                        backgroundColor: const Color(0xFF0D9488),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         elevation: 0,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => CloserCreatePackageModal.show(context),
-                      icon: const Icon(Icons.card_giftcard_rounded, size: 16, color: Color(0xFFF37021)),
-                      label: Text('New Package', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: const Color(0xFFF37021))),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        side: const BorderSide(color: Color(0xFFF37021)),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () => ClientCreateOrderModal.show(context),
+                          icon: const Icon(Icons.add_shopping_cart_rounded, size: 16, color: Colors.white),
+                          label: Text('Book Order', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFF37021),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            elevation: 0,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    tooltip: 'Dial Leads',
-                    onPressed: () => ref.read(closerActiveTabProvider.notifier).state = 3,
-                    icon: const Icon(Icons.phone_in_talk_rounded, color: Color(0xFF10B981)),
-                    style: IconButton.styleFrom(
-                      backgroundColor: const Color(0xFF10B981).withValues(alpha: 0.12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => CloserCreatePackageModal.show(context),
+                          icon: const Icon(Icons.card_giftcard_rounded, size: 16, color: Color(0xFFF37021)),
+                          label: Text('New Package', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: const Color(0xFFF37021))),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            side: const BorderSide(color: Color(0xFFF37021)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        tooltip: 'Dial Leads',
+                        onPressed: () => ref.read(closerActiveTabProvider.notifier).state = 3,
+                        icon: const Icon(Icons.phone_in_talk_rounded, color: Color(0xFF10B981)),
+                        style: IconButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981).withValues(alpha: 0.12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -1433,6 +1489,20 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                       ),
                     ),
                     const SizedBox(width: 14),
+                    OutlinedButton.icon(
+                      onPressed: () => SmartOrderPasteModal.show(context),
+                      icon: const Icon(Icons.paste_rounded, size: 16, color: Color(0xFF0D9488)),
+                      label: Text(
+                        'Paste WhatsApp',
+                        style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700, color: const Color(0xFF0D9488)),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFF0D9488)),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     ElevatedButton.icon(
                       onPressed: () => ClientCreateOrderModal.show(context),
                       icon: const Icon(Icons.add_circle_outline_rounded, size: 16, color: Colors.white),
@@ -1472,7 +1542,7 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
             ),
           )
         else ...[
-          // Top Action Bar: Scope Selector + Book Order Button
+          // Top Action Bar: Scope Selector + Action Buttons
           Container(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             color: isDark ? const Color(0xFF151D36) : Colors.white,
@@ -1493,19 +1563,34 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                     ],
                   ),
                 ),
-                ElevatedButton.icon(
-                  onPressed: () => ClientCreateOrderModal.show(context),
-                  icon: const Icon(Icons.add_circle_outline_rounded, size: 15, color: Colors.white),
-                  label: Text(
-                    '+ Book Order',
-                    style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w700, color: Colors.white),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFF37021),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    elevation: 0,
-                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: 'Paste WhatsApp Order',
+                      onPressed: () => SmartOrderPasteModal.show(context),
+                      icon: const Icon(Icons.paste_rounded, size: 18, color: Color(0xFF0D9488)),
+                      style: IconButton.styleFrom(
+                        backgroundColor: const Color(0xFF0D9488).withValues(alpha: 0.12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    ElevatedButton.icon(
+                      onPressed: () => ClientCreateOrderModal.show(context),
+                      icon: const Icon(Icons.add_circle_outline_rounded, size: 15, color: Colors.white),
+                      label: Text(
+                        '+ Book Order',
+                        style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w700, color: Colors.white),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFF37021),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        elevation: 0,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

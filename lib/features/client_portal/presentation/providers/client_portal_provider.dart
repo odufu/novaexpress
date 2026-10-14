@@ -2657,12 +2657,16 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
     String? closerAvatarUrl,
     String? leadId,
     String? notes,
+    String? customOrderNumber,
   }) async {
     state = state.copyWith(isLoading: true);
     try {
       final orderId = _generateUuid();
       final randomSuffix = (1000 + math.Random().nextInt(8999)).toString();
-      final orderNumber = 'NOV-${DateTime.now().year}-$randomSuffix';
+      final generatedOrderNum = 'NOV-${DateTime.now().year}-$randomSuffix';
+      final orderNumber = (customOrderNumber != null && customOrderNumber.trim().isNotEmpty)
+          ? customOrderNumber.trim()
+          : generatedOrderNum;
 
       // 1. Gather all Distribution Centers and Drivers from DCConsoleProvider
       final dcState = _ref.read(dcConsoleProvider);

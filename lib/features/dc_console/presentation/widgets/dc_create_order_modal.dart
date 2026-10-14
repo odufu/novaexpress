@@ -13,6 +13,7 @@ import '../../domain/entities/product_package.dart';
 import '../providers/dc_console_provider.dart';
 import '../providers/product_catalog_provider.dart';
 import 'dc_csv_order_import_modal.dart';
+import '../../../orders/presentation/widgets/smart_order_paste_modal.dart';
 
 class DCCreateOrderDraftState {
   final String selectedState;
@@ -544,6 +545,51 @@ class _DCCreateOrderModalState extends ConsumerState<DCCreateOrderModal> {
                               label: const Text('Import CSV', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Colors.white)),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF2563EB),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // WhatsApp / CRM Text Paste Banner
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0D9488).withValues(alpha: isDark ? 0.15 : 0.08),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF0D9488).withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.paste_rounded, color: Color(0xFF0D9488), size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Pasting an order copied from WhatsApp or CRM?',
+                                    style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF0D9488)),
+                                  ),
+                                  Text(
+                                    'Paste the raw text directly to auto-fill customer, city, and product details.',
+                                    style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                SmartOrderPasteModal.show(context);
+                              },
+                              icon: const Icon(Icons.flash_on_rounded, size: 14, color: Colors.white),
+                              label: const Text('Paste WhatsApp', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Colors.white)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF0D9488),
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               ),
