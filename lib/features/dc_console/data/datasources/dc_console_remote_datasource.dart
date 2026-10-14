@@ -138,6 +138,35 @@ abstract class DCConsoleRemoteDataSource {
     String? bankAccountNumber,
     String? bankAccountName,
   });
+  Future<ClientProfile> updateClientFullProfileAndTariffs({
+    required String clientId,
+    required String companyName,
+    required String contactPerson,
+    required String email,
+    required String phone,
+    required String address,
+    required String city,
+    required String stateName,
+    required String tier,
+    required int closerLimit,
+    required bool hasInventoryManagement,
+    required List<String> servicesEnabled,
+    required List<String> operatingStates,
+    String? logoUrl,
+    String? primaryColor,
+    String? secondaryColor,
+    String? accentColor,
+    double? customDeliveryFee,
+    double? customFailedAttemptFee,
+    double? customPlatformFee,
+    String? bankName,
+    String? bankAccountNumber,
+    String? bankAccountName,
+    String? settlementFrequency,
+    String? settlementDay,
+    bool? isActive,
+  });
+  Future<void> toggleClientActiveStatus(String clientId, bool isActive);
 }
 
 class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
@@ -1265,11 +1294,9 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
         'custom_delivery_fee': customDeliveryFee,
         'custom_failed_attempt_fee': customFailedAttemptFee,
         'custom_platform_fee': customPlatformFee,
-        'custom_platform_fee_value': customPlatformFee,
         if (bankName != null && bankName.trim().isNotEmpty) 'bank_name': bankName.trim(),
         if (bankAccountNumber != null && bankAccountNumber.trim().isNotEmpty) 'account_number': bankAccountNumber.trim(),
         if (bankAccountName != null && bankAccountName.trim().isNotEmpty) 'account_name': bankAccountName.trim(),
-        'updated_at': DateTime.now().toIso8601String(),
       };
 
       final response = await adminDb
@@ -1285,5 +1312,133 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
       debugPrint('[DC_CONSOLE] ❌ updateClientFinancialTariffs error: $e');
       rethrow;
     }
+  }
+
+  @override
+  Future<ClientProfile> updateClientFullProfileAndTariffs({
+    required String clientId,
+    required String companyName,
+    required String contactPerson,
+    required String email,
+    required String phone,
+    required String address,
+    required String city,
+    required String stateName,
+    required String tier,
+    required int closerLimit,
+    required bool hasInventoryManagement,
+    required List<String> servicesEnabled,
+    required List<String> operatingStates,
+    String? logoUrl,
+    String? primaryColor,
+    String? secondaryColor,
+    String? accentColor,
+    double? customDeliveryFee,
+    double? customFailedAttemptFee,
+    double? customPlatformFee,
+    String? bankName,
+    String? bankAccountNumber,
+    String? bankAccountName,
+    String? settlementFrequency,
+    String? settlementDay,
+    bool? isActive,
+  }) async {
+    final adminDb = _getAdminClient();
+    final isEnt = tier.toLowerCase().contains('ent');
+    final cleanName = companyName.trim();
+    final cleanPerson = contactPerson.trim();
+    final cleanEmail = email.trim();
+    final cleanPhone = phone.trim();
+    final cleanAddress = address.trim();
+    final cleanCity = city.trim();
+    final cleanState = stateName.trim();
+
+    final updatePayload = <String, dynamic>{
+      'company_name': cleanName,
+      'name': cleanName,
+      'contact_person': cleanPerson,
+      'email': cleanEmail,
+      'phone': cleanPhone,
+      'address': cleanAddress,
+      'city': cleanCity,
+      'state': cleanState,
+      'tier': tier,
+      'is_enterprise': isEnt,
+      'closer_limit': closerLimit,
+      'has_inventory_management': hasInventoryManagement,
+      'services_enabled': servicesEnabled,
+      'operating_states': operatingStates,
+      if (logoUrl != null && logoUrl.isNotEmpty) 'logo_url': logoUrl,
+      'brand_color_primary': primaryColor ?? '#0D9488',
+      'brand_color_secondary': secondaryColor ?? '#031632',
+      'brand_color_accent': accentColor ?? '#10B981',
+      'primary_color': primaryColor ?? '#0D9488',
+      'secondary_color': secondaryColor ?? '#031632',
+      'accent_color': accentColor ?? '#10B981',
+      'brand_theme': {
+        'primary': primaryColor ?? '#0D9488',
+        'secondary': secondaryColor ?? '#031632',
+        'accent': accentColor ?? '#10B981',
+      },
+      if (customDeliveryFee != null) 'custom_delivery_fee': customDeliveryFee,
+      if (customFailedAttemptFee != null) 'custom_failed_attempt_fee': customFailedAttemptFee,
+      if (customPlatformFee != null) 'custom_platform_fee': customPlatformFee,
+      if (bankName != null && bankName.trim().isNotEmpty) 'bank_name': bankName.trim(),
+      if (bankAccountNumber != null && bankAccountNumber.trim().isNotEmpty) 'account_number': bankAccountNumber.trim(),
+      if (bankAccountName != null && bankAccountName.trim().isNotEmpty) 'account_name': bankAccountName.trim(),
+      if (settlementFrequency != null && settlementFrequency.trim().isNotEmpty) 'settlement_frequency': settlementFrequency.trim(),
+      if (settlementDay != null && settlementDay.trim().isNotEmpty) 'settlement_day': settlementDay.trim(),
+      if (isActive != null) 'is_active': isActive,
+    };
+
+    dynamic response;
+    try {
+      response = await adminDb
+          .from('clients')
+          .update(updatePayload)
+          .eq('id', clientId)
+          .select('*, client_closers(id, is_active)')
+          .single();
+    } catch (selErr) {
+      debugPrint('[DC_DATASOURCE] ℹ️ Nested select notice, falling back to flat select: $selErr');
+      response = await adminDb
+          .from('clients')
+          .update(updatePayload)
+          .eq('id', clientId)
+          .select('*')
+          .single();
+    }
+
+    // Synchronize client admin in users table if exists
+    try {
+      final nameParts = cleanPerson.split(' ');
+      final fName = nameParts.isNotEmpty ? nameParts.first : cleanPerson;
+      final lName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+      final userUpdates = <String, dynamic>{
+        if (cleanEmail.isNotEmpty) 'email': cleanEmail,
+        if (cleanPhone.isNotEmpty) 'phone_number': cleanPhone,
+        if (fName.isNotEmpty) 'first_name': fName,
+        if (lName.isNotEmpty) 'last_name': lName,
+        if (logoUrl != null && logoUrl.isNotEmpty) 'avatar_url': logoUrl,
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+      await adminDb
+          .from('users')
+          .update(userUpdates)
+          .eq('client_id', clientId)
+          .eq('role', 'client');
+    } catch (e) {
+      debugPrint('[DC_DATASOURCE] ℹ️ Optional user record synchronization notice: $e');
+    }
+
+    debugPrint('[DC_DATASOURCE] ✅ Successfully persisted full profile for client "$cleanName" ($clientId)');
+    return ClientProfile.fromJson(Map<String, dynamic>.from(response as Map));
+  }
+
+  @override
+  Future<void> toggleClientActiveStatus(String clientId, bool isActive) async {
+    final adminDb = _getAdminClient();
+    await adminDb.from('clients').update({'is_active': isActive}).eq('id', clientId);
+    debugPrint('[DC_DATASOURCE] ✅ Successfully persisted is_active=$isActive for client $clientId');
   }
 }

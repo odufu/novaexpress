@@ -544,6 +544,7 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     final cachedReturns = await _storageService.getCachedReturnItems();
     final cachedPayouts = await _storageService.getCachedPayoutClaims();
     final cachedTxns = await _storageService.getCachedDcTransactions();
+    final cachedClients = await _storageService.getCachedClients();
 
     if (isTestEnvironment && state.drivers.isNotEmpty) {
       return;
@@ -558,6 +559,7 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
       returnItems: cachedReturns ?? state.returnItems,
       payoutClaims: cachedPayouts ?? state.payoutClaims,
       transactions: cachedTxns ?? state.transactions,
+      clients: (cachedClients != null && cachedClients.isNotEmpty) ? cachedClients : state.clients,
     );
 
     // Register all cached drivers into AuthRemoteDataSource in-memory store
@@ -727,6 +729,7 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
       final dbClients = await _repository.getClients();
       if (dbClients.isNotEmpty) {
         state = state.copyWith(clients: dbClients);
+        await _storageService.cacheClients(dbClients);
         debugPrint('[DC_CONSOLE] ⚡ Loaded ${dbClients.length} registered clients via repository.');
       } else {
         state = state.copyWith(clients: defaultRegisteredClients);
@@ -997,125 +1000,71 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     bool? isActive,
   }) async {
     try {
+      ClientProfile updatedClient;
       if (!isTestEnvironment) {
-        try {
-          final db = Supabase.instance.client;
-          // 1. Authoritative direct PostgREST update to clients table
-          final updatePayload = <String, dynamic>{
-            'company_name': companyName,
-            'name': companyName,
-            'contact_person': contactPerson,
-            'email': email,
-            'phone': phone,
-            'address': address,
-            'city': city,
-            'state': stateName,
-            'tier': tier,
-            'closer_limit': closerLimit,
-            'has_inventory_management': hasInventoryManagement,
-            'services_enabled': servicesEnabled,
-            'operating_states': operatingStates,
-            if (logoUrl != null && logoUrl.isNotEmpty) 'logo_url': logoUrl,
-            'brand_color_primary': primaryColor,
-            'brand_color_secondary': secondaryColor,
-            'brand_color_accent': accentColor,
-            'brand_theme': {
-              'primary': primaryColor ?? '#0D9488',
-              'secondary': secondaryColor ?? '#031632',
-              'accent': accentColor ?? '#10B981',
-            },
-            'custom_delivery_fee': customDeliveryFee,
-            'custom_failed_attempt_fee': customFailedAttemptFee,
-            'custom_platform_fee': customPlatformFee,
-            'bank_name': bankName,
-            'account_number': bankAccountNumber,
-            'account_name': bankAccountName,
-            'settlement_frequency': settlementFrequency,
-            'settlement_day': settlementDay,
-            if (isActive != null) 'is_active': isActive,
-            'updated_at': DateTime.now().toIso8601String(),
-          };
-          await db.from('clients').update(updatePayload).eq('id', clientId);
-          debugPrint('[DC_CONSOLE_PROVIDER] ✅ Authoritatively updated clients table for $clientId');
-
-          // 2. Also synchronize client admin avatar in users table
-          if (logoUrl != null && logoUrl.isNotEmpty) {
-            try {
-              await db.from('users').update({
-                'avatar_url': logoUrl,
-              }).or('client_id.eq.$clientId,email.eq.$email');
-            } catch (_) {}
-          }
-
-          // 3. Attempt RPC for backward-compatible triggers if installed
-          final rpcParams = <String, dynamic>{
-            'p_client_id': clientId,
-            'p_company_name': companyName,
-            'p_contact_person': contactPerson,
-            'p_email': email,
-            'p_phone': phone,
-            'p_address': address,
-            'p_city': city,
-            'p_state': stateName,
-            'p_tier': tier,
-            'p_closer_limit': closerLimit,
-            'p_has_inventory_management': hasInventoryManagement,
-            'p_services_enabled': servicesEnabled,
-            'p_operating_states': operatingStates,
-            'p_logo_url': logoUrl,
-            'p_primary_color': primaryColor,
-            'p_secondary_color': secondaryColor,
-            'p_accent_color': accentColor,
-            'p_custom_delivery_fee': customDeliveryFee,
-            'p_custom_failed_attempt_fee': customFailedAttemptFee,
-            'p_custom_platform_fee': customPlatformFee,
-            'p_bank_name': bankName,
-            'p_account_number': bankAccountNumber,
-            'p_account_name': bankAccountName,
-            'p_settlement_frequency': settlementFrequency,
-            'p_settlement_day': settlementDay,
-          };
-          if (isActive != null) {
-            rpcParams['p_is_active'] = isActive;
-          }
-          await db.rpc('fn_update_client_profile_and_tariffs', params: rpcParams);
-        } catch (dbErr) {
-          debugPrint('[DC_CONSOLE_PROVIDER] ℹ️ Client update notification: $dbErr');
-        }
+        updatedClient = await _repository.updateClientFullProfileAndTariffs(
+          clientId: clientId,
+          companyName: companyName,
+          contactPerson: contactPerson,
+          email: email,
+          phone: phone,
+          address: address,
+          city: city,
+          stateName: stateName,
+          tier: tier,
+          closerLimit: closerLimit,
+          hasInventoryManagement: hasInventoryManagement,
+          servicesEnabled: servicesEnabled,
+          operatingStates: operatingStates,
+          logoUrl: logoUrl,
+          primaryColor: primaryColor,
+          secondaryColor: secondaryColor,
+          accentColor: accentColor,
+          customDeliveryFee: customDeliveryFee,
+          customFailedAttemptFee: customFailedAttemptFee,
+          customPlatformFee: customPlatformFee,
+          bankName: bankName,
+          bankAccountNumber: bankAccountNumber,
+          bankAccountName: bankAccountName,
+          settlementFrequency: settlementFrequency,
+          settlementDay: settlementDay,
+          isActive: isActive,
+        );
+      } else {
+        final current = state.clients.firstWhere((c) => c.id == clientId, orElse: () => state.clients.first);
+        updatedClient = current.copyWith(
+          companyName: companyName,
+          contactPerson: contactPerson,
+          email: email,
+          phone: phone,
+          address: address,
+          city: city,
+          state: stateName,
+          tier: tier,
+          closerLimit: closerLimit,
+          isEnterprise: tier == 'enterprise',
+          hasInventoryManagement: hasInventoryManagement,
+          servicesEnabled: servicesEnabled,
+          operatingStates: operatingStates,
+          logoUrl: logoUrl,
+          primaryColor: primaryColor,
+          secondaryColor: secondaryColor,
+          accentColor: accentColor,
+          customDeliveryFee: customDeliveryFee,
+          customFailedAttemptFee: customFailedAttemptFee,
+          customPlatformFeeValue: customPlatformFee,
+          bankName: bankName,
+          accountNumber: bankAccountNumber,
+          accountName: bankAccountName,
+          settlementFrequency: settlementFrequency,
+          settlementDay: settlementDay,
+          isActive: isActive ?? current.isActive,
+        );
       }
-
-      final current = state.clients.firstWhere((c) => c.id == clientId, orElse: () => state.clients.first);
-      final updatedClient = current.copyWith(
-        companyName: companyName,
-        contactPerson: contactPerson,
-        email: email,
-        phone: phone,
-        address: address,
-        city: city,
-        state: stateName,
-        tier: tier,
-        closerLimit: closerLimit,
-        isEnterprise: tier == 'enterprise',
-        hasInventoryManagement: hasInventoryManagement,
-        servicesEnabled: servicesEnabled,
-        operatingStates: operatingStates,
-        logoUrl: logoUrl,
-        primaryColor: primaryColor,
-        secondaryColor: secondaryColor,
-        accentColor: accentColor,
-        customDeliveryFee: customDeliveryFee,
-        customFailedAttemptFee: customFailedAttemptFee,
-        customPlatformFeeValue: customPlatformFee,
-        bankName: bankName,
-        accountNumber: bankAccountNumber,
-        accountName: bankAccountName,
-        settlementFrequency: settlementFrequency,
-        settlementDay: settlementDay,
-        isActive: isActive ?? current.isActive,
-      );
 
       final updatedList = state.clients.map((c) => c.id == clientId ? updatedClient : c).toList();
       state = state.copyWith(clients: updatedList);
+      await _storageService.cacheClients(updatedList);
       debugPrint('[DC_CONSOLE_PROVIDER] 🏢 Updated full profile & brand for client "${updatedClient.companyName}".');
       return updatedClient;
     } catch (e) {
@@ -1127,12 +1076,7 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
   Future<void> toggleClientActiveStatus(String clientId, bool isActive) async {
     try {
       if (!isTestEnvironment) {
-        try {
-          final db = Supabase.instance.client;
-          await db.from('clients').update({'is_active': isActive}).eq('id', clientId);
-        } catch (dbErr) {
-          debugPrint('[DC_CONSOLE_PROVIDER] ⚠️ Note on clients is_active update: $dbErr');
-        }
+        await _repository.toggleClientActiveStatus(clientId, isActive);
       }
       final updatedList = state.clients.map((c) {
         if (c.id == clientId) {
@@ -1141,6 +1085,7 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
         return c;
       }).toList();
       state = state.copyWith(clients: updatedList);
+      await _storageService.cacheClients(updatedList);
       debugPrint('[DC_CONSOLE_PROVIDER] 🔒 Client $clientId active status changed to $isActive');
     } catch (e) {
       debugPrint('[DC_CONSOLE_PROVIDER] ❌ toggleClientActiveStatus error: $e');

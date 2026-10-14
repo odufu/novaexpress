@@ -442,4 +442,68 @@ class DCConsoleRepositoryImpl implements DCConsoleRepository {
       bankAccountName: bankAccountName,
     );
   }
+
+  @override
+  Future<ClientProfile> updateClientFullProfileAndTariffs({
+    required String clientId,
+    required String companyName,
+    required String contactPerson,
+    required String email,
+    required String phone,
+    required String address,
+    required String city,
+    required String stateName,
+    required String tier,
+    required int closerLimit,
+    required bool hasInventoryManagement,
+    required List<String> servicesEnabled,
+    required List<String> operatingStates,
+    String? logoUrl,
+    String? primaryColor,
+    String? secondaryColor,
+    String? accentColor,
+    double? customDeliveryFee,
+    double? customFailedAttemptFee,
+    double? customPlatformFee,
+    String? bankName,
+    String? bankAccountNumber,
+    String? bankAccountName,
+    String? settlementFrequency,
+    String? settlementDay,
+    bool? isActive,
+  }) async {
+    return await _remoteDataSource.updateClientFullProfileAndTariffs(
+      clientId: clientId,
+      companyName: companyName,
+      contactPerson: contactPerson,
+      email: email,
+      phone: phone,
+      address: address,
+      city: city,
+      stateName: stateName,
+      tier: tier,
+      closerLimit: closerLimit,
+      hasInventoryManagement: hasInventoryManagement,
+      servicesEnabled: servicesEnabled,
+      operatingStates: operatingStates,
+      logoUrl: logoUrl,
+      primaryColor: primaryColor,
+      secondaryColor: secondaryColor,
+      accentColor: accentColor,
+      customDeliveryFee: customDeliveryFee,
+      customFailedAttemptFee: customFailedAttemptFee,
+      customPlatformFee: customPlatformFee,
+      bankName: bankName,
+      bankAccountNumber: bankAccountNumber,
+      bankAccountName: bankAccountName,
+      settlementFrequency: settlementFrequency,
+      settlementDay: settlementDay,
+      isActive: isActive,
+    );
+  }
+
+  @override
+  Future<void> toggleClientActiveStatus(String clientId, bool isActive) async {
+    await _remoteDataSource.toggleClientActiveStatus(clientId, isActive);
+  }
 }

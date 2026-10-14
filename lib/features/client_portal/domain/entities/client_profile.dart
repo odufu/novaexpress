@@ -175,6 +175,7 @@ class ClientProfile {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'name': companyName,
       'company_name': companyName,
       'contact_person': contactPerson,
       'email': email,

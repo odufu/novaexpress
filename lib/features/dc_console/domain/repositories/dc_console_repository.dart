@@ -182,4 +182,37 @@ abstract class DCConsoleRepository {
     String? bankAccountNumber,
     String? bankAccountName,
   });
+
+  /// Authoritatively updates client profile, branding, contacts, and tariffs
+  Future<ClientProfile> updateClientFullProfileAndTariffs({
+    required String clientId,
+    required String companyName,
+    required String contactPerson,
+    required String email,
+    required String phone,
+    required String address,
+    required String city,
+    required String stateName,
+    required String tier,
+    required int closerLimit,
+    required bool hasInventoryManagement,
+    required List<String> servicesEnabled,
+    required List<String> operatingStates,
+    String? logoUrl,
+    String? primaryColor,
+    String? secondaryColor,
+    String? accentColor,
+    double? customDeliveryFee,
+    double? customFailedAttemptFee,
+    double? customPlatformFee,
+    String? bankName,
+    String? bankAccountNumber,
+    String? bankAccountName,
+    String? settlementFrequency,
+    String? settlementDay,
+    bool? isActive,
+  });
+
+  /// Toggles client active / suspended status
+  Future<void> toggleClientActiveStatus(String clientId, bool isActive);
 }

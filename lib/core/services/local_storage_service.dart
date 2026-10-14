@@ -23,6 +23,7 @@ import '../../features/pipeline_chat/data/models/order_conversation_message_mode
 import '../../features/pipeline_chat/data/models/order_conversation_model.dart';
 import '../../features/pipeline_chat/domain/entities/order_conversation.dart';
 import '../../features/pipeline_chat/domain/entities/order_conversation_message.dart';
+import '../../features/client_portal/domain/entities/client_profile.dart';
 
 abstract class LocalStorageService {
   Future<void> saveJsonList(String key, List<Map<String, dynamic>> items);
@@ -41,6 +42,8 @@ abstract class LocalStorageService {
   Future<List<DCFleetDriver>?> getCachedFleetDrivers();
   Future<void> cacheOperationsOfficers(List<DCOperationsOfficer> officers);
   Future<List<DCOperationsOfficer>?> getCachedOperationsOfficers();
+  Future<void> cacheClients(List<ClientProfile> clients);
+  Future<List<ClientProfile>?> getCachedClients();
 
   Future<void> cacheDriverCompensationTerms(String driverKey, Map<String, dynamic> terms);
   Future<Map<String, Map<String, dynamic>>?> getCachedDriverCompensationTerms();
@@ -99,6 +102,7 @@ class LocalStorageServiceImpl implements LocalStorageService {
   static const String _distributionCentersKey = 'novexps_cache_distribution_centers';
   static const String _fleetDriversKey = 'novexps_cache_fleet_drivers';
   static const String _operationsOfficersKey = 'novexps_cache_operations_officers';
+  static const String _clientsKey = 'novexps_cache_clients';
   static const String _driverTermsKey = 'novexps_cache_driver_terms_registry';
   static const String _financeSettingsKey = 'novexps_cache_dc_finance_settings';
   static const String _payoutClaimsKey = 'novexps_cache_payout_claims';
@@ -273,6 +277,32 @@ class LocalStorageServiceImpl implements LocalStorageService {
       }
     }
     return officers.isNotEmpty ? officers : null;
+  }
+
+  // --- Clients Caching ---
+
+  @override
+  Future<void> cacheClients(List<ClientProfile> clients) async {
+    final list = clients.map((c) => c.toJson()).toList();
+    await saveJsonList(_clientsKey, list);
+    await setLastSyncTime('clients');
+    debugPrint('[LOCAL_STORAGE] 💾 Cached ${clients.length} clients to local storage.');
+  }
+
+  @override
+  Future<List<ClientProfile>?> getCachedClients() async {
+    final rawList = await getJsonList(_clientsKey);
+    if (rawList == null || rawList.isEmpty) return null;
+
+    final clients = <ClientProfile>[];
+    for (final map in rawList) {
+      try {
+        clients.add(ClientProfile.fromJson(map));
+      } catch (e) {
+        debugPrint('[LOCAL_STORAGE] ⚠️ Error parsing cached client: $e');
+      }
+    }
+    return clients.isNotEmpty ? clients : null;
   }
 
   // --- Driver Compensation Terms Registry Caching ---
