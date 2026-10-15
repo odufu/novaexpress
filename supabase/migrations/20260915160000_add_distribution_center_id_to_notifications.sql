@@ -152,6 +152,7 @@ $$;
 -- 3. Stored Procedure: fn_receive_client_supply (Harden Notification)
 -- ============================================================================
 
+DROP FUNCTION IF EXISTS public.fn_receive_client_supply CASCADE;
 CREATE OR REPLACE FUNCTION public.fn_receive_client_supply(
     p_transfer_id UUID,
     p_receiver_id UUID,

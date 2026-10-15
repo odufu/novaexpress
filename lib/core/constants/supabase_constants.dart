@@ -13,21 +13,21 @@ class SupabaseConstants {
   static const String originalServiceRoleKey =
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95Z3RhZXJpbGp1ZWxoc2hmdmt2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4Mzg2ODcwMCwiZXhwIjoyMDk5NDQ0NzAwfQ.2kSLYbRoGqntCvZzpxknqh7gbk2FYICcjWq5vrXRkHM';
 
-  // --- ENVIRONMENT 2: Fresh Testing Project (qpcafevjsrbauweuiiyq) ---
-  static const String testingUrl = 'https://qpcafevjsrbauweuiiyq.supabase.co';
+  // --- ENVIRONMENT 2: Fresh Testing Project (hwyqqjilcifxajruusoa) ---
+  static const String testingUrl = 'https://hwyqqjilcifxajruusoa.supabase.co';
   static const String testingAnonKey =
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFwY2FmZXZqc3JiYXV3ZXVpaXlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3ODYzNjQsImV4cCI6MjEwNDM2MjM2NH0.L07TBq9gfNjLPYnaAjA7F9IGXN1_UoyOcelgsofnXK8';
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh3eXFxamlsY2lmeGFqcnV1c29hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIxMDE0NzIsImV4cCI6MjEwNzY3NzQ3Mn0.B1epG9i_R1pryMVFo78DcL-Ett21L3HR_4VST34QifA';
   static const String testingServiceRoleKey =
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFwY2FmZXZqc3JiYXV3ZXVpaXlxIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4ODc4NjM2NCwiZXhwIjoyMTA0MzYyMzY0fQ.RM1BJWKYWnhI7kkDVACqAxDj8U9shpWxQX8h8_K7UiU';
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh3eXFxamlsY2lmeGFqcnV1c29hIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjEwMTQ3MiwiZXhwIjoyMTA3Njc3NDcyfQ.ow0xtvrgq3wUXKlGeIDgRtBrKeirzy9XHN_8s8TCAiI';
 
   // --- ACTIVE CONNECTION ---
   // Default is set to ENVIRONMENT 2 (Testing).
   // Can be overridden at build-time using:
   //   flutter run --dart-define=SUPABASE_URL=... --dart-define=SUPABASE_ANON_KEY=...
   // Or switched using scripts/switch_supabase_env.py
-  static const String _defaultUrl = originalUrl;
-  static const String _defaultAnonKey = originalAnonKey;
-  static const String _defaultServiceRoleKey = originalServiceRoleKey;
+  static const String _defaultUrl = testingUrl;
+  static const String _defaultAnonKey = testingAnonKey;
+  static const String _defaultServiceRoleKey = testingServiceRoleKey;
 
   static const String supabaseUrl =
       String.fromEnvironment('SUPABASE_URL', defaultValue: _defaultUrl);

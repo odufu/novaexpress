@@ -5,6 +5,9 @@ ALTER TABLE IF EXISTS public.cash_remittances
     ADD COLUMN IF NOT EXISTS verified_by_user_id UUID REFERENCES public.users(id);
 
 ALTER TABLE IF EXISTS public.stock_transfers
+    ADD COLUMN IF NOT EXISTS initiated_by_user_id UUID REFERENCES public.users(id);
+
+ALTER TABLE IF EXISTS public.stock_transfers
     ALTER COLUMN initiated_by_user_id DROP NOT NULL;
 
 NOTIFY pgrst, 'reload schema';
