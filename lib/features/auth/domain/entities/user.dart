@@ -83,7 +83,12 @@ class UserEntity {
   bool get isPda => isRider && personnelType == 'pda';
   bool get isInHouseRider => isRider && personnelType == 'in_house_rider';
   bool get isDcManager => role == 'dc_manager' || role == 'dc_supervisor' || role == 'super_admin';
-  bool get isDcOperations => role == 'dc_operations' || role == 'operations_officer' || role == 'dispatcher' || role == 'ops_officer';
+  bool get isDcOperations =>
+      role == 'dc_operations' ||
+      role == 'operations_officer' ||
+      role == 'dispatcher' ||
+      role == 'ops_officer' ||
+      role == 'operations';
   bool get isCloser => role == 'closer' || role == 'client_closer';
   bool get isMarketerSupervisor => isSupervisor || role == 'marketing_supervisor' || role == 'supervisor_marketer';
   bool get isMarketer => role == 'marketer' || role == 'digital_marketer' || isMarketerSupervisor;

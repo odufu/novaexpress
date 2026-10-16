@@ -1931,7 +1931,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       final isDcOperations = rawRole == 'dc_operations' ||
           rawRole == 'operations_officer' ||
           rawRole == 'dispatcher' ||
-          rawRole == 'ops_officer';
+          rawRole == 'ops_officer' ||
+          rawRole == 'operations';
 
       String? deliveryAgentId;
       Map<String, dynamic>? agentRes;
