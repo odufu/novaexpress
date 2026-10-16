@@ -327,6 +327,13 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
       // Start realtime stream
       _streamSub = _dataSource.streamMessages(conv.id).listen(
         (updatedMsgs) {
+          // DEFENSIVE SHIELD: If realtime stream emits an empty snapshot while we already have loaded messages,
+          // do NOT wipe them out.
+          if (updatedMsgs.isEmpty && state.messages.isNotEmpty) {
+            debugPrint('[PIPELINE_CHAT] ℹ️ Stream emitted empty list while ${state.messages.length} messages are loaded. Preserving messages.');
+            return;
+          }
+
           final previousMsgs = state.messages;
           if (previousMsgs.isNotEmpty && updatedMsgs.length > previousMsgs.length) {
             final authUser = _ref.read(authProvider).user;
@@ -341,6 +348,7 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
         },
         onError: (err) {
           // Keep current messages if stream drops
+          debugPrint('[PIPELINE_CHAT] ⚠️ Messages stream notice: $err');
         },
       );
     } catch (e) {
