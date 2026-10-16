@@ -14,7 +14,6 @@ import '../../../pipeline_chat/domain/entities/order_conversation.dart';
 import '../../../pipeline_chat/presentation/providers/pipeline_chat_provider.dart';
 import '../../../pipeline_chat/presentation/widgets/conversation_list_modal.dart';
 import '../../../pipeline_chat/presentation/widgets/order_pipeline_chat_sheet.dart';
-import '../../../pipeline_chat/presentation/widgets/pipeline_chat_floating_action_button.dart';
 import '../../../stock/presentation/providers/stock_provider.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
 import '../../domain/entities/distribution_center.dart';
@@ -1272,7 +1271,6 @@ class _DCOperationsMobilePortalPageState
           ],
         ),
       ),
-      floatingActionButton: const PipelineChatFloatingActionButton(),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF031632) : Colors.white,
@@ -1368,7 +1366,7 @@ class _DCOperationsMobilePortalPageState
         o.status.toLowerCase() == 'failed' || o.status.toLowerCase() == 'cancelled').length;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 110),
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 120),
       children: [
         // 1. Organic Free Search Bar (Borderless Pill)
         Container(
@@ -1626,48 +1624,55 @@ class _DCOperationsMobilePortalPageState
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(20),
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Subtle organic left accent strip for unassigned orders
-              if (isPendingOrUnassigned)
-                Container(
-                  width: 4,
-                  color: const Color(0xFFF59E0B),
-                ),
-
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+        child: Stack(
+          children: [
+            Padding(
+              padding: EdgeInsets.only(
+                left: isPendingOrUnassigned ? 18 : 14,
+                right: 14,
+                top: 14,
+                bottom: 14,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Top Row: Order Tracking #, Status Badge, Price
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      // Top Row: Order Tracking #, Status Badge, Price
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Text(
-                            '#${order.orderNumber}',
-                            style: GoogleFonts.inter(
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.w800,
-                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      Expanded(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                '#${order.orderNumber}',
+                                style: GoogleFonts.inter(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          _buildOrderStatusBadge(order.status),
-                          const Spacer(),
-                          Text(
-                            currencyFormat.format(order.totalAmount),
-                            style: GoogleFonts.inter(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                              color: const Color(0xFF10B981),
-                            ),
-                          ),
-                        ],
+                            const SizedBox(width: 8),
+                            _buildOrderStatusBadge(order.status),
+                          ],
+                        ),
                       ),
+                      const SizedBox(width: 8),
+                      Text(
+                        currencyFormat.format(order.totalAmount),
+                        style: GoogleFonts.inter(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFF10B981),
+                        ),
+                      ),
+                    ],
+                  ),
 
                       const SizedBox(height: 10),
 
@@ -1888,12 +1893,16 @@ class _DCOperationsMobilePortalPageState
                                   children: [
                                     const Icon(Icons.two_wheeler_rounded, size: 15, color: Colors.white),
                                     const SizedBox(width: 6),
-                                    Text(
-                                      isAssigned ? 'Reassign' : 'Dispatch Rider',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
+                                    Flexible(
+                                      child: Text(
+                                        isAssigned ? 'Reassign' : 'Dispatch Rider',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
                                   ],
@@ -1921,12 +1930,16 @@ class _DCOperationsMobilePortalPageState
                                   children: [
                                     const Icon(Icons.swap_horiz_rounded, size: 16, color: Color(0xFFF37021)),
                                     const SizedBox(width: 4),
-                                    Text(
-                                      'Reroute',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color: const Color(0xFFF37021),
+                                    Flexible(
+                                      child: Text(
+                                        'Reroute',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: const Color(0xFFF37021),
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
                                   ],
@@ -1986,12 +1999,20 @@ class _DCOperationsMobilePortalPageState
                     ],
                   ),
                 ),
-              ),
-            ],
+                if (isPendingOrUnassigned)
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: 4.5,
+                    child: Container(
+                      color: const Color(0xFFF59E0B),
+                    ),
+                  ),
+              ],
+            ),
           ),
-        ),
-      ),
-    );
+        );
   }
 
   Widget _buildOrderStatusBadge(String status) {
@@ -2061,7 +2082,7 @@ class _DCOperationsMobilePortalPageState
     final allOrders = ref.watch(ordersProvider).orders;
 
     return ListView(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 120),
       children: [
         // Search bar
         TextField(
@@ -2235,7 +2256,7 @@ class _DCOperationsMobilePortalPageState
     }).toList();
 
     return ListView(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 120),
       children: [
         Container(
           padding: const EdgeInsets.all(12),
@@ -2313,7 +2334,7 @@ class _DCOperationsMobilePortalPageState
     final user = ref.watch(authProvider).user;
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
       children: [
         // Officer Profile Card
         Container(
