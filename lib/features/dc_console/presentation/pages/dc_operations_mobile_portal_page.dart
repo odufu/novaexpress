@@ -1154,10 +1154,19 @@ class _DCOperationsMobilePortalPageState
           title: Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(7),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0D9488),
-                  borderRadius: BorderRadius.circular(10),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF0D9488), Color(0xFF0F766E)],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF0D9488).withValues(alpha: 0.25),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: const Icon(Icons.support_agent_rounded, color: Colors.white, size: 20),
               ),
@@ -1182,17 +1191,17 @@ class _DCOperationsMobilePortalPageState
                         ),
                         const SizedBox(width: 6),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
                             color: const Color(0xFF10B981).withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(4),
+                            borderRadius: BorderRadius.circular(10),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Container(
-                                width: 6,
-                                height: 6,
+                                width: 5,
+                                height: 5,
                                 decoration: const BoxDecoration(
                                   color: Color(0xFF10B981),
                                   shape: BoxShape.circle,
@@ -1203,7 +1212,7 @@ class _DCOperationsMobilePortalPageState
                                 'LIVE',
                                 style: GoogleFonts.inter(
                                   fontSize: 9,
-                                  fontWeight: FontWeight.bold,
+                                  fontWeight: FontWeight.w800,
                                   color: const Color(0xFF10B981),
                                 ),
                               ),
@@ -1267,7 +1276,13 @@ class _DCOperationsMobilePortalPageState
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF031632) : Colors.white,
-          border: Border(top: BorderSide(color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0))),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.04),
+              blurRadius: 14,
+              offset: const Offset(0, -3),
+            ),
+          ],
         ),
         child: SafeArea(
           top: false,
@@ -1353,116 +1368,131 @@ class _DCOperationsMobilePortalPageState
         o.status.toLowerCase() == 'failed' || o.status.toLowerCase() == 'cancelled').length;
 
     return ListView(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 110),
       children: [
-        // Scope Banner
+        // 1. Organic Free Search Bar (Borderless Pill)
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: const Color(0xFF0D9488).withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFF0D9488).withValues(alpha: 0.25)),
+            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(24),
           ),
+          padding: const EdgeInsets.symmetric(horizontal: 14),
           child: Row(
             children: [
-              const Icon(Icons.shield_outlined, size: 16, color: Color(0xFF0D9488)),
+              Icon(
+                Icons.search_rounded,
+                size: 20,
+                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+              ),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  'Scoped strictly to ${officerDc.name} (${officerDc.code})',
+                child: TextField(
+                  controller: _orderSearchController,
+                  onChanged: (val) => setState(() {}),
                   style: GoogleFonts.inter(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF0D9488),
+                    fontSize: 13,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'Search order #, customer, phone, product...',
+                    hintStyle: GoogleFonts.inter(
+                      fontSize: 12.5,
+                      color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                    ),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 11),
+                    border: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    enabledBorder: InputBorder.none,
                   ),
                 ),
               ),
+              if (_orderSearchController.text.isNotEmpty)
+                InkWell(
+                  onTap: () {
+                    _orderSearchController.clear();
+                    setState(() {});
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: Icon(
+                      Icons.clear_rounded,
+                      size: 16,
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
 
         const SizedBox(height: 12),
 
-        // Quick Stats Strip
+        // 2. Consolidated Organic KPI & Status Filter Carousel
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(
             children: [
-              _buildStatChip('Pending Dispatch', unassignedCount, const Color(0xFFF37021), isDark, 'pending'),
+              _buildOrganicFilterPill(
+                label: 'All',
+                count: allDcOrders.length,
+                filterKey: 'all',
+                color: const Color(0xFF0D9488),
+                isDark: isDark,
+              ),
               const SizedBox(width: 8),
-              _buildStatChip('In Transit', inTransitCount, const Color(0xFF3B82F6), isDark, 'in_transit'),
+              _buildOrganicFilterPill(
+                label: 'Pending Dispatch',
+                count: unassignedCount,
+                filterKey: 'pending',
+                color: const Color(0xFFF59E0B),
+                isDark: isDark,
+              ),
               const SizedBox(width: 8),
-              _buildStatChip('Delivered Today', deliveredCount, const Color(0xFF10B981), isDark, 'delivered'),
+              _buildOrganicFilterPill(
+                label: 'In Transit',
+                count: inTransitCount,
+                filterKey: 'in_transit',
+                color: const Color(0xFF3B82F6),
+                isDark: isDark,
+              ),
               const SizedBox(width: 8),
-              _buildStatChip('Issues / Failed', failedCount, const Color(0xFFEF4444), isDark, 'failed'),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 12),
-
-        // Search Bar
-        TextField(
-          controller: _orderSearchController,
-          onChanged: (val) => setState(() {}),
-          style: GoogleFonts.inter(fontSize: 13),
-          decoration: InputDecoration(
-            hintText: 'Search order #, customer, phone, product...',
-            hintStyle: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF94A3B8)),
-            prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Color(0xFF0D9488)),
-            suffixIcon: _orderSearchController.text.isNotEmpty
-                ? IconButton(
-                    icon: const Icon(Icons.clear_rounded, size: 16),
-                    onPressed: () {
-                      _orderSearchController.clear();
-                      setState(() {});
-                    },
-                  )
-                : null,
-            filled: true,
-            fillColor: isDark ? const Color(0xFF151D36) : Colors.white,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
-            ),
-          ),
-        ),
-
-        const SizedBox(height: 10),
-
-        // Status Filter Chips
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              _buildFilterChip('All (${allDcOrders.length})', 'all', isDark),
-              const SizedBox(width: 6),
-              _buildFilterChip('Pending ($unassignedCount)', 'pending', isDark),
-              const SizedBox(width: 6),
-              _buildFilterChip('In Transit ($inTransitCount)', 'in_transit', isDark),
-              const SizedBox(width: 6),
-              _buildFilterChip('Delivered ($deliveredCount)', 'delivered', isDark),
-              const SizedBox(width: 6),
-              _buildFilterChip('Failed ($failedCount)', 'failed', isDark),
+              _buildOrganicFilterPill(
+                label: 'Delivered',
+                count: deliveredCount,
+                filterKey: 'delivered',
+                color: const Color(0xFF10B981),
+                isDark: isDark,
+              ),
+              const SizedBox(width: 8),
+              _buildOrganicFilterPill(
+                label: 'Issues / Failed',
+                count: failedCount,
+                filterKey: 'failed',
+                color: const Color(0xFFEF4444),
+                isDark: isDark,
+              ),
             ],
           ),
         ),
 
         const SizedBox(height: 14),
 
-        // Orders List
+        // 3. Orders List
         if (dcOrders.isEmpty)
           Container(
             padding: const EdgeInsets.all(32),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF151D36) : Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
+              color: isDark ? const Color(0xFF1E293B) : Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+                  blurRadius: 14,
+                  offset: const Offset(0, 3),
+                ),
+              ],
             ),
             child: Column(
               children: [
@@ -1487,64 +1517,87 @@ class _DCOperationsMobilePortalPageState
     );
   }
 
-  Widget _buildStatChip(String title, int count, Color color, bool isDark, String filterKey) {
+  Widget _buildOrganicFilterPill({
+    required String label,
+    required int count,
+    required String filterKey,
+    required Color color,
+    required bool isDark,
+  }) {
     final isSelected = _orderStatusFilter == filterKey;
     return InkWell(
       onTap: () => setState(() => _orderStatusFilter = isSelected ? 'all' : filterKey),
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      borderRadius: BorderRadius.circular(20),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
-          color: isSelected ? color.withValues(alpha: 0.18) : (isDark ? const Color(0xFF151D36) : Colors.white),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? color : (isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
-            width: isSelected ? 1.5 : 1,
-          ),
+          color: isSelected
+              ? color.withValues(alpha: isDark ? 0.22 : 0.14)
+              : (isDark ? const Color(0xFF1E293B) : Colors.white),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.18),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.03),
+                    blurRadius: 6,
+                    offset: const Offset(0, 1.5),
+                  ),
+                ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              padding: const EdgeInsets.all(5),
-              decoration: BoxDecoration(color: color.withValues(alpha: 0.15), shape: BoxShape.circle),
-              child: Text(
-                '$count',
-                style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12, color: color),
+            if (isSelected) ...[
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 6),
+            ],
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected
+                    ? color
+                    : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569)),
               ),
             ),
-            const SizedBox(width: 8),
-            Text(
-              title,
-              style: GoogleFonts.inter(
-                fontSize: 11.5,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                color: isSelected ? color : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569)),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? color.withValues(alpha: 0.22)
+                    : (isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$count',
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11,
+                  color: isSelected
+                      ? color
+                      : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                ),
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildFilterChip(String label, String key, bool isDark) {
-    final isSelected = _orderStatusFilter == key;
-    return ChoiceChip(
-      label: Text(label),
-      selected: isSelected,
-      onSelected: (val) {
-        if (val) setState(() => _orderStatusFilter = key);
-      },
-      selectedColor: const Color(0xFF0D9488),
-      backgroundColor: isDark ? const Color(0xFF151D36) : Colors.white,
-      labelStyle: GoogleFonts.inter(
-        fontSize: 11.5,
-        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-        color: isSelected ? Colors.white : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
-      ),
-      side: BorderSide(
-        color: isSelected ? const Color(0xFF0D9488) : (isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
       ),
     );
   }
@@ -1556,260 +1609,387 @@ class _DCOperationsMobilePortalPageState
         order.deliveryAgentName!.isNotEmpty;
 
     final isDelivered = order.status.toLowerCase() == 'delivered';
+    final isPendingOrUnassigned = !isAssigned && !isDelivered;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF151D36) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: !isAssigned && !isDelivered
-              ? const Color(0xFFF37021).withValues(alpha: 0.5)
-              : (isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
-          width: !isAssigned && !isDelivered ? 1.5 : 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Order Number, Status & Total
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        '#${order.orderNumber}',
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? Colors.white : const Color(0xFF0F172A),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    _buildOrderStatusBadge(order.status),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                currencyFormat.format(order.totalAmount),
-                style: GoogleFonts.inter(
-                  fontSize: 14.5,
-                  fontWeight: FontWeight.bold,
-                  color: const Color(0xFF10B981),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 8),
-
-          // Customer Row
-          Row(
-            children: [
-              const Icon(Icons.person_outline_rounded, size: 14, color: Color(0xFF64748B)),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  order.customerName,
-                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600),
-                ),
-              ),
-              if (order.customerPhone.isNotEmpty) ...[
-                IconButton(
-                  icon: const Icon(Icons.phone_rounded, size: 16, color: Color(0xFF3B82F6)),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  tooltip: 'Call Customer',
-                  onPressed: () => _makeCall(order.customerPhone),
-                ),
-                const SizedBox(width: 10),
-                IconButton(
-                  icon: const Icon(Icons.send_rounded, size: 16, color: Color(0xFF25D366)),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  tooltip: 'WhatsApp Customer',
-                  onPressed: () => _openWhatsApp(
-                    order.customerPhone,
-                    'Hello ${order.customerName}, this is NovaXpress Operations regarding your order #${order.orderNumber}.',
-                  ),
-                ),
-              ],
-            ],
-          ),
-
-          const SizedBox(height: 4),
-
-          // Destination Address
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(Icons.location_on_outlined, size: 14, color: Color(0xFF64748B)),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  '${order.deliveryLga != null ? '${order.deliveryLga}, ' : ''}${order.deliveryState} • ${order.deliveryAddress}',
-                  style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 4),
-
-          // Product & Quantity
-          Row(
-            children: [
-              const Icon(Icons.inventory_2_outlined, size: 14, color: Color(0xFF64748B)),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  '${order.quantity}x ${order.productName}',
-                  style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF0D9488), fontWeight: FontWeight.w500),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 8),
-
-          // Current Assigned Rider or Warning
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: isAssigned
-                  ? const Color(0xFF3B82F6).withValues(alpha: 0.08)
-                  : const Color(0xFFF37021).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: isAssigned
-                    ? const Color(0xFF3B82F6).withValues(alpha: 0.2)
-                    : const Color(0xFFF37021).withValues(alpha: 0.25),
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  isAssigned ? Icons.two_wheeler_rounded : Icons.warning_amber_rounded,
-                  size: 15,
-                  color: isAssigned ? const Color(0xFF3B82F6) : const Color(0xFFF37021),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    isAssigned
-                        ? 'Assigned Rider: ${order.deliveryAgentName} (${order.deliveryAgentCode ?? ''})'
-                        : '⚠️ Unassigned • Requires Dispatch to Available Rider',
-                    style: GoogleFonts.inter(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
-                      color: isAssigned ? const Color(0xFF3B82F6) : const Color(0xFFF37021),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 12),
-          const Divider(height: 1),
-          const SizedBox(height: 10),
-
-          // Action Buttons: Dispatch, Reroute, Pipeline Chat
-          Row(
-            children: [
-              // Dispatch to Rider
-              Expanded(
-                flex: 3,
-                child: ElevatedButton.icon(
-                  onPressed: isDelivered ? null : () => _showDispatchSheet(order, officerDc),
-                  icon: const Icon(Icons.two_wheeler_rounded, size: 15, color: Colors.white),
-                  label: Text(
-                    isAssigned ? 'Reassign Rider' : 'Dispatch Rider',
-                    style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0D9488),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                ),
-              ),
-
-              const SizedBox(width: 8),
-
-              // Reroute to DC
-              Expanded(
-                flex: 3,
-                child: OutlinedButton.icon(
-                  onPressed: isDelivered ? null : () => _showRerouteSheet(order, officerDc),
-                  icon: const Icon(Icons.swap_horiz_rounded, size: 15, color: Color(0xFFF37021)),
-                  label: Text(
-                    'Reroute DC',
-                    style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFFF37021)),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    side: const BorderSide(color: Color(0xFFF37021)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                ),
-              ),
-
-              const SizedBox(width: 8),
-
-              // Pipeline Chat Sheet with Real-time Order Unread Badge
-              Consumer(
-                builder: (context, ref, _) {
-                  final conv = ref.watch(
-                    pipelineChatProvider.select(
-                      (s) => s.recentConversations.cast<OrderConversationEntity?>().firstWhere(
-                            (c) => c?.orderId == order.id || (order.id.isNotEmpty && c?.orderNumber == order.orderNumber),
-                            orElse: () => null,
-                          ),
-                    ),
-                  );
-                  final unreadCount = conv?.unreadDcCount ?? 0;
-                  final hasUnread = unreadCount > 0;
-
-                  return IconButton(
-                    icon: Badge(
-                      isLabelVisible: hasUnread,
-                      label: Text(
-                        '$unreadCount',
-                        style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold),
-                      ),
-                      backgroundColor: const Color(0xFFEF4444),
-                      child: Icon(
-                        hasUnread ? Icons.chat_bubble_rounded : Icons.chat_bubble_outline_rounded,
-                        size: 18,
-                        color: hasUnread ? const Color(0xFFEF4444) : const Color(0xFF0D9488),
-                      ),
-                    ),
-                    tooltip: hasUnread
-                        ? 'Order Pipeline Chat ($unreadCount unread)'
-                        : 'Order Pipeline Chat',
-                    style: IconButton.styleFrom(
-                      backgroundColor: (hasUnread ? const Color(0xFFEF4444) : const Color(0xFF0D9488))
-                          .withValues(alpha: 0.1),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    onPressed: () => OrderPipelineChatSheet.showForOrder(context, order),
-                  );
-                },
-              ),
-            ],
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 3),
           ),
         ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Subtle organic left accent strip for unassigned orders
+              if (isPendingOrUnassigned)
+                Container(
+                  width: 4,
+                  color: const Color(0xFFF59E0B),
+                ),
+
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Top Row: Order Tracking #, Status Badge, Price
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Text(
+                            '#${order.orderNumber}',
+                            style: GoogleFonts.inter(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w800,
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          _buildOrderStatusBadge(order.status),
+                          const Spacer(),
+                          Text(
+                            currencyFormat.format(order.totalAmount),
+                            style: GoogleFonts.inter(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: const Color(0xFF10B981),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      // Customer Info & Organic Quick Action Pills
+                      Row(
+                        children: [
+                          Container(
+                            width: 28,
+                            height: 28,
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                colors: [Color(0xFF0D9488), Color(0xFF0F766E)],
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(
+                                order.customerName.isNotEmpty
+                                    ? order.customerName[0].toUpperCase()
+                                    : 'C',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              order.customerName,
+                              style: GoogleFonts.inter(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w700,
+                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (order.customerPhone.isNotEmpty) ...[
+                            Tooltip(
+                              message: 'Call Customer',
+                              child: InkWell(
+                                onTap: () => _makeCall(order.customerPhone),
+                                borderRadius: BorderRadius.circular(16),
+                                child: Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF3B82F6).withValues(alpha: 0.1),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.phone_rounded,
+                                    size: 15,
+                                    color: Color(0xFF3B82F6),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Tooltip(
+                              message: 'WhatsApp Customer',
+                              child: InkWell(
+                                onTap: () => _openWhatsApp(
+                                  order.customerPhone,
+                                  'Hello ${order.customerName}, this is NovaXpress Operations regarding your order #${order.orderNumber}.',
+                                ),
+                                borderRadius: BorderRadius.circular(16),
+                                child: Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF22C55E).withValues(alpha: 0.1),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.send_rounded,
+                                    size: 14,
+                                    color: Color(0xFF22C55E),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+
+                      const SizedBox(height: 6),
+
+                      // Destination Address Row
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.location_on_outlined,
+                            size: 15,
+                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                          ),
+                          const SizedBox(width: 5),
+                          Expanded(
+                            child: Text(
+                              '${order.deliveryLga != null ? '${order.deliveryLga}, ' : ''}${order.deliveryState} • ${order.deliveryAddress}',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                height: 1.3,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 6),
+
+                      // Product & Quantity Tag
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0D9488).withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.inventory_2_outlined,
+                              size: 13,
+                              color: Color(0xFF0D9488),
+                            ),
+                            const SizedBox(width: 5),
+                            Flexible(
+                              child: Text(
+                                '${order.quantity}x ${order.productName}',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFF0D9488),
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      // Rider Custody / Unassigned Status Pill
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6.5),
+                        decoration: BoxDecoration(
+                          color: isAssigned
+                              ? const Color(0xFF3B82F6).withValues(alpha: 0.08)
+                              : const Color(0xFFF59E0B).withValues(alpha: 0.09),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              isAssigned ? Icons.two_wheeler_rounded : Icons.pending_actions_rounded,
+                              size: 15,
+                              color: isAssigned ? const Color(0xFF3B82F6) : const Color(0xFFD97706),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                isAssigned
+                                    ? 'Assigned Rider: ${order.deliveryAgentName} (${order.deliveryAgentCode ?? ''})'
+                                    : 'Unassigned • Requires Dispatch to Available Rider',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: isAssigned ? const Color(0xFF2563EB) : const Color(0xFFD97706),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      // Action Buttons: Dispatch, Reroute, Pipeline Chat
+                      Row(
+                        children: [
+                          // Primary Dispatch Action
+                          Expanded(
+                            flex: 3,
+                            child: InkWell(
+                              onTap: isDelivered ? null : () => _showDispatchSheet(order, officerDc),
+                              borderRadius: BorderRadius.circular(14),
+                              child: Container(
+                                height: 38,
+                                decoration: BoxDecoration(
+                                  gradient: isDelivered
+                                      ? null
+                                      : const LinearGradient(
+                                          colors: [Color(0xFF0D9488), Color(0xFF0F766E)],
+                                        ),
+                                  color: isDelivered ? (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)) : null,
+                                  borderRadius: BorderRadius.circular(14),
+                                  boxShadow: isDelivered
+                                      ? null
+                                      : [
+                                          BoxShadow(
+                                            color: const Color(0xFF0D9488).withValues(alpha: 0.25),
+                                            blurRadius: 6,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.two_wheeler_rounded, size: 15, color: Colors.white),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      isAssigned ? 'Reassign' : 'Dispatch Rider',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(width: 8),
+
+                          // Reroute DC Action
+                          Expanded(
+                            flex: 2,
+                            child: InkWell(
+                              onTap: isDelivered ? null : () => _showRerouteSheet(order, officerDc),
+                              borderRadius: BorderRadius.circular(14),
+                              child: Container(
+                                height: 38,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF37021).withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.swap_horiz_rounded, size: 16, color: Color(0xFFF37021)),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Reroute',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: const Color(0xFFF37021),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(width: 8),
+
+                          // Pipeline Chat Button with Real-time Badge
+                          Consumer(
+                            builder: (context, ref, _) {
+                              final conv = ref.watch(
+                                pipelineChatProvider.select(
+                                  (s) => s.recentConversations.cast<OrderConversationEntity?>().firstWhere(
+                                        (c) => c?.orderId == order.id || (order.id.isNotEmpty && c?.orderNumber == order.orderNumber),
+                                        orElse: () => null,
+                                      ),
+                                ),
+                              );
+                              final unreadCount = conv?.unreadDcCount ?? 0;
+                              final hasUnread = unreadCount > 0;
+
+                              return InkWell(
+                                onTap: () => OrderPipelineChatSheet.showForOrder(context, order),
+                                borderRadius: BorderRadius.circular(14),
+                                child: Container(
+                                  width: 38,
+                                  height: 38,
+                                  decoration: BoxDecoration(
+                                    color: (hasUnread ? const Color(0xFFEF4444) : const Color(0xFF0D9488))
+                                        .withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  child: Center(
+                                    child: Badge(
+                                      isLabelVisible: hasUnread,
+                                      label: Text(
+                                        '$unreadCount',
+                                        style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold),
+                                      ),
+                                      backgroundColor: const Color(0xFFEF4444),
+                                      child: Icon(
+                                        hasUnread ? Icons.chat_bubble_rounded : Icons.chat_bubble_outline_rounded,
+                                        size: 17,
+                                        color: hasUnread ? const Color(0xFFEF4444) : const Color(0xFF0D9488),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1836,17 +2016,39 @@ class _DCOperationsMobilePortalPageState
         fg = const Color(0xFFEF4444);
         break;
       default:
-        bg = const Color(0xFFF37021).withValues(alpha: 0.12);
-        fg = const Color(0xFFF37021);
+        bg = const Color(0xFFF59E0B).withValues(alpha: 0.12);
+        fg = const Color(0xFFD97706);
         label = 'PENDING';
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
-      child: Text(
-        label,
-        style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: fg),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 5,
+            height: 5,
+            decoration: BoxDecoration(
+              color: fg,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 9.5,
+              fontWeight: FontWeight.w700,
+              color: fg,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ],
       ),
     );
   }
