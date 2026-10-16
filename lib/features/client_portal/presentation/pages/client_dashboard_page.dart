@@ -2,346 +2,278 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import '../../../../core/helpers/formatters.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:novexps/core/theme/theme_provider.dart';
 import '../../../dc_console/domain/entities/product_package.dart';
+import '../../../orders/domain/entities/order.dart';
 import '../providers/client_portal_provider.dart';
 import '../widgets/client_create_order_modal.dart';
 import '../widgets/client_order_tracking_modal.dart';
 import '../../../orders/presentation/widgets/smart_order_paste_modal.dart';
-import '../widgets/client_daily_accumulator_modal.dart';
+import '../widgets/client_add_expenditure_modal.dart';
 import '../widgets/client_add_package_modal.dart';
 import '../widgets/client_raise_stock_invoice_modal.dart';
 import '../widgets/client_supply_stock_modal.dart';
-import '../widgets/merchant_financial_intelligence_view.dart';
 
 class ClientDashboardPage extends ConsumerWidget {
   final VoidCallback onNavigateToOrders;
   final VoidCallback onNavigateToProducts;
   final VoidCallback? onNavigateToInventory;
+  final VoidCallback? onNavigateToFinance;
 
   const ClientDashboardPage({
     super.key,
     required this.onNavigateToOrders,
     required this.onNavigateToProducts,
     this.onNavigateToInventory,
+    this.onNavigateToFinance,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(clientPortalProvider);
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final themeMode = ref.watch(themeProvider);
+    final isDark = themeMode == ThemeMode.dark ||
+        (themeMode == ThemeMode.system &&
+            MediaQuery.of(context).platformBrightness == Brightness.dark);
     final screenWidth = MediaQuery.of(context).size.width;
-    final isCompact = screenWidth < 650;
+    final isMobile = screenWidth < 768;
 
     return RefreshIndicator(
       onRefresh: () => ref.read(clientPortalProvider.notifier).loadClientData(),
       child: ListView(
-        padding: EdgeInsets.symmetric(horizontal: isCompact ? 14 : 24, vertical: isCompact ? 14 : 20),
+        padding: EdgeInsets.symmetric(
+          horizontal: isMobile ? 14 : 24,
+          vertical: isMobile ? 14 : 20,
+        ),
         children: [
-          // Welcome & Quick Action Header
-          _buildWelcomeBanner(context, ref, state, isDark),
+          // 1. Executive Mission Control Header
+          _buildExecutiveHeader(context, state, isDark, isMobile),
           const SizedBox(height: 18),
 
-          // Dynamic Low-Stock & Replenishment Alert Banner
+          // 2. Urgent Inventory Alert Radar (Dynamic - only when replenishment is needed)
           if (_hasLowStock(state)) ...[
-            _buildLowStockAlertBanner(context, state, isDark),
+            _buildLowStockAlertBanner(context, state, isDark, isMobile),
             const SizedBox(height: 18),
           ],
 
-          // Core Merchant Financial Intelligence, Expenditures & Analytics (Legacy Parity + Product Filter)
-          MerchantFinancialIntelligenceView(
-            clientId: state.clientProfile.id,
-          ),
-          const SizedBox(height: 24),
+          // 3. Operational Pulse KPI Strip (Organic, Non-Boxy, Semantic Tooltips)
+          _buildKpiPulseStrip(context, state, isDark, isMobile),
+          const SizedBox(height: 20),
 
-          // Today's Live Cash Accumulator & 10:00 PM Closeout Card
-          _buildDailyCashAccumulatorCard(context, state),
-          const SizedBox(height: 24),
+          // 4. Financial Settlement Snapshot Teaser
+          _buildSettlementTeaserCard(context, state, isDark, isMobile),
+          const SizedBox(height: 20),
 
-          // Physical Inventory Custody & Landed Valuation
-          if (state.clientProfile.hasInventoryManagement || state.stockBalances.isNotEmpty) ...[
-            _buildInventoryCustodyCard(context, state, isDark),
-            const SizedBox(height: 24),
-          ],
-
-          // KPI Metric Summary Grid
-          _buildKpiMetricsGrid(context, state, isDark),
-          const SizedBox(height: 24),
-
-          // Fast-Moving Package Deals Commercial Velocity
+          // 5. Commercial Package Deals Velocity Strip
           if (_getAllPackages(state).isNotEmpty) ...[
-            _buildPackageDealsSection(context, state, isDark),
-            const SizedBox(height: 24),
+            _buildPackageDealsSection(context, state, isDark, isMobile),
+            const SizedBox(height: 20),
           ],
 
-          // Action Shortcuts & Bulk Import Bar
-          _buildQuickActionsRow(context, ref, state, isDark),
+          // 6. Live Active Dispatches (Desktop Scannable Table / Mobile Card-to-Sheet)
+          _buildLiveDispatchesSection(context, state, isDark, isMobile),
           const SizedBox(height: 24),
-
-          // Live Active Shipments Section
-          _buildLiveOrdersSection(context, state, ref, isDark),
         ],
       ),
     );
   }
 
-  Widget _buildWelcomeBanner(BuildContext context, WidgetRef ref, ClientPortalState state, bool isDark) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isCompact = screenWidth < 650;
+  // =========================================================================
+  // 1. EXECUTIVE MISSION CONTROL HEADER
+  // =========================================================================
+  Widget _buildExecutiveHeader(
+    BuildContext context,
+    ClientPortalState state,
+    bool isDark,
+    bool isMobile,
+  ) {
+    final companyName = state.clientProfile.companyName.isNotEmpty
+        ? state.clientProfile.companyName
+        : 'Novacare Limited';
+    final clientCode = state.clientProfile.code.isNotEmpty
+        ? state.clientProfile.code
+        : 'NOVACARE-LTD';
 
     return Container(
-      padding: EdgeInsets.all(isCompact ? 16 : 22),
+      padding: EdgeInsets.all(isMobile ? 16 : 20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isDark
-              ? const [Color(0xFF0F172A), Color(0xFF1E293B)]
-              : const [Colors.white, Color(0xFFF8FAFC)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
             blurRadius: 10,
-            offset: const Offset(0, 4),
+            offset: const Offset(0, 3),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Row 1: Merchant Identity & Status Badge
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 6,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: isDark
-                                ? const Color(0xFF0D9488).withValues(alpha: 0.25)
-                                : const Color(0xFF0D9488).withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: isDark
-                                  ? const Color(0xFF2DD4BF).withValues(alpha: 0.4)
-                                  : const Color(0xFF0D9488).withValues(alpha: 0.3),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.verified_rounded,
-                                color: isDark ? const Color(0xFF2DD4BF) : const Color(0xFF0D9488),
-                                size: 14,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                state.clientProfile.code,
-                                style: GoogleFonts.inter(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: isDark ? const Color(0xFF2DD4BF) : const Color(0xFF0D9488),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Text(
-                          'Live Merchant Console',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      state.clientProfile.companyName,
-                      style: GoogleFonts.inter(
-                        fontSize: isCompact ? 19 : 22,
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : const Color(0xFF0F172A),
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Managing Director: ${state.clientProfile.contactPerson} • ${state.clientProfile.city}, ${state.clientProfile.state}',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+              Container(
+                width: 10,
+                height: 10,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF10B981),
+                  shape: BoxShape.circle,
                 ),
               ),
-              if (!isCompact) ...[
-                const SizedBox(width: 16),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0D9488),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      onPressed: () => ClientCreateOrderModal.show(context),
-                      icon: const Icon(Icons.add_shopping_cart_rounded, size: 18),
-                      label: Text(
-                        'Create New Order',
-                        style: GoogleFonts.inter(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0F766E),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      onPressed: () => SmartOrderPasteModal.show(context),
-                      icon: const Icon(Icons.paste_rounded, size: 18),
-                      label: Text(
-                        'Paste Orders',
-                        style: GoogleFonts.inter(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: isDark ? Colors.white : const Color(0xFF0F172A),
-                        side: BorderSide(
-                          color: isDark ? Colors.white.withValues(alpha: 0.3) : const Color(0xFFCBD5E1),
-                        ),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      onPressed: () {
-                        if (state.clientProfile.hasInventoryManagement) {
-                          ClientRaiseStockInvoiceModal.show(context);
-                        } else if (state.products.isNotEmpty) {
-                          ClientSupplyStockModal.show(context, state.products.first);
-                        }
-                      },
-                      icon: Icon(
-                        state.clientProfile.hasInventoryManagement
-                            ? Icons.receipt_long_rounded
-                            : Icons.local_shipping_rounded,
-                        size: 18,
-                      ),
-                      label: Text(
-                        state.clientProfile.hasInventoryManagement
-                            ? 'Stock Intake'
-                            : 'Supply Consignment',
-                        style: GoogleFonts.inter(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  companyName,
+                  style: GoogleFonts.outfit(
+                    fontSize: isMobile ? 18 : 22,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0D9488).withValues(alpha: isDark ? 0.2 : 0.1),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: const Color(0xFF0D9488).withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Text(
+                  clientCode,
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF0D9488),
+                  ),
+                ),
+              ),
             ],
           ),
-          if (isCompact) ...[
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0D9488),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    onPressed: () => ClientCreateOrderModal.show(context),
-                    icon: const Icon(Icons.add_shopping_cart_rounded, size: 16),
-                    label: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        'Create Order',
-                        style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12.5),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0F766E),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    onPressed: () => SmartOrderPasteModal.show(context),
-                    icon: const Icon(Icons.paste_rounded, size: 16),
-                    label: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        'Paste Orders',
-                        style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12.5),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    onPressed: () {
-                      if (state.clientProfile.hasInventoryManagement) {
-                        ClientRaiseStockInvoiceModal.show(context);
-                      } else if (state.products.isNotEmpty) {
-                        ClientSupplyStockModal.show(context, state.products.first);
-                      }
-                    },
-                    icon: Icon(
-                      state.clientProfile.hasInventoryManagement
-                          ? Icons.receipt_long_rounded
-                          : Icons.local_shipping_rounded,
-                      size: 16,
-                    ),
-                    label: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        state.clientProfile.hasInventoryManagement ? 'Stock Intake' : 'Supply Stock',
-                        style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12.5),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+          const SizedBox(height: 6),
+          Text(
+            'Live Dispatch Radar & Commercial Command Hub',
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
             ),
-          ],
+          ),
+          const SizedBox(height: 16),
+
+          // Row 2: Streamlined Quick Action Buttons (With Tooltips)
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              Tooltip(
+                message: 'Dispatch a single customer order to courier network',
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0D9488),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  onPressed: () => ClientCreateOrderModal.show(context),
+                  icon: const Icon(Icons.add_shopping_cart_rounded, size: 16),
+                  label: Text(
+                    '+ New Order',
+                    style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              Tooltip(
+                message: 'Paste multiple customer orders from WhatsApp or Excel in 1 click',
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: isDark ? Colors.white : const Color(0xFF0F172A),
+                    side: BorderSide(
+                      color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  onPressed: () => SmartOrderPasteModal.show(context),
+                  icon: const Icon(Icons.paste_rounded, size: 16, color: Color(0xFF0D9488)),
+                  label: Text(
+                    '⚡ Smart Paste',
+                    style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+              Tooltip(
+                message: 'Record advertising, packaging, or operational expenditures with receipts',
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: isDark ? Colors.white : const Color(0xFF0F172A),
+                    side: BorderSide(
+                      color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  onPressed: () => ClientAddExpenditureModal.show(
+                    context,
+                    clientId: state.clientProfile.id,
+                  ),
+                  icon: const Icon(Icons.receipt_long_rounded, size: 16, color: Color(0xFFF43F5E)),
+                  label: Text(
+                    '+ Expense',
+                    style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+              Tooltip(
+                message: 'Notify distribution center of incoming inventory delivery',
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: isDark ? Colors.white : const Color(0xFF0F172A),
+                    side: BorderSide(
+                      color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  onPressed: () {
+                    if (state.clientProfile.hasInventoryManagement) {
+                      ClientRaiseStockInvoiceModal.show(context);
+                    } else if (state.products.isNotEmpty) {
+                      ClientSupplyStockModal.show(context, state.products.first);
+                    }
+                  },
+                  icon: const Icon(Icons.warehouse_rounded, size: 16, color: Color(0xFF8B5CF6)),
+                  label: Text(
+                    '📦 Inbound Stock',
+                    style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 
+  // =========================================================================
+  // 2. DYNAMIC LOW-STOCK / REORDER ALERT
+  // =========================================================================
   bool _hasLowStock(ClientPortalState state) {
     final hasLowProduct = state.products.any((p) => p.stockQuantity <= p.lowStockThreshold);
     final hasLowBalance = state.stockBalances.any((b) => b.balanceQty <= 15);
@@ -350,7 +282,12 @@ class ClientDashboardPage extends ConsumerWidget {
     return hasLowProduct || hasLowBalance || hasZeroProduct || hasZeroBalance;
   }
 
-  Widget _buildLowStockAlertBanner(BuildContext context, ClientPortalState state, bool isDark) {
+  Widget _buildLowStockAlertBanner(
+    BuildContext context,
+    ClientPortalState state,
+    bool isDark,
+    bool isMobile,
+  ) {
     final zeroProducts = state.products.where((p) => p.stockQuantity <= 0).toList();
     final zeroBalances = state.stockBalances.where((b) => b.balanceQty <= 0).toList();
     final isZeroStock = zeroProducts.isNotEmpty || zeroBalances.isNotEmpty;
@@ -360,223 +297,166 @@ class ClientDashboardPage extends ConsumerWidget {
         ? zeroProducts.first
         : (lowProducts.isNotEmpty ? lowProducts.first : null);
 
-    final lowName = firstProduct?.name ?? (zeroBalances.isNotEmpty ? zeroBalances.first.itemName : 'Inventory SKU');
+    final lowName = firstProduct?.name ?? (zeroBalances.isNotEmpty ? zeroBalances.first.itemName : 'Product SKU');
     final lowQty = firstProduct?.stockQuantity ?? (zeroBalances.isNotEmpty ? zeroBalances.first.balanceQty.toInt() : 0);
-    final threshold = firstProduct?.lowStockThreshold ?? 10;
-    final totalDepletedCount = zeroProducts.length + zeroBalances.length;
-    final extraCount = totalDepletedCount > 1 ? ' (+${totalDepletedCount - 1} more)' : '';
 
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: isZeroStock
-            ? (isDark ? const Color(0xFF450A0A).withValues(alpha: 0.75) : const Color(0xFFFEF2F2))
-            : (isDark ? const Color(0xFF451A03).withValues(alpha: 0.6) : const Color(0xFFFFFBEB)),
+            ? (isDark ? const Color(0xFF450A0A).withValues(alpha: 0.6) : const Color(0xFFFEF2F2))
+            : (isDark ? const Color(0xFF451A03).withValues(alpha: 0.5) : const Color(0xFFFFFBEB)),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: isZeroStock
               ? (isDark ? const Color(0xFFDC2626) : const Color(0xFFFCA5A5))
               : (isDark ? const Color(0xFFD97706) : const Color(0xFFFDE68A)),
-          width: isZeroStock ? 1.5 : 1.0,
         ),
       ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final isNarrow = constraints.maxWidth < 650;
-
-          final actionButtons = Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: isZeroStock ? const Color(0xFFDC2626) : const Color(0xFFD97706),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                onPressed: () {
-                  if (state.clientProfile.hasInventoryManagement) {
-                    ClientRaiseStockInvoiceModal.show(context, initialProduct: firstProduct);
-                  } else if (firstProduct != null) {
-                    ClientSupplyStockModal.show(context, firstProduct);
-                  }
-                },
-                icon: Icon(isZeroStock ? Icons.local_shipping_rounded : Icons.receipt_long_rounded, size: 14),
-                label: Text(
-                  isZeroStock
-                      ? '+ Dispatch Consignment to Hub Now'
-                      : (state.clientProfile.hasInventoryManagement ? 'Raise Stock Intake' : 'Supply Stock'),
-                  style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w700),
-                ),
-              ),
-              if (onNavigateToInventory != null)
-                OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: isDark ? Colors.white : const Color(0xFF334155),
-                    side: BorderSide(color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  onPressed: onNavigateToInventory,
-                  child: Text(
-                    'View Inventory Ledger',
-                    style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w700),
-                  ),
-                ),
-            ],
-          );
-
-          if (isNarrow) {
-            return Column(
+      child: Row(
+        children: [
+          Icon(
+            isZeroStock ? Icons.error_outline_rounded : Icons.warning_amber_rounded,
+            color: isZeroStock ? const Color(0xFFDC2626) : const Color(0xFFD97706),
+            size: 22,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(7),
-                      decoration: BoxDecoration(
-                        color: (isZeroStock ? const Color(0xFFDC2626) : const Color(0xFFD97706)).withValues(alpha: 0.15),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        isZeroStock ? Icons.error_outline_rounded : Icons.warning_amber_rounded,
-                        color: isZeroStock ? const Color(0xFFDC2626) : const Color(0xFFD97706),
-                        size: 18,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              isZeroStock ? '🚨 OUT OF STOCK AT DC' : '⚠️ LOW STOCK REORDER ALERT',
-                              style: GoogleFonts.inter(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w800,
-                                color: isZeroStock ? const Color(0xFFDC2626) : const Color(0xFFD97706),
-                                letterSpacing: 0.5,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                            decoration: BoxDecoration(
-                              color: isZeroStock ? const Color(0xFFDC2626) : const Color(0xFFD97706),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              isZeroStock ? '0 units left' : '$lowQty units left',
-                              style: GoogleFonts.jetBrainsMono(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
                 Text(
-                  isZeroStock
-                      ? '$lowName$extraCount is completely exhausted on DC warehouse shelves (0 units). New customer orders cannot be picked or fulfilled until you dispatch a fresh consignment.'
-                      : '$lowName$extraCount has dropped to or below safe threshold ($threshold units). Immediate replenishment recommended to prevent regional stock-outs.',
+                  isZeroStock ? 'Critical: Out of Stock at DC' : 'Low Stock Reorder Alert',
                   style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.bold,
+                    color: isZeroStock ? const Color(0xFFDC2626) : const Color(0xFFD97706),
                   ),
                 ),
-                const SizedBox(height: 12),
-                actionButtons,
+                Text(
+                  '$lowName has $lowQty units remaining on DC shelves. Dispatch fresh batch to avoid order holds.',
+                  style: GoogleFonts.inter(
+                    fontSize: 11.5,
+                    color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                  ),
+                  maxLines: isMobile ? 2 : 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
-            );
-          }
-
-          // Desktop wide layout
-          return Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: (isZeroStock ? const Color(0xFFDC2626) : const Color(0xFFD97706)).withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  isZeroStock ? Icons.error_outline_rounded : Icons.warning_amber_rounded,
-                  color: isZeroStock ? const Color(0xFFDC2626) : const Color(0xFFD97706),
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          isZeroStock ? '🚨 CRITICAL: OUT OF STOCK AT DISTRIBUTION CENTER' : '⚠️ LOW STOCK REORDER ALERT',
-                          style: GoogleFonts.inter(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w800,
-                            color: isZeroStock ? const Color(0xFFDC2626) : const Color(0xFFD97706),
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                          decoration: BoxDecoration(
-                            color: isZeroStock ? const Color(0xFFDC2626) : const Color(0xFFD97706),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            isZeroStock ? '0 units left' : '$lowQty units left',
-                            style: GoogleFonts.jetBrainsMono(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      isZeroStock
-                          ? '$lowName$extraCount is completely exhausted on DC warehouse shelves (0 units available for picking). Couriers cannot dispatch or fulfill new orders until you supply fresh stock.'
-                          : '$lowName$extraCount has dropped to or below safe threshold ($threshold units). Immediate replenishment recommended to prevent regional stock-outs.',
-                      style: GoogleFonts.inter(
-                        fontSize: 11.5,
-                        color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              actionButtons,
-            ],
-          );
-        },
+            ),
+          ),
+          const SizedBox(width: 10),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isZeroStock ? const Color(0xFFDC2626) : const Color(0xFFD97706),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              minimumSize: Size.zero,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+            ),
+            onPressed: () {
+              if (state.clientProfile.hasInventoryManagement) {
+                ClientRaiseStockInvoiceModal.show(context, initialProduct: firstProduct);
+              } else if (firstProduct != null) {
+                ClientSupplyStockModal.show(context, firstProduct);
+              }
+            },
+            child: Text(
+              '+ Dispatch Stock',
+              style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildInventoryCustodyCard(BuildContext context, ClientPortalState state, bool isDark) {
-    final totalValuation = state.stockBalances.fold(0.0, (sum, b) => sum + b.balanceValue);
-    final totalUnits = state.stockBalances.fold(0.0, (sum, b) => sum + b.balanceQty).toInt();
-    final activeHubs = state.stockBalances.map((b) => b.warehouse).where((w) => w.isNotEmpty).toSet();
+  // =========================================================================
+  // 3. OPERATIONAL KPI PULSE STRIP (Organic, Non-Boxy, Semantic Tooltips)
+  // =========================================================================
+  Widget _buildKpiPulseStrip(
+    BuildContext context,
+    ClientPortalState state,
+    bool isDark,
+    bool isMobile,
+  ) {
+    final currencyFmt = NumberFormat('#,##0', 'en_US');
 
+    final cards = [
+      _buildPulseMetricCard(
+        label: "Today's Revenue",
+        value: '₦${currencyFmt.format(state.totalRevenue)}',
+        contextText: '₦${currencyFmt.format(state.pendingCodRemittances)} pending COD',
+        icon: Icons.account_balance_wallet_rounded,
+        color: const Color(0xFF10B981),
+        tooltip: 'Delivered customer cash collections today across distribution hubs',
+        isDark: isDark,
+      ),
+      _buildPulseMetricCard(
+        label: 'Active Pipeline',
+        value: '${state.inTransitOrdersCount} In Transit',
+        contextText: '${state.pendingOrdersCount} awaiting hub dispatch',
+        icon: Icons.local_shipping_rounded,
+        color: const Color(0xFF2563EB),
+        tooltip: 'Shipments currently with courier PDA riders or staged for dispatch',
+        isDark: isDark,
+      ),
+      _buildPulseMetricCard(
+        label: 'Delivery Rate',
+        value: '${state.deliverySuccessRate.toStringAsFixed(1)}%',
+        contextText: '${state.deliveredOrdersCount} orders delivered today',
+        icon: Icons.task_alt_rounded,
+        color: const Color(0xFF0D9488),
+        tooltip: 'Percentage of dispatched packages successfully closed and collected',
+        isDark: isDark,
+      ),
+      _buildPulseMetricCard(
+        label: 'Warehouse Stock',
+        value: '${currencyFmt.format(state.stockBalances.fold(0.0, (s, b) => s + b.balanceQty).toInt())} Units',
+        contextText: '${state.stockBalances.length} active SKU positions',
+        icon: Icons.warehouse_rounded,
+        color: const Color(0xFF8B5CF6),
+        tooltip: 'Physical inventory custody safely held across regional distribution centers',
+        isDark: isDark,
+      ),
+    ];
+
+    if (isMobile) {
+      return Column(
+        children: cards
+            .map((c) => Padding(padding: const EdgeInsets.only(bottom: 10), child: c))
+            .toList(),
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final crossCount = constraints.maxWidth > 950 ? 4 : 2;
+        return GridView.count(
+          crossAxisCount: crossCount,
+          crossAxisSpacing: 14,
+          mainAxisSpacing: 14,
+          childAspectRatio: 2.2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          children: cards,
+        );
+      },
+    );
+  }
+
+  Widget _buildPulseMetricCard({
+    required String label,
+    required String value,
+    required String contextText,
+    required IconData icon,
+    required Color color,
+    required String tooltip,
+    required bool isDark,
+  }) {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -585,192 +465,187 @@ class ClientDashboardPage extends ConsumerWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isNarrow = constraints.maxWidth < 600;
-
-              final headerTitle = Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0D9488).withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(Icons.warehouse_rounded, color: Color(0xFF0D9488), size: 18),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Physical Inventory Custody & Landed Valuation',
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                            color: isDark ? Colors.white : const Color(0xFF0F172A),
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Consolidated stock valuation and regional warehouse asset holding',
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            color: const Color(0xFF64748B),
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              );
-
-              final actionBtn = onNavigateToInventory != null
-                  ? TextButton.icon(
-                      onPressed: onNavigateToInventory,
-                      icon: const Icon(Icons.arrow_forward_rounded, size: 14),
-                      label: Text('Open Ledger', style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w700)),
-                      style: TextButton.styleFrom(
-                        foregroundColor: const Color(0xFF0D9488),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      ),
-                    )
-                  : null;
-
-              if (isNarrow) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    headerTitle,
-                    if (actionBtn != null) ...[
-                      const SizedBox(height: 6),
-                      Align(alignment: Alignment.centerRight, child: actionBtn),
-                    ],
-                  ],
-                );
-              }
-
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(child: headerTitle),
-                  if (actionBtn != null) ...[
-                    const SizedBox(width: 12),
-                    actionBtn,
-                  ],
-                ],
-              );
-            },
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: isDark ? 0.2 : 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: color, size: 22),
           ),
-          const SizedBox(height: 16),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isNarrow = constraints.maxWidth < 650;
-              final metrics = [
-                _buildCustodyMetricTile(
-                  label: 'Consolidated Landed Value',
-                  value: '₦${NumberFormat('#,##0.00').format(totalValuation)}',
-                  subtitle: '${state.stockBalances.length} active stock positions',
-                  valueColor: const Color(0xFF10B981),
-                  isDark: isDark,
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      label,
+                      style: GoogleFonts.inter(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Tooltip(
+                      message: tooltip,
+                      child: Icon(
+                        Icons.info_outline_rounded,
+                        size: 13,
+                        color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                      ),
+                    ),
+                  ],
                 ),
-                _buildCustodyMetricTile(
-                  label: 'Physical Network Units',
-                  value: '${NumberFormat('#,###').format(totalUnits)} units',
-                  subtitle: 'In DC physical custody',
-                  valueColor: isDark ? Colors.white : const Color(0xFF0F172A),
-                  isDark: isDark,
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: GoogleFonts.outfit(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-                _buildCustodyMetricTile(
-                  label: 'Regional Depots Holding Stock',
-                  value: '${activeHubs.length} Distribution Hubs',
-                  subtitle: activeHubs.take(2).join(', ') + (activeHubs.length > 2 ? ' +more' : ''),
-                  valueColor: const Color(0xFF2563EB),
-                  isDark: isDark,
+                Text(
+                  contextText,
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ];
-
-              if (isNarrow) {
-                return Column(
-                  children: metrics
-                      .map((m) => Padding(padding: const EdgeInsets.only(bottom: 10), child: m))
-                      .toList(),
-                );
-              }
-              return Row(
-                children: metrics.map((m) => Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: m))).toList(),
-              );
-            },
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildCustodyMetricTile({
-    required String label,
-    required String value,
-    required String subtitle,
-    required Color valueColor,
-    required bool isDark,
-  }) {
+  // =========================================================================
+  // 4. FINANCIAL SETTLEMENT SNAPSHOT TEASER (No Duplicate Ledgers)
+  // =========================================================================
+  Widget _buildSettlementTeaserCard(
+    BuildContext context,
+    ClientPortalState state,
+    bool isDark,
+    bool isMobile,
+  ) {
+    final netExpected = state.todayNetExpectedPayout;
+    final currencyFmt = NumberFormat('#,##0.00', 'en_US');
+
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(10),
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Text(
-            label,
-            style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w600, color: const Color(0xFF64748B)),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF10B981).withValues(alpha: isDark ? 0.2 : 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.payments_rounded, color: Color(0xFF10B981), size: 22),
           ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: GoogleFonts.jetBrainsMono(fontSize: 14, fontWeight: FontWeight.w800, color: valueColor),
-            overflow: TextOverflow.ellipsis,
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      "Today's Net Remittance Expected",
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        '10:00 PM Batch',
+                        style: GoogleFonts.inter(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF10B981),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '₦${currencyFmt.format(netExpected)}',
+                  style: GoogleFonts.outfit(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF10B981),
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 2),
-          Text(
-            subtitle,
-            style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8)),
-            overflow: TextOverflow.ellipsis,
-          ),
+          if (onNavigateToFinance != null)
+            TextButton.icon(
+              onPressed: onNavigateToFinance,
+              icon: const Icon(Icons.arrow_forward_rounded, size: 14),
+              label: Text(
+                isMobile ? 'Finance' : 'Finance Console',
+                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF0D9488),
+              ),
+            ),
         ],
       ),
     );
   }
 
+  // =========================================================================
+  // 5. COMMERCIAL PACKAGE DEALS STRIP
+  // =========================================================================
   List<ProductPackage> _getAllPackages(ClientPortalState state) {
     return state.products.expand((p) => p.packages).toList();
   }
 
-  Widget _buildPackageDealsSection(BuildContext context, ClientPortalState state, bool isDark) {
+  Widget _buildPackageDealsSection(
+    BuildContext context,
+    ClientPortalState state,
+    bool isDark,
+    bool isMobile,
+  ) {
     final allPackages = _getAllPackages(state);
+    final currencyFmt = NumberFormat('#,###', 'en_US');
 
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -781,132 +656,54 @@ class ClientDashboardPage extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isNarrow = constraints.maxWidth < 560;
-
-              final createButton = ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFEC4899),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  minimumSize: Size.zero,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                ),
-                onPressed: () => ClientAddPackageModal.show(context),
-                icon: const Icon(Icons.add_rounded, size: 14),
-                label: Text('+ Create Bundle', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700)),
-              );
-
-              if (isNarrow) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFEC4899).withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Icon(Icons.sell_rounded, color: Color(0xFFEC4899), size: 18),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Commercial Package Deals & Bundle Velocity',
-                                style: GoogleFonts.inter(
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w800,
-                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Volume bundling matrix with promotional pricing and physical unit depletion',
-                                style: GoogleFonts.inter(
-                                  fontSize: 11,
-                                  color: const Color(0xFF64748B),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    createButton,
-                  ],
-                );
-              }
-
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
                 children: [
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFEC4899).withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Icon(Icons.sell_rounded, color: Color(0xFFEC4899), size: 18),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Commercial Package Deals & Bundle Velocity',
-                                style: GoogleFonts.inter(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w800,
-                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
-                                ),
-                              ),
-                              Text(
-                                'Volume bundling matrix with promotional pricing and physical unit depletion',
-                                style: GoogleFonts.inter(
-                                  fontSize: 11,
-                                  color: const Color(0xFF64748B),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                  const Icon(Icons.sell_rounded, size: 16, color: Color(0xFFEC4899)),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Active Commercial Bundles',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  createButton,
                 ],
-              );
-            },
+              ),
+              TextButton.icon(
+                onPressed: () => ClientAddPackageModal.show(context),
+                icon: const Icon(Icons.add_rounded, size: 14),
+                label: Text(
+                  '+ Bundle',
+                  style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold),
+                ),
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFFEC4899),
+                  padding: EdgeInsets.zero,
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           SizedBox(
-            height: 105,
+            height: 80,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: allPackages.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 12),
+              separatorBuilder: (_, __) => const SizedBox(width: 10),
               itemBuilder: (context, index) {
                 final pkg = allPackages[index];
                 return Container(
-                  width: 220,
-                  padding: const EdgeInsets.all(12),
+                  width: 200,
+                  padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: isDark ? const Color(0xFF0F172A) : const Color(0xFFFDF2F8),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: isDark ? const Color(0xFF334155) : const Color(0xFFFBCFE8),
                     ),
@@ -921,43 +718,42 @@ class ClientDashboardPage extends ConsumerWidget {
                           Expanded(
                             child: Text(
                               pkg.packageName,
-                              style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w800),
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                              ),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           if (pkg.freeQuantity > 0)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                              decoration: BoxDecoration(
+                            Text(
+                              '+${pkg.freeQuantity} Free',
+                              style: GoogleFonts.inter(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w700,
                                 color: const Color(0xFF10B981),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                '+${pkg.freeQuantity} Free',
-                                style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.white),
                               ),
                             ),
                         ],
-                      ),
-                      Text(
-                        pkg.productName,
-                        style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
-                        overflow: TextOverflow.ellipsis,
                       ),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            '₦${NumberFormat('#,###').format(pkg.packagePrice)}',
-                            style: GoogleFonts.jetBrainsMono(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w800,
+                            '₦${currencyFmt.format(pkg.packagePrice)}',
+                            style: GoogleFonts.outfit(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.bold,
                               color: const Color(0xFFEC4899),
                             ),
                           ),
                           Text(
-                            '${pkg.quantity} units (${NumberFormat('#,###').format(pkg.unitPrice)}/u)',
-                            style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B)),
+                            '${pkg.quantity} units (₦${currencyFmt.format(pkg.unitPrice)}/u)',
+                            style: GoogleFonts.inter(
+                              fontSize: 10,
+                              color: const Color(0xFF64748B),
+                            ),
                           ),
                         ],
                       ),
@@ -972,41 +768,28 @@ class ClientDashboardPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildDailyCashAccumulatorCard(BuildContext context, ClientPortalState state) {
-    final now = DateTime.now();
-    final closeoutTime = DateTime(now.year, now.month, now.day, 22, 0); // 10:00 PM
-    final isPastCloseout = now.isAfter(closeoutTime);
-    final difference = isPastCloseout
-        ? closeoutTime.add(const Duration(days: 1)).difference(now)
-        : closeoutTime.difference(now);
-    final hours = difference.inHours;
-    final minutes = difference.inMinutes % 60;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    String formatMoney(double amt) => CurrencyFormatter.formatNaira(amt).replaceAll('NGN', '').replaceAll('₦', '').trim();
-
-    final awaitingCount = state.todayCompletedOrdersCount;
-    final gross = state.todayGrossCashHolding;
-    final deductions = state.todayTotalChargesDeducted;
-    final netExpected = state.todayNetExpectedPayout;
+  // =========================================================================
+  // 6. LIVE DISPATCHES & ORDERS (Desktop Table / Mobile Card-to-Sheet)
+  // =========================================================================
+  Widget _buildLiveDispatchesSection(
+    BuildContext context,
+    ClientPortalState state,
+    bool isDark,
+    bool isMobile,
+  ) {
+    final recentOrders = state.orders.take(8).toList();
 
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: EdgeInsets.all(isMobile ? 14 : 20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isDark
-              ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
-              : [const Color(0xFFF0FDF4), const Color(0xFFE6F4EA)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isDark ? const Color(0xFF334155) : const Color(0xFF86EFAC),
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -1016,426 +799,46 @@ class ClientDashboardPage extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0D9488).withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.nightlight_round, color: Color(0xFF0D9488), size: 22),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            'Live Cash Accumulator (Awaiting Client Settlement)',
-                            style: GoogleFonts.inter(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w800,
-                              color: isDark ? Colors.white : const Color(0xFF065F46),
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Reconciliation batch in ${hours}h ${minutes}m • Live cash in DC vault',
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF047857),
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0D9488),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Text(
-                  '$awaitingCount Delivered',
-                  style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          const Divider(height: 1),
-          const SizedBox(height: 14),
-
-          // 3 Responsive Metrics
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isWide = constraints.maxWidth >= 640;
-              final metrics = Wrap(
-                spacing: 20,
-                runSpacing: 10,
+              Row(
                 children: [
-                  // Expected Net Settlement
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Expected Net Bank Settlement',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF047857),
-                        ),
-                      ),
-                      Text(
-                        '₦${formatMoney(netExpected)}',
-                        style: GoogleFonts.inter(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                          color: const Color(0xFF0D9488),
-                        ),
-                      ),
-                    ],
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0D9488).withValues(alpha: isDark ? 0.2 : 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.local_shipping_rounded, color: Color(0xFF0D9488), size: 18),
                   ),
-
-                  // Gross Collections
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Gross Collections',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                        ),
-                      ),
-                      Text(
-                        '₦${formatMoney(gross)}',
-                        style: GoogleFonts.inter(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                          color: isDark ? Colors.white : const Color(0xFF0F172A),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  // Deductions
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Itemized Charges',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                        ),
-                      ),
-                      Text(
-                        '-₦${formatMoney(deductions)}',
-                        style: GoogleFonts.inter(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                          color: const Color(0xFFDC2626),
-                        ),
-                      ),
-                    ],
+                  const SizedBox(width: 10),
+                  Text(
+                    'Live Dispatch Radar',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    ),
                   ),
                 ],
-              );
-
-              final btn = OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF0D9488),
-                  side: const BorderSide(color: Color(0xFF0D9488)),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                onPressed: () => ClientDailyAccumulatorModal.show(context),
-                icon: const Icon(Icons.receipt_long_rounded, size: 16),
-                label: Text(
-                  'Breakdown & Charges',
-                  style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold),
-                ),
-              );
-
-              return isWide
-                  ? Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(child: metrics),
-                        const SizedBox(width: 12),
-                        btn,
-                      ],
-                    )
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        metrics,
-                        const SizedBox(height: 12),
-                        SizedBox(width: double.infinity, child: btn),
-                      ],
-                    );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildKpiMetricsGrid(BuildContext context, ClientPortalState state, bool isDark) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final crossAxisCount = constraints.maxWidth > 900 ? 4 : (constraints.maxWidth > 550 ? 2 : 1);
-        final aspectRatio = constraints.maxWidth > 900 ? 2.1 : (constraints.maxWidth > 550 ? 2.1 : 3.0);
-        return GridView.count(
-          crossAxisCount: crossAxisCount,
-          crossAxisSpacing: 14,
-          mainAxisSpacing: 14,
-          childAspectRatio: aspectRatio,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          children: [
-            _buildKpiCard(
-              title: 'Total Shipments',
-              value: '${state.totalOrdersCount}',
-              subtitle: '${state.pendingOrdersCount} awaiting dispatch',
-              icon: Icons.inventory_2_outlined,
-              color: const Color(0xFF2563EB),
-              isDark: isDark,
-            ),
-            _buildKpiCard(
-              title: 'Active In-Transit',
-              value: '${state.inTransitOrdersCount}',
-              subtitle: 'Dispatched to field riders',
-              icon: Icons.two_wheeler_rounded,
-              color: const Color(0xFFF59E0B),
-              isDark: isDark,
-            ),
-            _buildKpiCard(
-              title: 'Delivered Today',
-              value: '${state.deliveredOrdersCount}',
-              subtitle: 'Success Rate: ${state.deliverySuccessRate.toStringAsFixed(1)}%',
-              icon: Icons.check_circle_outline_rounded,
-              color: const Color(0xFF10B981),
-              isDark: isDark,
-            ),
-            _buildKpiCard(
-              title: 'Gross Delivered Value',
-              value: '₦${_formatMoney(state.totalRevenue)}',
-              subtitle: 'COD Pending: ₦${_formatMoney(state.pendingCodRemittances)}',
-              icon: Icons.account_balance_wallet_outlined,
-              color: const Color(0xFF8B5CF6),
-              isDark: isDark,
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildKpiCard({
-    required String title,
-    required String value,
-    required String subtitle,
-    required IconData icon,
-    required Color color,
-    required bool isDark,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF151D36) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: isDark ? 0.2 : 0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: color, size: 24),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  title,
-                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  value,
-                  style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  subtitle,
-                  style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuickActionsRow(BuildContext context, WidgetRef ref, ClientPortalState state, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF151D36) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
-      ),
-      child: Wrap(
-        spacing: 12,
-        runSpacing: 10,
-        alignment: WrapAlignment.spaceBetween,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.flash_on_rounded, color: Color(0xFF0D9488), size: 20),
-              const SizedBox(width: 8),
-              Text(
-                'Quick Merchant Actions',
-                style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF1E293B)),
               ),
-            ],
-          ),
-          Wrap(
-            spacing: 10,
-            runSpacing: 8,
-            children: [
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  side: BorderSide(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFCBD5E1)),
-                ),
-                onPressed: () => ClientCreateOrderModal.show(context),
-                icon: const Icon(Icons.add_box_outlined, size: 16, color: Color(0xFF0D9488)),
-                label: Text('Create Order', style: GoogleFonts.inter(color: isDark ? Colors.white : const Color(0xFF1E293B))),
-              ),
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  side: BorderSide(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFCBD5E1)),
-                ),
-                onPressed: () {
-                  if (state.products.isNotEmpty) {
-                    ClientAddPackageModal.show(context, product: state.products.first);
-                  } else {
-                    onNavigateToProducts();
-                  }
-                },
-                icon: const Icon(Icons.add_shopping_cart, size: 16, color: Color(0xFF2563EB)),
-                label: Text('Add Package Deal', style: GoogleFonts.inter(color: isDark ? Colors.white : const Color(0xFF1E293B))),
-              ),
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  side: BorderSide(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFCBD5E1)),
-                ),
+              TextButton.icon(
                 onPressed: onNavigateToOrders,
-                icon: const Icon(Icons.list_alt_rounded, size: 16, color: Color(0xFF475569)),
-                label: Text('View All Orders', style: GoogleFonts.inter(color: isDark ? Colors.white : const Color(0xFF1E293B))),
+                icon: const Icon(Icons.arrow_forward_rounded, size: 14),
+                label: Text(
+                  'All Orders',
+                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFF0D9488),
+                  padding: EdgeInsets.zero,
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
               ),
             ],
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLiveOrdersSection(BuildContext context, ClientPortalState state, WidgetRef ref, bool isDark) {
-    final recentOrders = state.orders.take(6).toList();
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF151D36) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isNarrow = constraints.maxWidth < 550;
-
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          isNarrow ? 'Real-Time Shipments' : 'Real-Time Shipments & Dispatch Pipeline',
-                          style: GoogleFonts.inter(
-                            fontSize: isNarrow ? 15 : 16,
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? Colors.white : const Color(0xFF0F172A),
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Text(
-                          isNarrow ? 'Live orders & dispatches across DCs' : 'Track orders dispatched to Distribution Centers and PDA Riders across Nigeria',
-                          style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  TextButton.icon(
-                    onPressed: onNavigateToOrders,
-                    style: TextButton.styleFrom(
-                      padding: EdgeInsets.symmetric(horizontal: isNarrow ? 8 : 12, vertical: 6),
-                      minimumSize: Size.zero,
-                    ),
-                    icon: const Icon(Icons.arrow_forward_rounded, size: 15),
-                    label: Text(isNarrow ? 'See All' : 'See All Shipments', style: TextStyle(fontSize: isNarrow ? 12 : 13)),
-                  ),
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
           if (recentOrders.isEmpty)
             Center(
@@ -1443,246 +846,534 @@ class ClientDashboardPage extends ConsumerWidget {
                 padding: const EdgeInsets.all(32),
                 child: Column(
                   children: [
-                    const Icon(Icons.local_shipping_outlined, size: 48, color: Color(0xFFCBD5E1)),
-                    const SizedBox(height: 12),
+                    const Icon(Icons.inventory_2_outlined, size: 40, color: Color(0xFF94A3B8)),
+                    const SizedBox(height: 10),
                     Text(
-                      'No shipments created yet',
-                      style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: const Color(0xFF64748B)),
+                      'No active dispatches right now',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF64748B),
+                      ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Text(
-                      'Tap "Create New Order" to start sending packages to customers',
-                      style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)),
+                      'Tap "+ New Order" or "⚡ Smart Paste" to dispatch to customers',
+                      style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF94A3B8)),
                     ),
                   ],
                 ),
               ),
             )
-          else ...[
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final isTableMode = constraints.maxWidth >= 650;
-                return ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: recentOrders.length,
-                  separatorBuilder: (context, index) => Divider(color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9), height: 16),
-                  itemBuilder: (context, index) {
-                    final order = recentOrders[index];
-                    return InkWell(
-                      onTap: () => ClientOrderTrackingModal.show(context, order),
-                      borderRadius: BorderRadius.circular(8),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-                        child: isTableMode
-                            ? Row(
-                                children: [
-                                  Container(
-                                    width: 40,
-                                    height: 40,
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF0D9488).withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Icon(Icons.local_shipping_rounded, color: Color(0xFF0D9488), size: 20),
-                                  ),
-                                  const SizedBox(width: 14),
-                                  Expanded(
-                                    flex: 3,
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          order.orderNumber,
-                                          style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: isDark ? Colors.white : const Color(0xFF0F172A)),
-                                        ),
-                                        Text(
-                                          '${order.customerName} • ${order.deliveryLga ?? "AMAC"}, ${order.deliveryState}',
-                                          style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Expanded(
-                                    flex: 2,
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          '${order.productName} (${order.packageName ?? "${order.quantity} units"})',
-                                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500, color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF1E293B)),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        Text(
-                                          '₦${order.totalAmount.toStringAsFixed(0)} • ${order.paymentType}',
-                                          style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Expanded(
-                                    flex: 2,
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          order.assignedAgentName ?? (order.distributionCenterName ?? 'Station DC'),
-                                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? Colors.white : const Color(0xFF0F172A)),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        Text(
-                                          order.assignedAgentPhone ?? 'Auto-Assigned',
-                                          style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  _buildStatusBadge(order.status),
-                                  const SizedBox(width: 8),
-                                  IconButton(
-                                    icon: const Icon(Icons.track_changes_rounded, color: Color(0xFF0D9488), size: 20),
-                                    tooltip: 'Track Live Status',
-                                    onPressed: () => ClientOrderTrackingModal.show(context, order),
-                                  ),
-                                ],
-                              )
-                            : Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          order.orderNumber,
-                                          style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: isDark ? Colors.white : const Color(0xFF0F172A)),
-                                        ),
-                                        _buildStatusBadge(order.status),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      order.customerName,
-                                      style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: isDark ? Colors.white : const Color(0xFF1E293B)),
-                                    ),
-                                    Text(
-                                      '${order.customerPhone} • ${order.deliveryLga ?? "AMAC"}, ${order.deliveryState}',
-                                      style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            '${order.productName} (${order.packageName ?? "${order.quantity} units"})',
-                                            style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w500, color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155)),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                        Text(
-                                          '₦${order.totalAmount.toStringAsFixed(0)}',
-                                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF10B981)),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            const Icon(Icons.two_wheeler_rounded, size: 13, color: Color(0xFF94A3B8)),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              order.assignedAgentName ?? (order.distributionCenterName ?? 'Station DC'),
-                                              style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
-                                            ),
-                                          ],
-                                        ),
-                                        Row(
-                                          children: [
-                                            Text('Track', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF0D9488))),
-                                            const Icon(Icons.chevron_right_rounded, size: 14, color: Color(0xFF0D9488)),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                      ),
-                    );
-                  },
-                );
+          else if (isMobile)
+            // Mobile: Condensed Organic Cards -> Tapping opens Detail Bottom Sheet
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: recentOrders.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              itemBuilder: (context, index) {
+                final order = recentOrders[index];
+                return _buildMobileOrderCard(context, order, isDark);
               },
-            ),
-          ],
+            )
+          else
+            // Desktop: High-Density Scannable Table
+            _buildDesktopOrdersTable(context, recentOrders, isDark),
         ],
       ),
     );
   }
 
-  Widget _buildStatusBadge(String status) {
+  // =========================================================================
+  // MOBILE ORDER CARD & DETAIL BOTTOM SHEET
+  // =========================================================================
+  Widget _buildMobileOrderCard(BuildContext context, OrderEntity order, bool isDark) {
+    return InkWell(
+      onTap: () => _showOrderDetailSheet(context, order, isDark),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    order.orderNumber,
+                    style: GoogleFonts.inter(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                _buildStatusDotPill(order.status),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    order.customerName,
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF1E293B),
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Text(
+                  '₦${order.totalAmount.toStringAsFixed(0)}',
+                  style: GoogleFonts.outfit(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF10B981),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '${order.lga ?? "City"}, ${order.deliveryState} • ${order.productName}',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    color: const Color(0xFF64748B),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Row(
+                  children: [
+                    Text(
+                      'Details',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF0D9488),
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right_rounded, size: 14, color: Color(0xFF0D9488)),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showOrderDetailSheet(BuildContext context, OrderEntity order, bool isDark) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white24 : Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Header Row: Order Number & Status
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        order.orderNumber,
+                        style: GoogleFonts.outfit(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                      ),
+                      Text(
+                        'Destination: ${order.lga ?? "City"}, ${order.deliveryState}',
+                        style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                      ),
+                    ],
+                  ),
+                ),
+                _buildStatusDotPill(order.status),
+              ],
+            ),
+            const Divider(height: 24),
+
+            // Customer Contact Box
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.person_rounded, size: 16, color: Color(0xFF0D9488)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          order.customerName,
+                          style: GoogleFonts.inter(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '📍 ${order.deliveryAddress}',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+                    ),
+                  ),
+                  Text(
+                    '${order.lga ?? "City"}, ${order.deliveryState}',
+                    style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          minimumSize: Size.zero,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                        ),
+                        onPressed: () async {
+                          final cleanPhone = order.customerPhone.replaceAll(RegExp(r'[^0-9+]'), '');
+                          final uri = Uri.parse('tel:$cleanPhone');
+                          if (await canLaunchUrl(uri)) await launchUrl(uri);
+                        },
+                        icon: const Icon(Icons.call_rounded, size: 13),
+                        label: Text('Call', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold)),
+                      ),
+                      const SizedBox(width: 8),
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF25D366),
+                          side: const BorderSide(color: Color(0xFF25D366)),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          minimumSize: Size.zero,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                        ),
+                        onPressed: () async {
+                          var cleanPhone = order.customerPhone.replaceAll(RegExp(r'[^0-9]'), '');
+                          if (cleanPhone.startsWith('0')) cleanPhone = '234${cleanPhone.substring(1)}';
+                          final uri = Uri.parse('https://wa.me/$cleanPhone');
+                          if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        },
+                        icon: const Icon(Icons.chat_bubble_rounded, size: 13),
+                        label: Text('WhatsApp', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Order Items & Courier Details
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Item Ordered', style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B))),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${order.productName} (${order.packageDealName ?? "${order.quantity} units"})',
+                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          '₦${order.totalAmount.toStringAsFixed(0)} • ${order.paymentType}',
+                          style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF10B981)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Courier / Hub', style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B))),
+                        const SizedBox(height: 2),
+                        Text(
+                          order.deliveryAgentName ?? (order.distributionCenterName ?? 'Station DC'),
+                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          order.deliveryAgentPhone ?? 'Auto-Assigned',
+                          style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+
+            // Live Tracking Action Button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0D9488),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  ClientOrderTrackingModal.show(context, order);
+                },
+                icon: const Icon(Icons.track_changes_rounded, size: 16),
+                label: Text('Track Full Shipment Progress', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // =========================================================================
+  // DESKTOP ORDERS TABLE
+  // =========================================================================
+  Widget _buildDesktopOrdersTable(
+    BuildContext context,
+    List<OrderEntity> orders,
+    bool isDark,
+  ) {
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: orders.length,
+      separatorBuilder: (_, __) => Divider(
+        color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+        height: 14,
+      ),
+      itemBuilder: (context, index) {
+        final order = orders[index];
+        return InkWell(
+          onTap: () => ClientOrderTrackingModal.show(context, order),
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0D9488).withValues(alpha: isDark ? 0.2 : 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.local_shipping_rounded, color: Color(0xFF0D9488), size: 18),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 3,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        order.orderNumber,
+                        style: GoogleFonts.inter(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12.5,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                      ),
+                      Text(
+                        '${order.customerName} • ${order.lga ?? "City"}, ${order.deliveryState}',
+                        style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  flex: 3,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${order.productName} (${order.packageDealName ?? "${order.quantity}u"})',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        '₦${order.totalAmount.toStringAsFixed(0)} • ${order.paymentType}',
+                        style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF10B981)),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        order.deliveryAgentName ?? (order.distributionCenterName ?? 'Station DC'),
+                        style: GoogleFonts.inter(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        order.deliveryAgentPhone ?? 'Auto-Assigned',
+                        style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _buildStatusDotPill(order.status),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.track_changes_rounded, color: Color(0xFF0D9488), size: 18),
+                  tooltip: 'Track Live Status',
+                  onPressed: () => ClientOrderTrackingModal.show(context, order),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildStatusDotPill(String status) {
     Color bg;
-    Color fg;
+    Color dot;
     String label;
 
     final s = status.toLowerCase();
     if (s == 'delivered' || s == 'completed') {
       bg = const Color(0xFFDCFCE7);
-      fg = const Color(0xFF166534);
+      dot = const Color(0xFF166534);
       label = 'Delivered';
     } else if (s == 'in_transit' || s == 'out_for_delivery' || s == 'accepted') {
       bg = const Color(0xFFDBEAFE);
-      fg = const Color(0xFF1E40AF);
+      dot = const Color(0xFF1E40AF);
       label = 'In Transit';
     } else if (s == 'assigned') {
       bg = const Color(0xFFFEF3C7);
-      fg = const Color(0xFF92400E);
+      dot = const Color(0xFF92400E);
       label = 'Assigned';
     } else if (s == 'failed' || s == 'cancelled' || s == 'rejected') {
       bg = const Color(0xFFFEE2E2);
-      fg = const Color(0xFF991B1B);
+      dot = const Color(0xFF991B1B);
       label = 'Failed';
     } else {
       bg = const Color(0xFFF1F5F9);
-      fg = const Color(0xFF475569);
+      dot = const Color(0xFF475569);
       label = 'Processing';
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
-      child: Text(
-        label,
-        style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: fg),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 10.5,
+              fontWeight: FontWeight.bold,
+              color: dot,
+            ),
+          ),
+        ],
       ),
     );
-  }
-
-  String _formatMoney(double val) {
-    if (val >= 1000000) {
-      return '${(val / 1000000).toStringAsFixed(2)}M';
-    } else if (val >= 1000) {
-      return '${(val / 1000).toStringAsFixed(1)}K';
-    }
-    return val.toStringAsFixed(0);
   }
 }

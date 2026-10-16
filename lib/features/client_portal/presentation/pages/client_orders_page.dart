@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/constants/nigeria_locations.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../widgets/client_order_tracking_modal.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../providers/client_portal_provider.dart';
 import '../../../../core/helpers/formatters.dart';
-import '../widgets/client_daily_accumulator_modal.dart';
 import '../widgets/client_create_order_modal.dart';
 import '../widgets/pangea_excel_data_table.dart';
 import '../../../orders/presentation/widgets/smart_order_paste_modal.dart';
@@ -247,12 +247,6 @@ class _ClientOrdersPageState extends ConsumerState<ClientOrdersPage> {
           ),
           const SizedBox(height: 16),
 
-          // Daily 10:00 PM Closeout Cash Holding Alert Banner
-          if (state.todayCompletedOrdersCount > 0) ...[
-            _buildDailyCloseoutAlertBanner(context, state, isDark),
-            const SizedBox(height: 16),
-          ],
-
           // Orders List: Responsive Table for Desktop vs Clean Cards for Mobile/Tablet
           if (orders.isEmpty)
             Container(
@@ -393,96 +387,6 @@ class _ClientOrdersPageState extends ConsumerState<ClientOrdersPage> {
             color: isSelected ? Colors.white : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildDailyCloseoutAlertBanner(BuildContext context, ClientPortalState state, bool isDark) {
-    String formatMoney(double amt) => CurrencyFormatter.formatNaira(amt).replaceAll('NGN', '').replaceAll('₦', '').trim();
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isDark
-              ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
-              : [const Color(0xFFF0FDF4), const Color(0xFFDCFCE7)],
-        ),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFF86EFAC)),
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final isWide = constraints.maxWidth >= 640;
-          final content = Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0D9488).withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.nightlight_round, color: Color(0xFF0D9488), size: 20),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Delivered Today: ${state.todayCompletedOrdersCount} Orders Awaiting Client Settlement',
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        color: isDark ? Colors.white : const Color(0xFF065F46),
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Gross: ₦${formatMoney(state.todayGrossCashHolding)} • Deductions: -₦${formatMoney(state.todayTotalChargesDeducted)} • Net Expected: ₦${formatMoney(state.todayNetExpectedPayout)}',
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF047857),
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          );
-
-          final actionBtn = ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0D9488),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              elevation: 0,
-            ),
-            onPressed: () => ClientDailyAccumulatorModal.show(context),
-            icon: const Icon(Icons.account_balance_wallet_rounded, size: 14),
-            label: Text('Breakdown', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold)),
-          );
-
-          return isWide
-              ? Row(
-                  children: [
-                    Expanded(child: content),
-                    const SizedBox(width: 12),
-                    actionBtn,
-                  ],
-                )
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    content,
-                    const SizedBox(height: 10),
-                    SizedBox(width: double.infinity, child: actionBtn),
-                  ],
-                );
-        },
       ),
     );
   }
@@ -798,14 +702,14 @@ class _ClientOrdersPageState extends ConsumerState<ClientOrdersPage> {
 
   Widget _buildOrderMobileCard(OrderEntity order, bool isDark) {
     return InkWell(
-      onTap: () => ClientOrderTrackingModal.show(context, order),
+      onTap: () => _showOrderDetailSheet(context, order, isDark),
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF151D36) : Colors.white,
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
+          border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
@@ -823,7 +727,7 @@ class _ClientOrdersPageState extends ConsumerState<ClientOrdersPage> {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.local_shipping_rounded, size: 16, color: Color(0xFFF37021)),
+                    const Icon(Icons.local_shipping_rounded, size: 16, color: Color(0xFF0D9488)),
                     const SizedBox(width: 6),
                     Text(
                       order.orderNumber,
@@ -850,7 +754,7 @@ class _ClientOrdersPageState extends ConsumerState<ClientOrdersPage> {
               ),
             ),
             Text(
-              '${order.customerPhone} • ${order.lga ?? "AMAC"}, ${order.deliveryState}',
+              '${order.customerPhone} • ${order.lga ?? "City"}, ${order.deliveryState}',
               style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -861,7 +765,7 @@ class _ClientOrdersPageState extends ConsumerState<ClientOrdersPage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF0B1021) : const Color(0xFFF8FAFC),
+                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -905,37 +809,267 @@ class _ClientOrdersPageState extends ConsumerState<ClientOrdersPage> {
                     const Icon(Icons.two_wheeler_rounded, size: 14, color: Color(0xFF94A3B8)),
                     const SizedBox(width: 4),
                     Text(
-                      order.deliveryAgentName ?? 'Pending Rider',
+                      order.deliveryAgentName ?? 'Pending Courier',
                       style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
                     ),
                   ],
                 ),
-                if (order.closerCode != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF37021).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      'Closer: ${order.closerCode}',
-                      style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: const Color(0xFFF37021)),
-                    ),
-                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('View Details', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF0D9488))),
+                    const Icon(Icons.chevron_right_rounded, size: 14, color: Color(0xFF0D9488)),
+                  ],
+                ),
               ],
             ),
-            const SizedBox(height: 10),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showOrderDetailSheet(BuildContext context, OrderEntity order, bool isDark) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white24 : Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Header Row: Order Number & Status
             Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                OutlinedButton.icon(
-                  onPressed: () => OrderPipelineChatSheet.showForOrder(context, order),
-                  icon: const Icon(Icons.forum_outlined, size: 14, color: Color(0xFF0D9488)),
-                  label: const Text('Pipeline Chat', style: TextStyle(fontSize: 11.5, color: Color(0xFF0D9488), fontWeight: FontWeight.bold)),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    side: const BorderSide(color: Color(0xFF0D9488)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        order.orderNumber,
+                        style: GoogleFonts.outfit(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                      ),
+                      Text(
+                        'Destination: ${order.lga ?? "City"}, ${order.deliveryState}',
+                        style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                      ),
+                    ],
+                  ),
+                ),
+                _buildStatusBadge(order.status),
+              ],
+            ),
+            const Divider(height: 24),
+
+            // Customer Contact Box
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.person_rounded, size: 16, color: Color(0xFF0D9488)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          order.customerName,
+                          style: GoogleFonts.inter(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '📍 ${order.deliveryAddress}',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+                    ),
+                  ),
+                  Text(
+                    '${order.lga ?? "City"}, ${order.deliveryState}',
+                    style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          minimumSize: Size.zero,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                        ),
+                        onPressed: () async {
+                          final cleanPhone = order.customerPhone.replaceAll(RegExp(r'[^0-9+]'), '');
+                          final uri = Uri.parse('tel:$cleanPhone');
+                          if (await canLaunchUrl(uri)) await launchUrl(uri);
+                        },
+                        icon: const Icon(Icons.call_rounded, size: 13),
+                        label: Text('Call', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold)),
+                      ),
+                      const SizedBox(width: 8),
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF25D366),
+                          side: const BorderSide(color: Color(0xFF25D366)),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          minimumSize: Size.zero,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                        ),
+                        onPressed: () async {
+                          var cleanPhone = order.customerPhone.replaceAll(RegExp(r'[^0-9]'), '');
+                          if (cleanPhone.startsWith('0')) cleanPhone = '234${cleanPhone.substring(1)}';
+                          final uri = Uri.parse('https://wa.me/$cleanPhone');
+                          if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        },
+                        icon: const Icon(Icons.chat_bubble_rounded, size: 13),
+                        label: Text('WhatsApp', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Order Items & Courier Details
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Item Ordered', style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B))),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${order.productName} (${order.packageDealName ?? "${order.quantity} units"})',
+                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          '₦${order.totalAmount.toStringAsFixed(0)} • ${order.paymentType}',
+                          style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF10B981)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Courier / Hub', style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B))),
+                        const SizedBox(height: 2),
+                        Text(
+                          order.deliveryAgentName ?? (order.distributionCenterName ?? 'Station DC'),
+                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          order.deliveryAgentPhone ?? 'Auto-Assigned',
+                          style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+
+            // Live Tracking & Pipeline Chat Buttons
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF0D9488),
+                      side: const BorderSide(color: Color(0xFF0D9488)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      OrderPipelineChatSheet.showForOrder(context, order);
+                    },
+                    icon: const Icon(Icons.forum_outlined, size: 16),
+                    label: Text('Pipeline Chat', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0D9488),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      ClientOrderTrackingModal.show(context, order);
+                    },
+                    icon: const Icon(Icons.track_changes_rounded, size: 16),
+                    label: Text('Track Progress', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
                   ),
                 ),
               ],

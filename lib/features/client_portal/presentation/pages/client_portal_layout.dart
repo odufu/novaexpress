@@ -164,6 +164,7 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
           onNavigateToOrders: () => ref.read(clientActiveTabProvider.notifier).state = 'orders',
           onNavigateToProducts: () => ref.read(clientActiveTabProvider.notifier).state = 'products',
           onNavigateToInventory: () => ref.read(clientActiveTabProvider.notifier).state = 'inventory',
+          onNavigateToFinance: () => ref.read(clientActiveTabProvider.notifier).state = 'finance',
         );
     }
   }

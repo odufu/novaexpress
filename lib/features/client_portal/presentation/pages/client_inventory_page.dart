@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import '../../../../core/theme/theme_provider.dart';
 import '../../domain/entities/client_stock_balance.dart';
 import '../../domain/entities/client_stock_invoice.dart';
 import '../../domain/entities/client_supplier_expanded.dart';
@@ -154,7 +155,10 @@ class _ClientInventoryPageState extends ConsumerState<ClientInventoryPage> with 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(clientPortalProvider);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final themeMode = ref.watch(themeProvider);
+    final isDark = themeMode == ThemeMode.dark ||
+        (themeMode == ThemeMode.system &&
+            MediaQuery.of(context).platformBrightness == Brightness.dark);
     final screenWidth = MediaQuery.of(context).size.width;
     final isCompact = screenWidth < 900;
 
@@ -220,24 +224,39 @@ class _ClientInventoryPageState extends ConsumerState<ClientInventoryPage> with 
                   unselectedLabelStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500),
                   tabs: [
                     Tab(
-                      icon: const Icon(Icons.table_chart_rounded, size: 18),
-                      text: 'Stock Ledger (${state.stockBalances.length})',
+                      icon: const Tooltip(
+                        message: 'Multi-warehouse stock positions & inventory balance',
+                        child: Icon(Icons.table_chart_rounded, size: 18),
+                      ),
+                      text: 'Ledger (${state.stockBalances.length})',
                     ),
                     Tab(
-                      icon: const Icon(Icons.shield_outlined, size: 18),
-                      text: 'Custody & Holders (${state.stockHolders.length})',
+                      icon: const Tooltip(
+                        message: 'Stock held across DCs, riders, and depots',
+                        child: Icon(Icons.shield_outlined, size: 18),
+                      ),
+                      text: 'Custody (${state.stockHolders.length})',
                     ),
                     Tab(
-                      icon: const Icon(Icons.receipt_long_rounded, size: 18),
-                      text: 'Intake Invoices (${state.stockInvoices.length})',
+                      icon: const Tooltip(
+                        message: 'Supplier shipments & inbound goods invoices',
+                        child: Icon(Icons.receipt_long_rounded, size: 18),
+                      ),
+                      text: 'Invoices (${state.stockInvoices.length})',
                     ),
                     Tab(
-                      icon: const Icon(Icons.people_alt_rounded, size: 18),
-                      text: 'Suppliers Directory (${state.suppliers.length})',
+                      icon: const Tooltip(
+                        message: 'Procurement vendors and trade partners',
+                        child: Icon(Icons.people_alt_rounded, size: 18),
+                      ),
+                      text: 'Suppliers (${state.suppliers.length})',
                     ),
                     Tab(
-                      icon: const Icon(Icons.pie_chart_rounded, size: 18),
-                      text: 'Unit Economics & Landed Cost',
+                      icon: const Tooltip(
+                        message: 'Landed cost, margin and unit profitability',
+                        child: Icon(Icons.pie_chart_rounded, size: 18),
+                      ),
+                      text: 'Economics',
                     ),
                   ],
                 ),
@@ -328,36 +347,45 @@ class _ClientInventoryPageState extends ConsumerState<ClientInventoryPage> with 
       spacing: 8,
       runSpacing: 8,
       children: [
-        OutlinedButton.icon(
-          onPressed: () => ClientImportStockBalanceModal.show(context),
-          icon: const Icon(Icons.upload_file_rounded, size: 15),
-          label: Text('Import CSV', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
-          style: OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        Tooltip(
+          message: 'Upload stock balance spreadsheet (CSV)',
+          child: OutlinedButton.icon(
+            onPressed: () => ClientImportStockBalanceModal.show(context),
+            icon: const Icon(Icons.upload_file_rounded, size: 15),
+            label: Text('Import CSV', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
           ),
         ),
-        OutlinedButton.icon(
-          onPressed: _exportCsv,
-          icon: const Icon(Icons.download_rounded, size: 15),
-          label: Text('Export CSV', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
-          style: OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        Tooltip(
+          message: 'Copy stock ledger data to clipboard as CSV',
+          child: OutlinedButton.icon(
+            onPressed: _exportCsv,
+            icon: const Icon(Icons.download_rounded, size: 15),
+            label: Text('Export CSV', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
           ),
         ),
-        ElevatedButton.icon(
-          onPressed: () => ClientRaiseStockInvoiceModal.show(context),
-          icon: const Icon(Icons.add_rounded, size: 16),
-          label: Text(
-            '+ Raise Stock Invoice',
-            style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700),
-          ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF0D9488),
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        Tooltip(
+          message: 'Record incoming supplier consignment & generate intake invoice',
+          child: ElevatedButton.icon(
+            onPressed: () => ClientRaiseStockInvoiceModal.show(context),
+            icon: const Icon(Icons.add_rounded, size: 16),
+            label: Text(
+              '+ Raise Invoice',
+              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0D9488),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
           ),
         ),
       ],

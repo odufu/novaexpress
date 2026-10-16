@@ -173,42 +173,51 @@ class _ClientMarketingSuitePageState extends ConsumerState<ClientMarketingSuiteP
                       labelStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700),
                       tabs: [
                         Tab(
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.assignment_outlined, size: 16),
-                              const SizedBox(width: 8),
-                              Text('Campaign Lead Forms (${forms.length})'),
-                            ],
+                          child: Tooltip(
+                            message: 'Campaign lead capture checkout forms & webhooks',
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.assignment_outlined, size: 16),
+                                const SizedBox(width: 8),
+                                Text('Forms (${forms.length})'),
+                              ],
+                            ),
                           ),
                         ),
                         Tab(
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.people_alt_outlined, size: 16),
-                              const SizedBox(width: 8),
-                              Text('Digital Marketers Team (${marketers.length})'),
-                            ],
+                          child: Tooltip(
+                            message: 'Digital media buyers, ad agencies and closer assignments',
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.people_alt_outlined, size: 16),
+                                const SizedBox(width: 8),
+                                Text('Marketers (${marketers.length})'),
+                              ],
+                            ),
                           ),
                         ),
                         Tab(
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.insights_rounded, size: 16, color: Color(0xFF10B981)),
-                              const SizedBox(width: 8),
-                              const Text('Live Pipeline & Closer Analytics'),
-                              const SizedBox(width: 6),
-                              Container(
-                                width: 7,
-                                height: 7,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFF10B981),
-                                  shape: BoxShape.circle,
+                          child: Tooltip(
+                            message: 'Live campaign conversion and closer performance attribution',
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.insights_rounded, size: 16, color: Color(0xFF10B981)),
+                                const SizedBox(width: 8),
+                                const Text('Analytics'),
+                                const SizedBox(width: 6),
+                                Container(
+                                  width: 7,
+                                  height: 7,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF10B981),
+                                    shape: BoxShape.circle,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       ],
