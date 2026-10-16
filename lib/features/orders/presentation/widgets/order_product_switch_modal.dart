@@ -41,7 +41,27 @@ class _OrderProductSwitchModalState extends ConsumerState<OrderProductSwitchModa
   @override
   void initState() {
     super.initState();
-    _reasonController.text = 'Customer requested product switch during delivery consultation';
+    _reasonController.text = 'Customer requested upgrade package deal during consultation';
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _autoSelectCurrentProduct();
+    });
+  }
+
+  void _autoSelectCurrentProduct() {
+    final catalogState = ref.read(productCatalogProvider);
+    final prod = catalogState.findProductByName(widget.currentProductName);
+    if (prod != null && mounted) {
+      setState(() {
+        _selectedProduct = prod;
+        if (prod.packages.isNotEmpty) {
+          final curPkg = widget.currentPackageName?.trim().toLowerCase();
+          _selectedPackage = prod.packages.cast<ProductPackage?>().firstWhere(
+            (pk) => pk?.packageName.trim().toLowerCase() == curPkg,
+            orElse: () => prod.packages.first,
+          );
+        }
+      });
+    }
   }
 
   @override
@@ -182,7 +202,7 @@ class _OrderProductSwitchModalState extends ConsumerState<OrderProductSwitchModa
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Modify Product & Packages',
+                                'UPG • Upgrade Order Package',
                                 style: GoogleFonts.inter(
                                   fontSize: 17,
                                   fontWeight: FontWeight.w800,
@@ -191,7 +211,7 @@ class _OrderProductSwitchModalState extends ConsumerState<OrderProductSwitchModa
                                 overflow: TextOverflow.ellipsis,
                               ),
                               Text(
-                                'Order ${widget.orderNumber} • Handling DC Operations Override',
+                                'Order ${widget.orderNumber} • Upgrade commercial package deal',
                                 style: GoogleFonts.inter(
                                   fontSize: 12,
                                   color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
