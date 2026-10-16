@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/entities/order_conversation.dart';
@@ -76,14 +78,25 @@ class OrderPipelineChatSheet extends ConsumerStatefulWidget {
   ConsumerState<OrderPipelineChatSheet> createState() => _OrderPipelineChatSheetState();
 }
 
-class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet> {
+class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
+    with SingleTickerProviderStateMixin {
   final TextEditingController _msgController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _msgFocusNode = FocusNode();
+  late AnimationController _shimmerController;
+  late Animation<double> _shimmerAnimation;
 
   @override
   void initState() {
     super.initState();
+    _shimmerController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
+    _shimmerAnimation = Tween<double>(begin: 0.35, end: 0.85).animate(
+      CurvedAnimation(parent: _shimmerController, curve: Curves.easeInOut),
+    );
+
     if (widget.initialMessage != null && widget.initialMessage!.isNotEmpty) {
       _msgController.text = widget.initialMessage!;
     }
@@ -97,10 +110,33 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
 
   @override
   void dispose() {
+    _shimmerController.dispose();
     _msgController.dispose();
     _scrollController.dispose();
     _msgFocusNode.dispose();
     super.dispose();
+  }
+
+  void _callNumber(BuildContext context, String phone) async {
+    final clean = phone.replaceAll(RegExp(r'[^\d+]'), '');
+    final uri = Uri.parse('tel:$clean');
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri);
+      } else {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {
+      Clipboard.setData(ClipboardData(text: phone));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Phone copied: $phone'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   void _scrollToBottom() {
@@ -312,7 +348,7 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
           // Chat Messages Body
           Expanded(
             child: chatState.isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? _buildSkeletalChatMessages(isDark)
                 : chatState.errorMessage != null && chatState.activeConversation == null
                     ? Center(
                         child: Padding(
@@ -364,6 +400,145 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
     );
   }
 
+  Widget _buildSkeletalChatMessages(bool isDark) {
+    final shimmerColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final altShimmerColor = isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
+
+    return AnimatedBuilder(
+      animation: _shimmerAnimation,
+      builder: (context, _) {
+        final opacity = _shimmerAnimation.value;
+        return Opacity(
+          opacity: opacity,
+          child: ListView(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            physics: const NeverScrollableScrollPhysics(),
+            children: [
+              // System milestone placeholder in center
+              Center(
+                child: Container(
+                  width: 260,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: shimmerColor.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+
+              // Incoming message skeleton (left aligned with avatar)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: shimmerColor,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 80,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: shimmerColor.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        width: 210,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: altShimmerColor,
+                          borderRadius: const BorderRadius.only(
+                            topLeft: Radius.circular(4),
+                            topRight: Radius.circular(16),
+                            bottomLeft: Radius.circular(16),
+                            bottomRight: Radius.circular(16),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+
+              // Outgoing message skeleton (right aligned)
+              Align(
+                alignment: Alignment.centerRight,
+                child: Container(
+                  width: 190,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0284C7).withValues(alpha: 0.35 * opacity),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(16),
+                      topRight: Radius.circular(16),
+                      bottomLeft: Radius.circular(16),
+                      bottomRight: Radius.circular(4),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+
+              // Another incoming message
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: shimmerColor,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 90,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: shimmerColor.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        width: 170,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: altShimmerColor,
+                          borderRadius: const BorderRadius.only(
+                            topLeft: Radius.circular(4),
+                            topRight: Radius.circular(16),
+                            bottomLeft: Radius.circular(16),
+                            bottomRight: Radius.circular(16),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildHeader(BuildContext context, OrderConversationEntity? conv, bool isDark) {
     final authState = ref.watch(authProvider);
     final userRole = authState.user?.role.toLowerCase() ?? '';
@@ -372,6 +547,15 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
         userRole.contains('admin') ||
         userRole.contains('operation') ||
         userRole.contains('supervisor');
+
+    // Receiver is the customer who will receive the delivery
+    final receiverName = (conv?.customerName != null && conv!.customerName.trim().isNotEmpty)
+        ? conv.customerName.trim()
+        : widget.customerName.trim();
+    final receiverPhone = widget.customerPhone ?? conv?.customerPhone;
+    final orderStatus = (conv?.orderStatus.isNotEmpty == true)
+        ? conv!.orderStatus.toUpperCase()
+        : 'PENDING_DISPATCH';
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -400,57 +584,19 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 10),
           ],
 
-          // Creator of the order avatar (Marketer for marketer lead form orders, Closer for closer orders)
-          () {
-            final isFromMarketer = (conv?.marketerName != null && conv!.marketerName!.trim().isNotEmpty) ||
-                (conv?.marketerAvatarUrl != null && conv!.marketerAvatarUrl!.trim().isNotEmpty) ||
-                conv?.marketerId != null;
-            final headerName = isFromMarketer
-                ? (conv?.marketerName?.trim().isNotEmpty == true ? conv!.marketerName!.trim() : 'Digital Marketer')
-                : (conv?.closerName != null && conv!.closerName!.trim().isNotEmpty
-                    ? conv.closerName!.trim()
-                    : (conv?.clientName != null && conv!.clientName.trim().isNotEmpty
-                        ? conv.clientName.trim()
-                        : widget.customerName));
-            final headerAvatar = isFromMarketer
-                ? conv?.marketerAvatarUrl
-                : conv?.closerAvatarUrl;
-            final headerBg = isFromMarketer
-                ? const Color(0xFF10B981)
-                : const Color(0xFF4F46E5);
-
-            return InkWell(
-              onTap: () {
-                final tagToLookup = isFromMarketer
-                    ? (conv?.marketerName ?? 'marketer')
-                    : (conv?.closerName ?? 'closer');
-                ChatUserProfileCardModal.show(
-                  context: context,
-                  ref: ref,
-                  tag: tagToLookup,
-                  conversation: conv,
-                  onMention: _appendMentionTag,
-                );
-              },
-              borderRadius: BorderRadius.circular(18),
-              child: Tooltip(
-                message: 'View $headerName profile',
-                child: UserAvatarWidget(
-                  fullName: headerName,
-                  avatarUrl: headerAvatar,
-                  radius: 18,
-                  backgroundColor: headerBg,
-                  textColor: Colors.white,
-                ),
-              ),
-            );
-          }(),
+          // Receiver Avatar (Customer)
+          UserAvatarWidget(
+            fullName: receiverName,
+            radius: 18,
+            backgroundColor: const Color(0xFF0284C7),
+            textColor: Colors.white,
+          ),
           const SizedBox(width: 10),
 
-          // Order Number & Customer Name
+          // Receiver Name (Header Title) & Order Number / Status (Subtitle)
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -460,11 +606,11 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                   children: [
                     Flexible(
                       child: Text(
-                        widget.orderNumber,
+                        receiverName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.inter(
-                          fontSize: 14,
+                          fontSize: 15,
                           fontWeight: FontWeight.w800,
                           color: isDark ? Colors.white : const Color(0xFF0F172A),
                         ),
@@ -478,7 +624,7 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        conv?.orderStatus.toUpperCase() ?? 'LIVE PIPELINE',
+                        orderStatus,
                         style: GoogleFonts.inter(
                           fontSize: 9,
                           fontWeight: FontWeight.w700,
@@ -490,17 +636,45 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Customer: ${widget.customerName}',
+                  'Order #${widget.orderNumber}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.inter(
                     fontSize: 11,
+                    fontWeight: FontWeight.w500,
                     color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                   ),
                 ),
               ],
             ),
           ),
+
+          // Action: Direct Call Receiver (if phone available)
+          if (receiverPhone != null && receiverPhone.trim().isNotEmpty) ...[
+            Tooltip(
+              message: 'Call $receiverName ($receiverPhone)',
+              child: InkWell(
+                onTap: () => _callNumber(context, receiverPhone),
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: const Color(0xFF10B981).withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.phone_in_talk_rounded,
+                    size: 16,
+                    color: Color(0xFF10B981),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+          ],
 
           // Action: Switch Product (Restricted to DC Operations & Managers)
           if (isDcOperations) ...[
@@ -1006,51 +1180,11 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
-    final quickTags = <Map<String, dynamic>>[
-      {
-        'tag': '@Operations',
-        'label': 'Operations',
-        'color': const Color(0xFF6366F1),
-        'icon': Icons.corporate_fare_rounded,
-        'subtitle': conv?.distributionCenterName ?? 'DC Hub',
-      },
-      {
-        'tag': '@Rider',
-        'label': 'Rider',
-        'color': const Color(0xFFF59E0B),
-        'icon': Icons.two_wheeler_rounded,
-        'subtitle': conv?.deliveryAgentName ?? 'Courier',
-      },
-      if (conv?.closerName != null && conv!.closerName!.trim().isNotEmpty)
-        {
-          'tag': '@Closer',
-          'label': 'Closer',
-          'color': const Color(0xFF8B5CF6),
-          'icon': Icons.headset_mic_rounded,
-          'subtitle': conv.closerName!.split(' ').first,
-        },
-      if (conv?.marketerName != null && conv!.marketerName!.trim().isNotEmpty)
-        {
-          'tag': '@Marketer',
-          'label': 'Marketer',
-          'color': const Color(0xFF10B981),
-          'icon': Icons.campaign_rounded,
-          'subtitle': conv.marketerName!.split(' ').first,
-        },
-      {
-        'tag': '@Client',
-        'label': 'Merchant',
-        'color': const Color(0xFF0D9488),
-        'icon': Icons.storefront_rounded,
-        'subtitle': conv?.clientName ?? 'Client',
-      },
-    ];
-
     return Container(
       padding: EdgeInsets.only(
         left: 14,
         right: 14,
-        top: 8,
+        top: 10,
         bottom: bottomInset + (bottomPadding > 0 ? bottomPadding : 12),
       ),
       decoration: BoxDecoration(
@@ -1061,256 +1195,174 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
           ),
         ),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          // Quick tag pills bar
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            child: Row(
-              children: [
-                Text(
-                  'Tag:',
-                  style: GoogleFonts.inter(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
-                  ),
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                  width: 1.2,
                 ),
-                const SizedBox(width: 6),
-                ...quickTags.map((t) {
-                  final Color c = t['color'] as Color;
-                  final String tag = t['tag'] as String;
-                  final IconData icon = t['icon'] as IconData;
-
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: InkWell(
-                      onTap: () => _appendMentionTag(tag),
-                      borderRadius: BorderRadius.circular(20),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: c.withValues(alpha: isDark ? 0.16 : 0.08),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: c.withValues(alpha: isDark ? 0.35 : 0.25),
-                            width: 0.8,
-                          ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  const SizedBox(width: 14),
+                  // Clean Organic Text Field
+                  Expanded(
+                    child: TextField(
+                      controller: _msgController,
+                      focusNode: _msgFocusNode,
+                      minLines: 1,
+                      maxLines: 4,
+                      textCapitalization: TextCapitalization.sentences,
+                      onSubmitted: (_) => _handleSendMessage(),
+                      style: GoogleFonts.inter(
+                        fontSize: 13.5,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        height: 1.35,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: 'Type a message...',
+                        hintStyle: GoogleFonts.inter(
+                          fontSize: 13,
+                          color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(icon, size: 12, color: c),
-                            const SizedBox(width: 4),
-                            Text(
-                              tag,
-                              style: GoogleFonts.inter(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: c,
-                              ),
-                            ),
-                          ],
-                        ),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                        isDense: true,
                       ),
                     ),
-                  );
-                }),
-              ],
+                  ),
+
+                  // Emoji Quick Picker Popup Button
+                  Tooltip(
+                    message: 'Add Emoji',
+                    child: PopupMenuButton<String>(
+                      icon: Icon(
+                        Icons.sentiment_satisfied_alt_outlined,
+                        size: 20,
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      ),
+                      padding: const EdgeInsets.only(left: 4, right: 10, bottom: 10, top: 10),
+                      constraints: const BoxConstraints(minWidth: 34, minHeight: 44),
+                      tooltip: 'Add emoji',
+                      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(
+                          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                        ),
+                      ),
+                      onSelected: (emoji) {
+                        final cur = _msgController.text;
+                        _msgController.text = '$cur $emoji '.trimLeft();
+                        _msgController.selection = TextSelection.fromPosition(
+                          TextPosition(offset: _msgController.text.length),
+                        );
+                        _msgFocusNode.requestFocus();
+                      },
+                      itemBuilder: (ctx) => [
+                        PopupMenuItem(
+                          enabled: false,
+                          child: Text(
+                            'Quick Reactions',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                            ),
+                          ),
+                        ),
+                        const PopupMenuDivider(height: 4),
+                        PopupMenuItem(
+                          padding: EdgeInsets.zero,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            child: Wrap(
+                              spacing: 10,
+                              runSpacing: 10,
+                              children: [
+                                '👍', '✅', '📦', '🚚', '📍', '💰', '📞', '⚠️', '🚨', '🙏'
+                              ].map((emoji) {
+                                return InkWell(
+                                  onTap: () {
+                                    Navigator.of(ctx).pop(emoji);
+                                  },
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: isDark
+                                          ? const Color(0xFF334155).withValues(alpha: 0.5)
+                                          : const Color(0xFFF1F5F9),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(emoji, style: const TextStyle(fontSize: 18)),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(width: 8),
 
-          // Main Organic Input Row
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(
-                      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                      width: 1.2,
-                    ),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      // @ Shortcut button
-                      Tooltip(
-                        message: 'Quick Mention',
-                        child: IconButton(
-                          padding: const EdgeInsets.only(left: 10, right: 4, bottom: 10, top: 10),
-                          constraints: const BoxConstraints(minWidth: 34, minHeight: 44),
-                          icon: Icon(
-                            Icons.alternate_email_rounded,
+          // Circular Organic Send Button (Smooth micro-pulse on sending, NO circular spinner)
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [
+                  Color(0xFF0284C7),
+                  Color(0xFF0369A1),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF0284C7).withValues(alpha: 0.35),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(22),
+                onTap: isSending ? null : _handleSendMessage,
+                child: Center(
+                  child: isSending
+                      ? FadeTransition(
+                          opacity: _shimmerAnimation,
+                          child: const Icon(
+                            Icons.arrow_upward_rounded,
+                            color: Colors.white,
                             size: 19,
-                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                           ),
-                          onPressed: () {
-                            _appendMentionTag('@');
-                          },
+                        )
+                      : const Icon(
+                          Icons.send_rounded,
+                          color: Colors.white,
+                          size: 19,
                         ),
-                      ),
-
-                      // Text Field
-                      Expanded(
-                        child: TextField(
-                          controller: _msgController,
-                          focusNode: _msgFocusNode,
-                          minLines: 1,
-                          maxLines: 4,
-                          textCapitalization: TextCapitalization.sentences,
-                          onSubmitted: (_) => _handleSendMessage(),
-                          style: GoogleFonts.inter(
-                            fontSize: 13.5,
-                            color: isDark ? Colors.white : const Color(0xFF0F172A),
-                            height: 1.35,
-                          ),
-                          decoration: InputDecoration(
-                            hintText: 'Type order update... (use @ to tag)',
-                            hintStyle: GoogleFonts.inter(
-                              fontSize: 13,
-                              color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
-                            ),
-                            border: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
-                            isDense: true,
-                          ),
-                        ),
-                      ),
-
-                      // Emoji Quick Picker Popup Button
-                      Tooltip(
-                        message: 'Add Emoji',
-                        child: PopupMenuButton<String>(
-                          icon: Icon(
-                            Icons.sentiment_satisfied_alt_outlined,
-                            size: 20,
-                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                          ),
-                          padding: const EdgeInsets.only(left: 4, right: 10, bottom: 10, top: 10),
-                          constraints: const BoxConstraints(minWidth: 34, minHeight: 44),
-                          tooltip: 'Add emoji',
-                          color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            side: BorderSide(
-                              color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                            ),
-                          ),
-                          onSelected: (emoji) {
-                            final cur = _msgController.text;
-                            _msgController.text = '$cur $emoji '.trimLeft();
-                            _msgController.selection = TextSelection.fromPosition(
-                              TextPosition(offset: _msgController.text.length),
-                            );
-                            _msgFocusNode.requestFocus();
-                          },
-                          itemBuilder: (ctx) => [
-                            PopupMenuItem(
-                              enabled: false,
-                              child: Text(
-                                'Quick Reactions',
-                                style: GoogleFonts.inter(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                                ),
-                              ),
-                            ),
-                            const PopupMenuDivider(height: 4),
-                            PopupMenuItem(
-                              padding: EdgeInsets.zero,
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                child: Wrap(
-                                  spacing: 10,
-                                  runSpacing: 10,
-                                  children: [
-                                    '👍', '✅', '📦', '🚚', '📍', '💰', '📞', '⚠️', '🚨', '🙏'
-                                  ].map((emoji) {
-                                    return InkWell(
-                                      onTap: () {
-                                        Navigator.of(ctx).pop(emoji);
-                                      },
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: Container(
-                                        padding: const EdgeInsets.all(6),
-                                        decoration: BoxDecoration(
-                                          color: isDark
-                                              ? const Color(0xFF334155).withValues(alpha: 0.5)
-                                              : const Color(0xFFF1F5F9),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Text(emoji, style: const TextStyle(fontSize: 18)),
-                                      ),
-                                    );
-                                  }).toList(),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
               ),
-              const SizedBox(width: 8),
-
-              // Circular Organic Send Button (Matching user screenshot)
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFF0284C7),
-                      Color(0xFF0369A1),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF0284C7).withValues(alpha: 0.35),
-                      blurRadius: 10,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(22),
-                    onTap: isSending ? null : _handleSendMessage,
-                    child: Center(
-                      child: isSending
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Icon(
-                              Icons.send_rounded,
-                              color: Colors.white,
-                              size: 19,
-                            ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ],
       ),

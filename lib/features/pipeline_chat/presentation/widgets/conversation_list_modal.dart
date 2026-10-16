@@ -351,7 +351,7 @@ class _ConversationListModalState extends ConsumerState<ConversationListModal> {
           // Conversations List Body
           Expanded(
             child: chatState.isLoading && allConversations.isEmpty
-                ? const Center(child: CircularProgressIndicator())
+                ? _buildSkeletalConversationList(isDark)
                 : filteredConversations.isEmpty
                     ? _buildEmptyState(isDark)
                     : ListView.separated(
@@ -375,6 +375,80 @@ class _ConversationListModalState extends ConsumerState<ConversationListModal> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSkeletalConversationList(bool isDark) {
+    final shimmerColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final altShimmerColor = isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
+
+    return ListView.separated(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: 5,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, index) {
+        return Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: altShimmerColor,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isDark ? const Color(0xFF334155).withValues(alpha: 0.5) : const Color(0xFFE2E8F0),
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: shimmerColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          width: 120,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: shimmerColor,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                        Container(
+                          width: 40,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: shimmerColor.withValues(alpha: 0.7),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: 180,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: shimmerColor.withValues(alpha: 0.6),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

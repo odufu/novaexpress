@@ -292,9 +292,56 @@ class PipelineChatRemoteDataSourceImpl implements PipelineChatRemoteDataSource {
           .eq('conversation_id', conversationId)
           .order('created_at', ascending: true);
 
-      return (res as List)
+      final list = (res as List)
           .map((e) => OrderConversationMessageModel.fromJson(e as Map<String, dynamic>))
           .toList();
+
+      if (list.isEmpty) {
+        // Auto-seed initial milestone message for this order conversation
+        try {
+          final convRow = await db
+              .from('order_conversations')
+              .select()
+              .eq('id', conversationId)
+              .maybeSingle();
+
+          if (convRow != null) {
+            final orderId = convRow['order_id']?.toString() ?? '';
+            final custName = convRow['customer_name']?.toString() ?? 'Customer';
+            final prodName = convRow['current_product_name']?.toString() ?? 'Product';
+            final pkgName = convRow['current_package_name']?.toString() ?? '';
+            final totalAmt = convRow['current_total_amount'] ?? 0;
+            final dcName = convRow['distribution_center_name']?.toString();
+            final closerName = convRow['closer_name']?.toString();
+            final riderName = convRow['delivery_agent_name']?.toString();
+
+            final pkgText = pkgName.isNotEmpty ? '$prodName ($pkgName)' : prodName;
+            String body = 'Order registered in dispatch pipeline for $custName.\n'
+                'Package: $pkgText • Total: ₦${totalAmt.toString()} COD.\n'
+                'Hub: ${dcName ?? "Awaiting DC Routing"}';
+            if (closerName != null && closerName.trim().isNotEmpty) {
+              body += '\nCloser: $closerName';
+            }
+            if (riderName != null && riderName.trim().isNotEmpty) {
+              body += '\nAssigned Rider: $riderName';
+            }
+
+            final seedMsg = await sendMessage(
+              conversationId: conversationId,
+              orderId: orderId,
+              senderName: 'System',
+              senderRole: ChatSenderRole.system,
+              messageType: ChatMessageType.statusChange,
+              messageBody: body,
+            );
+            return [seedMsg];
+          }
+        } catch (e) {
+          debugPrint('[PIPELINE_CHAT] Notice auto-seeding message: $e');
+        }
+      }
+
+      return list;
     } catch (e) {
       debugPrint('[PIPELINE_CHAT] Error fetching messages for $conversationId: $e');
       return [];
