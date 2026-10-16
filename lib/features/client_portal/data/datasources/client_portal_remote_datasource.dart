@@ -1575,7 +1575,7 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
       try {
         final agentsRes = await adminDb
             .from('agent_inventory')
-            .select('id, total_in_custody, available_count, product_id, updated_at, delivery_agents(id, agent_code, bank_account_name, operating_city, operating_state, phone)')
+            .select('id, total_in_custody, available_count, product_id, updated_at, delivery_agents(id, agent_code, bank_account_name, operating_city, operating_state)')
             .gt('available_count', 0);
         for (final raw in agentsRes) {
           final row = Map<String, dynamic>.from(raw);

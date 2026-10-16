@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import '../../../../core/theme/theme_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/entities/order_conversation.dart';
 import '../../domain/entities/order_conversation_message.dart';
@@ -10,6 +11,7 @@ import '../../../orders/presentation/widgets/order_product_switch_modal.dart';
 import '../../../../core/widgets/user_avatar_widget.dart';
 import '../providers/pipeline_chat_provider.dart';
 import 'conversation_list_modal.dart';
+import 'chat_user_profile_card_modal.dart';
 
 class OrderPipelineChatSheet extends ConsumerStatefulWidget {
   final String orderId;
@@ -122,11 +124,156 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
     }
   }
 
+  void _appendMentionTag(String tag) {
+    final cur = _msgController.text.trim();
+    if (cur.isEmpty) {
+      _msgController.text = '$tag ';
+    } else {
+      _msgController.text = '$cur $tag ';
+    }
+    _msgController.selection = TextSelection.fromPosition(
+      TextPosition(offset: _msgController.text.length),
+    );
+    _msgFocusNode.requestFocus();
+  }
+
+  String _formatMessageTime(DateTime dt) {
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+    if (diff.inSeconds < 60) {
+      return 'now';
+    } else if (diff.inHours < 1) {
+      return '${diff.inMinutes}m ago';
+    } else if (now.year == dt.year && now.month == dt.month && now.day == dt.day) {
+      return DateFormat('h:mm a').format(dt);
+    } else if (now.difference(dt).inDays < 7) {
+      return DateFormat('EEE, h:mm a').format(dt);
+    } else {
+      return DateFormat('d MMM, h:mm a').format(dt);
+    }
+  }
+
+  Widget _buildMessageBodyWithInteractiveMentions(
+    String text, {
+    required bool isMyMessage,
+    required bool isDark,
+    required OrderConversationEntity? conv,
+  }) {
+    final mentionRegex = RegExp(r'@([A-Za-z0-9_.\-]+(?:\s+[A-Za-z0-9_.\-]+)?)');
+    final matches = mentionRegex.allMatches(text);
+
+    final defaultStyle = GoogleFonts.inter(
+      fontSize: 13.5,
+      height: 1.4,
+      color: isMyMessage
+          ? Colors.white
+          : (isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A)),
+      fontWeight: isMyMessage ? FontWeight.w500 : FontWeight.w400,
+    );
+
+    if (matches.isEmpty) {
+      return Text(text, style: defaultStyle);
+    }
+
+    final spans = <InlineSpan>[];
+    int lastEnd = 0;
+
+    for (final match in matches) {
+      if (match.start > lastEnd) {
+        spans.add(TextSpan(
+          text: text.substring(lastEnd, match.start),
+          style: defaultStyle,
+        ));
+      }
+
+      final tag = match.group(0)!;
+
+      spans.add(
+        WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            child: InkWell(
+              onTap: () {
+                ChatUserProfileCardModal.show(
+                  context: context,
+                  ref: ref,
+                  tag: tag,
+                  conversation: conv,
+                  onMention: _appendMentionTag,
+                );
+              },
+              borderRadius: BorderRadius.circular(6),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: isMyMessage
+                      ? Colors.white.withValues(alpha: 0.24)
+                      : (isDark
+                          ? const Color(0xFF38BDF8).withValues(alpha: 0.2)
+                          : const Color(0xFF0284C7).withValues(alpha: 0.12)),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: isMyMessage
+                        ? Colors.white.withValues(alpha: 0.45)
+                        : (isDark
+                            ? const Color(0xFF38BDF8).withValues(alpha: 0.45)
+                            : const Color(0xFF0284C7).withValues(alpha: 0.3)),
+                    width: 0.8,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.alternate_email_rounded,
+                      size: 11,
+                      color: isMyMessage
+                          ? Colors.white
+                          : (isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7)),
+                    ),
+                    const SizedBox(width: 2),
+                    Text(
+                      tag.substring(1),
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: isMyMessage
+                            ? Colors.white
+                            : (isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7)),
+                        decoration: TextDecoration.underline,
+                        decorationStyle: TextDecorationStyle.solid,
+                        decorationThickness: 1.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      lastEnd = match.end;
+    }
+
+    if (lastEnd < text.length) {
+      spans.add(TextSpan(
+        text: text.substring(lastEnd),
+        style: defaultStyle,
+      ));
+    }
+
+    return Text.rich(TextSpan(children: spans));
+  }
+
   @override
   Widget build(BuildContext context) {
     final chatState = ref.watch(pipelineChatProvider);
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final themeMode = ref.watch(themeProvider);
+    final isDark = themeMode == ThemeMode.dark ||
+        (themeMode == ThemeMode.system &&
+            MediaQuery.of(context).platformBrightness == Brightness.dark);
     final conv = chatState.activeConversation;
 
     return Container(
@@ -204,14 +351,14 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                         itemCount: chatState.messages.length,
                         itemBuilder: (context, index) {
                           final msg = chatState.messages[index];
-                          return _buildMessageItem(msg, isDark);
+                          return _buildMessageItem(msg, isDark, conv);
                         },
                       ),
           ),
 
           // Input Footer (only rendered if user is authorized and conversation is loaded)
           if (conv != null)
-            _buildInputFooter(context, isDark, chatState.isSending),
+            _buildInputFooter(context, isDark, chatState.isSending, conv),
         ],
       ),
     );
@@ -275,12 +422,30 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                 ? const Color(0xFF10B981)
                 : const Color(0xFF4F46E5);
 
-            return UserAvatarWidget(
-              fullName: headerName,
-              avatarUrl: headerAvatar,
-              radius: 18,
-              backgroundColor: headerBg,
-              textColor: Colors.white,
+            return InkWell(
+              onTap: () {
+                final tagToLookup = isFromMarketer
+                    ? (conv?.marketerName ?? 'marketer')
+                    : (conv?.closerName ?? 'closer');
+                ChatUserProfileCardModal.show(
+                  context: context,
+                  ref: ref,
+                  tag: tagToLookup,
+                  conversation: conv,
+                  onMention: _appendMentionTag,
+                );
+              },
+              borderRadius: BorderRadius.circular(18),
+              child: Tooltip(
+                message: 'View $headerName profile',
+                child: UserAvatarWidget(
+                  fullName: headerName,
+                  avatarUrl: headerAvatar,
+                  radius: 18,
+                  backgroundColor: headerBg,
+                  textColor: Colors.white,
+                ),
+              ),
             );
           }(),
           const SizedBox(width: 10),
@@ -411,7 +576,7 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
             const SizedBox(width: 10),
             Container(width: 1, height: 12, color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
             const SizedBox(width: 10),
-            _buildParticipantPill('Client', conv.clientName, const Color(0xFF0D9488)),
+            _buildParticipantPill('Client', conv.clientName, const Color(0xFF0D9488), conv: conv),
             if (conv.marketerName != null && conv.marketerName!.trim().isNotEmpty) ...[
               const SizedBox(width: 5),
               _buildParticipantPill(
@@ -419,6 +584,7 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                 conv.marketerName!,
                 const Color(0xFF10B981),
                 avatarUrl: conv.marketerAvatarUrl,
+                conv: conv,
               ),
             ],
             if (conv.closerName != null && conv.closerName!.trim().isNotEmpty) ...[
@@ -428,52 +594,74 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                 conv.closerName!,
                 const Color(0xFF7C3AED),
                 avatarUrl: conv.closerAvatarUrl,
+                conv: conv,
               ),
             ],
             const SizedBox(width: 5),
-            _buildParticipantPill('DC', conv.distributionCenterName ?? 'DC', const Color(0xFF6366F1)),
+            _buildParticipantPill('DC', conv.distributionCenterName ?? 'DC', const Color(0xFF6366F1), conv: conv),
             const SizedBox(width: 5),
-            _buildParticipantPill('Rider', conv.deliveryAgentName ?? 'Unassigned', const Color(0xFFF59E0B)),
+            _buildParticipantPill('Rider', conv.deliveryAgentName ?? 'Unassigned', const Color(0xFFF59E0B), conv: conv),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildParticipantPill(String role, String name, Color color, {String? avatarUrl}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (avatarUrl != null && avatarUrl.isNotEmpty) ...[
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.network(
-                avatarUrl,
-                width: 14,
-                height: 14,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-              ),
-            ),
-            const SizedBox(width: 4),
-          ],
-          Text(
-            '$role: ${name.split(' ').first}',
-            style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: color),
+  Widget _buildParticipantPill(
+    String role,
+    String name,
+    Color color, {
+    String? avatarUrl,
+    required OrderConversationEntity conv,
+  }) {
+    return InkWell(
+      onTap: () {
+        ChatUserProfileCardModal.show(
+          context: context,
+          ref: ref,
+          tag: role.toLowerCase(),
+          conversation: conv,
+          onMention: _appendMentionTag,
+        );
+      },
+      borderRadius: BorderRadius.circular(6),
+      child: Tooltip(
+        message: 'View $role profile',
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: color.withValues(alpha: 0.25)),
           ),
-        ],
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (avatarUrl != null && avatarUrl.isNotEmpty) ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(
+                    avatarUrl,
+                    width: 14,
+                    height: 14,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                  ),
+                ),
+                const SizedBox(width: 4),
+              ],
+              Text(
+                '$role: ${name.split(' ').first}',
+                style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: color),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildMessageItem(OrderConversationMessageEntity msg, bool isDark) {
+  Widget _buildMessageItem(OrderConversationMessageEntity msg, bool isDark, OrderConversationEntity? conv) {
     if (msg.isSystem || msg.isStatusEvent) {
       return _buildSystemMilestone(msg, isDark);
     }
@@ -494,20 +682,20 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
       roleColor = const Color(0xFF10B981); // Emerald
       roleLabel = 'Marketer';
     } else if (isCloser) {
-      roleColor = const Color(0xFF7C3AED); // Vibrant Purple
+      roleColor = const Color(0xFF8B5CF6); // Vibrant Purple
       roleLabel = 'Closer';
     } else if (isClient) {
-      roleColor = const Color(0xFFD97706); // Warm Amber
+      roleColor = const Color(0xFF0D9488); // Teal
       roleLabel = 'Merchant';
     } else if (isDc) {
       roleColor = const Color(0xFF6366F1); // Indigo
       roleLabel = 'DC Operations';
     } else if (isRider) {
-      roleColor = const Color(0xFF0284C7); // Sky Blue / Cyan
+      roleColor = const Color(0xFFF59E0B); // Amber Courier
       roleLabel = 'Rider';
     }
 
-    final timeStr = DateFormat('h:mm a').format(msg.createdAt);
+    final timeStr = _formatMessageTime(msg.createdAt);
 
     // 1. Right-aligned for current account
     if (isMyMessage) {
@@ -527,59 +715,52 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
                         colors: [
-                          Color(0xFF0D9488),
-                          Color(0xFF0F766E),
+                          Color(0xFF0284C7),
+                          Color(0xFF0369A1),
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
                       borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(16),
-                        topRight: Radius.circular(16),
-                        bottomLeft: Radius.circular(16),
+                        topLeft: Radius.circular(18),
+                        topRight: Radius.circular(18),
+                        bottomLeft: Radius.circular(18),
                         bottomRight: Radius.circular(4),
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF0D9488).withValues(alpha: 0.25),
-                          blurRadius: 6,
+                          color: const Color(0xFF0284C7).withValues(alpha: 0.22),
+                          blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
                       ],
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          msg.messageBody,
-                          style: GoogleFonts.inter(
-                            fontSize: 13.5,
-                            height: 1.35,
-                            color: Colors.white,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              timeStr,
-                              style: GoogleFonts.inter(
-                                fontSize: 10,
-                                color: Colors.white.withValues(alpha: 0.75),
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            const Icon(
-                              Icons.done_all_rounded,
-                              size: 13,
-                              color: Colors.white70,
-                            ),
-                          ],
-                        ),
-                      ],
+                    child: _buildMessageBodyWithInteractiveMentions(
+                      msg.messageBody,
+                      isMyMessage: true,
+                      isDark: isDark,
+                      conv: conv,
                     ),
+                  ),
+                  const SizedBox(height: 3),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        timeStr,
+                        style: GoogleFonts.inter(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w500,
+                          color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(
+                        Icons.done_all_rounded,
+                        size: 14,
+                        color: Color(0xFF0284C7),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -589,8 +770,8 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
             UserAvatarWidget(
               avatarUrl: msg.senderAvatarUrl ?? authUser?.avatarUrl,
               fullName: authUser?.fullName.isNotEmpty == true ? authUser!.fullName : 'You',
-              radius: 15,
-              backgroundColor: const Color(0xFF0D9488),
+              radius: 14,
+              backgroundColor: const Color(0xFF0284C7),
               textColor: Colors.white,
             ),
           ],
@@ -599,24 +780,8 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
     }
 
     // 2. Left-aligned with role-based color differentiation for other accounts
-    Color otherBg;
-    Color otherBorder;
-    if (isMarketer) {
-      otherBg = isDark ? const Color(0xFF064E3B).withValues(alpha: 0.35) : const Color(0xFFECFDF5);
-      otherBorder = const Color(0xFF10B981).withValues(alpha: 0.3);
-    } else if (isCloser) {
-      otherBg = isDark ? const Color(0xFF3B0764).withValues(alpha: 0.3) : const Color(0xFFF5F3FF);
-      otherBorder = const Color(0xFF7C3AED).withValues(alpha: 0.25);
-    } else if (isDc) {
-      otherBg = isDark ? const Color(0xFF1E1B4B).withValues(alpha: 0.5) : const Color(0xFFEEF2FF);
-      otherBorder = const Color(0xFF6366F1).withValues(alpha: 0.25);
-    } else if (isRider) {
-      otherBg = isDark ? const Color(0xFF0C4A6E).withValues(alpha: 0.3) : const Color(0xFFF0F9FF);
-      otherBorder = const Color(0xFF0284C7).withValues(alpha: 0.25);
-    } else {
-      otherBg = isDark ? const Color(0xFF451A03).withValues(alpha: 0.3) : const Color(0xFFFFFBEB);
-      otherBorder = const Color(0xFFD97706).withValues(alpha: 0.25);
-    }
+    final bubbleBg = isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
+    final bubbleBorder = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -624,83 +789,108 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
         mainAxisAlignment: MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // DP of sender
-          UserAvatarWidget(
-            avatarUrl: msg.senderAvatarUrl,
-            fullName: msg.senderName,
-            radius: 16,
-            backgroundColor: roleColor.withValues(alpha: 0.18),
-            textColor: roleColor,
+          // DP of sender (interactive: tap to view profile card)
+          InkWell(
+            onTap: () {
+              ChatUserProfileCardModal.show(
+                context: context,
+                ref: ref,
+                tag: msg.senderName,
+                conversation: conv,
+                onMention: _appendMentionTag,
+              );
+            },
+            borderRadius: BorderRadius.circular(16),
+            child: Tooltip(
+              message: 'View ${msg.senderName} profile',
+              child: UserAvatarWidget(
+                avatarUrl: msg.senderAvatarUrl,
+                fullName: msg.senderName,
+                radius: 16,
+                backgroundColor: roleColor.withValues(alpha: 0.18),
+                textColor: roleColor,
+              ),
+            ),
           ),
           const SizedBox(width: 8),
           Flexible(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Sender name and role tag
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        msg.senderName,
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: isDark ? Colors.white : const Color(0xFF0F172A),
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: roleColor.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: roleColor.withValues(alpha: 0.2)),
-                      ),
-                      child: Text(
-                        roleLabel,
-                        style: GoogleFonts.inter(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w700,
-                          color: roleColor,
+                // Sender name and role tag (interactive: tap to view profile card)
+                InkWell(
+                  onTap: () {
+                    ChatUserProfileCardModal.show(
+                      context: context,
+                      ref: ref,
+                      tag: msg.senderName,
+                      conversation: conv,
+                      onMention: _appendMentionTag,
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          msg.senderName,
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      timeStr,
-                      style: GoogleFonts.inter(
-                        fontSize: 10,
-                        color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: roleColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: roleColor.withValues(alpha: 0.2)),
+                        ),
+                        child: Text(
+                          roleLabel,
+                          style: GoogleFonts.inter(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: roleColor,
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 4),
 
-                // Bubble
+                // Organic Recipient Bubble with clickable mentions
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
-                    color: otherBg,
+                    color: bubbleBg,
                     borderRadius: const BorderRadius.only(
                       topLeft: Radius.circular(4),
-                      topRight: Radius.circular(16),
-                      bottomLeft: Radius.circular(16),
-                      bottomRight: Radius.circular(16),
+                      topRight: Radius.circular(18),
+                      bottomLeft: Radius.circular(18),
+                      bottomRight: Radius.circular(18),
                     ),
-                    border: Border.all(color: otherBorder),
+                    border: Border.all(color: bubbleBorder),
                   ),
-                  child: Text(
+                  child: _buildMessageBodyWithInteractiveMentions(
                     msg.messageBody,
-                    style: GoogleFonts.inter(
-                      fontSize: 13.5,
-                      height: 1.4,
-                      color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF1E293B),
-                    ),
+                    isMyMessage: false,
+                    isDark: isDark,
+                    conv: conv,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  timeStr,
+                  style: GoogleFonts.inter(
+                    fontSize: 10,
+                    color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
                   ),
                 ),
               ],
@@ -807,192 +997,324 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
     );
   }
 
-  Widget _buildInputFooter(BuildContext context, bool isDark, bool isSending) {
+  Widget _buildInputFooter(
+    BuildContext context,
+    bool isDark,
+    bool isSending,
+    OrderConversationEntity? conv,
+  ) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final bottomPadding = MediaQuery.of(context).padding.bottom;
-    final authUser = ref.watch(authProvider).user;
-    final userRole = authUser?.role.toLowerCase() ?? '';
-    final isRider = userRole.contains('rider') || userRole.contains('agent') || userRole.contains('pda');
-    final isDc = userRole.contains('dc') || userRole.contains('manager') || userRole.contains('admin');
+
+    final quickTags = <Map<String, dynamic>>[
+      {
+        'tag': '@Operations',
+        'label': 'Operations',
+        'color': const Color(0xFF6366F1),
+        'icon': Icons.corporate_fare_rounded,
+        'subtitle': conv?.distributionCenterName ?? 'DC Hub',
+      },
+      {
+        'tag': '@Rider',
+        'label': 'Rider',
+        'color': const Color(0xFFF59E0B),
+        'icon': Icons.two_wheeler_rounded,
+        'subtitle': conv?.deliveryAgentName ?? 'Courier',
+      },
+      if (conv?.closerName != null && conv!.closerName!.trim().isNotEmpty)
+        {
+          'tag': '@Closer',
+          'label': 'Closer',
+          'color': const Color(0xFF8B5CF6),
+          'icon': Icons.headset_mic_rounded,
+          'subtitle': conv.closerName!.split(' ').first,
+        },
+      if (conv?.marketerName != null && conv!.marketerName!.trim().isNotEmpty)
+        {
+          'tag': '@Marketer',
+          'label': 'Marketer',
+          'color': const Color(0xFF10B981),
+          'icon': Icons.campaign_rounded,
+          'subtitle': conv.marketerName!.split(' ').first,
+        },
+      {
+        'tag': '@Client',
+        'label': 'Merchant',
+        'color': const Color(0xFF0D9488),
+        'icon': Icons.storefront_rounded,
+        'subtitle': conv?.clientName ?? 'Client',
+      },
+    ];
 
     return Container(
       padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
+        left: 14,
+        right: 14,
         top: 8,
-        bottom: bottomInset + (bottomPadding > 0 ? bottomPadding : 14),
+        bottom: bottomInset + (bottomPadding > 0 ? bottomPadding : 12),
       ),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF0F172A) : Colors.white,
         border: Border(
-          top: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+          top: BorderSide(
+            color: isDark ? const Color(0xFF334155).withValues(alpha: 0.6) : const Color(0xFFE2E8F0),
+          ),
         ),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Quick tag pills (Role-aware for Rider, DC Operations, and Merchant)
+          // Quick tag pills bar
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
             child: Row(
               children: [
-                if (isRider) ...[
-                  ActionChip(
-                    avatar: const Icon(Icons.swap_horiz_rounded, size: 12, color: Color(0xFF0D9488)),
-                    label: Text('Tag @Operations (Package Change)', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF0D9488))),
-                    backgroundColor: const Color(0xFF0D9488).withValues(alpha: 0.08),
-                    side: const BorderSide(color: Color(0xFF0D9488)),
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-                    onPressed: () {
-                      final cur = _msgController.text;
-                      if (!cur.contains('@Operations')) {
-                        _msgController.text = '@Operations Customer requested product/package change: $cur'.trim();
-                        _msgController.selection = TextSelection.fromPosition(TextPosition(offset: _msgController.text.length));
-                      }
-                      _msgFocusNode.requestFocus();
-                    },
+                Text(
+                  'Tag:',
+                  style: GoogleFonts.inter(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
                   ),
-                  const SizedBox(width: 6),
-                  ActionChip(
-                    avatar: const Icon(Icons.location_on_outlined, size: 12, color: Color(0xFF2563EB)),
-                    label: Text('Tag @Operations (Address Adjustment)', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF2563EB))),
-                    backgroundColor: const Color(0xFF2563EB).withValues(alpha: 0.08),
-                    side: const BorderSide(color: Color(0xFF2563EB)),
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-                    onPressed: () {
-                      final cur = _msgController.text;
-                      if (!cur.contains('@Operations')) {
-                        _msgController.text = '@Operations Customer requested address adjustment: $cur'.trim();
-                        _msgController.selection = TextSelection.fromPosition(TextPosition(offset: _msgController.text.length));
-                      }
-                      _msgFocusNode.requestFocus();
-                    },
-                  ),
-                ] else if (isDc) ...[
-                  ActionChip(
-                    avatar: const Icon(Icons.two_wheeler_rounded, size: 12, color: Color(0xFFF59E0B)),
-                    label: Text('Tag @Rider (Delivery Instructions)', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFF59E0B))),
-                    backgroundColor: const Color(0xFFF59E0B).withValues(alpha: 0.08),
-                    side: const BorderSide(color: Color(0xFFF59E0B)),
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-                    onPressed: () {
-                      final cur = _msgController.text;
-                      if (!cur.contains('@Rider')) {
-                        _msgController.text = '@Rider '.trim();
-                        _msgController.selection = TextSelection.fromPosition(TextPosition(offset: _msgController.text.length));
-                      }
-                      _msgFocusNode.requestFocus();
-                    },
-                  ),
-                  const SizedBox(width: 6),
-                  ActionChip(
-                    avatar: const Icon(Icons.storefront_rounded, size: 12, color: Color(0xFF0D9488)),
-                    label: Text('Tag @Client (Status Update)', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF0D9488))),
-                    backgroundColor: const Color(0xFF0D9488).withValues(alpha: 0.08),
-                    side: const BorderSide(color: Color(0xFF0D9488)),
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-                    onPressed: () {
-                      final cur = _msgController.text;
-                      if (!cur.contains('@Client')) {
-                        _msgController.text = '@Client '.trim();
-                        _msgController.selection = TextSelection.fromPosition(TextPosition(offset: _msgController.text.length));
-                      }
-                      _msgFocusNode.requestFocus();
-                    },
-                  ),
-                ] else ...[
-                  ActionChip(
-                    avatar: const Icon(Icons.corporate_fare_rounded, size: 12, color: Color(0xFF0D9488)),
-                    label: Text('Tag @Operations (Urgent Request)', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF0D9488))),
-                    backgroundColor: const Color(0xFF0D9488).withValues(alpha: 0.08),
-                    side: const BorderSide(color: Color(0xFF0D9488)),
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-                    onPressed: () {
-                      final cur = _msgController.text;
-                      if (!cur.contains('@Operations')) {
-                        _msgController.text = '@Operations '.trim();
-                        _msgController.selection = TextSelection.fromPosition(TextPosition(offset: _msgController.text.length));
-                      }
-                      _msgFocusNode.requestFocus();
-                    },
-                  ),
-                  const SizedBox(width: 6),
-                  ActionChip(
-                    avatar: const Icon(Icons.two_wheeler_rounded, size: 12, color: Color(0xFFF59E0B)),
-                    label: Text('Tag @Rider (Delivery Notes)', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFF59E0B))),
-                    backgroundColor: const Color(0xFFF59E0B).withValues(alpha: 0.08),
-                    side: const BorderSide(color: Color(0xFFF59E0B)),
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-                    onPressed: () {
-                      final cur = _msgController.text;
-                      if (!cur.contains('@Rider')) {
-                        _msgController.text = '@Rider '.trim();
-                        _msgController.selection = TextSelection.fromPosition(TextPosition(offset: _msgController.text.length));
-                      }
-                      _msgFocusNode.requestFocus();
-                    },
-                  ),
-                ],
+                ),
+                const SizedBox(width: 6),
+                ...quickTags.map((t) {
+                  final Color c = t['color'] as Color;
+                  final String tag = t['tag'] as String;
+                  final IconData icon = t['icon'] as IconData;
+
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: InkWell(
+                      onTap: () => _appendMentionTag(tag),
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: c.withValues(alpha: isDark ? 0.16 : 0.08),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: c.withValues(alpha: isDark ? 0.35 : 0.25),
+                            width: 0.8,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(icon, size: 12, color: c),
+                            const SizedBox(width: 4),
+                            Text(
+                              tag,
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: c,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }),
               ],
             ),
           ),
           const SizedBox(height: 8),
+
+          // Main Organic Input Row
           Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Expanded(
-                child: TextField(
-                  controller: _msgController,
-                  focusNode: _msgFocusNode,
-                  onSubmitted: (_) => _handleSendMessage(),
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                      width: 1.2,
+                    ),
                   ),
-              decoration: InputDecoration(
-                hintText: 'Type order update or message...',
-                hintStyle: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF94A3B8)),
-                filled: true,
-                fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: const BorderSide(color: Color(0xFF0D9488), width: 1.5),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      // @ Shortcut button
+                      Tooltip(
+                        message: 'Quick Mention',
+                        child: IconButton(
+                          padding: const EdgeInsets.only(left: 10, right: 4, bottom: 10, top: 10),
+                          constraints: const BoxConstraints(minWidth: 34, minHeight: 44),
+                          icon: Icon(
+                            Icons.alternate_email_rounded,
+                            size: 19,
+                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                          ),
+                          onPressed: () {
+                            _appendMentionTag('@');
+                          },
+                        ),
+                      ),
+
+                      // Text Field
+                      Expanded(
+                        child: TextField(
+                          controller: _msgController,
+                          focusNode: _msgFocusNode,
+                          minLines: 1,
+                          maxLines: 4,
+                          textCapitalization: TextCapitalization.sentences,
+                          onSubmitted: (_) => _handleSendMessage(),
+                          style: GoogleFonts.inter(
+                            fontSize: 13.5,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                            height: 1.35,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: 'Type order update... (use @ to tag)',
+                            hintStyle: GoogleFonts.inter(
+                              fontSize: 13,
+                              color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                            ),
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+                            isDense: true,
+                          ),
+                        ),
+                      ),
+
+                      // Emoji Quick Picker Popup Button
+                      Tooltip(
+                        message: 'Add Emoji',
+                        child: PopupMenuButton<String>(
+                          icon: Icon(
+                            Icons.sentiment_satisfied_alt_outlined,
+                            size: 20,
+                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                          ),
+                          padding: const EdgeInsets.only(left: 4, right: 10, bottom: 10, top: 10),
+                          constraints: const BoxConstraints(minWidth: 34, minHeight: 44),
+                          tooltip: 'Add emoji',
+                          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            side: BorderSide(
+                              color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                            ),
+                          ),
+                          onSelected: (emoji) {
+                            final cur = _msgController.text;
+                            _msgController.text = '$cur $emoji '.trimLeft();
+                            _msgController.selection = TextSelection.fromPosition(
+                              TextPosition(offset: _msgController.text.length),
+                            );
+                            _msgFocusNode.requestFocus();
+                          },
+                          itemBuilder: (ctx) => [
+                            PopupMenuItem(
+                              enabled: false,
+                              child: Text(
+                                'Quick Reactions',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                ),
+                              ),
+                            ),
+                            const PopupMenuDivider(height: 4),
+                            PopupMenuItem(
+                              padding: EdgeInsets.zero,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                child: Wrap(
+                                  spacing: 10,
+                                  runSpacing: 10,
+                                  children: [
+                                    '👍', '✅', '📦', '🚚', '📍', '💰', '📞', '⚠️', '🚨', '🙏'
+                                  ].map((emoji) {
+                                    return InkWell(
+                                      onTap: () {
+                                        Navigator.of(ctx).pop(emoji);
+                                      },
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(6),
+                                        decoration: BoxDecoration(
+                                          color: isDark
+                                              ? const Color(0xFF334155).withValues(alpha: 0.5)
+                                              : const Color(0xFFF1F5F9),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Text(emoji, style: const TextStyle(fontSize: 18)),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Container(
-            decoration: const BoxDecoration(
-              color: Color(0xFF0D9488),
-              shape: BoxShape.circle,
-            ),
-            child: IconButton(
-              onPressed: isSending ? null : _handleSendMessage,
-              icon: isSending
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Icon(Icons.send_rounded, color: Colors.white, size: 18),
-            ),
+              const SizedBox(width: 8),
+
+              // Circular Organic Send Button (Matching user screenshot)
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [
+                      Color(0xFF0284C7),
+                      Color(0xFF0369A1),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF0284C7).withValues(alpha: 0.35),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(22),
+                    onTap: isSending ? null : _handleSendMessage,
+                    child: Center(
+                      child: isSending
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.send_rounded,
+                              color: Colors.white,
+                              size: 19,
+                            ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
-    ],
-  ),
-);
-
+    );
   }
 }
 
