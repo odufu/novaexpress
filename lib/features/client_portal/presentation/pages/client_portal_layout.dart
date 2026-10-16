@@ -11,7 +11,10 @@ import '../widgets/client_create_order_modal.dart';
 import 'client_closer_workspace_page.dart';
 import 'client_closers_page.dart';
 import 'client_dashboard_page.dart';
-import 'client_finance_page.dart';
+import 'finance/client_expenses_view.dart';
+import 'finance/client_payouts_view.dart';
+import 'finance/client_profits_view.dart';
+import 'finance/client_remittance_view.dart';
 import 'client_inventory_page.dart';
 import 'client_orders_page.dart';
 import 'client_products_page.dart';
@@ -42,6 +45,7 @@ class ClientPortalLayout extends ConsumerStatefulWidget {
 
 class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  bool _isFinanceExpanded = true;
 
   @override
   Widget build(BuildContext context) {
@@ -139,7 +143,14 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
       case 'inventory':
         return const ClientInventoryPage();
       case 'finance':
-        return const ClientFinancePage();
+      case 'finance_remittance':
+        return const ClientRemittanceView();
+      case 'finance_expenses':
+        return const ClientExpensesView();
+      case 'finance_profits':
+        return const ClientProfitsView();
+      case 'finance_payouts':
+        return const ClientPayoutsView();
       case 'products':
         return const ClientProductsPage();
       case 'marketing':
@@ -288,7 +299,7 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
                 ] else ...[
                   _buildNavItem(
                     key: 'dashboard',
-                    title: 'Dashboard & KPIs',
+                    title: 'Dashboard',
                     icon: Icons.dashboard_rounded,
                     isSelected: activeTab == 'dashboard',
                     isCollapsed: isCollapsed,
@@ -296,25 +307,22 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
                   ),
                   _buildNavItem(
                     key: 'orders',
-                    title: 'Deliveries & Orders',
+                    title: 'Orders',
                     icon: Icons.local_shipping_rounded,
                     badge: state.totalOrdersCount > 0 ? '${state.totalOrdersCount}' : null,
                     isSelected: activeTab == 'orders',
                     isCollapsed: isCollapsed,
                     isDrawer: isDrawer,
                   ),
-                  _buildNavItem(
-                    key: 'finance',
-                    title: 'Finance & Settlements',
-                    icon: Icons.account_balance_wallet_rounded,
-                    badge: state.activeFinanceSummary.awaitingRemittance > 0 ? 'Ready' : null,
-                    isSelected: activeTab == 'finance',
+                  _buildExpandableFinanceItem(
+                    activeTab: activeTab,
                     isCollapsed: isCollapsed,
                     isDrawer: isDrawer,
+                    state: state,
                   ),
                   _buildNavItem(
                     key: 'products',
-                    title: 'Products & Deals',
+                    title: 'Products',
                     icon: Icons.inventory_2_rounded,
                     isSelected: activeTab == 'products',
                     isCollapsed: isCollapsed,
@@ -323,7 +331,7 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
                   if (state.clientProfile.hasInventoryManagement)
                     _buildNavItem(
                       key: 'inventory',
-                      title: 'Inventory & Stock',
+                      title: 'Inventory',
                       icon: Icons.warehouse_rounded,
                       badge: state.stockBalances.isNotEmpty ? '${state.uniqueWarehousesCount} Hubs' : null,
                       isSelected: activeTab == 'inventory',
@@ -333,7 +341,7 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
                   if (state.clientProfile.isEnterprise)
                     _buildNavItem(
                       key: 'closers',
-                      title: 'Closers & Team',
+                      title: 'Closers',
                       icon: Icons.people_alt_rounded,
                       badge: state.closers.isNotEmpty ? '${state.closers.length}' : null,
                       isSelected: activeTab == 'closers',
@@ -342,7 +350,7 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
                     ),
                   _buildNavItem(
                     key: 'marketing',
-                    title: 'Digital Marketing',
+                    title: 'Marketing',
                     icon: Icons.campaign_rounded,
                     badge: state.leadForms.isNotEmpty ? '${state.leadForms.length}' : null,
                     isSelected: activeTab == 'marketing',
@@ -519,25 +527,252 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
     );
   }
 
+  Widget _buildExpandableFinanceItem({
+    required String activeTab,
+    required bool isCollapsed,
+    required bool isDrawer,
+    required ClientPortalState state,
+  }) {
+    final brandPrimary = state.clientProfile.brandPrimaryColor;
+    final isAnyFinanceSelected = activeTab.startsWith('finance');
+    final awaitingRemittance = state.activeFinanceSummary.awaitingRemittance;
+
+    if (isCollapsed) {
+      return Tooltip(
+        message: 'Finance',
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 4),
+          child: Material(
+            color: isAnyFinanceSelected ? const Color(0xFF1A2B48) : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            child: InkWell(
+              onTap: () {
+                ref.read(clientActiveTabProvider.notifier).state = 'finance_remittance';
+              },
+              borderRadius: BorderRadius.circular(10),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                child: Center(
+                  child: Icon(
+                    Icons.account_balance_wallet_rounded,
+                    size: 20,
+                    color: isAnyFinanceSelected ? brandPrimary : const Color(0xFF8293B5),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Parent Header Tile
+          Material(
+            color: (isAnyFinanceSelected && !_isFinanceExpanded) ? const Color(0xFF1A2B48) : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            child: InkWell(
+              onTap: () {
+                setState(() {
+                  _isFinanceExpanded = !_isFinanceExpanded;
+                });
+                if (!isAnyFinanceSelected) {
+                  ref.read(clientActiveTabProvider.notifier).state = 'finance_remittance';
+                }
+              },
+              borderRadius: BorderRadius.circular(10),
+              hoverColor: Colors.white.withValues(alpha: 0.08),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.account_balance_wallet_rounded,
+                      size: 20,
+                      color: isAnyFinanceSelected ? brandPrimary : const Color(0xFF8293B5),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Finance',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: isAnyFinanceSelected ? FontWeight.bold : FontWeight.w500,
+                          color: isAnyFinanceSelected ? Colors.white : const Color(0xFFCBD5E1),
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (awaitingRemittance > 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        margin: const EdgeInsets.only(right: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          'Ready',
+                          style: GoogleFonts.inter(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF10B981),
+                          ),
+                        ),
+                      ),
+                    Icon(
+                      _isFinanceExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                      size: 18,
+                      color: const Color(0xFF8293B5),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // Sub-items list when expanded
+          if (_isFinanceExpanded) ...[
+            Padding(
+              padding: const EdgeInsets.only(left: 12, top: 2),
+              child: Column(
+                children: [
+                  _buildSubNavItem(
+                    key: 'finance_remittance',
+                    title: 'Remittance',
+                    tooltip: 'Daily Collections & Payouts',
+                    icon: Icons.payments_outlined,
+                    isSelected: activeTab == 'finance_remittance' || activeTab == 'finance',
+                    isDrawer: isDrawer,
+                  ),
+                  _buildSubNavItem(
+                    key: 'finance_expenses',
+                    title: 'Expenses',
+                    tooltip: 'Operating & Product Expenditures',
+                    icon: Icons.receipt_long_outlined,
+                    isSelected: activeTab == 'finance_expenses',
+                    isDrawer: isDrawer,
+                  ),
+                  _buildSubNavItem(
+                    key: 'finance_profits',
+                    title: 'Profits',
+                    tooltip: 'Commercial Profit & Loss Analysis',
+                    icon: Icons.trending_up_rounded,
+                    isSelected: activeTab == 'finance_profits',
+                    isDrawer: isDrawer,
+                  ),
+                  _buildSubNavItem(
+                    key: 'finance_payouts',
+                    title: 'Payouts',
+                    tooltip: 'Closer & Marketer Commission Payouts',
+                    icon: Icons.account_balance_rounded,
+                    isSelected: activeTab == 'finance_payouts',
+                    isDrawer: isDrawer,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSubNavItem({
+    required String key,
+    required String title,
+    required String tooltip,
+    required IconData icon,
+    required bool isSelected,
+    required bool isDrawer,
+  }) {
+    final brandPrimary = ref.watch(clientPortalProvider).clientProfile.brandPrimaryColor;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 2),
+      child: Tooltip(
+        message: tooltip,
+        child: Material(
+          color: isSelected ? const Color(0xFF1A2B48) : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          child: InkWell(
+            onTap: () {
+              ref.read(clientActiveTabProvider.notifier).state = key;
+              if (isDrawer) {
+                Navigator.of(context).pop();
+              }
+            },
+            borderRadius: BorderRadius.circular(8),
+            hoverColor: Colors.white.withValues(alpha: 0.06),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8.5),
+              child: Row(
+                children: [
+                  Container(
+                    width: 4,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: isSelected ? brandPrimary : const Color(0xFF64748B),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Icon(
+                    icon,
+                    size: 16,
+                    color: isSelected ? brandPrimary : const Color(0xFF8293B5),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: GoogleFonts.inter(
+                        fontSize: 12.5,
+                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                        color: isSelected ? Colors.white : const Color(0xFF94A3B8),
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   String _getActiveTabTitle(String activeTab, bool isCloser) {
     switch (activeTab) {
       case 'leads':
-        return 'My Leads & Telesales Dialer';
+        return 'Leads';
       case 'closers':
-        return 'Closers & Telesales Team';
+        return 'Closers';
       case 'orders':
-        return isCloser ? 'Booked Orders Pipeline' : 'Deliveries & Customer Orders';
+        return 'Orders';
       case 'finance':
-        return 'Finance & Settlements Command';
+      case 'finance_remittance':
+        return 'Remittance';
+      case 'finance_expenses':
+        return 'Expenses';
+      case 'finance_profits':
+        return 'Profits';
+      case 'finance_payouts':
+        return 'Payouts';
       case 'inventory':
-        return 'Inventory & Stock';
+        return 'Inventory';
       case 'products':
-        return 'Product Catalog & Deals';
+        return 'Products';
       case 'marketing':
-        return 'Digital Marketing & Lead Ingestion Suite';
+        return 'Marketing';
       case 'dashboard':
       default:
-        return isCloser ? 'My Leads & Telesales Dialer' : 'Merchant Dashboard';
+        return isCloser ? 'Leads' : 'Dashboard';
     }
   }
 
@@ -760,7 +995,7 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
       if (state.clientProfile.hasInventoryManagement)
         (key: 'inventory', label: 'Inventory', icon: Icons.warehouse_rounded),
       (key: 'products', label: 'Products', icon: Icons.inventory_2_rounded),
-      (key: 'finance', label: 'Finance', icon: Icons.account_balance_wallet_rounded),
+      (key: 'finance_remittance', label: 'Finance', icon: Icons.account_balance_wallet_rounded),
       if (state.clientProfile.isEnterprise)
         (key: 'closers', label: 'Closers', icon: Icons.people_alt_rounded),
     ];
@@ -788,7 +1023,9 @@ class _ClientPortalLayoutState extends ConsumerState<ClientPortalLayout> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: navItems.map((item) {
-              final isSelected = activeTab == item.key;
+              final isSelected = item.key == 'finance_remittance'
+                  ? activeTab.startsWith('finance')
+                  : activeTab == item.key;
               return Expanded(
                 child: InkWell(
                   onTap: () => ref.read(clientActiveTabProvider.notifier).state = item.key,

@@ -91,6 +91,33 @@ class ExpenditureRepository {
     }
   }
 
+  /// Delete / Archive an expenditure record
+  Future<bool> deleteExpenditure(String id) async {
+    try {
+      await _supabase.from('business_expenditures').delete().eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('Error deleting expenditure: $e');
+      return false;
+    }
+  }
+
+  /// Update an existing expenditure record
+  Future<BusinessExpenditureEntity?> updateExpenditure(String id, Map<String, dynamic> updates) async {
+    try {
+      final response = await _supabase
+          .from('business_expenditures')
+          .update(updates)
+          .eq('id', id)
+          .select()
+          .single();
+      return BusinessExpenditureEntity.fromMap(Map<String, dynamic>.from(response));
+    } catch (e) {
+      debugPrint('Error updating expenditure: $e');
+      return null;
+    }
+  }
+
   /// Query the 8 core merchant metrics from fn_get_merchant_financial_dashboard RPC
   Future<MerchantFinancialMetrics> fetchMerchantFinancialDashboard({
     required String clientId,
