@@ -233,6 +233,10 @@ def main():
     closers = src_fetch("/rest/v1/client_closers?select=*")
     tgt_rest_upsert("client_closers", closers, table_cols=table_cols)
 
+    # 5.9 Client Stock Balances
+    stock_balances = src_fetch("/rest/v1/client_stock_balances?select=*")
+    tgt_rest_upsert("client_stock_balances", stock_balances, table_cols=table_cols)
+
     print("\n" + "=" * 60, flush=True)
     print("REPLICATION TASK FINISHED SUCCESSFULLY", flush=True)
     print(f"All pilot logins available on test sandbox using: '{DEFAULT_PASSWORD}'", flush=True)
