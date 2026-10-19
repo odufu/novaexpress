@@ -265,7 +265,7 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
                 _buildNavItem(2, 'Rider Remittances', Icons.receipt_long_rounded, state.activeTabIndex == 2, isCollapsed, isDrawer),
                 _buildNavItem(3, 'Inventory & Stock', Icons.inventory_2_rounded, state.activeTabIndex == 3, isCollapsed, isDrawer),
                 _buildNavItem(4, 'Vault Cash & Settlements', Icons.account_balance_wallet_rounded, state.activeTabIndex == 4, isCollapsed, isDrawer),
-                _buildNavItem(13, 'Expenditures & Invoices', Icons.receipt_long_rounded, state.activeTabIndex == 13, isCollapsed, isDrawer),
+                _buildNavItem(13, 'Business Finance & P&L', Icons.insights_rounded, state.activeTabIndex == 13, isCollapsed, isDrawer),
                 _buildNavItem(5, 'Audit Ledger', Icons.history_rounded, state.activeTabIndex == 5, isCollapsed, isDrawer),
                 _buildNavItem(6, 'Returns & QC Desk', Icons.assignment_return_rounded, state.activeTabIndex == 6, isCollapsed, isDrawer),
                 _buildNavItem(7, 'Rider Payout Claims', Icons.payments_rounded, state.activeTabIndex == 7, isCollapsed, isDrawer),

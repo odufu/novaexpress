@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -8,6 +7,7 @@ import '../../../client_portal/domain/entities/business_expenditure.dart';
 import '../../domain/entities/distribution_center.dart';
 import '../providers/dc_console_provider.dart';
 import '../providers/dc_expenditures_provider.dart';
+import '../services/dc_finance_excel_exporter.dart';
 import '../widgets/dc_create_expenditure_modal.dart';
 import '../widgets/dc_receipt_preview_modal.dart';
 
@@ -18,13 +18,23 @@ class DCExpendituresPage extends ConsumerStatefulWidget {
   ConsumerState<DCExpendituresPage> createState() => _DCExpendituresPageState();
 }
 
-class _DCExpendituresPageState extends ConsumerState<DCExpendituresPage> {
+class _DCExpendituresPageState extends ConsumerState<DCExpendituresPage> with SingleTickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
   final NumberFormat _currencyFormat = NumberFormat.currency(locale: 'en_NG', symbol: '₦', decimalDigits: 2);
   final NumberFormat _compactCurrency = NumberFormat.currency(locale: 'en_NG', symbol: '₦', decimalDigits: 0);
+  
+  late TabController _tabController;
+  bool _isExporting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 4, vsync: this);
+  }
 
   @override
   void dispose() {
+    _tabController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -32,27 +42,27 @@ class _DCExpendituresPageState extends ConsumerState<DCExpendituresPage> {
   Color _getCategoryColor(ExpenditureCategory category) {
     switch (category) {
       case ExpenditureCategory.dieselFuel:
-        return const Color(0xFFF59E0B); // Amber
+        return const Color(0xFFF59E0B);
       case ExpenditureCategory.riderAllowance:
-        return const Color(0xFF0D9488); // Teal
+        return const Color(0xFF0D9488);
       case ExpenditureCategory.logistics:
-        return const Color(0xFF3B82F6); // Blue
+        return const Color(0xFF3B82F6);
       case ExpenditureCategory.rentUtilities:
-        return const Color(0xFF8B5CF6); // Purple
+        return const Color(0xFF8B5CF6);
       case ExpenditureCategory.equipmentMaintenance:
-        return const Color(0xFFEC4899); // Pink
+        return const Color(0xFFEC4899);
       case ExpenditureCategory.packaging:
       case ExpenditureCategory.stationery:
-        return const Color(0xFF10B981); // Emerald
+        return const Color(0xFF10B981);
       case ExpenditureCategory.facilitySupplies:
-        return const Color(0xFF06B6D4); // Cyan
+        return const Color(0xFF06B6D4);
       case ExpenditureCategory.security:
-        return const Color(0xFF6366F1); // Indigo
+        return const Color(0xFF6366F1);
       case ExpenditureCategory.salaries:
-        return const Color(0xFFF97316); // Orange
+        return const Color(0xFFF97316);
       case ExpenditureCategory.other:
       default:
-        return const Color(0xFF64748B); // Slate
+        return const Color(0xFF64748B);
     }
   }
 
@@ -84,7 +94,7 @@ class _DCExpendituresPageState extends ConsumerState<DCExpendituresPage> {
   }
 
   String _getDcName(String? dcId, List<DistributionCenter> dcs) {
-    if (dcId == null || dcId.isEmpty) return 'General Network';
+    if (dcId == null || dcId.isEmpty || dcId == 'all') return 'All Distribution Centers (Consolidated)';
     final dc = dcs.where((d) => d.id == dcId || d.code == dcId).firstOrNull;
     return dc?.name ?? 'Station $dcId';
   }
@@ -98,13 +108,78 @@ class _DCExpendituresPageState extends ConsumerState<DCExpendituresPage> {
     return name.contains('wuse') ||
         name.contains('abuja') ||
         code.contains('wuse') ||
-        code == 'dc-wuse-01';
+        code == 'dc-wuse-01' ||
+        dc.isPrimaryHub;
+  }
+
+  Future<void> _exportToExcel(DCExpendituresState expState, List<DistributionCenter> dcs) async {
+    setState(() => _isExporting = true);
+    try {
+      final success = await DcFinanceExcelExporter.exportFinancialReport(
+        periodName: expState.datePreset,
+        stationName: _getDcName(expState.selectedDcId, dcs),
+        totalRevenue: expState.totalRevenue,
+        riderWages: expState.riderSalaryAndWages,
+        fuelAndMaintenance: expState.fuelMaintenanceAndLubricant,
+        airtimeAndData: expState.airtimeAndData,
+        totalDirectCosts: expState.totalDirectCosts,
+        grossProfit: expState.grossProfit,
+        grossProfitMargin: expState.grossProfitMargin,
+        adminSalaries: expState.adminSalaries,
+        officeExpenses: expState.officeExpenses,
+        otherExpenses: expState.otherExpenses,
+        totalOpex: expState.totalOpex,
+        netProfit: expState.netProfit,
+        netProfitMargin: expState.netProfitMargin,
+        adjustedNetProfit: expState.adjustedNetProfit,
+        totalOrdersAssigned: expState.totalOrdersAssigned,
+        totalOrdersDelivered: expState.totalOrdersDelivered,
+        deliverySuccessRate: expState.deliverySuccessRate,
+        expenditures: expState.filteredExpenditures,
+        dcs: dcs,
+        failureBreakdown: expState.failureBreakdown,
+        riderScorecards: expState.riderScorecards,
+        momTrends: expState.momTrends,
+      );
+
+      if (mounted) {
+        setState(() => _isExporting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: success ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+            behavior: SnackBarBehavior.floating,
+            content: Row(
+              children: [
+                Icon(success ? Icons.check_circle_rounded : Icons.error_outline_rounded, color: Colors.white),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    success
+                        ? 'Excel Financial Report downloaded successfully! (.xlsx)'
+                        : 'Failed to generate Excel report.',
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isExporting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(backgroundColor: const Color(0xFFEF4444), content: Text('Export error: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _confirmDelete(BusinessExpenditureEntity exp) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text('Delete Expenditure Record?', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
         content: Text(
           'Are you sure you want to delete "${exp.title}" (${_currencyFormat.format(exp.amount)})? This action cannot be undone.',
@@ -113,13 +188,14 @@ class _DCExpendituresPageState extends ConsumerState<DCExpendituresPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text('Cancel', style: GoogleFonts.inter(color: const Color(0xFF64748B))),
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFEF4444),
               foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
             child: const Text('Delete'),
           ),
@@ -133,7 +209,10 @@ class _DCExpendituresPageState extends ConsumerState<DCExpendituresPage> {
     final ok = await ref.read(dcExpendituresProvider.notifier).deleteExpenditure(exp.id);
     if (ok && mounted) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('Expenditure record deleted')),
+        const SnackBar(
+          backgroundColor: Color(0xFF10B981),
+          content: Text('Expenditure record removed from station ledger'),
+        ),
       );
     }
   }
@@ -143,7 +222,7 @@ class _DCExpendituresPageState extends ConsumerState<DCExpendituresPage> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth >= 950;
+    final isDesktop = screenWidth >= 1050;
 
     final expState = ref.watch(dcExpendituresProvider);
     final expNotifier = ref.read(dcExpendituresProvider.notifier);
@@ -157,89 +236,74 @@ class _DCExpendituresPageState extends ConsumerState<DCExpendituresPage> {
       backgroundColor: Colors.transparent,
       body: RefreshIndicator(
         onRefresh: () => expNotifier.loadExpenditures(),
-        color: const Color(0xFF0D9488),
-        child: CustomScrollView(
+        color: const Color(0xFFF37021),
+        child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          slivers: [
-            // 1. Top Header Banner & Quick Action Buttons
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                  isDesktop ? 24 : 16,
-                  isDesktop ? 24 : 16,
-                  isDesktop ? 24 : 16,
-                  16,
+          padding: EdgeInsets.all(isDesktop ? 24 : 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 1. Executive Header Control Bar
+              _buildHeader(isDesktop, isDark, userIsAbujaMain, userDcId, dcs, expState, expNotifier),
+              const SizedBox(height: 20),
+
+              // 2. High-Impact Executive KPI Cards (Grid)
+              _buildExecutiveKpiGrid(expState, isDesktop, isDark),
+              const SizedBox(height: 24),
+
+              // 3. Sub-Tab Switcher Navigation
+              Container(
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF151D36) : Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
                 ),
-                child: _buildHeader(isDesktop, isDark, userIsAbujaMain, userDcId, dcs),
+                child: TabBar(
+                  controller: _tabController,
+                  isScrollable: !isDesktop,
+                  indicatorColor: const Color(0xFFF37021),
+                  indicatorWeight: 3,
+                  labelColor: const Color(0xFFF37021),
+                  unselectedLabelColor: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                  labelStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700),
+                  unselectedLabelStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500),
+                  tabs: const [
+                    Tab(icon: Icon(Icons.analytics_rounded, size: 18), text: 'P&L Statement & KPIs'),
+                    Tab(icon: Icon(Icons.receipt_long_rounded, size: 18), text: 'Expenditures & Invoices'),
+                    Tab(icon: Icon(Icons.local_shipping_rounded, size: 18), text: 'Delivery Operations & Root Cause'),
+                    Tab(icon: Icon(Icons.trending_up_rounded, size: 18), text: 'MoM Growth & Comparison'),
+                  ],
+                ),
               ),
-            ),
+              const SizedBox(height: 20),
 
-            // 2. High-Impact Business KPI Cards
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: isDesktop ? 24 : 16),
-                child: _buildKpisGrid(expState, isDesktop, isDark),
+              // 4. Tab Views Area
+              AnimatedBuilder(
+                animation: _tabController,
+                builder: (context, _) {
+                  switch (_tabController.index) {
+                    case 0:
+                      return _buildPnlStatementTab(expState, isDark, isDesktop);
+                    case 1:
+                      return _buildExpendituresLedgerTab(expState, expNotifier, isDark, isDesktop, dcs);
+                    case 2:
+                      return _buildDeliveryOperationsTab(expState, isDark, isDesktop);
+                    case 3:
+                      return _buildMomGrowthTab(expState, isDark, isDesktop);
+                    default:
+                      return _buildPnlStatementTab(expState, isDark, isDesktop);
+                  }
+                },
               ),
-            ),
-
-            const SliverToBoxAdapter(child: SizedBox(height: 20)),
-
-            // 3. Filter Controls Toolbar
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: isDesktop ? 24 : 16),
-                child: _buildFiltersBar(expState, expNotifier, isDesktop, isDark, userIsAbujaMain, dcs),
-              ),
-            ),
-
-            const SliverToBoxAdapter(child: SizedBox(height: 16)),
-
-            // 4. Content Area: Table for Desktop, Cards for Mobile
-            SliverPadding(
-              padding: EdgeInsets.fromLTRB(
-                isDesktop ? 24 : 16,
-                0,
-                isDesktop ? 24 : 16,
-                80,
-              ),
-              sliver: expState.isLoading
-                  ? const SliverToBoxAdapter(
-                      child: Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(60),
-                          child: CircularProgressIndicator(color: Color(0xFF0D9488)),
-                        ),
-                      ),
-                    )
-                  : expState.filteredExpenditures.isEmpty
-                      ? SliverToBoxAdapter(
-                          child: _buildEmptyState(isDark),
-                        )
-                      : isDesktop
-                          ? SliverToBoxAdapter(
-                              child: _buildDesktopTable(
-                                expState.filteredExpenditures,
-                                isDark,
-                                dcs,
-                              ),
-                            )
-                          : SliverList(
-                              delegate: SliverChildBuilderDelegate(
-                                (context, index) {
-                                  final exp = expState.filteredExpenditures[index];
-                                  return _buildMobileCard(exp, isDark, dcs);
-                                },
-                                childCount: expState.filteredExpenditures.length,
-                              ),
-                            ),
-            ),
-          ],
+              const SizedBox(height: 40),
+            ],
+          ),
         ),
       ),
       floatingActionButton: !isDesktop
           ? FloatingActionButton.extended(
               onPressed: () => DCCreateExpenditureModal.show(context),
-              backgroundColor: const Color(0xFF0D9488),
+              backgroundColor: const Color(0xFFF37021),
               icon: const Icon(Icons.add_rounded, color: Colors.white),
               label: Text(
                 'Record Expense',
@@ -250,397 +314,195 @@ class _DCExpendituresPageState extends ConsumerState<DCExpendituresPage> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // 1. HEADER SECTION
-  // ---------------------------------------------------------------------------
+  // ==========================================
+  // 1. EXECUTIVE HEADER CONTROL BAR
+  // ==========================================
   Widget _buildHeader(
     bool isDesktop,
     bool isDark,
     bool userIsAbujaMain,
     String? userDcId,
     List<DistributionCenter> dcs,
+    DCExpendituresState state,
+    DCExpendituresNotifier notifier,
   ) {
-    final currentStationName = userIsAbujaMain
-        ? 'Abuja Main Grand DC (Headquarters)'
-        : _getDcName(userDcId, dcs);
-
-    final canPop = Navigator.of(context).canPop();
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        if (canPop) ...[
-          IconButton(
-            icon: Icon(Icons.arrow_back_rounded, color: isDark ? Colors.white : const Color(0xFF0F172A)),
-            onPressed: () => Navigator.of(context).pop(),
-            tooltip: 'Back',
-          ),
-          const SizedBox(width: 6),
-        ],
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF0D9488), Color(0xFF0F766E)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF0D9488).withValues(alpha: 0.25),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: const Icon(
-            Icons.receipt_long_rounded,
-            color: Colors.white,
-            size: 26,
-          ),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Flexible(
-                    child: Text(
-                      'Distribution Center Expenditures',
-                      style: GoogleFonts.inter(
-                        fontSize: isDesktop ? 20 : 16.5,
-                        fontWeight: FontWeight.w800,
-                        color: isDark ? Colors.white : const Color(0xFF0F172A),
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: userIsAbujaMain
-                          ? const Color(0xFF0D9488).withValues(alpha: 0.12)
-                          : const Color(0xFF3B82F6).withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          userIsAbujaMain ? Icons.hub_rounded : Icons.warehouse_rounded,
-                          size: 12,
-                          color: userIsAbujaMain ? const Color(0xFF0D9488) : const Color(0xFF3B82F6),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          userIsAbujaMain ? 'ALL-DC ACCESS' : 'LOCAL STATION',
-                          style: GoogleFonts.inter(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: userIsAbujaMain ? const Color(0xFF0D9488) : const Color(0xFF3B82F6),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 3),
-              Text(
-                '$currentStationName • Operational OpEx, Invoices, Receipts & Logistics Costs',
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ),
-        if (isDesktop) ...[
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded, size: 20),
-            tooltip: 'Refresh expenditures',
-            onPressed: () => ref.read(dcExpendituresProvider.notifier).loadExpenditures(),
-          ),
-          const SizedBox(width: 8),
-          ElevatedButton.icon(
-            onPressed: () => DCCreateExpenditureModal.show(context),
-            icon: const Icon(Icons.add_rounded, size: 18),
-            label: const Text('Record Expenditure'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0D9488),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              elevation: 0,
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // 2. BUSINESS KPIS SECTION (5 METRICS)
-  // ---------------------------------------------------------------------------
-  Widget _buildKpisGrid(DCExpendituresState state, bool isDesktop, bool isDark) {
-    final kpis = [
-      _KpiData(
-        title: 'Total Period OpEx',
-        value: _compactCurrency.format(state.totalExpenditure),
-        subtitle: '${state.totalInvoicesCount} total vouchers',
-        icon: Icons.payments_rounded,
-        gradient: const [Color(0xFF0D9488), Color(0xFF0F766E)],
-      ),
-      _KpiData(
-        title: 'Fuel & Fleet Logistics',
-        value: _compactCurrency.format(state.fuelAndLogisticsTotal),
-        subtitle: state.totalExpenditure > 0
-            ? '${((state.fuelAndLogisticsTotal / state.totalExpenditure) * 100).toStringAsFixed(1)}% of total OpEx'
-            : '0.0% of OpEx',
-        icon: Icons.local_gas_station_rounded,
-        gradient: const [Color(0xFFF59E0B), Color(0xFFD97706)],
-      ),
-      _KpiData(
-        title: 'Station Facilities & Utilities',
-        value: _compactCurrency.format(state.facilityAndUtilitiesTotal),
-        subtitle: 'Power, rent, repairs & supplies',
-        icon: Icons.power_rounded,
-        gradient: const [Color(0xFF8B5CF6), Color(0xFF7C3AED)],
-      ),
-      _KpiData(
-        title: 'Packaging & Consumables',
-        value: _compactCurrency.format(state.packagingTotal),
-        subtitle: 'Waybills, tapes & bags',
-        icon: Icons.inventory_2_rounded,
-        gradient: const [Color(0xFF10B981), Color(0xFF059669)],
-      ),
-      _KpiData(
-        title: 'Verifiable Receipt Rate',
-        value: '${state.receiptVerificationRate.toStringAsFixed(1)}%',
-        subtitle: '${state.receiptsAttachedCount} of ${state.totalInvoicesCount} with receipts',
-        icon: Icons.verified_rounded,
-        gradient: const [Color(0xFF3B82F6), Color(0xFF2563EB)],
-      ),
-    ];
-
-    if (isDesktop) {
-      return LayoutBuilder(
-        builder: (context, constraints) {
-          final itemWidth = (constraints.maxWidth - (12 * 4)) / 5;
-          return Row(
-            children: kpis.map((kpi) {
-              return Container(
-                width: itemWidth,
-                margin: EdgeInsets.only(right: kpi == kpis.last ? 0 : 12),
-                child: _buildKpiCard(kpi, isDark),
-              );
-            }).toList(),
-          );
-        },
-      );
-    } else {
-      // Mobile: Horizontal scrolling cards
-      return SizedBox(
-        height: 110,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          itemCount: kpis.length,
-          separatorBuilder: (_, __) => const SizedBox(width: 12),
-          itemBuilder: (context, index) {
-            return SizedBox(
-              width: 190,
-              child: _buildKpiCard(kpis[index], isDark),
-            );
-          },
-        ),
-      );
-    }
-  }
-
-  Widget _buildKpiCard(_KpiData kpi, bool isDark) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: EdgeInsets.all(isDesktop ? 20 : 16),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-        ),
+        color: isDark ? const Color(0xFF151D36) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Flexible(
-                child: Text(
-                  kpi.title,
-                  style: GoogleFonts.inter(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w600,
-                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
               Container(
-                padding: const EdgeInsets.all(6),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: kpi.gradient),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(kpi.icon, size: 14, color: Colors.white),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            kpi.value,
-            style: GoogleFonts.inter(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              color: isDark ? Colors.white : const Color(0xFF0F172A),
-              letterSpacing: -0.5,
-            ),
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 2),
-          Text(
-            kpi.subtitle,
-            style: GoogleFonts.inter(
-              fontSize: 10.5,
-              fontWeight: FontWeight.w500,
-              color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
-            ),
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // 3. FILTERS & SEARCH TOOLBAR
-  // ---------------------------------------------------------------------------
-  Widget _buildFiltersBar(
-    DCExpendituresState state,
-    DCExpendituresNotifier notifier,
-    bool isDesktop,
-    bool isDark,
-    bool userIsAbujaMain,
-    List<DistributionCenter> dcs,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              // Search Input
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(14),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFF37021), Color(0xFFEA580C)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.search_rounded, size: 18, color: Color(0xFF94A3B8)),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextField(
-                          controller: _searchController,
-                          onChanged: (val) => notifier.setSearchQuery(val),
-                          style: GoogleFonts.inter(fontSize: 13),
-                          decoration: InputDecoration(
-                            hintText: 'Search title, invoice #, vendor, notes...',
-                            hintStyle: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF94A3B8)),
-                            border: InputBorder.none,
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.insights_rounded, color: Colors.white, size: 26),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            'Financial Command & Operations Reporting',
+                            style: GoogleFonts.inter(
+                              fontSize: isDesktop ? 20 : 16,
+                              fontWeight: FontWeight.w900,
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                              letterSpacing: -0.3,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                      ),
-                      if (_searchController.text.isNotEmpty)
-                        IconButton(
-                          icon: const Icon(Icons.clear_rounded, size: 16),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          onPressed: () {
-                            _searchController.clear();
-                            notifier.setSearchQuery('');
-                          },
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+                          ),
+                          child: Text(
+                            'AUDITED REPORT',
+                            style: GoogleFonts.jetBrainsMono(fontSize: 10, fontWeight: FontWeight.w800, color: const Color(0xFF10B981)),
+                          ),
                         ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'P&L statement, cost of services, direct expenses, and delivery unit economics',
+                      style: GoogleFonts.inter(
+                        fontSize: 12.5,
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              if (isDesktop) ...[
+                // Excel Export Button
+                ElevatedButton.icon(
+                  onPressed: _isExporting ? null : () => _exportToExcel(state, dcs),
+                  icon: _isExporting
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.table_view_rounded, size: 16, color: Colors.white),
+                  label: Text(
+                    _isExporting ? 'Generating Excel...' : 'Export Excel (.xlsx)',
+                    style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700, color: Colors.white),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF10B981),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    elevation: 0,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                // Record Expense Button
+                ElevatedButton.icon(
+                  onPressed: () => DCCreateExpenditureModal.show(context),
+                  icon: const Icon(Icons.add_rounded, size: 18, color: Colors.white),
+                  label: Text(
+                    'Record Expense',
+                    style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700, color: Colors.white),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFF37021),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    elevation: 0,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 16),
+          Divider(height: 1, color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFF1F5F9)),
+          const SizedBox(height: 14),
+
+          // Filters Row: Station Selector & Period Selector
+          Wrap(
+            spacing: 12,
+            runSpacing: 10,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              // Period Dropdown
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0B1021) : const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: state.datePreset,
+                    dropdownColor: isDark ? const Color(0xFF151D36) : Colors.white,
+                    style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                    icon: const Icon(Icons.calendar_month_rounded, size: 16, color: Color(0xFFF37021)),
+                    items: const [
+                      DropdownMenuItem(value: 'September 2026', child: Text('September 2026 (Audited)')),
+                      DropdownMenuItem(value: 'August 2026', child: Text('August 2026 (Audited)')),
+                      DropdownMenuItem(value: 'July 2026', child: Text('July 2026 (Audited)')),
+                      DropdownMenuItem(value: 'This Month', child: Text('Current Month (Live)')),
+                      DropdownMenuItem(value: 'Last 90 Days', child: Text('Last 90 Days (Quarter)')),
+                      DropdownMenuItem(value: 'All Time', child: Text('All Time History')),
                     ],
+                    onChanged: (val) {
+                      if (val != null) notifier.setDatePreset(val);
+                    },
                   ),
                 ),
               ),
 
-              const SizedBox(width: 10),
-
-              // Station Scope Dropdown (Abuja Main DC can view all stations)
-              if (userIsAbujaMain)
+              // Station Scope Filter
+              if (userIsAbujaMain) ...[
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
                   decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(14),
+                    color: isDark ? const Color(0xFF0B1021) : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
                       value: state.selectedDcId,
-                      dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-                      icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18),
-                      style: GoogleFonts.inter(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? Colors.white : const Color(0xFF0F172A),
-                      ),
+                      dropdownColor: isDark ? const Color(0xFF151D36) : Colors.white,
+                      style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                      icon: const Icon(Icons.apartment_rounded, size: 16, color: Color(0xFF3B82F6)),
                       items: [
-                        const DropdownMenuItem(
-                          value: 'all',
-                          child: Row(
-                            children: [
-                              Icon(Icons.hub_rounded, size: 15, color: Color(0xFF0D9488)),
-                              SizedBox(width: 6),
-                              Text('All Distribution Centers'),
-                            ],
-                          ),
-                        ),
-                        ...dcs.map((dc) {
+                        const DropdownMenuItem(value: 'all', child: Text('🌐 All Distribution Centers Combined')),
+                        ...dcs.map((d) {
                           return DropdownMenuItem(
-                            value: dc.id,
-                            child: Row(
-                              children: [
-                                const Icon(Icons.warehouse_rounded, size: 15, color: Color(0xFF3B82F6)),
-                                const SizedBox(width: 6),
-                                Text(dc.name),
-                              ],
-                            ),
+                            value: d.id,
+                            child: Text('${d.name} (${d.city})'),
                           );
                         }),
                       ],
@@ -650,775 +512,1137 @@ class _DCExpendituresPageState extends ConsumerState<DCExpendituresPage> {
                     ),
                   ),
                 ),
-
-              const SizedBox(width: 10),
-
-              // Date Range Preset Filter
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: state.datePreset,
-                    dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-                    icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18),
-                    style: GoogleFonts.inter(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w600,
-                      color: isDark ? Colors.white : const Color(0xFF0F172A),
-                    ),
-                    items: const [
-                      DropdownMenuItem(value: 'Today', child: Text('Today')),
-                      DropdownMenuItem(value: 'This Week', child: Text('This Week')),
-                      DropdownMenuItem(value: 'This Month', child: Text('This Month')),
-                      DropdownMenuItem(value: 'All Time', child: Text('All Time')),
+              ] else ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0D9488).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF0D9488).withValues(alpha: 0.25)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.lock_outline_rounded, size: 14, color: Color(0xFF0D9488)),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Scoped Station: ${_getDcName(userDcId, dcs)}',
+                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: const Color(0xFF0D9488)),
+                      ),
                     ],
-                    onChanged: (val) {
-                      if (val == null) return;
-                      final now = DateTime.now();
-                      DateTime? start;
-                      DateTime? end = now;
-
-                      switch (val) {
-                        case 'Today':
-                          start = DateTime(now.year, now.month, now.day);
-                          break;
-                        case 'This Week':
-                          start = now.subtract(Duration(days: now.weekday - 1));
-                          break;
-                        case 'This Month':
-                          start = DateTime(now.year, now.month, 1);
-                          break;
-                        case 'All Time':
-                          start = null;
-                          end = null;
-                          break;
-                      }
-                      notifier.setDateRange(start, end, preset: val);
-                    },
                   ),
                 ),
-              ),
+              ],
+
+              if (!isDesktop) ...[
+                OutlinedButton.icon(
+                  onPressed: _isExporting ? null : () => _exportToExcel(state, dcs),
+                  icon: const Icon(Icons.table_view_rounded, size: 15, color: Color(0xFF10B981)),
+                  label: Text('Export Excel', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: const Color(0xFF10B981))),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFF10B981)),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ],
             ],
           ),
-
-          const SizedBox(height: 10),
-
-          // Horizontal Category Filter Pills
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _buildCategoryPill('all', 'All Categories', Icons.apps_rounded, state.selectedCategory, notifier, isDark),
-                const SizedBox(width: 8),
-                _buildCategoryPill('diesel_fuel', 'Diesel & Fuel', Icons.local_gas_station_rounded, state.selectedCategory, notifier, isDark),
-                const SizedBox(width: 8),
-                _buildCategoryPill('rider_allowance', 'Rider Allowances', Icons.two_wheeler_rounded, state.selectedCategory, notifier, isDark),
-                const SizedBox(width: 8),
-                _buildCategoryPill('logistics', 'Logistics & Haulage', Icons.local_shipping_rounded, state.selectedCategory, notifier, isDark),
-                const SizedBox(width: 8),
-                _buildCategoryPill('rent_utilities', 'Rent & Utilities', Icons.power_rounded, state.selectedCategory, notifier, isDark),
-                const SizedBox(width: 8),
-                _buildCategoryPill('equipment_maintenance', 'Maintenance', Icons.build_circle_rounded, state.selectedCategory, notifier, isDark),
-                const SizedBox(width: 8),
-                _buildCategoryPill('packaging', 'Packaging', Icons.inventory_2_rounded, state.selectedCategory, notifier, isDark),
-                const SizedBox(width: 8),
-                _buildCategoryPill('facility_supplies', 'Hub Supplies', Icons.cleaning_services_rounded, state.selectedCategory, notifier, isDark),
-                const SizedBox(width: 8),
-                _buildCategoryPill('other', 'Other OpEx', Icons.receipt_rounded, state.selectedCategory, notifier, isDark),
-              ],
-            ),
-          ),
         ],
       ),
     );
   }
 
-  Widget _buildCategoryPill(
-    String val,
-    String label,
-    IconData icon,
-    String currentVal,
-    DCExpendituresNotifier notifier,
-    bool isDark,
-  ) {
-    final isSelected = currentVal == val;
-    return InkWell(
-      onTap: () => notifier.setCategory(val),
-      borderRadius: BorderRadius.circular(12),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? const Color(0xFF0D9488)
-              : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9)),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected
-                ? const Color(0xFF0D9488)
-                : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
+  // ==========================================
+  // 2. HIGH-IMPACT EXECUTIVE KPI GRID
+  // ==========================================
+  Widget _buildExecutiveKpiGrid(DCExpendituresState state, bool isDesktop, bool isDark) {
+    final cols = isDesktop ? 6 : 2;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cardWidth = (constraints.maxWidth - ((cols - 1) * 12)) / cols;
+        return Wrap(
+          spacing: 12,
+          runSpacing: 12,
           children: [
-            Icon(
-              icon,
-              size: 14,
-              color: isSelected
-                  ? Colors.white
-                  : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+            _buildExecutiveCard(
+              title: 'TOTAL REVENUE',
+              value: _compactCurrency.format(state.totalRevenue),
+              subtitle: '${state.totalOrdersDelivered} Delivered Orders',
+              icon: Icons.payments_rounded,
+              accentColor: const Color(0xFF10B981),
+              trend: '+6.69% MoM ↑',
+              isDark: isDark,
+              width: cardWidth,
             ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: GoogleFonts.inter(
-                fontSize: 11.5,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                color: isSelected
-                    ? Colors.white
-                    : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155)),
-              ),
+            _buildExecutiveCard(
+              title: 'COST OF SERVICES',
+              value: _compactCurrency.format(state.totalDirectCosts),
+              subtitle: '${state.directCostPercentage.toStringAsFixed(1)}% of Revenue (Direct)',
+              icon: Icons.two_wheeler_rounded,
+              accentColor: const Color(0xFF3B82F6),
+              trend: 'Wages, Fuel & Comms',
+              isDark: isDark,
+              width: cardWidth,
+            ),
+            _buildExecutiveCard(
+              title: 'GROSS PROFIT',
+              value: _compactCurrency.format(state.grossProfit),
+              subtitle: '${state.grossProfitMargin.toStringAsFixed(1)}% Margin',
+              icon: Icons.account_balance_wallet_rounded,
+              accentColor: const Color(0xFFF37021),
+              trend: '+8.95% Margin Growth ↑',
+              isDark: isDark,
+              width: cardWidth,
+            ),
+            _buildExecutiveCard(
+              title: 'OPERATIONAL EXPENSES',
+              value: _compactCurrency.format(state.totalOpex),
+              subtitle: 'Admin, Capex & Power',
+              icon: Icons.business_center_rounded,
+              accentColor: const Color(0xFF8B5CF6),
+              trend: '${state.opexPercentage.toStringAsFixed(1)}% of Rev',
+              isDark: isDark,
+              width: cardWidth,
+            ),
+            _buildExecutiveCard(
+              title: 'NET PROFIT',
+              value: _compactCurrency.format(state.netProfit),
+              subtitle: 'Pre-Capex: ${_compactCurrency.format(state.adjustedNetProfit)}',
+              icon: Icons.price_check_rounded,
+              accentColor: const Color(0xFF0D9488),
+              trend: '22.3% Pre-Capex Margin',
+              isDark: isDark,
+              width: cardWidth,
+            ),
+            _buildExecutiveCard(
+              title: 'DELIVERY SUCCESS RATE',
+              value: '${state.deliverySuccessRate.toStringAsFixed(1)}%',
+              subtitle: '${state.totalOrdersDelivered} / ${state.totalOrdersAssigned} Assigned',
+              icon: Icons.check_circle_outline_rounded,
+              accentColor: state.deliverySuccessRate >= 70 ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+              trend: 'Root Cause Tracked',
+              isDark: isDark,
+              width: cardWidth,
             ),
           ],
-        ),
-      ),
+        );
+      },
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // 4. DESKTOP VIEW: HIGH PERFORMANCE DATA TABLE
-  // ---------------------------------------------------------------------------
-  Widget _buildDesktopTable(
-    List<BusinessExpenditureEntity> list,
-    bool isDark,
-    List<DistributionCenter> dcs,
-  ) {
+  Widget _buildExecutiveCard({
+    required String title,
+    required String value,
+    required String subtitle,
+    required IconData icon,
+    required Color accentColor,
+    required String trend,
+    required bool isDark,
+    required double width,
+  }) {
     return Container(
+      width: width,
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-        ),
+        color: isDark ? const Color(0xFF151D36) : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minWidth: 1050),
-            child: DataTable(
-              headingRowColor: WidgetStateProperty.all(
-                isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-              ),
-              dataRowColor: WidgetStateProperty.resolveWith((states) {
-                if (states.contains(WidgetState.hovered)) {
-                  return isDark ? const Color(0xFF243048) : const Color(0xFFF1F5F9);
-                }
-                return Colors.transparent;
-              }),
-              horizontalMargin: 18,
-              columnSpacing: 20,
-              dataRowMinHeight: 58,
-              dataRowMaxHeight: 64,
-              columns: [
-                DataColumn(
-                  label: Text('DATE / INVOICE #', style: _tableHeaderStyle(isDark)),
-                ),
-                DataColumn(
-                  label: Text('EXPENSE TITLE', style: _tableHeaderStyle(isDark)),
-                ),
-                DataColumn(
-                  label: Text('STATION / DC', style: _tableHeaderStyle(isDark)),
-                ),
-                DataColumn(
-                  label: Text('CATEGORY', style: _tableHeaderStyle(isDark)),
-                ),
-                DataColumn(
-                  label: Text('VENDOR / SUPPLIER', style: _tableHeaderStyle(isDark)),
-                ),
-                DataColumn(
-                  label: Text('AMOUNT (₦)', style: _tableHeaderStyle(isDark)),
-                ),
-                DataColumn(
-                  label: Text('RECEIPT', style: _tableHeaderStyle(isDark)),
-                ),
-                DataColumn(
-                  label: Text('ACTIONS', style: _tableHeaderStyle(isDark)),
-                ),
-              ],
-              rows: list.map((exp) {
-                final catColor = _getCategoryColor(exp.category);
-                final stationName = _getDcName(exp.distributionCenterId, dcs);
-
-                return DataRow(
-                  cells: [
-                    // 1. Date & Invoice #
-                    DataCell(
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            DateFormat('MMM d, yyyy').format(exp.expenditureDate),
-                            style: GoogleFonts.inter(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w600,
-                              color: isDark ? Colors.white : const Color(0xFF0F172A),
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            exp.invoiceNumber ?? 'NO-INVOICE',
-                            style: GoogleFonts.jetBrainsMono(
-                              fontSize: 11,
-                              color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // 2. Title & Description
-                    DataCell(
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 240),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              exp.title,
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: isDark ? Colors.white : const Color(0xFF0F172A),
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            if (exp.description != null && exp.description!.isNotEmpty) ...[
-                              const SizedBox(height: 2),
-                              Text(
-                                exp.description!,
-                                style: GoogleFonts.inter(
-                                  fontSize: 11,
-                                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    // 3. Station / DC Badge
-                    DataCell(
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: (stationName.toLowerCase().contains('wuse')
-                                  ? const Color(0xFF0D9488)
-                                  : const Color(0xFF3B82F6))
-                              .withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              stationName.toLowerCase().contains('wuse')
-                                  ? Icons.hub_rounded
-                                  : Icons.warehouse_rounded,
-                              size: 13,
-                              color: stationName.toLowerCase().contains('wuse')
-                                  ? const Color(0xFF0D9488)
-                                  : const Color(0xFF3B82F6),
-                            ),
-                            const SizedBox(width: 5),
-                            ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 130),
-                              child: Text(
-                                stationName,
-                                style: GoogleFonts.inter(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: stationName.toLowerCase().contains('wuse')
-                                      ? const Color(0xFF0D9488)
-                                      : const Color(0xFF3B82F6),
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    // 4. Category
-                    DataCell(
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: catColor.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(_getCategoryIcon(exp.category), size: 13, color: catColor),
-                            const SizedBox(width: 5),
-                            Text(
-                              exp.category.label,
-                              style: GoogleFonts.inter(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: catColor,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    // 5. Vendor / Beneficiary
-                    DataCell(
-                      Text(
-                        exp.vendorName ?? 'Station Petty Cash',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-
-                    // 6. Amount
-                    DataCell(
-                      Text(
-                        _currencyFormat.format(exp.amount),
-                        style: GoogleFonts.inter(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w800,
-                          color: const Color(0xFF10B981),
-                        ),
-                      ),
-                    ),
-
-                    // 7. Receipt Preview Button
-                    DataCell(
-                      exp.hasReceipt
-                          ? InkWell(
-                              onTap: () => DCReceiptPreviewModal.show(context, exp, dcName: stationName),
-                              borderRadius: BorderRadius.circular(10),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF0D9488).withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color: const Color(0xFF0D9488).withValues(alpha: 0.25),
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      exp.isPdfReceipt
-                                          ? Icons.picture_as_pdf_rounded
-                                          : Icons.receipt_long_rounded,
-                                      size: 14,
-                                      color: const Color(0xFF0D9488),
-                                    ),
-                                    const SizedBox(width: 5),
-                                    Text(
-                                      exp.isPdfReceipt ? 'View PDF' : 'Receipt',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: const Color(0xFF0D9488),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            )
-                          : Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: (isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                'No Receipt',
-                                style: GoogleFonts.inter(
-                                  fontSize: 10.5,
-                                  color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
-                                ),
-                              ),
-                            ),
-                    ),
-
-                    // 8. Actions (Delete, Copy Ref)
-                    DataCell(
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (exp.invoiceNumber != null && exp.invoiceNumber!.isNotEmpty)
-                            IconButton(
-                              icon: const Icon(Icons.copy_rounded, size: 16),
-                              tooltip: 'Copy voucher reference',
-                              onPressed: () {
-                                Clipboard.setData(ClipboardData(text: exp.invoiceNumber!));
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Copied ${exp.invoiceNumber} to clipboard'),
-                                    duration: const Duration(seconds: 2),
-                                  ),
-                                );
-                              },
-                            ),
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline_rounded, size: 17, color: Color(0xFFEF4444)),
-                            tooltip: 'Delete expenditure',
-                            onPressed: () => _confirmDelete(exp),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                );
-              }).toList(),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  TextStyle _tableHeaderStyle(bool isDark) {
-    return GoogleFonts.inter(
-      fontSize: 11,
-      fontWeight: FontWeight.w700,
-      letterSpacing: 0.5,
-      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // 5. MOBILE VIEW: ORGANIC TOUCH-FRIENDLY CARDS
-  // ---------------------------------------------------------------------------
-  Widget _buildMobileCard(
-    BusinessExpenditureEntity exp,
-    bool isDark,
-    List<DistributionCenter> dcs,
-  ) {
-    final catColor = _getCategoryColor(exp.category);
-    final stationName = _getDcName(exp.distributionCenterId, dcs);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
-            blurRadius: 10,
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
+            blurRadius: 6,
             offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: accentColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: accentColor, size: 16),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: accentColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  trend,
+                  style: GoogleFonts.inter(fontSize: 9.5, fontWeight: FontWeight.w700, color: accentColor),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            title,
+            style: GoogleFonts.inter(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+              letterSpacing: 0.5,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: GoogleFonts.inter(
+              fontSize: 17,
+              fontWeight: FontWeight.w900,
+              color: isDark ? Colors.white : const Color(0xFF0F172A),
+              letterSpacing: -0.5,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            style: GoogleFonts.inter(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w500,
+              color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==========================================
+  // TAB 1: P&L STATEMENT & REVENUE BREAKDOWN
+  // ==========================================
+  Widget _buildPnlStatementTab(DCExpendituresState state, bool isDark, bool isDesktop) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Main Audited P&L Table Card
+        Container(
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF151D36) : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header: Category Badge + Date + Amount
+              // Header
+              Padding(
+                padding: const EdgeInsets.all(18),
+                child: Row(
+                  children: [
+                    const Icon(Icons.table_chart_rounded, color: Color(0xFFF37021), size: 20),
+                    const SizedBox(width: 10),
+                    Text(
+                      'P&L Statement of Operations (${state.datePreset})',
+                      style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                    ),
+                  ],
+                ),
+              ),
+              Divider(height: 1, color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFF1F5F9)),
+
+              // Table Body
+              _buildPnlRow('TOTAL LOGISTICS REVENUE', state.totalRevenue, '100.0%', isDark, isHeader: true, color: const Color(0xFF10B981)),
+              _buildPnlSectionHeader('Cost of Services / Direct Operating Costs', isDark),
+              _buildPnlRow('  • Riders / PDA Salary & Wages', state.riderSalaryAndWages, '${(state.riderSalaryAndWages / state.totalRevenue * 100).toStringAsFixed(1)}%', isDark),
+              _buildPnlRow('  • Fuel, Maintenance & Lubricant', state.fuelMaintenanceAndLubricant, '${(state.fuelMaintenanceAndLubricant / state.totalRevenue * 100).toStringAsFixed(1)}%', isDark),
+              _buildPnlRow('  • Logistics Dispatch Comms (Airtime & Data)', state.airtimeAndData, '${(state.airtimeAndData / state.totalRevenue * 100).toStringAsFixed(1)}%', isDark),
+              _buildPnlRow('TOTAL DIRECT OPERATING COSTS', state.totalDirectCosts, '${state.directCostPercentage.toStringAsFixed(1)}%', isDark, isSubtotal: true, color: const Color(0xFF3B82F6)),
+
+              _buildPnlRow('GROSS PROFIT', state.grossProfit, '${state.grossProfitMargin.toStringAsFixed(2)}%', isDark, isHeader: true, color: const Color(0xFFF37021)),
+
+              _buildPnlSectionHeader('Operational Expenses (OPEX)', isDark),
+              _buildPnlRow('  • Admin Salaries & Hub Operations Team', state.adminSalaries, '${(state.adminSalaries / state.totalRevenue * 100).toStringAsFixed(1)}%', isDark),
+              _buildPnlRow('  • Office Expenses & Management Airtime', state.officeExpenses, '${(state.officeExpenses / state.totalRevenue * 100).toStringAsFixed(1)}%', isDark),
+              _buildPnlRow('  • Other Expenses & Capex (Power, Lagos Project, Equipment)', state.otherExpenses, '${(state.otherExpenses / state.totalRevenue * 100).toStringAsFixed(1)}%', isDark),
+              _buildPnlRow('TOTAL OPERATIONAL EXPENSES', state.totalOpex, '${state.opexPercentage.toStringAsFixed(1)}%', isDark, isSubtotal: true, color: const Color(0xFF8B5CF6)),
+
+              _buildPnlRow('REPORTED NET PROFIT', state.netProfit, '${state.netProfitMargin.toStringAsFixed(2)}%', isDark, isHeader: true, color: const Color(0xFF0D9488)),
+              _buildPnlRow('Adjusted Operating Profit (Before Expansion & Equipment Capex)', state.adjustedNetProfit, '${state.adjustedNetProfitMargin.toStringAsFixed(2)}%', isDark, isSpecial: true),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        // Deep-Dive: What is inside Other Expenses (Table 2c in Report)
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF151D36) : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.account_tree_rounded, color: Color(0xFF8B5CF6), size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        'What is Inside Other Expenses (${_compactCurrency.format(state.otherExpenses)})',
+                        style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    '100.0% OF OTHER OPEX',
+                    style: GoogleFonts.jetBrainsMono(fontSize: 10, fontWeight: FontWeight.w800, color: const Color(0xFF8B5CF6)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              ...state.otherExpensesBreakdown.map((item) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF0B1021) : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Icon(Icons.arrow_right_rounded, size: 16, color: Color(0xFFF37021)),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          item['group'].toString(),
+                          style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: isDark ? Colors.white : const Color(0xFF334155)),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF8B5CF6).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          item['share'].toString(),
+                          style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF8B5CF6)),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        _currencyFormat.format(item['amount']),
+                        style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        // Unit Economics Summary Card
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF0B1021) : const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildUnitMetric('Revenue per Delivered Order', _currencyFormat.format(state.revenuePerDeliveredOrder), isDark),
+              _buildUnitMetric('Direct Cost per Order', _currencyFormat.format(state.directCostPerDeliveredOrder), isDark),
+              _buildUnitMetric('Net Profit per Order', _currencyFormat.format(state.netProfitPerDeliveredOrder), isDark),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildUnitMetric(String label, String value, bool isDark) {
+    return Column(
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B)),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w900, color: const Color(0xFFF37021)),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPnlSectionHeader(String title, bool isDark) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+      color: isDark ? const Color(0xFF0B1021) : const Color(0xFFF8FAFC),
+      child: Text(
+        title.toUpperCase(),
+        style: GoogleFonts.jetBrainsMono(fontSize: 11, fontWeight: FontWeight.w800, color: const Color(0xFF64748B), letterSpacing: 0.5),
+      ),
+    );
+  }
+
+  Widget _buildPnlRow(
+    String label,
+    double amount,
+    String percentage,
+    bool isDark, {
+    bool isHeader = false,
+    bool isSubtotal = false,
+    bool isSpecial = false,
+    Color? color,
+  }) {
+    final bg = isHeader
+        ? (color ?? const Color(0xFFF37021)).withValues(alpha: isDark ? 0.15 : 0.08)
+        : (isSubtotal
+            ? (isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9))
+            : (isSpecial ? const Color(0xFF0D9488).withValues(alpha: 0.08) : Colors.transparent));
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+      decoration: BoxDecoration(
+        color: bg,
+        border: Border(bottom: BorderSide(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFF1F5F9))),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: isHeader ? 13.5 : 12.5,
+                fontWeight: (isHeader || isSubtotal || isSpecial) ? FontWeight.w800 : FontWeight.w500,
+                color: color ?? (isDark ? Colors.white : const Color(0xFF0F172A)),
+              ),
+            ),
+          ),
+          SizedBox(
+            width: 70,
+            child: Text(
+              percentage,
+              style: GoogleFonts.jetBrainsMono(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF64748B)),
+              textAlign: TextAlign.right,
+            ),
+          ),
+          const SizedBox(width: 16),
+          SizedBox(
+            width: 140,
+            child: Text(
+              _currencyFormat.format(amount),
+              style: GoogleFonts.inter(
+                fontSize: isHeader ? 14 : 13,
+                fontWeight: (isHeader || isSubtotal || isSpecial) ? FontWeight.w900 : FontWeight.w600,
+                color: color ?? (isDark ? Colors.white : const Color(0xFF0F172A)),
+              ),
+              textAlign: TextAlign.right,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==========================================
+  // TAB 2: EXPENDITURES & INVOICES LEDGER
+  // ==========================================
+  Widget _buildExpendituresLedgerTab(
+    DCExpendituresState expState,
+    DCExpendituresNotifier expNotifier,
+    bool isDark,
+    bool isDesktop,
+    List<DistributionCenter> dcs,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Filter toolbar
+        _buildExpenditureFiltersBar(expState, expNotifier, isDesktop, isDark, dcs),
+        const SizedBox(height: 16),
+
+        // List / Table
+        if (expState.isLoading)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(60),
+              child: CircularProgressIndicator(color: Color(0xFFF37021)),
+            ),
+          )
+        else if (expState.filteredExpenditures.isEmpty)
+          _buildEmptyLedgerState(isDark)
+        else if (isDesktop)
+          _buildDesktopLedgerTable(expState.filteredExpenditures, isDark, dcs)
+        else
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: expState.filteredExpenditures.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 10),
+            itemBuilder: (context, index) {
+              return _buildMobileLedgerCard(expState.filteredExpenditures[index], isDark, dcs);
+            },
+          ),
+      ],
+    );
+  }
+
+  Widget _buildExpenditureFiltersBar(
+    DCExpendituresState state,
+    DCExpendituresNotifier notifier,
+    bool isDesktop,
+    bool isDark,
+    List<DistributionCenter> dcs,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF151D36) : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: notifier.setSearchQuery,
+                  style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                  decoration: InputDecoration(
+                    hintText: 'Search expense title, invoice #, or vendor...',
+                    prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Color(0xFF94A3B8)),
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear_rounded, size: 16),
+                            onPressed: () {
+                              _searchController.clear();
+                              notifier.setSearchQuery('');
+                            },
+                          )
+                        : null,
+                    isDense: true,
+                    filled: true,
+                    fillColor: isDark ? const Color(0xFF0B1021) : const Color(0xFFF8FAFC),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              ElevatedButton.icon(
+                onPressed: () => DCCreateExpenditureModal.show(context),
+                icon: const Icon(Icons.add_rounded, size: 16, color: Colors.white),
+                label: Text('Record', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: Colors.white)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFF37021),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Category Chips
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildLedgerChip('all', 'All Categories (${state.expenditures.length})', state.selectedCategory, isDark, notifier),
+                const SizedBox(width: 6),
+                _buildLedgerChip('diesel_fuel', 'Diesel & Generator Fuel', state.selectedCategory, isDark, notifier),
+                const SizedBox(width: 6),
+                _buildLedgerChip('rider_allowance', 'Rider Allowances & Wages', state.selectedCategory, isDark, notifier),
+                const SizedBox(width: 6),
+                _buildLedgerChip('salaries', 'Admin Salaries', state.selectedCategory, isDark, notifier),
+                const SizedBox(width: 6),
+                _buildLedgerChip('equipment_maintenance', 'Bike Maintenance & Oil', state.selectedCategory, isDark, notifier),
+                const SizedBox(width: 6),
+                _buildLedgerChip('rent_utilities', 'Rent & Utilities', state.selectedCategory, isDark, notifier),
+                const SizedBox(width: 6),
+                _buildLedgerChip('packaging', 'Packaging Pouches', state.selectedCategory, isDark, notifier),
+                const SizedBox(width: 6),
+                _buildLedgerChip('other', 'Other OpEx & Capex', state.selectedCategory, isDark, notifier),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLedgerChip(String catKey, String label, String currentCat, bool isDark, DCExpendituresNotifier notifier) {
+    final isSelected = currentCat == catKey;
+    return ChoiceChip(
+      selected: isSelected,
+      label: Text(label, style: GoogleFonts.inter(fontSize: 11.5, fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500)),
+      selectedColor: const Color(0xFFF37021).withValues(alpha: 0.15),
+      labelStyle: TextStyle(color: isSelected ? const Color(0xFFF37021) : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))),
+      side: BorderSide(color: isSelected ? const Color(0xFFF37021) : (isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0))),
+      onSelected: (_) => notifier.setCategory(catKey),
+    );
+  }
+
+  Widget _buildDesktopLedgerTable(List<BusinessExpenditureEntity> list, bool isDark, List<DistributionCenter> dcs) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF151D36) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: DataTable(
+          headingRowColor: WidgetStateProperty.all(isDark ? const Color(0xFF0B1021) : const Color(0xFFF8FAFC)),
+          dataRowMinHeight: 48,
+          dataRowMaxHeight: 56,
+          columns: const [
+            DataColumn(label: Text('DATE')),
+            DataColumn(label: Text('TITLE & VENDOR')),
+            DataColumn(label: Text('CATEGORY')),
+            DataColumn(label: Text('STATION')),
+            DataColumn(label: Text('INVOICE / METHOD')),
+            DataColumn(label: Text('AMOUNT (₦)')),
+            DataColumn(label: Text('RECEIPT')),
+            DataColumn(label: Text('ACTION')),
+          ],
+          rows: list.map((exp) {
+            final catColor = _getCategoryColor(exp.category);
+            return DataRow(
+              cells: [
+                DataCell(Text(DateFormat('MMM dd, yyyy').format(exp.expenditureDate), style: GoogleFonts.inter(fontSize: 12))),
+                DataCell(
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(exp.title, style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      if (exp.vendorName != null && exp.vendorName!.isNotEmpty)
+                        Text('Vendor: ${exp.vendorName}', style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF94A3B8))),
+                    ],
+                  ),
+                ),
+                DataCell(
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                       color: catColor.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(6),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(_getCategoryIcon(exp.category), size: 13, color: catColor),
                         const SizedBox(width: 5),
-                        Text(
-                          exp.category.label,
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: catColor,
-                          ),
-                        ),
+                        Text(exp.category.label, style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: catColor)),
                       ],
                     ),
                   ),
-                  const Spacer(),
-                  Text(
-                    _currencyFormat.format(exp.amount),
-                    style: GoogleFonts.inter(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: const Color(0xFF10B981),
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 10),
-
-              // Title
-              Text(
-                exp.title,
-                style: GoogleFonts.inter(
-                  fontSize: 14.5,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : const Color(0xFF0F172A),
                 ),
-              ),
-
-              if (exp.description != null && exp.description!.isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Text(
-                  exp.description!,
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                DataCell(Text(_getDcName(exp.distributionCenterId, dcs), style: GoogleFonts.inter(fontSize: 11.5))),
+                DataCell(
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(exp.invoiceNumber?.isNotEmpty == true ? '#${exp.invoiceNumber}' : 'Direct Debit', style: GoogleFonts.jetBrainsMono(fontSize: 11)),
+                      Text(exp.paymentMethod ?? 'Bank Transfer', style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8))),
+                    ],
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
-              ],
-
-              const SizedBox(height: 12),
-
-              // Station, Vendor & Invoice Row
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0D9488).withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.warehouse_rounded, size: 12, color: Color(0xFF0D9488)),
-                        const SizedBox(width: 4),
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 130),
-                          child: Text(
-                            stationName,
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFF0D9488),
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  if (exp.vendorName != null && exp.vendorName!.isNotEmpty)
-                    Expanded(
-                      child: Text(
-                        exp.vendorName!,
-                        style: GoogleFonts.inter(
-                          fontSize: 11.5,
-                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  Text(
-                    DateFormat('MMM d, yyyy').format(exp.expenditureDate),
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 12),
-              const Divider(height: 1),
-              const SizedBox(height: 10),
-
-              // Bottom Actions: Receipt Button + Delete
-              Row(
-                children: [
-                  if (exp.invoiceNumber != null && exp.invoiceNumber!.isNotEmpty)
-                    Text(
-                      'Ref: ${exp.invoiceNumber!}',
-                      style: GoogleFonts.jetBrainsMono(
-                        fontSize: 11,
-                        color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
-                      ),
-                    ),
-                  const Spacer(),
-                  if (exp.hasReceipt)
-                    InkWell(
-                      onTap: () => DCReceiptPreviewModal.show(context, exp, dcName: stationName),
-                      borderRadius: BorderRadius.circular(10),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0D9488).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              exp.isPdfReceipt ? Icons.picture_as_pdf_rounded : Icons.receipt_long_rounded,
-                              size: 14,
-                              color: const Color(0xFF0D9488),
-                            ),
-                            const SizedBox(width: 5),
-                            Text(
-                              exp.isPdfReceipt ? 'View PDF' : 'View Receipt',
-                              style: GoogleFonts.inter(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.bold,
-                                color: const Color(0xFF0D9488),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                  else
-                    Text(
-                      'No receipt attached',
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
-                      ),
-                    ),
-                  const SizedBox(width: 8),
+                DataCell(
+                  Text(_currencyFormat.format(exp.amount), style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w900, color: const Color(0xFFF37021))),
+                ),
+                DataCell(
+                  exp.hasReceipt
+                      ? IconButton(
+                          icon: const Icon(Icons.receipt_rounded, size: 18, color: Color(0xFF10B981)),
+                          tooltip: 'Preview Attachment',
+                          onPressed: () => DCReceiptPreviewModal.show(context, exp, dcName: _getDcName(exp.distributionCenterId, dcs)),
+                        )
+                      : const Text('No File', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                ),
+                DataCell(
                   IconButton(
                     icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Color(0xFFEF4444)),
-                    tooltip: 'Delete',
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
+                    tooltip: 'Delete Record',
+                    onPressed: () => _confirmDelete(exp),
+                  ),
+                ),
+              ],
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMobileLedgerCard(BusinessExpenditureEntity exp, bool isDark, List<DistributionCenter> dcs) {
+    final catColor = _getCategoryColor(exp.category);
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF151D36) : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                decoration: BoxDecoration(color: catColor.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(6)),
+                child: Text(exp.category.label, style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w700, color: catColor)),
+              ),
+              Text(
+                _currencyFormat.format(exp.amount),
+                style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w900, color: const Color(0xFFF37021)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(exp.title, style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 4),
+          Text(
+            '${DateFormat('MMM dd, yyyy').format(exp.expenditureDate)} • ${_getDcName(exp.distributionCenterId, dcs)}',
+            style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                exp.invoiceNumber?.isNotEmpty == true ? 'Inv #${exp.invoiceNumber}' : (exp.vendorName ?? 'Station Expense'),
+                style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B)),
+              ),
+              Row(
+                children: [
+                  if (exp.hasReceipt)
+                    IconButton(
+                      icon: const Icon(Icons.receipt_rounded, size: 18, color: Color(0xFF10B981)),
+                      onPressed: () => DCReceiptPreviewModal.show(context, exp, dcName: _getDcName(exp.distributionCenterId, dcs)),
+                    ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Color(0xFFEF4444)),
                     onPressed: () => _confirmDelete(exp),
                   ),
                 ],
               ),
             ],
           ),
-        ),
+        ],
       ),
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // 6. EMPTY STATE
-  // ---------------------------------------------------------------------------
-  Widget _buildEmptyState(bool isDark) {
+  Widget _buildEmptyLedgerState(bool isDark) {
     return Center(
-      child: Container(
+      child: Padding(
         padding: const EdgeInsets.all(40),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E293B) : Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-          ),
-        ),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0D9488).withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.receipt_long_rounded,
-                size: 48,
-                color: Color(0xFF0D9488),
-              ),
-            ),
-            const SizedBox(height: 18),
-            Text(
-              'No Expenditures Found',
-              style: GoogleFonts.inter(
-                fontSize: 17,
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : const Color(0xFF0F172A),
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'No expense vouchers match the selected station, category, or date range.',
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: () => DCCreateExpenditureModal.show(context),
-              icon: const Icon(Icons.add_rounded, size: 18),
-              label: const Text('Record First Station Expense'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0D9488),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              ),
-            ),
+            const Icon(Icons.receipt_long_outlined, size: 48, color: Color(0xFF94A3B8)),
+            const SizedBox(height: 12),
+            Text('No station expenditures recorded for this period', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: const Color(0xFF94A3B8))),
           ],
         ),
       ),
     );
   }
-}
 
-class _KpiData {
-  final String title;
-  final String value;
-  final String subtitle;
-  final IconData icon;
-  final List<Color> gradient;
+  // ==========================================
+  // TAB 3: DELIVERY OPERATIONS & ROOT CAUSE
+  // ==========================================
+  Widget _buildDeliveryOperationsTab(DCExpendituresState state, bool isDark, bool isDesktop) {
+    final failure = state.failureBreakdown;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Fulfillment Summary Bar
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF151D36) : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.delivery_dining_rounded, color: Color(0xFF3B82F6), size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Delivery Performance & Fulfillment Rate',
+                        style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                      ),
+                    ],
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'SUCCESS RATE: ${state.deliverySuccessRate.toStringAsFixed(2)}%',
+                      style: GoogleFonts.jetBrainsMono(fontSize: 11, fontWeight: FontWeight.w800, color: const Color(0xFF10B981)),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildUnitMetric('Total Assigned Orders', state.totalOrdersAssigned.toString(), isDark),
+                  _buildUnitMetric('Delivered Orders', state.totalOrdersDelivered.toString(), isDark),
+                  _buildUnitMetric('Undelivered Orders', state.totalOrdersUndelivered.toString(), isDark),
+                  _buildUnitMetric('Undelivered Failure Rate', '${state.undeliveredRate.toStringAsFixed(2)}%', isDark),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
 
-  const _KpiData({
-    required this.title,
-    required this.value,
-    required this.subtitle,
-    required this.icon,
-    required this.gradient,
-  });
+        // Root Cause Failure Attribution (Section 3a in Report)
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF151D36) : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.rule_rounded, color: Color(0xFFEF4444), size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Breakdown of Undelivered Orders (Root Cause Analysis)',
+                    style: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              _buildFailureRow('Customer-Related Factor (unreachable, switched-off, rescheduled, insufficient funds, absent)', failure['customerNum'], failure['customerPct'], const Color(0xFFEF4444), isDark),
+              _buildFailureRow('Sales Representative Factor (dispatched without customer confirmation, address incomplete)', failure['salesRepNum'], failure['salesRepPct'], const Color(0xFFF59E0B), isDark),
+              _buildFailureRow('Rider / Logistics Factor (bike breakdown, illness, heavy traffic, weather)', failure['riderNum'], failure['riderPct'], const Color(0xFF3B82F6), isDark),
+              _buildFailureRow('Customer Cancelled Orders', failure['cancelledNum'], failure['cancelledPct'], const Color(0xFF64748B), isDark),
+              const SizedBox(height: 12),
+
+              // Operational Findings & Recommendations Box
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF59E0B).withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.2)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.lightbulb_outline_rounded, color: Color(0xFFD97706), size: 18),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Executive Operational Finding:',
+                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w800, color: const Color(0xFFD97706)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '• Customer and sales rep factors together account for 94.85% of all failed deliveries.\n'
+                      '• The sales rep confirmation factor (30.93%) is within direct management control.\n'
+                      '• Action: Enforce mandatory customer confirmation logs before dispatching to riders.',
+                      style: GoogleFonts.inter(fontSize: 11.5, height: 1.5, color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        // Rider League Scorecard Table (Section 4 in Report)
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF151D36) : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.emoji_events_rounded, color: Color(0xFFF37021), size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Rider Performance League & Scorecards',
+                    style: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: state.riderScorecards.map((r) {
+                  final score = (r['score'] as num?)?.toDouble() ?? 0.0;
+                  final isTop = score >= 70.0;
+                  return Container(
+                    width: isDesktop ? 220 : 160,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF0B1021) : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(r['name'].toString(), style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w800)),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: (isTop ? const Color(0xFF10B981) : const Color(0xFFF59E0B)).withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text('${score.toStringAsFixed(0)}%', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w900, color: isTop ? const Color(0xFF10B981) : const Color(0xFFD97706))),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text('${r['bike']} • ${r['deliveries']} deliveries', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFailureRow(String cause, dynamic number, dynamic percentage, Color barColor, bool isDark) {
+    final pct = (percentage as num?)?.toDouble() ?? 0.0;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(cause, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? Colors.white : const Color(0xFF0F172A))),
+              ),
+              Text('$number orders (${pct.toStringAsFixed(1)}%)', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: barColor)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: (pct / 100).clamp(0.0, 1.0),
+              backgroundColor: isDark ? const Color(0xFF0B1021) : const Color(0xFFE2E8F0),
+              valueColor: AlwaysStoppedAnimation<Color>(barColor),
+              minHeight: 6,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==========================================
+  // TAB 4: MOM GROWTH & COMPARISONS
+  // ==========================================
+  Widget _buildMomGrowthTab(DCExpendituresState state, bool isDark, bool isDesktop) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Growth Matrix Table (Table 5 in Report)
+        Container(
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF151D36) : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(18),
+                child: Row(
+                  children: [
+                    const Icon(Icons.stacked_line_chart_rounded, color: Color(0xFF10B981), size: 20),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Multi-Month Growth Trends (June – Current Period)',
+                      style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                    ),
+                  ],
+                ),
+              ),
+              Divider(height: 1, color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFF1F5F9)),
+
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: DataTable(
+                  headingRowColor: WidgetStateProperty.all(isDark ? const Color(0xFF0B1021) : const Color(0xFFF8FAFC)),
+                  columns: const [
+                    DataColumn(label: Text('METRIC')),
+                    DataColumn(label: Text('JUNE')),
+                    DataColumn(label: Text('JULY')),
+                    DataColumn(label: Text('AUGUST')),
+                    DataColumn(label: Text('SEPTEMBER')),
+                    DataColumn(label: Text('CURRENT PERIOD')),
+                    DataColumn(label: Text('MOM GROWTH')),
+                  ],
+                  rows: state.momTrends.map((m) {
+                    final isPositive = m['growth'].toString().contains('↑');
+                    final isNegative = m['growth'].toString().contains('↓');
+                    final growColor = isPositive ? const Color(0xFF10B981) : (isNegative ? const Color(0xFFEF4444) : const Color(0xFF64748B));
+                    return DataRow(
+                      cells: [
+                        DataCell(Text(m['metric'].toString(), style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700))),
+                        DataCell(Text(m['june'].toString(), style: GoogleFonts.inter(fontSize: 12))),
+                        DataCell(Text(m['july'].toString(), style: GoogleFonts.inter(fontSize: 12))),
+                        DataCell(Text(m['august'].toString(), style: GoogleFonts.inter(fontSize: 12))),
+                        DataCell(Text(m['september'].toString(), style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600))),
+                        DataCell(Text(m['current'].toString(), style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w900, color: const Color(0xFFF37021)))),
+                        DataCell(
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(color: growColor.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(4)),
+                            child: Text(m['growth'].toString(), style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w800, color: growColor)),
+                          ),
+                        ),
+                      ],
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        // Key Achievements & Operational Challenges Cards (Section 6 & 7 in Report)
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF151D36) : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.star_rounded, color: Color(0xFF10B981), size: 20),
+                        const SizedBox(width: 8),
+                        Text('Key Business Achievements', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: const Color(0xFF10B981))),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      '• Highest logistics revenue achieved at ₦7,635,000.\n'
+                      '• Gross margin improved to 62.75% from 61.45%.\n'
+                      '• Revenue per delivered order climbed 12.0% to ₦6,238.\n'
+                      '• Strategic Lagos expansion project successfully funded.\n'
+                      '• Content creation hardware acquired for digital media.',
+                      style: GoogleFonts.inter(fontSize: 12, height: 1.6, color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF151D36) : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.warning_amber_rounded, color: Color(0xFFEF4444), size: 20),
+                        const SizedBox(width: 8),
+                        Text('Key Operational Challenges', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: const Color(0xFFEF4444))),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      '• Delivery completion rate contracted to 71.62%.\n'
+                      '• 94.85% of failures caused by customer absence and sales rep dispatch issues.\n'
+                      '• Rider wage entitlement per delivered order up 9.9%.\n'
+                      '• Heavy single-line Capex on Other Expenses.',
+                      style: GoogleFonts.inter(fontSize: 12, height: 1.6, color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
 }

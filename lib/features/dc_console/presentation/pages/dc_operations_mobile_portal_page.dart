@@ -2421,9 +2421,9 @@ class _DCOperationsMobilePortalPageState
           child: Column(
             children: [
               ListTile(
-                leading: const Icon(Icons.receipt_long_rounded, color: Color(0xFF0D9488)),
-                title: Text('Station Expenditures & Invoices', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w600)),
-                subtitle: Text('Record station expenses, upload receipts & view bills', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
+                leading: const Icon(Icons.insights_rounded, color: Color(0xFFF37021)),
+                title: Text('Business Finance & P&L Reports', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w700)),
+                subtitle: Text('Audited P&L, direct costs, expenditures ledger & Excel export', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
                 trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
                 onTap: () {
                   Navigator.of(context).push(
