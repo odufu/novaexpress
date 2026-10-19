@@ -18,6 +18,7 @@ import '../../../stock/presentation/providers/stock_provider.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
 import '../../domain/entities/distribution_center.dart';
 import '../providers/dc_console_provider.dart';
+import 'dc_expenditures_page.dart';
 
 class DCOperationsMobilePortalPage extends ConsumerStatefulWidget {
   const DCOperationsMobilePortalPage({super.key});
@@ -2419,6 +2420,22 @@ class _DCOperationsMobilePortalPageState
           ),
           child: Column(
             children: [
+              ListTile(
+                leading: const Icon(Icons.receipt_long_rounded, color: Color(0xFF0D9488)),
+                title: Text('Station Expenditures & Invoices', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w600)),
+                subtitle: Text('Record station expenses, upload receipts & view bills', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const Scaffold(
+                        body: SafeArea(child: DCExpendituresPage()),
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const Divider(height: 1),
               ListTile(
                 leading: const Icon(Icons.lock_reset_rounded, color: Color(0xFF0D9488)),
                 title: Text('Change Password', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w600)),

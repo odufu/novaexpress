@@ -167,4 +167,44 @@ class ExpenditureRepository {
       return {};
     }
   }
+
+  /// Fetch expenditures for Distribution Centers (supports multi-DC scoping)
+  Future<List<BusinessExpenditureEntity>> fetchDcExpenditures({
+    String? dcId,
+    String? category,
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    try {
+      var query = _supabase
+          .from('business_expenditures')
+          .select()
+          .not('distribution_center_id', 'is', null);
+
+      if (dcId != null && dcId != 'all' && dcId.isNotEmpty) {
+        query = query.eq('distribution_center_id', dcId);
+      }
+
+      if (category != null && category != 'all' && category.isNotEmpty) {
+        query = query.eq('category', category);
+      }
+
+      if (startDate != null) {
+        query = query.gte('expenditure_date', startDate.toIso8601String().split('T').first);
+      }
+
+      if (endDate != null) {
+        query = query.lte('expenditure_date', endDate.toIso8601String().split('T').first);
+      }
+
+      final response = await query.order('expenditure_date', ascending: false);
+      return (response as List)
+          .map((row) => BusinessExpenditureEntity.fromMap(Map<String, dynamic>.from(row)))
+          .toList();
+    } catch (e) {
+      debugPrint('Error fetching DC expenditures: $e');
+      return [];
+    }
+  }
 }
+

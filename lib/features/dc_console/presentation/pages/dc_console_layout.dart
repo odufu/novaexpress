@@ -23,6 +23,7 @@ import 'dc_riders_page.dart';
 import 'dc_settings_page.dart';
 import 'dc_stock_page.dart';
 import 'dc_transactions_page.dart';
+import 'dc_expenditures_page.dart';
 import '../../../pipeline_chat/presentation/widgets/pipeline_chat_floating_action_button.dart';
 import '../../../pipeline_chat/presentation/providers/pipeline_chat_fab_provider.dart';
 
@@ -48,6 +49,22 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
       ref.read(dcConsoleProvider.notifier).loadOperationsOfficersFromDatabase();
       ref.read(dcConsoleProvider.notifier).loadTransactionsFromDatabase();
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    try {
+      final uri = GoRouterState.of(context).uri;
+      final path = uri.path.toLowerCase();
+      if (path.contains('expenditure') || path.contains('expense')) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            ref.read(dcConsoleProvider.notifier).setActiveTab(13);
+          }
+        });
+      }
+    } catch (_) {}
   }
 
   @override
@@ -139,6 +156,8 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
         return const DCClientsPage();
       case 12:
         return const DCOperationsPage();
+      case 13:
+        return const DCExpendituresPage();
       default:
         return const DCDashboardPage();
     }
@@ -246,7 +265,8 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
                 _buildNavItem(2, 'Rider Remittances', Icons.receipt_long_rounded, state.activeTabIndex == 2, isCollapsed, isDrawer),
                 _buildNavItem(3, 'Inventory & Stock', Icons.inventory_2_rounded, state.activeTabIndex == 3, isCollapsed, isDrawer),
                 _buildNavItem(4, 'Vault Cash & Settlements', Icons.account_balance_wallet_rounded, state.activeTabIndex == 4, isCollapsed, isDrawer),
-                _buildNavItem(5, 'Audit Ledger', Icons.receipt_long_rounded, state.activeTabIndex == 5, isCollapsed, isDrawer),
+                _buildNavItem(13, 'Expenditures & Invoices', Icons.receipt_long_rounded, state.activeTabIndex == 13, isCollapsed, isDrawer),
+                _buildNavItem(5, 'Audit Ledger', Icons.history_rounded, state.activeTabIndex == 5, isCollapsed, isDrawer),
                 _buildNavItem(6, 'Returns & QC Desk', Icons.assignment_return_rounded, state.activeTabIndex == 6, isCollapsed, isDrawer),
                 _buildNavItem(7, 'Rider Payout Claims', Icons.payments_rounded, state.activeTabIndex == 7, isCollapsed, isDrawer),
                 _buildNavItem(8, 'Riders & Fleet', Icons.badge_rounded, state.activeTabIndex == 8, isCollapsed, isDrawer),
@@ -463,6 +483,10 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
         return 'Policy & Settings';
       case 11:
         return 'Clients & Merchants';
+      case 12:
+        return 'Operations Team';
+      case 13:
+        return 'Expenditures & Invoices';
       default:
         return 'Distribution Center';
     }
@@ -813,9 +837,9 @@ class _DCConsoleLayoutState extends ConsumerState<DCConsoleLayout> {
     final navItems = [
       (index: 0, label: 'Dashboard', icon: Icons.dashboard_rounded),
       (index: 1, label: 'Deliveries', icon: Icons.local_shipping_rounded),
-      (index: 2, label: 'Remittances', icon: Icons.receipt_long_rounded),
+      (index: 2, label: 'Remittances', icon: Icons.price_check_rounded),
+      (index: 13, label: 'Expenses', icon: Icons.receipt_long_rounded),
       (index: 3, label: 'Stock', icon: Icons.inventory_2_rounded),
-      (index: 8, label: 'Fleet', icon: Icons.two_wheeler_rounded),
       (index: -1, label: 'More', icon: Icons.menu_open_rounded),
     ];
 

@@ -268,7 +268,9 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(path: 'payouts', builder: (context, state) => const DCConsoleLayout()),
           GoRoute(path: 'riders', builder: (context, state) => const DCConsoleLayout()),
           GoRoute(path: 'operations', builder: (context, state) => const DCConsoleLayout()),
+          GoRoute(path: 'expenditures', builder: (context, state) => const DCConsoleLayout()),
           // Aliases for seamless backward compatibility
+          GoRoute(path: 'expenses', builder: (context, state) => const DCConsoleLayout()),
           GoRoute(path: 'fleet', builder: (context, state) => const DCConsoleLayout()),
           GoRoute(path: 'stock', builder: (context, state) => const DCConsoleLayout()),
           GoRoute(path: 'dispatch', builder: (context, state) => const DCConsoleLayout()),

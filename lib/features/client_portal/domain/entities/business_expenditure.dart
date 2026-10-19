@@ -10,6 +10,9 @@ enum ExpenditureCategory {
   riderAllowance,
   dieselFuel,
   equipmentMaintenance,
+  facilitySupplies,
+  security,
+  stationery,
   other;
 
   String get label {
@@ -32,6 +35,12 @@ enum ExpenditureCategory {
         return 'Diesel & Generator Fuel';
       case ExpenditureCategory.equipmentMaintenance:
         return 'Equipment Maintenance';
+      case ExpenditureCategory.facilitySupplies:
+        return 'Facility & Hub Supplies';
+      case ExpenditureCategory.security:
+        return 'Station Security & Guards';
+      case ExpenditureCategory.stationery:
+        return 'Stationery & Waybill Paper';
       case ExpenditureCategory.other:
         return 'Other General OpEx';
     }
@@ -57,6 +66,12 @@ enum ExpenditureCategory {
         return ExpenditureCategory.dieselFuel;
       case 'equipment_maintenance':
         return ExpenditureCategory.equipmentMaintenance;
+      case 'facility_supplies':
+        return ExpenditureCategory.facilitySupplies;
+      case 'security':
+        return ExpenditureCategory.security;
+      case 'stationery':
+        return ExpenditureCategory.stationery;
       default:
         return ExpenditureCategory.other;
     }
@@ -82,6 +97,12 @@ enum ExpenditureCategory {
         return 'diesel_fuel';
       case ExpenditureCategory.equipmentMaintenance:
         return 'equipment_maintenance';
+      case ExpenditureCategory.facilitySupplies:
+        return 'facility_supplies';
+      case ExpenditureCategory.security:
+        return 'security';
+      case ExpenditureCategory.stationery:
+        return 'stationery';
       case ExpenditureCategory.other:
         return 'other';
     }
@@ -100,6 +121,10 @@ class BusinessExpenditureEntity {
   final ExpenditureCategory category;
   final double amount;
   final DateTime expenditureDate;
+  final String? invoiceNumber;
+  final String? vendorName;
+  final String? paymentMethod;
+  final String? status;
   final String? receiptUrl;
   final String? receiptFileName;
   final String? receiptMimeType;
@@ -117,6 +142,10 @@ class BusinessExpenditureEntity {
     required this.category,
     required this.amount,
     required this.expenditureDate,
+    this.invoiceNumber,
+    this.vendorName,
+    this.paymentMethod,
+    this.status = 'approved',
     this.receiptUrl,
     this.receiptFileName,
     this.receiptMimeType,
@@ -126,6 +155,50 @@ class BusinessExpenditureEntity {
 
   bool get hasReceipt => receiptUrl != null && receiptUrl!.trim().isNotEmpty;
   bool get isPdfReceipt => receiptMimeType?.toLowerCase().contains('pdf') ?? false;
+
+  BusinessExpenditureEntity copyWith({
+    String? id,
+    String? entityType,
+    String? clientId,
+    String? distributionCenterId,
+    String? productId,
+    String? title,
+    String? description,
+    ExpenditureCategory? category,
+    double? amount,
+    DateTime? expenditureDate,
+    String? invoiceNumber,
+    String? vendorName,
+    String? paymentMethod,
+    String? status,
+    String? receiptUrl,
+    String? receiptFileName,
+    String? receiptMimeType,
+    String? createdBy,
+    DateTime? createdAt,
+  }) {
+    return BusinessExpenditureEntity(
+      id: id ?? this.id,
+      entityType: entityType ?? this.entityType,
+      clientId: clientId ?? this.clientId,
+      distributionCenterId: distributionCenterId ?? this.distributionCenterId,
+      productId: productId ?? this.productId,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      category: category ?? this.category,
+      amount: amount ?? this.amount,
+      expenditureDate: expenditureDate ?? this.expenditureDate,
+      invoiceNumber: invoiceNumber ?? this.invoiceNumber,
+      vendorName: vendorName ?? this.vendorName,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
+      status: status ?? this.status,
+      receiptUrl: receiptUrl ?? this.receiptUrl,
+      receiptFileName: receiptFileName ?? this.receiptFileName,
+      receiptMimeType: receiptMimeType ?? this.receiptMimeType,
+      createdBy: createdBy ?? this.createdBy,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
 
   factory BusinessExpenditureEntity.fromMap(Map<String, dynamic> map) {
     return BusinessExpenditureEntity(
@@ -141,6 +214,10 @@ class BusinessExpenditureEntity {
       expenditureDate: map['expenditure_date'] != null
           ? DateTime.tryParse(map['expenditure_date'].toString()) ?? DateTime.now()
           : DateTime.now(),
+      invoiceNumber: map['invoice_number']?.toString(),
+      vendorName: map['vendor_name']?.toString(),
+      paymentMethod: map['payment_method']?.toString() ?? 'transfer',
+      status: map['status']?.toString() ?? 'approved',
       receiptUrl: map['receipt_url']?.toString(),
       receiptFileName: map['receipt_file_name']?.toString(),
       receiptMimeType: map['receipt_mime_type']?.toString(),
@@ -162,9 +239,13 @@ class BusinessExpenditureEntity {
       'category': category.toDbValue(),
       'amount': amount,
       'expenditure_date': expenditureDate.toIso8601String().split('T').first,
-      if (receiptUrl != null) 'receipt_url': receiptUrl,
-      if (receiptFileName != null) 'receipt_file_name': receiptFileName,
-      if (receiptMimeType != null) 'receipt_mime_type': receiptMimeType,
+      if (invoiceNumber != null && invoiceNumber!.trim().isNotEmpty) 'invoice_number': invoiceNumber!.trim(),
+      if (vendorName != null && vendorName!.trim().isNotEmpty) 'vendor_name': vendorName!.trim(),
+      if (paymentMethod != null && paymentMethod!.trim().isNotEmpty) 'payment_method': paymentMethod!.trim(),
+      if (status != null && status!.trim().isNotEmpty) 'status': status!.trim(),
+      if (receiptUrl != null && receiptUrl!.trim().isNotEmpty) 'receipt_url': receiptUrl!.trim(),
+      if (receiptFileName != null && receiptFileName!.trim().isNotEmpty) 'receipt_file_name': receiptFileName!.trim(),
+      if (receiptMimeType != null && receiptMimeType!.trim().isNotEmpty) 'receipt_mime_type': receiptMimeType!.trim(),
     };
   }
 }
