@@ -329,7 +329,7 @@ class _ClientEditOrderModalState extends ConsumerState<ClientEditOrderModal> {
           children: [
             // Modal Header
             Container(
-              padding: const EdgeInsets.fromLTRB(20, 16, 16, 16),
+              padding: EdgeInsets.fromLTRB(isCompact ? 14 : 20, isCompact ? 14 : 16, isCompact ? 12 : 16, isCompact ? 14 : 16),
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
@@ -343,20 +343,26 @@ class _ClientEditOrderModalState extends ConsumerState<ClientEditOrderModal> {
                       color: const Color(0xFFF37021).withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.edit_note_rounded, color: Color(0xFFF37021), size: 24),
+                    child: const Icon(Icons.edit_note_rounded, color: Color(0xFFF37021), size: 22),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             Text(
                               'Edit Order & Packages',
-                              style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                              style: GoogleFonts.inter(
+                                fontSize: isCompact ? 15 : 16,
+                                fontWeight: FontWeight.w800,
+                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                              ),
                             ),
-                            const SizedBox(width: 8),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                               decoration: BoxDecoration(
@@ -370,9 +376,12 @@ class _ClientEditOrderModalState extends ConsumerState<ClientEditOrderModal> {
                             ),
                           ],
                         ),
+                        const SizedBox(height: 2),
                         Text(
                           'Update customer destination, package deals & units live',
-                          style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                          style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
@@ -380,6 +389,8 @@ class _ClientEditOrderModalState extends ConsumerState<ClientEditOrderModal> {
                   IconButton(
                     icon: const Icon(Icons.close_rounded, size: 20),
                     color: const Color(0xFF94A3B8),
+                    padding: const EdgeInsets.all(4),
+                    constraints: const BoxConstraints(),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                 ],
@@ -389,7 +400,7 @@ class _ClientEditOrderModalState extends ConsumerState<ClientEditOrderModal> {
             // Form Body
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
+                padding: EdgeInsets.all(isCompact ? 14 : 20),
                 child: Form(
                   key: _formKey,
                   child: Column(
@@ -405,74 +416,131 @@ class _ClientEditOrderModalState extends ConsumerState<ClientEditOrderModal> {
                         validator: (v) => (v == null || v.trim().isEmpty) ? 'Customer name is required' : null,
                       ),
                       const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: _customerPhoneController,
-                              keyboardType: TextInputType.phone,
-                              style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : const Color(0xFF0F172A)),
-                              decoration: _inputDecoration('Primary Phone', Icons.phone_rounded, isDark),
-                              validator: (v) {
-                                if (v == null || v.trim().isEmpty) return 'Phone is required';
-                                if (v.replaceAll(RegExp(r'\D'), '').length < 10) return 'Valid phone required';
-                                return null;
-                              },
+                      if (isCompact) ...[
+                        TextFormField(
+                          controller: _customerPhoneController,
+                          keyboardType: TextInputType.phone,
+                          style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                          decoration: _inputDecoration('Primary Phone', Icons.phone_rounded, isDark),
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) return 'Phone is required';
+                            if (v.replaceAll(RegExp(r'\D'), '').length < 10) return 'Valid phone required';
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _customerAltPhoneController,
+                          keyboardType: TextInputType.phone,
+                          style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                          decoration: _inputDecoration('Alt / WhatsApp (Optional)', Icons.chat_bubble_outline_rounded, isDark),
+                        ),
+                      ] else ...[
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: _customerPhoneController,
+                                keyboardType: TextInputType.phone,
+                                style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                                decoration: _inputDecoration('Primary Phone', Icons.phone_rounded, isDark),
+                                validator: (v) {
+                                  if (v == null || v.trim().isEmpty) return 'Phone is required';
+                                  if (v.replaceAll(RegExp(r'\D'), '').length < 10) return 'Valid phone required';
+                                  return null;
+                                },
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: TextFormField(
-                              controller: _customerAltPhoneController,
-                              keyboardType: TextInputType.phone,
-                              style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : const Color(0xFF0F172A)),
-                              decoration: _inputDecoration('Alt / WhatsApp (Opt)', Icons.chat_bubble_outline_rounded, isDark),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: TextFormField(
+                                controller: _customerAltPhoneController,
+                                keyboardType: TextInputType.phone,
+                                style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                                decoration: _inputDecoration('Alt / WhatsApp (Opt)', Icons.chat_bubble_outline_rounded, isDark),
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
+                      ],
                       const SizedBox(height: 20),
 
                       // SECTION 2: DESTINATION LOCATION
                       _buildSectionHeader('2. Delivery Destination', Icons.location_on_outlined, isDark),
                       const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                              initialValue: _selectedState,
-                              dropdownColor: isDark ? const Color(0xFF151D36) : Colors.white,
-                              style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : const Color(0xFF0F172A)),
-                              decoration: _inputDecoration('State', Icons.map_outlined, isDark),
-                              items: LocationLookupService.getAllStates().map((s) {
-                                return DropdownMenuItem(value: s, child: Text(s, overflow: TextOverflow.ellipsis));
-                              }).toList(),
-                              onChanged: (val) {
-                                if (val != null) {
-                                  setState(() {
-                                    _selectedState = val;
-                                    _loadLgas();
-                                  });
-                                }
-                              },
+                      if (isCompact) ...[
+                        DropdownButtonFormField<String>(
+                          isExpanded: true,
+                          initialValue: _selectedState,
+                          dropdownColor: isDark ? const Color(0xFF151D36) : Colors.white,
+                          style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                          decoration: _inputDecoration('State', Icons.map_outlined, isDark),
+                          items: LocationLookupService.getAllStates().map((s) {
+                            return DropdownMenuItem(value: s, child: Text(s, overflow: TextOverflow.ellipsis));
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) {
+                              setState(() {
+                                _selectedState = val;
+                                _loadLgas();
+                              });
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          isExpanded: true,
+                          initialValue: _selectedLga,
+                          dropdownColor: isDark ? const Color(0xFF151D36) : Colors.white,
+                          style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                          decoration: _inputDecoration('LGA (Local Govt)', Icons.holiday_village_outlined, isDark),
+                          items: _availableLgas.map((l) {
+                            return DropdownMenuItem(value: l, child: Text(l, overflow: TextOverflow.ellipsis));
+                          }).toList(),
+                          onChanged: (val) => setState(() => _selectedLga = val),
+                          validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+                        ),
+                      ] else ...[
+                        Row(
+                          children: [
+                            Expanded(
+                              child: DropdownButtonFormField<String>(
+                                isExpanded: true,
+                                initialValue: _selectedState,
+                                dropdownColor: isDark ? const Color(0xFF151D36) : Colors.white,
+                                style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                                decoration: _inputDecoration('State', Icons.map_outlined, isDark),
+                                items: LocationLookupService.getAllStates().map((s) {
+                                  return DropdownMenuItem(value: s, child: Text(s, overflow: TextOverflow.ellipsis));
+                                }).toList(),
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    setState(() {
+                                      _selectedState = val;
+                                      _loadLgas();
+                                    });
+                                  }
+                                },
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                              initialValue: _selectedLga,
-                              dropdownColor: isDark ? const Color(0xFF151D36) : Colors.white,
-                              style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : const Color(0xFF0F172A)),
-                              decoration: _inputDecoration('LGA (Local Govt)', Icons.holiday_village_outlined, isDark),
-                              items: _availableLgas.map((l) {
-                                return DropdownMenuItem(value: l, child: Text(l, overflow: TextOverflow.ellipsis));
-                              }).toList(),
-                              onChanged: (val) => setState(() => _selectedLga = val),
-                              validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: DropdownButtonFormField<String>(
+                                isExpanded: true,
+                                initialValue: _selectedLga,
+                                dropdownColor: isDark ? const Color(0xFF151D36) : Colors.white,
+                                style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                                decoration: _inputDecoration('LGA (Local Govt)', Icons.holiday_village_outlined, isDark),
+                                items: _availableLgas.map((l) {
+                                  return DropdownMenuItem(value: l, child: Text(l, overflow: TextOverflow.ellipsis));
+                                }).toList(),
+                                onChanged: (val) => setState(() => _selectedLga = val),
+                                validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
+                      ],
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _addressController,
@@ -497,6 +565,7 @@ class _ClientEditOrderModalState extends ConsumerState<ClientEditOrderModal> {
                       // Product Selector
                       if (availableProducts.isNotEmpty) ...[
                         DropdownButtonFormField<CatalogProduct>(
+                          isExpanded: true,
                           initialValue: _selectedProduct,
                           dropdownColor: isDark ? const Color(0xFF151D36) : Colors.white,
                           style: GoogleFonts.inter(fontSize: 13, color: isDark ? Colors.white : const Color(0xFF0F172A)),
@@ -610,7 +679,7 @@ class _ClientEditOrderModalState extends ConsumerState<ClientEditOrderModal> {
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 10),
+                            const SizedBox(height: 12),
                             Row(
                               children: [
                                 // Total Units
@@ -618,8 +687,9 @@ class _ClientEditOrderModalState extends ConsumerState<ClientEditOrderModal> {
                                   child: TextFormField(
                                     controller: _totalQuantityController,
                                     keyboardType: TextInputType.number,
-                                    style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w800, color: const Color(0xFFF37021)),
-                                    decoration: _inputDecoration('Total Units', Icons.all_inbox_rounded, isDark),
+                                    textAlign: TextAlign.center,
+                                    style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: const Color(0xFFF37021)),
+                                    decoration: _compactNumberDecoration('Total Qty', Icons.all_inbox_rounded, const Color(0xFFF37021), isDark),
                                     onChanged: _syncQuantitiesFromTotal,
                                     validator: (v) {
                                       final num = int.tryParse(v ?? '');
@@ -634,8 +704,9 @@ class _ClientEditOrderModalState extends ConsumerState<ClientEditOrderModal> {
                                   child: TextFormField(
                                     controller: _paidQuantityController,
                                     keyboardType: TextInputType.number,
-                                    style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF0F172A)),
-                                    decoration: _inputDecoration('Paid Units', Icons.payments_outlined, isDark),
+                                    textAlign: TextAlign.center,
+                                    style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                                    decoration: _compactNumberDecoration('Paid Qty', Icons.payments_outlined, const Color(0xFFF37021), isDark),
                                     onChanged: (_) => _syncQuantitiesFromComponents(),
                                   ),
                                 ),
@@ -645,14 +716,15 @@ class _ClientEditOrderModalState extends ConsumerState<ClientEditOrderModal> {
                                   child: TextFormField(
                                     controller: _freeQuantityController,
                                     keyboardType: TextInputType.number,
-                                    style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: const Color(0xFF10B981)),
-                                    decoration: _inputDecoration('Free Bonus', Icons.card_giftcard_rounded, isDark),
+                                    textAlign: TextAlign.center,
+                                    style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: const Color(0xFF10B981)),
+                                    decoration: _compactNumberDecoration('Free Bonus', Icons.card_giftcard_rounded, const Color(0xFF10B981), isDark),
                                     onChanged: (_) => _syncQuantitiesFromComponents(),
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 10),
+                            const SizedBox(height: 12),
 
                             // Total Price field
                             TextFormField(
@@ -693,34 +765,40 @@ class _ClientEditOrderModalState extends ConsumerState<ClientEditOrderModal> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  priceDiff > 0
-                                      ? Icons.trending_up_rounded
-                                      : (priceDiff < 0 ? Icons.trending_down_rounded : Icons.check_circle_outline_rounded),
-                                  size: 18,
-                                  color: priceDiff > 0
-                                      ? const Color(0xFF10B981)
-                                      : (priceDiff < 0 ? const Color(0xFFF59E0B) : const Color(0xFF64748B)),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  priceDiff > 0
-                                      ? 'Package Upgrade: +${_currencyFormatter.format(priceDiff)}'
-                                      : (priceDiff < 0
-                                          ? 'Package Adjustment: ${_currencyFormatter.format(priceDiff)}'
-                                          : 'No Price Change (Identical Total)'),
-                                  style: GoogleFonts.inter(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    priceDiff > 0
+                                        ? Icons.trending_up_rounded
+                                        : (priceDiff < 0 ? Icons.trending_down_rounded : Icons.check_circle_outline_rounded),
+                                    size: 18,
                                     color: priceDiff > 0
                                         ? const Color(0xFF10B981)
-                                        : (priceDiff < 0 ? const Color(0xFFD97706) : const Color(0xFF64748B)),
+                                        : (priceDiff < 0 ? const Color(0xFFF59E0B) : const Color(0xFF64748B)),
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      priceDiff > 0
+                                          ? 'Package Upgrade: +${_currencyFormatter.format(priceDiff)}'
+                                          : (priceDiff < 0
+                                              ? 'Package Adjustment: ${_currencyFormatter.format(priceDiff)}'
+                                              : 'No Price Change (Identical Total)'),
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: priceDiff > 0
+                                            ? const Color(0xFF10B981)
+                                            : (priceDiff < 0 ? const Color(0xFFD97706) : const Color(0xFF64748B)),
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
+                            const SizedBox(width: 8),
                             Text(
                               _currencyFormatter.format(currentTotal),
                               style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: const Color(0xFFF37021)),
@@ -734,6 +812,7 @@ class _ClientEditOrderModalState extends ConsumerState<ClientEditOrderModal> {
                       _buildSectionHeader('4. Payment Terms', Icons.payment_rounded, isDark),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
+                        isExpanded: true,
                         initialValue: ['Pay on Delivery (Cash/POS)', 'Prepaid (Bank Transfer)', 'Partial Deposit + Balance on Delivery'].contains(_paymentType)
                             ? _paymentType
                             : 'Pay on Delivery (Cash/POS)',
@@ -743,15 +822,15 @@ class _ClientEditOrderModalState extends ConsumerState<ClientEditOrderModal> {
                         items: const [
                           DropdownMenuItem(
                             value: 'Pay on Delivery (Cash/POS)',
-                            child: Text('Pay on Delivery (Cash/POS)'),
+                            child: Text('Pay on Delivery (Cash/POS)', overflow: TextOverflow.ellipsis),
                           ),
                           DropdownMenuItem(
                             value: 'Prepaid (Bank Transfer)',
-                            child: Text('Prepaid (Bank Transfer)'),
+                            child: Text('Prepaid (Bank Transfer)', overflow: TextOverflow.ellipsis),
                           ),
                           DropdownMenuItem(
                             value: 'Partial Deposit + Balance on Delivery',
-                            child: Text('Partial Deposit + Balance on Delivery'),
+                            child: Text('Partial Deposit + Balance on Delivery', overflow: TextOverflow.ellipsis),
                           ),
                         ],
                         onChanged: (v) => setState(() => _paymentType = v ?? 'Pay on Delivery (Cash/POS)'),
@@ -795,8 +874,11 @@ class _ClientEditOrderModalState extends ConsumerState<ClientEditOrderModal> {
                           ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                           : const Icon(Icons.check_circle_rounded, size: 18, color: Colors.white),
                       label: Text(
-                        _isSubmitting ? 'Updating Order...' : 'Save Changes & Deal',
+                        _isSubmitting
+                            ? 'Updating Order...'
+                            : (isCompact ? 'Save Changes' : 'Save Changes & Deal'),
                         style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13, color: Colors.white),
+                        overflow: TextOverflow.ellipsis,
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFF37021),
@@ -833,6 +915,7 @@ class _ClientEditOrderModalState extends ConsumerState<ClientEditOrderModal> {
       labelText: label,
       labelStyle: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
       prefixIcon: Icon(icon, size: 18, color: const Color(0xFFF37021)),
+      prefixIconConstraints: const BoxConstraints(minWidth: 38, minHeight: 38),
       filled: true,
       fillColor: isDark ? const Color(0xFF0B1021) : const Color(0xFFF8FAFC),
       isDense: true,
@@ -847,6 +930,35 @@ class _ClientEditOrderModalState extends ConsumerState<ClientEditOrderModal> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: Color(0xFFF37021), width: 1.5),
+      ),
+    );
+  }
+
+  InputDecoration _compactNumberDecoration(String label, IconData icon, Color iconColor, bool isDark) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B)),
+      floatingLabelBehavior: FloatingLabelBehavior.always,
+      prefixIcon: Padding(
+        padding: const EdgeInsets.only(left: 6, right: 4),
+        child: Icon(icon, size: 15, color: iconColor),
+      ),
+      prefixIconConstraints: const BoxConstraints(minWidth: 26, minHeight: 26),
+      filled: true,
+      fillColor: isDark ? const Color(0xFF151D36) : Colors.white,
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFCBD5E1)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFCBD5E1)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
         borderSide: const BorderSide(color: Color(0xFFF37021), width: 1.5),
       ),
     );
