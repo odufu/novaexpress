@@ -837,6 +837,12 @@ class _ClientAddExpenditureModalState extends ConsumerState<ClientAddExpenditure
         return Icons.local_gas_station_rounded;
       case ExpenditureCategory.equipmentMaintenance:
         return Icons.build_rounded;
+      case ExpenditureCategory.facilitySupplies:
+        return Icons.cleaning_services_rounded;
+      case ExpenditureCategory.stationery:
+        return Icons.edit_note_rounded;
+      case ExpenditureCategory.security:
+        return Icons.security_rounded;
       case ExpenditureCategory.other:
         return Icons.more_horiz_rounded;
     }
@@ -862,6 +868,12 @@ class _ClientAddExpenditureModalState extends ConsumerState<ClientAddExpenditure
         return const Color(0xFFEF4444);
       case ExpenditureCategory.equipmentMaintenance:
         return const Color(0xFF64748B);
+      case ExpenditureCategory.facilitySupplies:
+        return const Color(0xFF14B8A6);
+      case ExpenditureCategory.stationery:
+        return const Color(0xFF6366F1);
+      case ExpenditureCategory.security:
+        return const Color(0xFF0284C7);
       case ExpenditureCategory.other:
         return const Color(0xFF94A3B8);
     }
