@@ -673,9 +673,12 @@ class _ClientEditOrderModalState extends ConsumerState<ClientEditOrderModal> {
                               children: [
                                 const Icon(Icons.calculate_outlined, size: 16, color: Color(0xFFF37021)),
                                 const SizedBox(width: 6),
-                                Text(
-                                  'Quantity & Units Accounting',
-                                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                                Expanded(
+                                  child: Text(
+                                    'Quantity & Units Accounting',
+                                    style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
                               ],
                             ),
@@ -902,9 +905,12 @@ class _ClientEditOrderModalState extends ConsumerState<ClientEditOrderModal> {
       children: [
         Icon(icon, size: 18, color: const Color(0xFFF37021)),
         const SizedBox(width: 8),
-        Text(
-          title,
-          style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+        Expanded(
+          child: Text(
+            title,
+            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
       ],
     );
