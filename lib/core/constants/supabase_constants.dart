@@ -21,13 +21,13 @@ class SupabaseConstants {
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh3eXFxamlsY2lmeGFqcnV1c29hIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjEwMTQ3MiwiZXhwIjoyMTA3Njc3NDcyfQ.ow0xtvrgq3wUXKlGeIDgRtBrKeirzy9XHN_8s8TCAiI';
 
   // --- ACTIVE CONNECTION ---
-  // Default is set to ENVIRONMENT 2 (Testing).
+  // Default is set to ENVIRONMENT 1 (Live Production).
   // Can be overridden at build-time using:
   //   flutter run --dart-define=SUPABASE_URL=... --dart-define=SUPABASE_ANON_KEY=...
   // Or switched using scripts/switch_supabase_env.py
-  static const String _defaultUrl = testingUrl;
-  static const String _defaultAnonKey = testingAnonKey;
-  static const String _defaultServiceRoleKey = testingServiceRoleKey;
+  static const String _defaultUrl = originalUrl;
+  static const String _defaultAnonKey = originalAnonKey;
+  static const String _defaultServiceRoleKey = originalServiceRoleKey;
 
   static const String supabaseUrl =
       String.fromEnvironment('SUPABASE_URL', defaultValue: _defaultUrl);
