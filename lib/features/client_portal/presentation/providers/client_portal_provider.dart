@@ -2918,6 +2918,56 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
     }
   }
 
+  /// Updates existing order customer details, delivery location, product package, and pricing
+  Future<bool> updateOrderDetails({
+    required String orderId,
+    required Map<String, dynamic> updates,
+  }) async {
+    try {
+      final db = Supabase.instance.client;
+      await db.from('orders').update(updates).eq('id', orderId);
+
+      final updatedOrders = state.orders.map((o) {
+        if (o.id == orderId || o.orderNumber == orderId) {
+          return o.copyWith(
+            customerName: updates['customer_name']?.toString() ?? o.customerName,
+            customerPhone: updates['customer_phone']?.toString() ?? o.customerPhone,
+            customerAltPhone: updates['customer_alt_phone']?.toString() ?? o.customerAltPhone,
+            deliveryAddress: updates['delivery_address']?.toString() ?? o.deliveryAddress,
+            deliveryCity: updates['delivery_city']?.toString() ?? updates['delivery_lga']?.toString() ?? o.deliveryCity,
+            deliveryState: updates['delivery_state']?.toString() ?? o.deliveryState,
+            lga: updates['delivery_lga']?.toString() ?? updates['lga']?.toString() ?? o.lga,
+            productName: updates['product_name']?.toString() ?? o.productName,
+            productId: updates['product_id']?.toString() ?? o.productId,
+            productSku: updates['product_sku']?.toString() ?? o.productSku,
+            packageDealId: updates['package_deal_id']?.toString() ?? o.packageDealId,
+            packageDealName: updates['package_deal_name']?.toString() ?? o.packageDealName,
+            quantity: (updates['quantity'] as num?)?.toInt() ?? o.quantity,
+            paidQuantity: (updates['paid_quantity'] as num?)?.toInt() ?? o.paidQuantity,
+            freeQuantity: (updates['free_quantity'] as num?)?.toInt() ?? o.freeQuantity,
+            basePrice: (updates['base_price'] as num?)?.toDouble() ?? o.basePrice,
+            totalAmount: (updates['total_amount'] as num?)?.toDouble() ?? o.totalAmount,
+            deliveryNotes: updates['delivery_notes']?.toString() ?? o.deliveryNotes,
+            paymentType: updates['payment_type']?.toString() ?? o.paymentType,
+          );
+        }
+        return o;
+      }).toList();
+
+      state = state.copyWith(orders: updatedOrders);
+
+      // Synchronize OrdersProvider cache
+      try {
+        _ref.read(ordersProvider.notifier).fetchOrders();
+      } catch (_) {}
+
+      return true;
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] ❌ Error updating order details: $e');
+      return false;
+    }
+  }
+
   static bool _stateMatches(String dcState, String targetState) {
     final cleanDc = dcState.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
     final cleanTarget = targetState.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');

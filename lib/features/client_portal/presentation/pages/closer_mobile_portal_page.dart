@@ -18,6 +18,7 @@ import '../widgets/client_confirm_order_modal.dart';
 import '../widgets/client_convert_lead_modal.dart';
 import '../widgets/client_create_order_modal.dart';
 import '../widgets/client_order_tracking_modal.dart';
+import '../widgets/client_edit_order_modal.dart';
 import '../widgets/closer_create_package_modal.dart';
 import '../../../orders/presentation/widgets/smart_order_paste_modal.dart';
 import '../../../dc_console/domain/entities/product_package.dart';
@@ -1775,9 +1776,22 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Text(
-                      currencyFormatter.format(order.totalAmount),
-                      style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          currencyFormatter.format(order.totalAmount),
+                          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                        ),
+                        const SizedBox(width: 4),
+                        IconButton(
+                          tooltip: 'Edit Order & Package Deal',
+                          icon: const Icon(Icons.edit_note_rounded, size: 22, color: Color(0xFFF37021)),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          onPressed: () => ClientEditOrderModal.show(context, order),
+                        ),
+                      ],
                     ),
                   ],
                 );
@@ -2060,7 +2074,22 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                   const SizedBox(width: 6),
                 ],
 
-                // 4. Track Stages
+                // 4. Edit Order & Package
+                IconButton(
+                  tooltip: 'Edit Order & Package Deal',
+                  onPressed: () => ClientEditOrderModal.show(context, order),
+                  icon: const Icon(Icons.edit_note_rounded, size: 18, color: Color(0xFFF37021)),
+                  style: IconButton.styleFrom(
+                    backgroundColor: const Color(0xFFF37021).withValues(alpha: 0.1),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: const BorderSide(color: Color(0xFFF37021), width: 1.2),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+
+                // 5. Track Stages
                 IconButton(
                   tooltip: 'Track Stages',
                   onPressed: () => ClientOrderTrackingModal.show(context, order),
@@ -2260,28 +2289,56 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
             ),
             const SizedBox(height: 6),
             ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 110),
+              constraints: const BoxConstraints(maxHeight: 180),
               child: SingleChildScrollView(
                 child: Column(
                   children: prod.packages.map((pkg) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF0B1021) : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
+                      ),
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.card_giftcard_rounded, size: 14, color: Color(0xFFF37021)),
-                              const SizedBox(width: 6),
-                              Text(
-                                pkg.packageName,
-                                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? Colors.white : const Color(0xFF334155)),
-                              ),
-                            ],
+                          const Icon(Icons.card_giftcard_rounded, size: 15, color: Color(0xFFF37021)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  pkg.packageName,
+                                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF334155)),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 1),
+                                Text(
+                                  '${pkg.quantity} units (${pkg.paidQuantity} paid + ${pkg.freeQuantity} free bonus)',
+                                  style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B), fontWeight: FontWeight.w500),
+                                ),
+                              ],
+                            ),
                           ),
                           Text(
                             currencyFormatter.format(pkg.packagePrice),
-                            style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: const Color(0xFFF37021)),
+                            style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w800, color: const Color(0xFFF37021)),
+                          ),
+                          const SizedBox(width: 8),
+                          InkWell(
+                            onTap: () => CloserCreatePackageModal.show(context, product: prod, packageToEdit: pkg),
+                            borderRadius: BorderRadius.circular(6),
+                            child: Container(
+                              padding: const EdgeInsets.all(5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF3B82F6).withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Icon(Icons.edit_rounded, size: 14, color: Color(0xFF3B82F6)),
+                            ),
                           ),
                         ],
                       ),

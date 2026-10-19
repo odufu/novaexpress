@@ -15,6 +15,7 @@ import '../widgets/pda_navigation_card.dart';
 import '../widgets/reschedule_callback_modal.dart';
 import '../widgets/upsell_selector_modal.dart';
 import '../widgets/multi_stop_pickup_manifest_card.dart';
+import '../../../client_portal/presentation/widgets/client_edit_order_modal.dart';
 
 class OrderDetailPage extends ConsumerWidget {
   final String orderId;
@@ -318,6 +319,12 @@ class OrderDetailPage extends ConsumerWidget {
         centerTitle: true,
         actions: [
           IconButton(
+            tooltip: 'Edit Order & Package Deal',
+            icon: const Icon(Icons.edit_note_rounded, color: Color(0xFFF37021)),
+            onPressed: () => ClientEditOrderModal.show(context, order),
+          ),
+          IconButton(
+            tooltip: 'Refresh',
             icon: Icon(Icons.refresh_rounded, color: theme.colorScheme.onSurface),
             onPressed: () => ref.read(ordersProvider.notifier).fetchOrders(),
           ),
@@ -732,35 +739,62 @@ class OrderDetailPage extends ConsumerWidget {
                   ),
                   const SizedBox(height: 8),
 
-                  // + Add Upsell Item Action
+                  // Actions: Edit Deal / Units & Add Upsell Item Action
                   if (order.status != 'delivered' && order.status != 'cancelled')
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF059669),
-                        side: const BorderSide(color: Color(0xFF10B981)),
-                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      onPressed: () {
-                        final stockItems = ref.read(stockProvider).stockItems;
-                        UpsellSelectorModal.show(
-                          context: context,
-                          availableStock: stockItems,
-                          onUpsellSelected: (item, extraPrice) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                backgroundColor: const Color(0xFF16A34A),
-                                content: Text('Added +1 ${item.name} (+${CurrencyFormatter.formatNaira(extraPrice)}) to order! 💰'),
-                              ),
-                            );
-                          },
-                        );
-                      },
-                      icon: const Icon(Icons.add_circle_outline_rounded, size: 16),
-                      label: Text(
-                        '+ Add On-Site Upsell (+₦1,500 Commission)',
-                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFFF37021),
+                              side: const BorderSide(color: Color(0xFFF37021)),
+                              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            onPressed: () => ClientEditOrderModal.show(context, order),
+                            icon: const Icon(Icons.edit_note_rounded, size: 16),
+                            label: Text(
+                              'Edit Deal / Units',
+                              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF059669),
+                              side: const BorderSide(color: Color(0xFF10B981)),
+                              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            onPressed: () {
+                              final stockItems = ref.read(stockProvider).stockItems;
+                              UpsellSelectorModal.show(
+                                context: context,
+                                availableStock: stockItems,
+                                onUpsellSelected: (item, extraPrice) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      backgroundColor: const Color(0xFF16A34A),
+                                      content: Text('Added +1 ${item.name} (+${CurrencyFormatter.formatNaira(extraPrice)}) to order! 💰'),
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                            icon: const Icon(Icons.add_circle_outline_rounded, size: 16),
+                            label: Text(
+                              '+ Add Upsell',
+                              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
 
                   if (order.deliveryNotes != null && order.deliveryNotes!.isNotEmpty) ...[
