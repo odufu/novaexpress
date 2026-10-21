@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/widgets/user_avatar_widget.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../orders/domain/entities/order.dart';
@@ -18,6 +17,7 @@ import '../../../stock/presentation/providers/stock_provider.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
 import '../../domain/entities/distribution_center.dart';
 import '../providers/dc_console_provider.dart';
+import '../widgets/dc_staff_profile_settings_tab.dart';
 import 'dc_expenditures_page.dart';
 
 class DCOperationsMobilePortalPage extends ConsumerStatefulWidget {
@@ -1005,83 +1005,6 @@ class _DCOperationsMobilePortalPageState
             ),
           );
         },
-      ),
-    );
-  }
-
-  void _showPasswordResetDialog() {
-    final passCtrl = TextEditingController();
-    final confirmCtrl = TextEditingController();
-    bool obscure = true;
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDlgState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Row(
-            children: [
-              const Icon(Icons.lock_reset_rounded, color: Color(0xFF0D9488)),
-              const SizedBox(width: 10),
-              Text('Change Password', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 17)),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: passCtrl,
-                obscureText: obscure,
-                decoration: InputDecoration(
-                  labelText: 'New Password',
-                  prefixIcon: const Icon(Icons.lock_outline_rounded, size: 18),
-                  suffixIcon: IconButton(
-                    icon: Icon(obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 18),
-                    onPressed: () => setDlgState(() => obscure = !obscure),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: confirmCtrl,
-                obscureText: obscure,
-                decoration: const InputDecoration(
-                  labelText: 'Confirm New Password',
-                  prefixIcon: Icon(Icons.lock_outline_rounded, size: 18),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0D9488)),
-              onPressed: () async {
-                final newPass = passCtrl.text.trim();
-                if (newPass.length < 6) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Password must be at least 6 characters')),
-                  );
-                  return;
-                }
-                if (newPass != confirmCtrl.text.trim()) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Passwords do not match')),
-                  );
-                  return;
-                }
-                Navigator.of(ctx).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('✅ Password updated successfully!'), backgroundColor: Color(0xFF10B981)),
-                );
-              },
-              child: const Text('Update Password', style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -2332,166 +2255,28 @@ class _DCOperationsMobilePortalPageState
   // TAB 3: STATION & PROFILE
   // ---------------------------------------------------------------------------
   Widget _buildStationProfileTab(DistributionCenter officerDc, bool isDark) {
-    final user = ref.watch(authProvider).user;
-
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
-      children: [
-        // Officer Profile Card
-        Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF151D36) : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
-          ),
-          child: Column(
-            children: [
-              UserAvatarWidget(
-                avatarUrl: user?.avatarUrl,
-                fullName: user?.fullName.isNotEmpty == true ? user!.fullName : 'Operations Officer',
-                radius: 32,
-                backgroundColor: const Color(0xFF0D9488).withValues(alpha: 0.15),
-                textColor: const Color(0xFF0D9488),
-                showBorder: true,
-                borderColor: const Color(0xFF0D9488).withValues(alpha: 0.3),
-                borderWidth: 2,
+    return DCStaffProfileSettingsTab(
+      roleBadgeTitle: 'DC Operations Officer',
+      departmentLabel: 'DC OPERATIONS & DISPATCH',
+      accentColor: const Color(0xFF0D9488),
+      roleIcon: Icons.support_agent_rounded,
+      station: officerDc,
+      extraActionTile: ListTile(
+        leading: const Icon(Icons.insights_rounded, color: Color(0xFFF37021)),
+        title: Text('Business Finance & P&L Reports', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w700)),
+        subtitle: Text('Audited P&L, direct costs, expenditures ledger & Excel export', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
+        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const Scaffold(
+                body: SafeArea(child: DCExpendituresPage()),
               ),
-              const SizedBox(height: 10),
-              Text(
-                user?.fullName ?? 'Operations Officer',
-                style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 2),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0D9488).withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  'DC OPERATIONS DEPARTMENT',
-                  style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF0D9488)),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Divider(height: 1),
-              const SizedBox(height: 14),
-              _buildProfileRow(Icons.badge_outlined, 'Staff Code', user?.deliveryAgentCode ?? 'OPS-WUSE-01'),
-              _buildProfileRow(Icons.alternate_email_rounded, 'Email', user?.email ?? 'operations@novaxpress.ng'),
-              _buildProfileRow(Icons.phone_outlined, 'Phone', user?.phone ?? 'N/A'),
-              _buildProfileRow(Icons.warehouse_rounded, 'Assigned DC', officerDc.name),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 16),
-
-        // Distribution Center Station Details Card
-        Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF151D36) : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Station Information', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 10),
-              _buildProfileRow(Icons.location_city_rounded, 'Station Name', officerDc.name),
-              _buildProfileRow(Icons.pin_drop_outlined, 'State & City', '${officerDc.city}, ${officerDc.state}'),
-              _buildProfileRow(Icons.map_outlined, 'Address', officerDc.address),
-              _buildProfileRow(Icons.person_pin_circle_outlined, 'DC Supervisor', officerDc.managerName ?? 'Manager'),
-              _buildProfileRow(Icons.phone_in_talk_outlined, 'Supervisor Phone', officerDc.contactPhone ?? 'N/A'),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 16),
-
-        // Settings / Actions Card
-        Container(
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF151D36) : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
-          ),
-          child: Column(
-            children: [
-              ListTile(
-                leading: const Icon(Icons.insights_rounded, color: Color(0xFFF37021)),
-                title: Text('Business Finance & P&L Reports', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w700)),
-                subtitle: Text('Audited P&L, direct costs, expenditures ledger & Excel export', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
-                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const Scaffold(
-                        body: SafeArea(child: DCExpendituresPage()),
-                      ),
-                    ),
-                  );
-                },
-              ),
-              const Divider(height: 1),
-              ListTile(
-                leading: const Icon(Icons.lock_reset_rounded, color: Color(0xFF0D9488)),
-                title: Text('Change Password', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w600)),
-                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
-                onTap: _showPasswordResetDialog,
-              ),
-              const Divider(height: 1),
-              ListTile(
-                leading: Icon(
-                  isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
-                  color: const Color(0xFFF37021),
-                ),
-                title: Text('Toggle Dark Mode', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w600)),
-                trailing: Switch.adaptive(
-                  value: isDark,
-                  activeColor: const Color(0xFF0D9488),
-                  onChanged: (val) {
-                    ref.read(themeProvider.notifier).toggleTheme();
-                  },
-                ),
-              ),
-              const Divider(height: 1),
-              ListTile(
-                leading: const Icon(Icons.logout_rounded, color: Color(0xFFEF4444)),
-                title: Text(
-                  'Logout',
-                  style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold, color: const Color(0xFFEF4444)),
-                ),
-                onTap: _confirmLogout,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildProfileRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 16, color: const Color(0xFF64748B)),
-          const SizedBox(width: 10),
-          Text(label, style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              value,
-              textAlign: TextAlign.end,
-              style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600),
             ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
+
 }

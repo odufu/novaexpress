@@ -9,6 +9,7 @@ import '../../../stock/presentation/providers/stock_provider.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
 import '../../domain/entities/distribution_center.dart';
 import '../providers/dc_console_provider.dart';
+import '../widgets/dc_staff_profile_settings_tab.dart';
 
 class DCStockOperationsPage extends ConsumerStatefulWidget {
   const DCStockOperationsPage({super.key});
@@ -17,15 +18,13 @@ class DCStockOperationsPage extends ConsumerStatefulWidget {
   ConsumerState<DCStockOperationsPage> createState() => _DCStockOperationsPageState();
 }
 
-class _DCStockOperationsPageState extends ConsumerState<DCStockOperationsPage>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _DCStockOperationsPageState extends ConsumerState<DCStockOperationsPage> {
+  int _activeTab = 0; // 0: Assign Stock, 1: Rider Balancing, 2: DC Transfers, 3: Damaged Returns, 4: Profile & Settings
   final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadStockData();
     });
@@ -41,7 +40,6 @@ class _DCStockOperationsPageState extends ConsumerState<DCStockOperationsPage>
 
   @override
   void dispose() {
-    _tabController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -63,6 +61,9 @@ class _DCStockOperationsPageState extends ConsumerState<DCStockOperationsPage>
     final int totalDamagedUnits = warehouseItems.fold(0, (sum, i) => sum + i.complaintCount);
     final interDcTransfers = stockState.stockTransfers.where((t) => t.isInterDc).toList();
 
+    final currentDc = dcState.distributionCenters.where((d) => d.id == dcState.activeHubId).firstOrNull ??
+        dcState.distributionCenters.firstOrNull;
+
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0B132B) : const Color(0xFFF8FAFC),
       appBar: AppBar(
@@ -73,11 +74,11 @@ class _DCStockOperationsPageState extends ConsumerState<DCStockOperationsPage>
           children: [
             Text(
               'Stock Operations Console',
-              style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold),
+              style: GoogleFonts.inter(fontSize: 17.5, fontWeight: FontWeight.bold),
             ),
             Text(
               '${dcState.activeHubName} • Station & Field Inventory Control',
-              style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF00522A), fontWeight: FontWeight.w600),
+              style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF0284C7), fontWeight: FontWeight.w600),
             ),
           ],
         ),
@@ -89,104 +90,171 @@ class _DCStockOperationsPageState extends ConsumerState<DCStockOperationsPage>
           ),
           const SizedBox(width: 8),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: const Color(0xFF00522A),
-          unselectedLabelColor: const Color(0xFF64748B),
-          indicatorColor: const Color(0xFF00522A),
-          indicatorWeight: 3,
-          isScrollable: true,
-          labelStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
-          unselectedLabelStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500),
-          tabs: [
-            Tab(
-              icon: const Icon(Icons.assignment_ind_outlined, size: 18),
-              text: 'Assign Stock to Riders (${riderAllocations.length})',
-            ),
-            const Tab(
-              icon: Icon(Icons.swap_horiz_rounded, size: 18),
-              text: 'Rider-to-Rider Balancing',
-            ),
-            Tab(
-              icon: const Icon(Icons.local_shipping_outlined, size: 18),
-              text: 'DC-to-DC Transfers (${interDcTransfers.length})',
-            ),
-            Tab(
-              icon: const Icon(Icons.report_problem_outlined, size: 18),
-              text: 'Damaged / Spoilage Returns ($totalDamagedUnits)',
+      ),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF0F172A) : Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.04),
+              blurRadius: 14,
+              offset: const Offset(0, -3),
             ),
           ],
+        ),
+        child: SafeArea(
+          top: false,
+          child: BottomNavigationBar(
+            currentIndex: _activeTab,
+            onTap: (index) => setState(() => _activeTab = index),
+            backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+            selectedItemColor: const Color(0xFF0284C7),
+            unselectedItemColor: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+            type: BottomNavigationBarType.fixed,
+            selectedLabelStyle: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.bold),
+            unselectedLabelStyle: GoogleFonts.inter(fontSize: 10.5),
+            items: [
+              BottomNavigationBarItem(
+                icon: Badge(
+                  isLabelVisible: riderAllocations.isNotEmpty,
+                  label: Text('${riderAllocations.length}'),
+                  backgroundColor: const Color(0xFF0284C7),
+                  child: const Icon(Icons.assignment_ind_outlined),
+                ),
+                label: 'Allocation',
+              ),
+              const BottomNavigationBarItem(
+                icon: Icon(Icons.swap_horiz_rounded),
+                label: 'Balancing',
+              ),
+              BottomNavigationBarItem(
+                icon: Badge(
+                  isLabelVisible: interDcTransfers.isNotEmpty,
+                  label: Text('${interDcTransfers.length}'),
+                  backgroundColor: const Color(0xFFF37021),
+                  child: const Icon(Icons.local_shipping_outlined),
+                ),
+                label: 'Transfers',
+              ),
+              BottomNavigationBarItem(
+                icon: Badge(
+                  isLabelVisible: totalDamagedUnits > 0,
+                  label: Text('$totalDamagedUnits'),
+                  backgroundColor: const Color(0xFFDC2626),
+                  child: const Icon(Icons.report_problem_outlined),
+                ),
+                label: 'Returns',
+              ),
+              const BottomNavigationBarItem(
+                icon: Icon(Icons.person_outline_rounded),
+                label: 'Profile',
+              ),
+            ],
+          ),
         ),
       ),
       body: Column(
         children: [
-          // KPI Metric Header
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E293B) : Colors.white,
-              border: Border(bottom: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
+          // KPI Metric Header - Horizontally Scrollable & Overflow-Free (only on Operational Tabs)
+          if (_activeTab != 4)
+            Container(
+              height: 84,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                border: Border(bottom: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
+              ),
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                children: [
+                  SizedBox(
+                    width: 175,
+                    child: _buildKpiCard(
+                      'STATION ON-HAND',
+                      '$totalWarehouseUnits Units',
+                      'Available in DC warehouse',
+                      Icons.inventory_2_outlined,
+                      const Color(0xFF2563EB),
+                      isDark,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  SizedBox(
+                    width: 175,
+                    child: _buildKpiCard(
+                      'RIDER CUSTODY',
+                      '$totalFieldCustodyUnits Units',
+                      'In delivery vehicles',
+                      Icons.motorcycle_outlined,
+                      const Color(0xFF16A34A),
+                      isDark,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  SizedBox(
+                    width: 185,
+                    child: _buildKpiCard(
+                      'DAMAGED / SPOILAGE',
+                      '$totalDamagedUnits Units',
+                      'Quarantined from delivery',
+                      Icons.warning_amber_rounded,
+                      const Color(0xFFDC2626),
+                      isDark,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _buildKpiCard(
-                    'STATION ON-HAND',
-                    '$totalWarehouseUnits Units',
-                    'Available in DC warehouse',
-                    Icons.inventory_2_outlined,
-                    const Color(0xFF2563EB),
-                    isDark,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildKpiCard(
-                    'RIDER CUSTODY',
-                    '$totalFieldCustodyUnits Units',
-                    'In delivery vehicles',
-                    Icons.motorcycle_outlined,
-                    const Color(0xFF16A34A),
-                    isDark,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildKpiCard(
-                    'DAMAGED / SPOILAGE',
-                    '$totalDamagedUnits Units',
-                    'Quarantined from delivery',
-                    Icons.warning_amber_rounded,
-                    const Color(0xFFDC2626),
-                    isDark,
-                  ),
-                ),
-              ],
-            ),
-          ),
 
           // Main Tabs
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                // 1. ASSIGN STOCK TO RIDERS
-                _buildAssignStockView(warehouseItems, riderAllocations, drivers, isDark),
-
-                // 2. RIDER-TO-RIDER BALANCING
-                _buildRiderToRiderView(riderAllocations, drivers, isDark),
-
-                // 3. DC-TO-DC TRANSFERS
-                _buildDcToDcTransfersView(warehouseItems, interDcTransfers, dcs, dcState.activeHubId, isDark),
-
-                // 4. DAMAGED / SPOILAGE RETURNS
-                _buildSpoilageReturnsView(warehouseItems, riderAllocations, drivers, isDark),
-              ],
+            child: _buildActiveTabBody(
+              warehouseItems,
+              riderAllocations,
+              drivers,
+              interDcTransfers,
+              dcs,
+              currentDc,
+              dcState.activeHubId,
+              isDark,
             ),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildActiveTabBody(
+    List<StockItemEntity> warehouseItems,
+    List<RiderStockAllocation> riderAllocations,
+    List<DCFleetDriver> drivers,
+    List<dynamic> interDcTransfers,
+    List<DistributionCenter> dcs,
+    DistributionCenter? currentDc,
+    String activeHubId,
+    bool isDark,
+  ) {
+    switch (_activeTab) {
+      case 0:
+        return _buildAssignStockView(warehouseItems, riderAllocations, drivers, isDark);
+      case 1:
+        return _buildRiderToRiderView(riderAllocations, drivers, isDark);
+      case 2:
+        return _buildDcToDcTransfersView(warehouseItems, interDcTransfers, dcs, activeHubId, isDark);
+      case 3:
+        return _buildSpoilageReturnsView(warehouseItems, riderAllocations, drivers, isDark);
+      case 4:
+        return DCStaffProfileSettingsTab(
+          roleBadgeTitle: 'DC Stock Controller',
+          departmentLabel: 'INVENTORY & WAREHOUSE CONTROL',
+          accentColor: const Color(0xFF0284C7),
+          roleIcon: Icons.inventory_2_outlined,
+          station: currentDc,
+        );
+      default:
+        return _buildAssignStockView(warehouseItems, riderAllocations, drivers, isDark);
+    }
   }
 
   Widget _buildKpiCard(

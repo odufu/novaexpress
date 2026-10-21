@@ -9,7 +9,9 @@ import '../../../../core/widgets/user_avatar_widget.dart';
 import '../../../finance/domain/entities/remittance.dart';
 import '../../../finance/presentation/providers/finance_provider.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
+import '../../domain/entities/distribution_center.dart';
 import '../providers/dc_console_provider.dart';
+import '../widgets/dc_staff_profile_settings_tab.dart';
 
 class DCFinanceOperationsPage extends ConsumerStatefulWidget {
   const DCFinanceOperationsPage({super.key});
@@ -18,16 +20,14 @@ class DCFinanceOperationsPage extends ConsumerStatefulWidget {
   ConsumerState<DCFinanceOperationsPage> createState() => _DCFinanceOperationsPageState();
 }
 
-class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPage>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPage> {
+  int _activeTab = 0; // 0: Approvals Queue, 1: Rider Cash Liabilities, 2: Audit History, 3: Profile & Settings
   final TextEditingController _searchController = TextEditingController();
   String _riderLiabilityFilter = 'all'; // 'all', 'holding_cash', 'high_balance'
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadData();
     });
@@ -42,7 +42,6 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
 
   @override
   void dispose() {
-    _tabController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -75,6 +74,9 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
           r.createdAt.day == now.day;
     }).fold(0.0, (sum, r) => sum + r.amount);
 
+    final currentDc = dcState.distributionCenters.where((d) => d.id == dcState.activeHubId).firstOrNull ??
+        dcState.distributionCenters.firstOrNull;
+
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0B132B) : const Color(0xFFF8FAFC),
       appBar: AppBar(
@@ -85,11 +87,11 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
           children: [
             Text(
               'Finance Admin Console',
-              style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold),
+              style: GoogleFonts.inter(fontSize: 17.5, fontWeight: FontWeight.bold),
             ),
             Text(
               '${dcState.activeHubName} • Cash Remittances & Audit',
-              style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF00522A), fontWeight: FontWeight.w600),
+              style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF00522A), fontWeight: FontWeight.w600),
             ),
           ],
         ),
@@ -101,96 +103,148 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
           ),
           const SizedBox(width: 8),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: const Color(0xFF00522A),
-          unselectedLabelColor: const Color(0xFF64748B),
-          indicatorColor: const Color(0xFF00522A),
-          indicatorWeight: 3,
-          labelStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
-          unselectedLabelStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500),
-          tabs: [
-            Tab(
-              icon: const Icon(Icons.pending_actions_rounded, size: 18),
-              text: 'Approvals Queue (${pendingRemittances.length})',
-            ),
-            Tab(
-              icon: const Icon(Icons.account_balance_wallet_rounded, size: 18),
-              text: 'Rider Cash Liabilities (${allDrivers.where((d) => d.cashInCustody > 0).length})',
-            ),
-            Tab(
-              icon: const Icon(Icons.history_rounded, size: 18),
-              text: 'Audit History (${approvedRemittances.length})',
+      ),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF0F172A) : Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.04),
+              blurRadius: 14,
+              offset: const Offset(0, -3),
             ),
           ],
+        ),
+        child: SafeArea(
+          top: false,
+          child: BottomNavigationBar(
+            currentIndex: _activeTab,
+            onTap: (index) => setState(() => _activeTab = index),
+            backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+            selectedItemColor: const Color(0xFF00522A),
+            unselectedItemColor: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+            type: BottomNavigationBarType.fixed,
+            selectedLabelStyle: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold),
+            unselectedLabelStyle: GoogleFonts.inter(fontSize: 11),
+            items: [
+              BottomNavigationBarItem(
+                icon: Badge(
+                  isLabelVisible: pendingRemittances.isNotEmpty,
+                  label: Text('${pendingRemittances.length}'),
+                  backgroundColor: const Color(0xFFEA580C),
+                  child: const Icon(Icons.pending_actions_rounded),
+                ),
+                label: 'Approvals',
+              ),
+              BottomNavigationBarItem(
+                icon: Badge(
+                  isLabelVisible: allDrivers.any((d) => d.cashInCustody > 0),
+                  label: Text('${allDrivers.where((d) => d.cashInCustody > 0).length}'),
+                  backgroundColor: const Color(0xFFDC2626),
+                  child: const Icon(Icons.account_balance_wallet_rounded),
+                ),
+                label: 'Rider Cash',
+              ),
+              BottomNavigationBarItem(
+                icon: const Icon(Icons.history_rounded),
+                label: 'Audit History',
+              ),
+              const BottomNavigationBarItem(
+                icon: Icon(Icons.person_outline_rounded),
+                label: 'Profile',
+              ),
+            ],
+          ),
         ),
       ),
       body: Column(
         children: [
-          // KPI Metric Header
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E293B) : Colors.white,
-              border: Border(bottom: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
+          // KPI Metric Header - Horizontally Scrollable & Overflow-Free (only on Operational Tabs 0, 1, 2)
+          if (_activeTab != 3)
+            Container(
+              height: 84,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                border: Border(bottom: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
+              ),
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                children: [
+                  SizedBox(
+                    width: 175,
+                    child: _buildKpiCard(
+                      'PENDING APPROVAL',
+                      CurrencyFormatter.formatNaira(totalPendingVerification),
+                      '${pendingRemittances.length} submissions waiting',
+                      Icons.hourglass_top_rounded,
+                      const Color(0xFFEA580C),
+                      isDark,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  SizedBox(
+                    width: 185,
+                    child: _buildKpiCard(
+                      'FIELD CASH LIABILITY',
+                      CurrencyFormatter.formatNaira(totalFieldCashLiability),
+                      'Held by active fleet riders',
+                      Icons.payments_rounded,
+                      const Color(0xFFDC2626),
+                      isDark,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  SizedBox(
+                    width: 175,
+                    child: _buildKpiCard(
+                      'CLEARED TODAY',
+                      CurrencyFormatter.formatNaira(totalApprovedToday),
+                      'Verified & banked',
+                      Icons.verified_rounded,
+                      const Color(0xFF16A34A),
+                      isDark,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _buildKpiCard(
-                    'PENDING APPROVAL',
-                    CurrencyFormatter.formatNaira(totalPendingVerification),
-                    '${pendingRemittances.length} submissions waiting',
-                    Icons.hourglass_top_rounded,
-                    const Color(0xFFEA580C),
-                    isDark,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildKpiCard(
-                    'FIELD CASH LIABILITY',
-                    CurrencyFormatter.formatNaira(totalFieldCashLiability),
-                    'Held by active fleet riders',
-                    Icons.payments_rounded,
-                    const Color(0xFFDC2626),
-                    isDark,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildKpiCard(
-                    'CLEARED TODAY',
-                    CurrencyFormatter.formatNaira(totalApprovedToday),
-                    'Verified & banked',
-                    Icons.verified_rounded,
-                    const Color(0xFF16A34A),
-                    isDark,
-                  ),
-                ),
-              ],
-            ),
-          ),
 
-          // Main Tabs
+          // Main Tab Body
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                // 1. APPROVALS QUEUE
-                _buildApprovalsQueueView(pendingRemittances, allDrivers, isDark),
-
-                // 2. RIDER LIABILITIES LEDGER
-                _buildRiderLiabilitiesView(allDrivers, isDark),
-
-                // 3. REMITTANCE AUDIT HISTORY
-                _buildAuditHistoryView(approvedRemittances, allDrivers, isDark),
-              ],
-            ),
+            child: _buildActiveTabBody(pendingRemittances, allDrivers, approvedRemittances, currentDc, isDark),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildActiveTabBody(
+    List<RemittanceEntity> pendingRemittances,
+    List<DCFleetDriver> allDrivers,
+    List<RemittanceEntity> approvedRemittances,
+    DistributionCenter? currentDc,
+    bool isDark,
+  ) {
+    switch (_activeTab) {
+      case 0:
+        return _buildApprovalsQueueView(pendingRemittances, allDrivers, isDark);
+      case 1:
+        return _buildRiderLiabilitiesView(allDrivers, isDark);
+      case 2:
+        return _buildAuditHistoryView(approvedRemittances, allDrivers, isDark);
+      case 3:
+        return DCStaffProfileSettingsTab(
+          roleBadgeTitle: 'Station Finance Admin',
+          departmentLabel: 'FINANCE & CASH REMITTANCES',
+          accentColor: const Color(0xFF00522A),
+          roleIcon: Icons.account_balance_wallet_rounded,
+          station: currentDc,
+        );
+      default:
+        return _buildApprovalsQueueView(pendingRemittances, allDrivers, isDark);
+    }
   }
 
   Widget _buildKpiCard(
@@ -327,9 +381,13 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
                       children: [
                         Row(
                           children: [
-                            Text(
-                              riderName,
-                              style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold),
+                            Flexible(
+                              child: Text(
+                                riderName,
+                                style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
                             ),
                             const SizedBox(width: 6),
                             Container(
@@ -526,7 +584,14 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
                         children: [
                           Row(
                             children: [
-                              Text(d.name, style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold)),
+                              Flexible(
+                                child: Text(
+                                  d.name,
+                                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                              ),
                               const SizedBox(width: 6),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
@@ -536,7 +601,7 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
                                 ),
                                 child: Text(
                                   d.driverCode,
-                                  style: GoogleFonts.jetBrainsMono(fontSize: 9.5, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
+                                  style: GoogleFonts.jetBrainsMono(fontSize: 9, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
                                 ),
                               ),
                             ],
@@ -552,7 +617,7 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
                         Text(
                           CurrencyFormatter.formatNaira(d.cashInCustody),
                           style: GoogleFonts.jetBrainsMono(
-                            fontSize: 15,
+                            fontSize: 13.5,
                             fontWeight: FontWeight.w900,
                             color: isHigh
                                 ? const Color(0xFFDC2626)
@@ -643,6 +708,8 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
                     Text(
                       '$riderName ($riderCode)',
                       style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
                     ),
                     const SizedBox(height: 2),
                     Text(

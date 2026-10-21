@@ -13,6 +13,7 @@ import '../../../finance/presentation/providers/finance_provider.dart';
 import '../../domain/entities/dc_fleet_driver.dart';
 import '../../domain/entities/distribution_center.dart';
 import '../providers/dc_console_provider.dart';
+import '../widgets/dc_staff_profile_settings_tab.dart';
 
 class GeneralAccountantConsolePage extends ConsumerStatefulWidget {
   const GeneralAccountantConsolePage({super.key});
@@ -23,16 +24,14 @@ class GeneralAccountantConsolePage extends ConsumerStatefulWidget {
 }
 
 class _GeneralAccountantConsolePageState
-    extends ConsumerState<GeneralAccountantConsolePage>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+    extends ConsumerState<GeneralAccountantConsolePage> {
+  int _activeTab = 0; // 0: Stations, 1: Settlements, 2: Cash Ledger, 3: Profile & Settings
   final TextEditingController _searchController = TextEditingController();
   List<ClientSettlement> _settlements = [];
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadNationalData();
     });
@@ -55,7 +54,6 @@ class _GeneralAccountantConsolePageState
 
   @override
   void dispose() {
-    _tabController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -84,6 +82,9 @@ class _GeneralAccountantConsolePageState
         .where((s) => s.status.toLowerCase() != 'completed')
         .fold(0.0, (sum, s) => sum + s.netPayoutAmount);
 
+    final currentDc = dcState.distributionCenters.where((d) => d.id == dcState.activeHubId).firstOrNull ??
+        dcState.distributionCenters.firstOrNull;
+
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0B132B) : const Color(0xFFF8FAFC),
       appBar: AppBar(
@@ -94,11 +95,11 @@ class _GeneralAccountantConsolePageState
           children: [
             Text(
               'General Accountant Console',
-              style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold),
+              style: GoogleFonts.inter(fontSize: 17.5, fontWeight: FontWeight.bold),
             ),
             Text(
-              'National Financial Oversight • DC Audits & Merchant Disbursements',
-              style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF00522A), fontWeight: FontWeight.w600),
+              'National Financial Oversight • DC Audits & Disbursements',
+              style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF7C3AED), fontWeight: FontWeight.w600),
             ),
           ],
         ),
@@ -110,96 +111,161 @@ class _GeneralAccountantConsolePageState
           ),
           const SizedBox(width: 8),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: const Color(0xFF00522A),
-          unselectedLabelColor: const Color(0xFF64748B),
-          indicatorColor: const Color(0xFF00522A),
-          indicatorWeight: 3,
-          labelStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
-          unselectedLabelStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500),
-          tabs: [
-            Tab(
-              icon: const Icon(Icons.hub_outlined, size: 18),
-              text: 'Station Breakdown (${dcs.length} DCs)',
-            ),
-            Tab(
-              icon: const Icon(Icons.payments_outlined, size: 18),
-              text: 'Merchant Settlements (${settlements.length})',
-            ),
-            Tab(
-              icon: const Icon(Icons.account_balance_outlined, size: 18),
-              text: 'National Cash Ledger (${remittances.length})',
+      ),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF0F172A) : Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.04),
+              blurRadius: 14,
+              offset: const Offset(0, -3),
             ),
           ],
+        ),
+        child: SafeArea(
+          top: false,
+          child: BottomNavigationBar(
+            currentIndex: _activeTab,
+            onTap: (index) => setState(() => _activeTab = index),
+            backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+            selectedItemColor: const Color(0xFF7C3AED),
+            unselectedItemColor: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+            type: BottomNavigationBarType.fixed,
+            selectedLabelStyle: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold),
+            unselectedLabelStyle: GoogleFonts.inter(fontSize: 11),
+            items: [
+              BottomNavigationBarItem(
+                icon: Badge(
+                  isLabelVisible: dcs.isNotEmpty,
+                  label: Text('${dcs.length}'),
+                  backgroundColor: const Color(0xFF7C3AED),
+                  child: const Icon(Icons.hub_outlined),
+                ),
+                label: 'Stations',
+              ),
+              BottomNavigationBarItem(
+                icon: Badge(
+                  isLabelVisible: settlements.isNotEmpty,
+                  label: Text('${settlements.length}'),
+                  backgroundColor: const Color(0xFF2563EB),
+                  child: const Icon(Icons.payments_outlined),
+                ),
+                label: 'Settlements',
+              ),
+              BottomNavigationBarItem(
+                icon: Badge(
+                  isLabelVisible: remittances.isNotEmpty,
+                  label: Text('${remittances.length}'),
+                  backgroundColor: const Color(0xFF16A34A),
+                  child: const Icon(Icons.account_balance_outlined),
+                ),
+                label: 'Cash Ledger',
+              ),
+              const BottomNavigationBarItem(
+                icon: Icon(Icons.person_outline_rounded),
+                label: 'Profile',
+              ),
+            ],
+          ),
         ),
       ),
       body: Column(
         children: [
-          // National Financial KPIs
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E293B) : Colors.white,
-              border: Border(bottom: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
+          // KPI Metric Header - Horizontally Scrollable & Overflow-Free (only on Operational Tabs 0, 1, 2)
+          if (_activeTab != 3)
+            Container(
+              height: 84,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                border: Border(bottom: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
+              ),
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                children: [
+                  SizedBox(
+                    width: 185,
+                    child: _buildKpiCard(
+                      'NATIONAL FIELD LIABILITY',
+                      CurrencyFormatter.formatNaira(totalFieldCashLiability),
+                      '${drivers.where((d) => d.cashInCustody > 0).length} active riders holding cash',
+                      Icons.payments_rounded,
+                      const Color(0xFFEA580C),
+                      isDark,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  SizedBox(
+                    width: 180,
+                    child: _buildKpiCard(
+                      'CLEARED REMITTANCES',
+                      CurrencyFormatter.formatNaira(totalRemittancesCleared),
+                      'Verified & banked into DC treasury',
+                      Icons.verified_rounded,
+                      const Color(0xFF16A34A),
+                      isDark,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  SizedBox(
+                    width: 180,
+                    child: _buildKpiCard(
+                      'MERCHANT PAYABLE DUE',
+                      CurrencyFormatter.formatNaira(totalMerchantPayable),
+                      'Net payable across clients',
+                      Icons.account_balance_wallet_rounded,
+                      const Color(0xFF2563EB),
+                      isDark,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _buildKpiCard(
-                    'NATIONAL FIELD LIABILITY',
-                    CurrencyFormatter.formatNaira(totalFieldCashLiability),
-                    '${drivers.where((d) => d.cashInCustody > 0).length} riders with cash in hand',
-                    Icons.payments_rounded,
-                    const Color(0xFFEA580C),
-                    isDark,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildKpiCard(
-                    'CLEARED REMITTANCES',
-                    CurrencyFormatter.formatNaira(totalRemittancesCleared),
-                    'Verified & banked into DC treasury',
-                    Icons.verified_rounded,
-                    const Color(0xFF16A34A),
-                    isDark,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildKpiCard(
-                    'MERCHANT PAYABLE DUE',
-                    CurrencyFormatter.formatNaira(totalMerchantPayable),
-                    'Net payable across clients',
-                    Icons.account_balance_wallet_rounded,
-                    const Color(0xFF2563EB),
-                    isDark,
-                  ),
-                ),
-              ],
-            ),
-          ),
 
           // Main Tabs
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                // 1. MULTI-STATION BREAKDOWN
-                _buildMultiStationView(dcs, drivers, isDark),
-
-                // 2. MERCHANT RECONCILIATIONS & PAYOUTS
-                _buildMerchantSettlementsView(settlements, isDark),
-
-                // 3. NATIONAL CASH AUDIT LEDGER
-                _buildNationalLedgerView(remittances, drivers, isDark),
-              ],
+            child: _buildActiveAccountantTabBody(
+              dcs,
+              drivers,
+              settlements,
+              remittances,
+              currentDc,
+              isDark,
             ),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildActiveAccountantTabBody(
+    List<DistributionCenter> dcs,
+    List<DCFleetDriver> drivers,
+    List<ClientSettlement> settlements,
+    List<RemittanceEntity> remittances,
+    DistributionCenter? currentDc,
+    bool isDark,
+  ) {
+    switch (_activeTab) {
+      case 0:
+        return _buildMultiStationView(dcs, drivers, isDark);
+      case 1:
+        return _buildMerchantSettlementsView(settlements, isDark);
+      case 2:
+        return _buildNationalLedgerView(remittances, drivers, isDark);
+      case 3:
+        return DCStaffProfileSettingsTab(
+          roleBadgeTitle: 'General Accountant',
+          departmentLabel: 'NATIONAL TREASURY & ACCOUNTS',
+          accentColor: const Color(0xFF7C3AED),
+          roleIcon: Icons.account_balance_rounded,
+          station: currentDc,
+        );
+      default:
+        return _buildMultiStationView(dcs, drivers, isDark);
+    }
   }
 
   Widget _buildKpiCard(
