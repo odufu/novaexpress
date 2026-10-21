@@ -172,6 +172,7 @@ class DCConsoleRepositoryImpl implements DCConsoleRepository {
     String? password,
     String? staffCode,
     dynamic authDataSource,
+    String role = 'dc_operations',
   }) async {
     final created = await _remoteDataSource.createOperationsOfficer(
       firstName: firstName,

@@ -36,6 +36,7 @@ class _DCOnboardOperationsOfficerModalState
   bool _obscurePassword = true;
   bool _isSubmitting = false;
   String? _selectedDcId;
+  String _selectedRole = 'dc_operations';
   DCOperationsOfficer? _createdOfficer;
 
   @override
@@ -115,6 +116,7 @@ class _DCOnboardOperationsOfficerModalState
             staffCode: staffCode,
             distributionCenterId: dcId,
             assignedZone: assignedZone,
+            role: _selectedRole,
           );
 
       if (mounted) {
@@ -486,6 +488,114 @@ Scope: Incoming Order Routing & Dispatch Only
                                 ),
                               ),
                             ],
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    // Operational Role / Console Access Dropdown
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.admin_panel_settings_rounded, size: 16, color: const Color(0xFFF37021)),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Operational Role / Console Access',
+                              style: GoogleFonts.inter(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w600,
+                                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                            ),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: _selectedRole,
+                              isExpanded: true,
+                              dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                              items: const [
+                                DropdownMenuItem(
+                                  value: 'dc_operations',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.alt_route_rounded, size: 16, color: Color(0xFF059669)),
+                                      SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          'Orders & Dispatch Admin (/ops)',
+                                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'dc_stock_admin',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.inventory_2_rounded, size: 16, color: Color(0xFF0284C7)),
+                                      SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          'Stock & Inventory Admin (/stock-ops)',
+                                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'dc_finance_admin',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.account_balance_wallet_rounded, size: 16, color: Color(0xFFD97706)),
+                                      SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          'Station Finance Admin (/finance-ops)',
+                                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'general_accountant',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.account_balance_rounded, size: 16, color: Color(0xFF7C3AED)),
+                                      SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          'General Accountant (/accountant)',
+                                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setState(() => _selectedRole = val);
+                                }
+                              },
+                            ),
                           ),
                         ),
                       ],

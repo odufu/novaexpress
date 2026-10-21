@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
+import '../../../../core/constants/supabase_constants.dart';
 import '../../../../core/services/local_storage_service.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/datasources/orders_remote_datasource.dart';
@@ -513,8 +514,19 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
   }) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      final db = Supabase.instance.client;
-      await db.from('orders').update(updates).eq('id', orderId);
+      SupabaseClient db = Supabase.instance.client;
+      if (SupabaseConstants.supabaseServiceRoleKey.isNotEmpty) {
+        db = SupabaseClient(
+          SupabaseConstants.supabaseUrl,
+          SupabaseConstants.supabaseServiceRoleKey,
+        );
+      }
+      final res = await db.from('orders').update(updates).eq('id', orderId).select();
+      if (res.isEmpty) {
+        debugPrint('[ORDERS_PROVIDER] ⚠️ No rows updated for orderId $orderId');
+        state = state.copyWith(isLoading: false, errorMessage: 'No order updated');
+        return false;
+      }
 
       final updatedOrders = state.orders.map((o) {
         if (o.id == orderId || o.orderNumber == orderId) {

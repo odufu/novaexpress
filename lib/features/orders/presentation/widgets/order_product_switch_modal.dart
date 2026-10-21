@@ -6,6 +6,7 @@ import '../../../dc_console/domain/entities/product_package.dart';
 import '../../../dc_console/presentation/providers/product_catalog_provider.dart';
 import '../../../pipeline_chat/presentation/providers/pipeline_chat_provider.dart';
 import '../providers/orders_provider.dart';
+import '../../../client_portal/presentation/providers/client_portal_provider.dart';
 
 class OrderProductSwitchModal extends ConsumerStatefulWidget {
   final String orderId;
@@ -128,6 +129,9 @@ class _OrderProductSwitchModalState extends ConsumerState<OrderProductSwitchModa
 
       // Refresh orders in DC console and Client Portal
       ref.read(ordersProvider.notifier).fetchOrders();
+      try {
+        ref.read(clientPortalProvider.notifier).loadClientData();
+      } catch (_) {}
 
       if (mounted) {
         Navigator.of(context).pop();

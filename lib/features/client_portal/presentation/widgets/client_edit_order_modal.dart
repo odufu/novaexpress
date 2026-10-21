@@ -233,6 +233,7 @@ class _ClientEditOrderModalState extends ConsumerState<ClientEditOrderModal> {
         'free_quantity': freeQty,
         'base_price': price,
         'total_amount': price,
+        'updated_at': DateTime.now().toIso8601String(),
       };
 
       // 1. Update in ClientPortalProvider (updates Supabase orders table)
@@ -252,6 +253,11 @@ class _ClientEditOrderModalState extends ConsumerState<ClientEditOrderModal> {
       if (mounted) {
         setState(() => _isSubmitting = false);
         if (success1) {
+          // Trigger immediate fresh background fetch across portals
+          try {
+            ref.read(clientPortalProvider.notifier).loadClientData();
+            ref.read(ordersProvider.notifier).fetchOrders();
+          } catch (_) {}
           Navigator.of(context).pop(true);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(

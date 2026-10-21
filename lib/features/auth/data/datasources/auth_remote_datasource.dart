@@ -52,6 +52,7 @@ abstract class AuthRemoteDataSource {
     required String distributionCenterId,
     required String distributionCenterName,
     String? staffCode,
+    String role = 'dc_operations',
   });
   Future<UserModel> registerClientAccount({
     required String email,
@@ -310,6 +311,7 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
     required String distributionCenterId,
     required String distributionCenterName,
     String? staffCode,
+    String role = 'dc_operations',
   }) async {
     final clean = email.trim().toLowerCase();
     final code = staffCode ?? 'OPS-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}';
@@ -1277,6 +1279,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     required String distributionCenterId,
     required String distributionCenterName,
     String? staffCode,
+    String role = 'dc_operations',
   }) async {
     final cleanEmail = email.trim().toLowerCase();
     debugPrint(
@@ -1321,7 +1324,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           userMetadata: {
             'first_name': firstName,
             'last_name': lastName,
-            'role': 'dc_operations',
+            'role': role,
             'phone': phone,
             'staff_code': effectiveCode,
             'distribution_center_id': distributionCenterId,
@@ -1353,7 +1356,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
               userMetadata: {
                 'first_name': firstName,
                 'last_name': lastName,
-                'role': 'dc_operations',
+                'role': role,
                 'phone': phone,
                 'staff_code': effectiveCode,
                 'distribution_center_id': distributionCenterId,
@@ -1375,7 +1378,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
             data: {
               'first_name': firstName,
               'last_name': lastName,
-              'role': 'dc_operations',
+              'role': role,
               'phone': phone,
               'staff_code': effectiveCode,
               'distribution_center_id': distributionCenterId,
@@ -1404,7 +1407,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         'phone_number': phone,
         'first_name': firstName,
         'last_name': lastName,
-        'role': 'dc_operations',
+        'role': role,
         'distribution_center_id': effectiveDcId,
         'is_active': true,
       });

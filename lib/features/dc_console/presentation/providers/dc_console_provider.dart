@@ -1766,6 +1766,7 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
     String? staffCode,
     String? distributionCenterId,
     String? assignedZone,
+    String role = 'dc_operations',
   }) async {
     final cleanEmail = email.trim().toLowerCase();
     final cleanName = name.trim();
@@ -1804,6 +1805,7 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
       staffCode: effectiveCode,
       distributionCenterId: targetDcId,
       distributionCenterName: targetDcName,
+      role: role,
     );
 
     final officerWithPass = newOfficer.copyWith(

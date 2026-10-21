@@ -50,6 +50,7 @@ abstract class DCConsoleRemoteDataSource {
     String? password,
     String? staffCode,
     dynamic authDataSource,
+    String role = 'dc_operations',
   });
   Future<void> toggleOperationsOfficerStatus(String officerId, bool isActive);
   Future<void> deleteOperationsOfficer(String officerId);
@@ -518,6 +519,7 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
     String? password,
     String? staffCode,
     dynamic authDataSource,
+    String role = 'dc_operations',
   }) async {
     final supPass = (password != null && password.trim().isNotEmpty)
         ? password.trim()
@@ -538,6 +540,7 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
         distributionCenterId: distributionCenterId,
         distributionCenterName: distributionCenterName,
         staffCode: effectiveCode,
+        role: role,
       );
     } else {
       final authDs = AuthRemoteDataSourceImpl(_getAdminClient());
@@ -550,6 +553,7 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
         distributionCenterId: distributionCenterId,
         distributionCenterName: distributionCenterName,
         staffCode: effectiveCode,
+        role: role,
       );
     }
 

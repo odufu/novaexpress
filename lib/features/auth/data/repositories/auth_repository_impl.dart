@@ -102,6 +102,7 @@ class AuthRepositoryImpl implements AuthRepository {
     required String distributionCenterId,
     required String distributionCenterName,
     String? staffCode,
+    String role = 'dc_operations',
   }) async {
     return await remoteDataSource.registerDcOperationsOfficer(
       email: email,
@@ -112,6 +113,7 @@ class AuthRepositoryImpl implements AuthRepository {
       distributionCenterId: distributionCenterId,
       distributionCenterName: distributionCenterName,
       staffCode: staffCode,
+      role: role,
     );
   }
 

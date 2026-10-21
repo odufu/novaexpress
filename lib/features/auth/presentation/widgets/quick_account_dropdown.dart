@@ -50,7 +50,52 @@ class QuickAccountDropdown extends StatefulWidget {
     ),
   ];
 
-  static const List<QuickAccountOption> secondaryAccounts = [];
+  static const List<QuickAccountOption> secondaryAccounts = [
+    QuickAccountOption(
+      roleKey: 'client',
+      title: 'Novacare Merchant Partner',
+      personName: 'Joel Odufu / Novacare',
+      badge: 'Merchant Portal',
+      email: 'novacare@novaxpress.net',
+      password: 'novacare@novaxpress.net',
+      icon: Icons.storefront_rounded,
+      themeColor: Color(0xFFD97706),
+      isSecondary: true,
+    ),
+    QuickAccountOption(
+      roleKey: 'closer',
+      title: 'Head Sales Closer (Shorp 11)',
+      personName: 'Prestige Godwin Uto',
+      badge: 'Telesales',
+      email: 'prestige.godwin@novaxpress.net',
+      password: 'Closer123!',
+      icon: Icons.headset_mic_rounded,
+      themeColor: Color(0xFF4F46E5),
+      isSecondary: true,
+    ),
+    QuickAccountOption(
+      roleKey: 'dc_operations',
+      title: 'DC Dispatch Operations Officer',
+      personName: 'Abigail Kooyon',
+      badge: 'Station Ops',
+      email: 'abigail.kooyon@novaxpress.net',
+      password: 'CDV8pRxC#b',
+      icon: Icons.alt_route_rounded,
+      themeColor: Color(0xFF059669),
+      isSecondary: true,
+    ),
+    QuickAccountOption(
+      roleKey: 'delivery_agent',
+      title: 'Fleet Delivery Courier / Rider',
+      personName: 'Oladele Omowaye',
+      badge: 'Field Courier',
+      email: 'oladele.omowaye@novaxpress.ng',
+      password: 'omowaye123456',
+      icon: Icons.two_wheeler_rounded,
+      themeColor: Color(0xFF7C3AED),
+      isSecondary: true,
+    ),
+  ];
 
   static List<QuickAccountOption> get allAccounts => [
         ...primaryAccounts,

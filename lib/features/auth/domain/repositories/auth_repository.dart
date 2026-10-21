@@ -45,6 +45,7 @@ abstract class AuthRepository {
     required String distributionCenterId,
     required String distributionCenterName,
     String? staffCode,
+    String role = 'dc_operations',
   });
   Future<UserEntity> registerClientAccount({
     required String email,

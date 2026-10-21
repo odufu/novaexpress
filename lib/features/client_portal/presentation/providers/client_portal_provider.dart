@@ -2924,8 +2924,18 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
     required Map<String, dynamic> updates,
   }) async {
     try {
-      final db = Supabase.instance.client;
-      await db.from('orders').update(updates).eq('id', orderId);
+      SupabaseClient db = Supabase.instance.client;
+      if (SupabaseConstants.supabaseServiceRoleKey.isNotEmpty) {
+        db = SupabaseClient(
+          SupabaseConstants.supabaseUrl,
+          SupabaseConstants.supabaseServiceRoleKey,
+        );
+      }
+      final res = await db.from('orders').update(updates).eq('id', orderId).select();
+      if (res.isEmpty) {
+        debugPrint('[CLIENT_PORTAL] ⚠️ No rows updated for orderId $orderId');
+        return false;
+      }
 
       final updatedOrders = state.orders.map((o) {
         if (o.id == orderId || o.orderNumber == orderId) {

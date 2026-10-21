@@ -62,6 +62,7 @@ abstract class DCConsoleRepository {
     String? password,
     String? staffCode,
     dynamic authDataSource,
+    String role = 'dc_operations',
   });
 
   /// Toggles active status of an operations officer

@@ -34,6 +34,16 @@ class _DevAccountOption {
 
 const List<_DevAccountOption> _devTestAccounts = [
   _DevAccountOption(
+    name: 'Ahmed Bello (Grand DC Supervisor)',
+    code: 'DC-MGR-WUSE-01',
+    roleBadge: 'DC MANAGER',
+    email: 'dc.supervisor@novaxpress.ng',
+    password: 'Password123!',
+    portalRoute: '/dc (Grand DC Console)',
+    icon: Icons.account_balance_rounded,
+    roleColor: Color(0xFF1E3A8A),
+  ),
+  _DevAccountOption(
     name: 'Novacare Merchant',
     code: 'CLIENT-NOVACARE',
     roleBadge: 'MERCHANT',
