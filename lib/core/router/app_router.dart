@@ -203,9 +203,9 @@ String? appRouteRedirect({
         matchedLocation.startsWith('/orders/scan') ||
         matchedLocation.endsWith('/deliver-pod') ||
         matchedLocation.endsWith('/log-failure') ||
-        matchedLocation.startsWith('/stock') ||
+        (matchedLocation.startsWith('/stock') && !matchedLocation.startsWith('/stock-ops')) ||
         matchedLocation.startsWith('/cash') ||
-        matchedLocation.startsWith('/finance');
+        (matchedLocation.startsWith('/finance') && !matchedLocation.startsWith('/finance-ops'));
 
     if (isRiderOnlyPath && !isRider) {
       debugPrint('[AUTH_ROUTER] 🛑 Access Denied: Role "${user.role}" cannot access Rider route "$matchedLocation" -> Redirecting to $homePath');

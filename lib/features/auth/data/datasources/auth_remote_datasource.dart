@@ -217,6 +217,69 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
       return _currentUser!;
     }
 
+    if (clean == 'joelfinances@gmail.com' || clean == 'finance@novaxpress.ng') {
+      if (password != 'Password123!') {
+        throw AppAuthException(
+            'Invalid email or password. Please check your credentials.');
+      }
+      _currentUser = const UserModel(
+        id: 'd68ffe88-cfb4-48b6-8e60-ee5c3797e03a',
+        email: 'joelfinances@gmail.com',
+        firstName: 'Joel',
+        lastName: 'Finances',
+        phone: '08087968576',
+        role: 'dc_finance_admin',
+        deliveryAgentCode: 'FIN-WUSE-01-830',
+        distributionCenterId: '22222222-2222-4222-8222-222222222222',
+        distributionCenterName: 'Wuse Grand Central Distribution Center',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Abuja',
+      );
+      return _currentUser!;
+    }
+
+    if (clean == 'stock.admin@novaxpress.ng' || clean == 'stock@novaxpress.ng') {
+      if (password != 'Password123!') {
+        throw AppAuthException(
+            'Invalid email or password. Please check your credentials.');
+      }
+      _currentUser = const UserModel(
+        id: 's4444444-4444-4444-8444-444444444444',
+        email: 'stock.admin@novaxpress.ng',
+        firstName: 'Suleiman',
+        lastName: 'StockAdmin',
+        phone: '08098765432',
+        role: 'dc_stock_admin',
+        deliveryAgentCode: 'STK-WUSE-01-102',
+        distributionCenterId: '22222222-2222-4222-8222-222222222222',
+        distributionCenterName: 'Wuse Grand Central Distribution Center',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Abuja',
+      );
+      return _currentUser!;
+    }
+
+    if (clean == 'accountant@novaxpress.ng' || clean == 'finance.director@novaxpress.ng') {
+      if (password != 'Password123!') {
+        throw AppAuthException(
+            'Invalid email or password. Please check your credentials.');
+      }
+      _currentUser = const UserModel(
+        id: 'a5555555-5555-4555-8555-555555555555',
+        email: 'accountant@novaxpress.ng',
+        firstName: 'Chief',
+        lastName: 'Accountant',
+        phone: '08055554444',
+        role: 'general_accountant',
+        deliveryAgentCode: 'ACC-HQ-01-01',
+        distributionCenterId: '22222222-2222-4222-8222-222222222222',
+        distributionCenterName: 'Central Executive Hub',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Abuja',
+      );
+      return _currentUser!;
+    }
+
     if (clean == 'emeka.rider@novaxpress.ng' ||
         clean == 'rider.emeka@novaxpress.com') {
       if (password != 'Password123!') {
@@ -1914,6 +1977,15 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         } else if (cleanEmail.contains('supervisor') ||
             cleanEmail.contains('manager')) {
           rawRole = 'dc_manager';
+        } else if (cleanEmail.contains('stock') ||
+            cleanEmail.contains('inventory')) {
+          rawRole = 'dc_stock_admin';
+        } else if (cleanEmail.contains('finance') ||
+            cleanEmail.contains('remit')) {
+          rawRole = 'dc_finance_admin';
+        } else if (cleanEmail.contains('accountant') ||
+            cleanEmail.contains('accounting')) {
+          rawRole = 'general_accountant';
         } else if (cleanEmail.contains('ops') ||
             cleanEmail.contains('operation') ||
             cleanEmail.contains('dispatch') ||
@@ -1935,7 +2007,31 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           rawRole == 'operations_officer' ||
           rawRole == 'dispatcher' ||
           rawRole == 'ops_officer' ||
-          rawRole == 'operations';
+          rawRole == 'operations' ||
+          rawRole == 'dc_orders_admin' ||
+          rawRole == 'orders_admin';
+      final isDcStockAdmin = rawRole == 'dc_stock_admin' ||
+          rawRole == 'dc_stock_officer' ||
+          rawRole == 'stock_admin' ||
+          rawRole == 'stock_officer' ||
+          rawRole == 'inventory_officer';
+      final isDcFinanceAdmin = rawRole == 'dc_finance_admin' ||
+          rawRole == 'dc_finance_officer' ||
+          rawRole == 'finance_admin' ||
+          rawRole == 'finance_officer' ||
+          rawRole == 'remittance_officer';
+      final isGeneralAccountant = rawRole == 'general_accountant' ||
+          rawRole == 'chief_accountant' ||
+          rawRole == 'accountant' ||
+          rawRole == 'finance_director';
+      final isNonRider = isCloser ||
+          isMarketer ||
+          isClientAdmin ||
+          isDcStaff ||
+          isDcOperations ||
+          isDcStockAdmin ||
+          isDcFinanceAdmin ||
+          isGeneralAccountant;
 
       String? deliveryAgentId;
       Map<String, dynamic>? agentRes;
@@ -2214,6 +2310,171 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         } catch (healErr) {
           debugPrint('[AUTH_DATASOURCE] ℹ️ Self-heal notice: $healErr');
         }
+      } else if (isDcStockAdmin) {
+        merged['role'] = 'dc_stock_admin';
+        merged['delivery_agent_id'] = null;
+
+        String? assignedDcId = userRes?['distribution_center_id'] ??
+            merged['distribution_center_id'];
+        String? assignedDcName = userRes?['distribution_center_name'] ??
+            merged['distribution_center_name'];
+        String? assignedDcCode =
+            userRes?['delivery_agent_code'] ?? merged['delivery_agent_code'];
+
+        try {
+          Map<String, dynamic>? dcRow;
+          if (assignedDcId != null && assignedDcId.isNotEmpty) {
+            dcRow = await dbClient
+                .from('distribution_centers')
+                .select()
+                .eq('id', assignedDcId)
+                .maybeSingle();
+          }
+          dcRow ??= await dbClient
+              .from('distribution_centers')
+              .select()
+              .eq('is_active', true)
+              .order('is_hub', ascending: false)
+              .limit(1)
+              .maybeSingle();
+
+          if (dcRow != null) {
+            assignedDcId = dcRow['id'];
+            assignedDcName = dcRow['name'];
+            assignedDcCode ??= dcRow['code'];
+          }
+        } catch (e) {
+          debugPrint(
+              '[AUTH_DATASOURCE] ℹ️ DC Stock Admin hub query notice ($e)');
+        }
+
+        merged['first_name'] ??= userRes?['first_name'] ?? 'Stock';
+        merged['last_name'] ??= userRes?['last_name'] ?? 'Admin';
+        merged['distribution_center_id'] =
+            assignedDcId ?? '22222222-2222-4222-8222-222222222222';
+        merged['distribution_center_name'] =
+            assignedDcName ?? 'Wuse Grand Central Distribution Center';
+        merged['delivery_agent_code'] = assignedDcCode ?? 'STK-WUSE-01-102';
+
+        // Auto-heal / synchronize to public.users table so it is permanently persisted
+        try {
+          await dbClient.from(SupabaseConstants.usersTable).upsert({
+            'id': userId,
+            'company_id': '11111111-1111-4111-8111-111111111111',
+            'email': cleanEmail,
+            'phone_number': merged['phone_number'] ?? merged['phone'] ?? '',
+            'first_name': merged['first_name'],
+            'last_name': merged['last_name'],
+            'role': 'dc_stock_admin',
+            'distribution_center_id': merged['distribution_center_id'],
+            'is_active': true,
+          });
+          debugPrint(
+              '[AUTH_DATASOURCE] ✅ Self-healed public.users entry for DC Stock Admin ($userId, $cleanEmail)');
+        } catch (healErr) {
+          debugPrint('[AUTH_DATASOURCE] ℹ️ Self-heal notice: $healErr');
+        }
+      } else if (isDcFinanceAdmin) {
+        merged['role'] = 'dc_finance_admin';
+        merged['delivery_agent_id'] = null;
+
+        String? assignedDcId = userRes?['distribution_center_id'] ??
+            merged['distribution_center_id'];
+        String? assignedDcName = userRes?['distribution_center_name'] ??
+            merged['distribution_center_name'];
+        String? assignedDcCode =
+            userRes?['delivery_agent_code'] ?? merged['delivery_agent_code'];
+
+        try {
+          Map<String, dynamic>? dcRow;
+          if (assignedDcId != null && assignedDcId.isNotEmpty) {
+            dcRow = await dbClient
+                .from('distribution_centers')
+                .select()
+                .eq('id', assignedDcId)
+                .maybeSingle();
+          }
+          dcRow ??= await dbClient
+              .from('distribution_centers')
+              .select()
+              .eq('is_active', true)
+              .order('is_hub', ascending: false)
+              .limit(1)
+              .maybeSingle();
+
+          if (dcRow != null) {
+            assignedDcId = dcRow['id'];
+            assignedDcName = dcRow['name'];
+            assignedDcCode ??= dcRow['code'];
+          }
+        } catch (e) {
+          debugPrint(
+              '[AUTH_DATASOURCE] ℹ️ DC Finance Admin hub query notice ($e)');
+        }
+
+        merged['first_name'] ??= userRes?['first_name'] ?? 'Joel';
+        merged['last_name'] ??= userRes?['last_name'] ?? 'Finances';
+        merged['distribution_center_id'] =
+            assignedDcId ?? '22222222-2222-4222-8222-222222222222';
+        merged['distribution_center_name'] =
+            assignedDcName ?? 'Wuse Grand Central Distribution Center';
+        merged['delivery_agent_code'] = assignedDcCode ?? 'FIN-WUSE-01-830';
+
+        // Auto-heal / synchronize to public.users table so it is permanently persisted
+        try {
+          await dbClient.from(SupabaseConstants.usersTable).upsert({
+            'id': userId,
+            'company_id': '11111111-1111-4111-8111-111111111111',
+            'email': cleanEmail,
+            'phone_number': merged['phone_number'] ?? merged['phone'] ?? '',
+            'first_name': merged['first_name'],
+            'last_name': merged['last_name'],
+            'role': 'dc_finance_admin',
+            'distribution_center_id': merged['distribution_center_id'],
+            'is_active': true,
+          });
+          debugPrint(
+              '[AUTH_DATASOURCE] ✅ Self-healed public.users entry for DC Finance Admin ($userId, $cleanEmail)');
+        } catch (healErr) {
+          debugPrint('[AUTH_DATASOURCE] ℹ️ Self-heal notice: $healErr');
+        }
+      } else if (isGeneralAccountant) {
+        merged['role'] = 'general_accountant';
+        merged['delivery_agent_id'] = null;
+
+        String? assignedDcId = userRes?['distribution_center_id'] ??
+            merged['distribution_center_id'];
+        String? assignedDcName = userRes?['distribution_center_name'] ??
+            merged['distribution_center_name'];
+        String? assignedDcCode =
+            userRes?['delivery_agent_code'] ?? merged['delivery_agent_code'];
+
+        merged['first_name'] ??= userRes?['first_name'] ?? 'Chief';
+        merged['last_name'] ??= userRes?['last_name'] ?? 'Accountant';
+        merged['distribution_center_id'] =
+            assignedDcId ?? '22222222-2222-4222-8222-222222222222';
+        merged['distribution_center_name'] =
+            assignedDcName ?? 'Central Executive Hub';
+        merged['delivery_agent_code'] = assignedDcCode ?? 'ACC-HQ-01-01';
+
+        // Auto-heal / synchronize to public.users table so it is permanently persisted
+        try {
+          await dbClient.from(SupabaseConstants.usersTable).upsert({
+            'id': userId,
+            'company_id': '11111111-1111-4111-8111-111111111111',
+            'email': cleanEmail,
+            'phone_number': merged['phone_number'] ?? merged['phone'] ?? '',
+            'first_name': merged['first_name'],
+            'last_name': merged['last_name'],
+            'role': 'general_accountant',
+            'distribution_center_id': merged['distribution_center_id'],
+            'is_active': true,
+          });
+          debugPrint(
+              '[AUTH_DATASOURCE] ✅ Self-healed public.users entry for General Accountant ($userId, $cleanEmail)');
+        } catch (healErr) {
+          debugPrint('[AUTH_DATASOURCE] ℹ️ Self-heal notice: $healErr');
+        }
       } else {
         // Field Delivery Agent (Rider)
         merged['role'] = 'delivery_agent';
@@ -2311,8 +2572,18 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         merged['email'] = email;
       }
 
-      // Apply custom compensation terms if configured
+      // Strip rider compensation defaults for non-riders
+      if (isNonRider) {
+        merged['personnel_type'] = null;
+        merged['commission_rate'] = null;
+        merged['transport_allowance'] = null;
+        merged['fuel_allowance'] = null;
+        merged['failed_delivery_allowance'] = null;
+      }
+
+      // Apply custom compensation terms if configured (only for delivery agents)
       bool matchedCustomTerms = false;
+      if (!isNonRider) {
       for (final u in _registeredUsers.values) {
         final matchesEmail =
             cleanEmail.isNotEmpty && u.email.toLowerCase() == cleanEmail;
@@ -2377,10 +2648,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         } catch (_) {}
       }
 
+      } // end if (!isNonRider)
+
       final profile = UserModel.fromJson(
         merged,
         deliveryAgentId:
-            (isDcStaff || isDcOperations) ? null : (deliveryAgentId ?? agentRes?['id']),
+            isNonRider ? null : (deliveryAgentId ?? agentRes?['id']),
       );
       debugPrint(
           '[AUTH_DATASOURCE] ✅ User profile loaded from database: ${profile.firstName} ${profile.lastName} (Role: ${profile.role}, isDcManager: ${profile.isDcManager}, AgentCode: ${profile.deliveryAgentCode}, Commission: ₦${profile.commissionRate}, Transport: ₦${profile.transportAllowance})');
