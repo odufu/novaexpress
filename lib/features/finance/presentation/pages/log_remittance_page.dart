@@ -8,7 +8,9 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../dc_console/presentation/providers/dc_console_provider.dart';
 import '../../../notifications/presentation/providers/notifications_provider.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
-import '../../../../core/services/paystack_gateway_launcher.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/services.dart';
+import '../../../../core/services/signature_storage_service.dart';
 import '../../../../core/providers/navigation_provider.dart';
 import '../../domain/entities/remittance.dart';
 import '../providers/finance_provider.dart';
@@ -27,7 +29,11 @@ class LogRemittancePage extends ConsumerStatefulWidget {
 class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
-  bool _isPaystackLaunching = false;
+  final _referenceController = TextEditingController();
+  String _selectedPaymentMethod = 'bank_transfer';
+  String? _receiptFileName;
+  String? _receiptUrl;
+  bool _isUploadingReceipt = false;
 
   final List<String> _discrepancyReasons = [
     'Cash shortage',
@@ -41,7 +47,58 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
   @override
   void dispose() {
     _amountController.dispose();
+    _referenceController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickReceipt() async {
+    try {
+      final result = await FilePickerPlatform.instance.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf', 'webp'],
+      );
+      if (result.isNotEmpty) {
+        final file = result.first;
+        final bytes = await file.readAsBytes();
+        if (bytes.isNotEmpty) {
+          setState(() {
+            _receiptFileName = file.name;
+            _isUploadingReceipt = true;
+          });
+
+          final ext = file.extension?.toLowerCase() ?? 'jpg';
+          final user = ref.read(authProvider).user;
+          final agentId = user?.deliveryAgentId ?? user?.id ?? 'rider';
+          final cleanAgent = agentId.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '');
+          final remTag = 'rmt_${cleanAgent}_${DateTime.now().millisecondsSinceEpoch}';
+
+          final url = await SignatureStorageService.uploadRemittanceReceipt(
+            imageBytes: bytes,
+            remittanceId: remTag,
+            ext: ext,
+          );
+
+          if (mounted) {
+            setState(() {
+              _receiptUrl = url;
+              _isUploadingReceipt = false;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Receipt proof uploaded successfully!'),
+                backgroundColor: Color(0xFF16A34A),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isUploadingReceipt = false);
+        _onPaymentFailure('Error selecting receipt: $e');
+      }
+    }
   }
 
   @override
@@ -185,9 +242,9 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
               ),
             ),
             Text(
-              'Automatic Paystack Verification ⚡',
+              'Manual Submission & DC Approval 📋',
               style: GoogleFonts.inter(
-                color: const Color(0xFF16A34A),
+                color: const Color(0xFF00522A),
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
               ),
@@ -407,94 +464,321 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
               ],
               const SizedBox(height: 18),
 
-              // 4. INSTANT AUTO-VERIFICATION BANNER (PAYSTACK ONLY)
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: isDark
-                        ? [const Color(0xFF0F172A), const Color(0xFF1E293B)]
-                        : [const Color(0xFFF0FDF4), const Color(0xFFDCFCE7)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFF86EFAC)),
+              // 4. PAYMENT METHOD SELECTOR
+              Text(
+                'Remittance Method',
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
                 ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF00A2D3).withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(10),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _selectedPaymentMethod = 'bank_transfer'),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                        decoration: BoxDecoration(
+                          color: _selectedPaymentMethod == 'bank_transfer'
+                              ? const Color(0xFF00522A)
+                              : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: _selectedPaymentMethod == 'bank_transfer'
+                                ? const Color(0xFF00522A)
+                                : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                          ),
+                        ),
+                        child: Center(
+                          child: Text(
+                            '🏦 Bank Transfer',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: _selectedPaymentMethod == 'bank_transfer' ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                            ),
+                          ),
+                        ),
                       ),
-                      child: const Icon(Icons.bolt_rounded, color: Color(0xFF00A2D3), size: 24),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _selectedPaymentMethod = 'cash_to_dc'),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                        decoration: BoxDecoration(
+                          color: _selectedPaymentMethod == 'cash_to_dc'
+                              ? const Color(0xFF00522A)
+                              : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: _selectedPaymentMethod == 'cash_to_dc'
+                                ? const Color(0xFF00522A)
+                                : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                          ),
+                        ),
+                        child: Center(
+                          child: Text(
+                            '💵 Cash Handover',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: _selectedPaymentMethod == 'cash_to_dc' ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _selectedPaymentMethod = 'pos_deposit'),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                        decoration: BoxDecoration(
+                          color: _selectedPaymentMethod == 'pos_deposit'
+                              ? const Color(0xFF00522A)
+                              : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: _selectedPaymentMethod == 'pos_deposit'
+                                ? const Color(0xFF00522A)
+                                : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                          ),
+                        ),
+                        child: Center(
+                          child: Text(
+                            '💳 POS Machine',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: _selectedPaymentMethod == 'pos_deposit' ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // 5. STATION / COMPANY BANK DETAILS (Visible for Bank Transfer)
+              if (_selectedPaymentMethod == 'bank_transfer') ...[
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF0FDF4),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF86EFAC)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Row(
                             children: [
-                              Expanded(
-                                child: Text(
-                                  'Paystack Remittance Portal',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 13.5,
-                                    fontWeight: FontWeight.bold,
-                                    color: isDark ? Colors.white : const Color(0xFF0F172A),
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
+                              const Icon(Icons.account_balance_rounded, color: Color(0xFF16A34A), size: 18),
                               const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
+                              Text(
+                                'OFFICIAL REMITTANCE ACCOUNT',
+                                style: GoogleFonts.jetBrainsMono(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.bold,
                                   color: const Color(0xFF16A34A),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  'AUTO-SETTLE',
-                                  style: GoogleFonts.jetBrainsMono(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
+                                  letterSpacing: 0.5,
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Remit easily via Card, Dedicated Virtual NUBAN Account, or USSD (*737#). Once paid, NovaXpress automatically updates your cash in custody without manual DC receipts.',
-                            style: GoogleFonts.inter(
-                              fontSize: 11.5,
-                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
-                              height: 1.35,
+                          InkWell(
+                            onTap: () {
+                              Clipboard.setData(const ClipboardData(text: '1023456789'));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Account number copied to clipboard!'), duration: Duration(seconds: 2)),
+                              );
+                            },
+                            child: Row(
+                              children: [
+                                const Icon(Icons.copy_rounded, size: 13, color: Color(0xFF16A34A)),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Copy NUBAN',
+                                  style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF16A34A)),
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
+                      const SizedBox(height: 10),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Bank Name:', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                          Text('First Bank of Nigeria', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Account Number:', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                          Text('1023456789', style: GoogleFonts.jetBrainsMono(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF00522A))),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Account Name:', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                          Text('NovaXpress Logistics Ltd', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // 6. BANK RECEIPT PHOTO / DOCUMENT UPLOAD SECTION
+              Text(
+                'Deposit / Transfer Receipt Proof',
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                ),
+              ),
+              const SizedBox(height: 8),
+              GestureDetector(
+                onTap: _isUploadingReceipt ? null : _pickReceipt,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _receiptUrl != null
+                          ? const Color(0xFF16A34A)
+                          : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                      width: _receiptUrl != null ? 1.5 : 1,
                     ),
-                  ],
+                  ),
+                  child: _isUploadingReceipt
+                      ? const Center(
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                                SizedBox(width: 12),
+                                Text('Uploading receipt to secure storage...'),
+                              ],
+                            ),
+                          ),
+                        )
+                      : (_receiptUrl != null
+                          ? Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFDCFCE7),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(Icons.receipt_long_rounded, color: Color(0xFF16A34A), size: 24),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        _receiptFileName ?? 'Remittance Receipt Attached',
+                                        style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'Verified & ready for DC Finance audit ✓',
+                                        style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF16A34A)),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: _pickReceipt,
+                                  child: const Text('Change', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                ),
+                              ],
+                            )
+                          : Column(
+                              children: [
+                                const Icon(Icons.cloud_upload_outlined, size: 36, color: Color(0xFF64748B)),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Tap to Upload Deposit Slip or Transfer Screenshot',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: theme.colorScheme.onSurface,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Supports PNG, JPG, or PDF receipt confirmations',
+                                  style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
+                                ),
+                              ],
+                            )),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // 7. TRANSACTION REFERENCE OR DEPOSITOR NAME
+              Text(
+                'Payment Reference / Bank Narration (Optional)',
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _referenceController,
+                decoration: InputDecoration(
+                  hintText: 'e.g., TRF-GTB-829103 or Cashier Slip #',
+                  hintStyle: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF94A3B8)),
+                  filled: true,
+                  fillColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 ),
               ),
               const SizedBox(height: 24),
 
-              // 5. MAIN REMIT CTA BUTTON (TRIGGER PAYSTACK POPUP DIRECTLY)
+              // 8. SUBMIT REMITTANCE ACTION BUTTON
               (() {
-                final isButtonDisabled = financeState.isLoading || _isPaystackLaunching;
+                final isButtonDisabled = financeState.isLoading || _isUploadingReceipt;
                 return SizedBox(
                   width: double.infinity,
                   height: 52,
                   child: ElevatedButton.icon(
                     onPressed: isButtonDisabled
                         ? null
-                        : () => _handlePaystackRemit(
+                        : () => _handleSubmitRemittance(
                             enteredAmount,
                             user,
                             grossCollections,
@@ -506,44 +790,27 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
                             associatedOrderItems,
                           ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF00A2D3),
+                      backgroundColor: const Color(0xFF00522A),
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       elevation: 2,
                     ),
                     icon: isButtonDisabled
                         ? const SizedBox.shrink()
-                        : const Icon(Icons.bolt_rounded, size: 20, color: Colors.white),
-                    label: _isPaystackLaunching
-                        ? Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const SizedBox(
-                                height: 18,
-                                width: 18,
-                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                              ),
-                              const SizedBox(width: 10),
-                              Text(
-                                'Initializing Paystack Gateway...',
-                                style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700),
-                              ),
-                            ],
+                        : const Icon(Icons.send_rounded, size: 20, color: Colors.white),
+                    label: financeState.isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                           )
-                        : (financeState.isLoading
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                              )
-                            : Text(
-                                'Remit ${CurrencyFormatter.formatNaira(enteredAmount > 0 ? enteredAmount : expectedAmount)} via Paystack ⚡',
-                                style: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.w800),
-                              )),
+                        : Text(
+                            'Submit Remittance (${CurrencyFormatter.formatNaira(enteredAmount > 0 ? enteredAmount : expectedAmount)})',
+                            style: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.w800),
+                          ),
                   ),
                 );
-              }()),
-              const SizedBox(height: 16),
+              }()),              const SizedBox(height: 16),
             ],
           ),
         ),
@@ -551,7 +818,7 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
     );
   }
 
-  void _handlePaystackRemit(
+  void _handleSubmitRemittance(
     double enteredAmount,
     dynamic user,
     double grossCollections,
@@ -561,7 +828,7 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
     double posFeeDeduction,
     double expectedAmount,
     List<RemittanceOrderItem> associatedOrders,
-  ) {
+  ) async {
     final rawText = _amountController.text.replaceAll(',', '').replaceAll('₦', '').trim();
     final parsed = double.tryParse(rawText);
     final finalAmount = (parsed != null && parsed > 0)
@@ -584,89 +851,63 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
     }
 
     final riderCode = user?.deliveryAgentCode ?? user?.riderCode ?? user?.deliveryAgentId ?? 'RDR';
-    final riderEmail = (user?.email != null && user!.email.isNotEmpty)
-        ? user.email
-        : 'rider.${riderCode.toLowerCase()}@novaxpress.ng';
+    final cleanCode = riderCode.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '');
+    final timestamp = DateTime.now().millisecondsSinceEpoch.toString().substring(7);
+    final customRef = _referenceController.text.trim();
+    final paymentRef = customRef.isNotEmpty ? customRef : 'REM-${cleanCode.isNotEmpty ? cleanCode : "RDR"}-$timestamp';
 
-    void onPaymentConfirmed(String confirmedRef) async {
-      final reason = ref.read(logRemittanceDiscrepancyReasonProvider) ??
-          (isPartial ? 'Partial Remittance' : null);
+    final reason = ref.read(logRemittanceDiscrepancyReasonProvider) ??
+        (isPartial ? 'Partial Remittance' : null);
 
-      final success = await ref.read(financeProvider.notifier).submitRemittance(
-            amount: finalAmount,
-            paymentMethod: 'paystack',
-            agentId: user?.deliveryAgentId ?? user?.id,
-            companyId: user?.companyId,
-            grossCollections: grossCollections,
-            commissionDeducted: commissionDeduction,
-            transportAllowanceDeducted: transportDeduction,
-            failedStipendsDeducted: failedStipendsDeduction,
-            posFee: posFeeDeduction,
-            referenceNumber: confirmedRef,
-            discrepancyReason: reason,
-            discrepancyAmount: (finalAmount - expectedAmount),
-            expectedAmount: expectedAmount,
-            isPartial: isPartial,
-            associatedOrders: associatedOrders,
+    final success = await ref.read(financeProvider.notifier).submitRemittance(
+          amount: finalAmount,
+          paymentMethod: _selectedPaymentMethod,
+          agentId: user?.deliveryAgentId ?? user?.id,
+          companyId: user?.companyId,
+          grossCollections: grossCollections,
+          commissionDeducted: commissionDeduction,
+          transportAllowanceDeducted: transportDeduction,
+          failedStipendsDeducted: failedStipendsDeduction,
+          posFee: posFeeDeduction,
+          depositReceiptUrl: _receiptUrl,
+          referenceNumber: paymentRef,
+          discrepancyReason: reason,
+          discrepancyAmount: (finalAmount - expectedAmount),
+          expectedAmount: expectedAmount,
+          isPartial: isPartial,
+          associatedOrders: associatedOrders,
+        );
+
+    if (!mounted) return;
+
+    if (success) {
+      _amountController.text = isPartial ? remainingAfterPayment.toInt().toString() : '0';
+      _referenceController.clear();
+      setState(() {
+        _receiptFileName = null;
+        _receiptUrl = null;
+      });
+      ref.read(logRemittanceEnteredAmountProvider.notifier).state = isPartial ? remainingAfterPayment : 0.0;
+      ref.read(logRemittanceInitialSetProvider.notifier).state = true;
+
+      try {
+        ref.read(dcConsoleProvider.notifier).loadTransactionsFromDatabase();
+      } catch (_) {}
+
+      ref.read(notificationsProvider.notifier).emitNotification(
+            title: isPartial ? 'Partial Remittance Submitted 📋' : 'Remittance Submitted for DC Approval 📋',
+            message: isPartial
+                ? 'Your partial remittance of ${CurrencyFormatter.formatNaira(finalAmount)} was submitted. DC Finance Admin will verify your receipt and credit alert.'
+                : 'Your cash remittance of ${CurrencyFormatter.formatNaira(finalAmount)} was submitted. Awaiting DC Finance Admin verification.',
+            category: 'finance',
+            actionRoute: '/cash/history',
           );
 
       if (!mounted) return;
-
-      if (success) {
-        _amountController.text = isPartial ? remainingAfterPayment.toInt().toString() : '0';
-        ref.read(logRemittanceEnteredAmountProvider.notifier).state = isPartial ? remainingAfterPayment : 0.0;
-        ref.read(logRemittanceInitialSetProvider.notifier).state = true;
-
-        try {
-          ref.read(dcConsoleProvider.notifier).loadTransactionsFromDatabase();
-        } catch (_) {}
-
-        ref.read(notificationsProvider.notifier).emitNotification(
-              title: isPartial ? 'Partial Remittance Verified ⚡' : 'Remittance Auto-Verified ⚡',
-              message: isPartial
-                  ? 'Your partial remittance of ${CurrencyFormatter.formatNaira(finalAmount)} was verified. Remaining balance: ${CurrencyFormatter.formatNaira(remainingAfterPayment)}.'
-                  : 'Your cash remittance of ${CurrencyFormatter.formatNaira(finalAmount)} was instantly verified via Paystack and cleared from your custody.',
-              category: 'finance',
-              actionRoute: '/cash/history',
-            );
-
-        if (!mounted) return;
-        _showSuccessCard(finalAmount, confirmedRef, remainingAfterPayment, isPartial);
-      } else {
-        if (!mounted) return;
-        _onPaymentFailure('Could not record verified remittance to ledger. Please check network.');
-      }
-    }
-
-    final cleanCode = riderCode.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '');
-    final timestamp = DateTime.now().millisecondsSinceEpoch.toString().substring(7);
-    final paymentRef = 'PSTK-RMT-${cleanCode.isNotEmpty ? cleanCode : 'RDR'}-$timestamp';
-
-    if (!mounted) return;
-    setState(() => _isPaystackLaunching = true);
-
-    try {
-      PaystackGatewayLauncher.openPayment(
-        context: context,
-        amount: finalAmount,
-        email: riderEmail,
-        reference: paymentRef,
-        title: 'Paystack Remittance Portal',
-        payerName: user != null ? '${user.firstName} ${user.lastName}'.trim() : 'Field Agent',
-        payerCode: cleanCode.isNotEmpty ? cleanCode : 'RDR',
-        agentId: user?.deliveryAgentId ?? user?.id,
-        transactionType: 'remittance',
-        onSuccess: (confirmedRef) {
-          if (mounted) setState(() => _isPaystackLaunching = false);
-          onPaymentConfirmed(confirmedRef);
-        },
-        onCancel: () {
-          if (mounted) setState(() => _isPaystackLaunching = false);
-        },
-      );
-    } catch (e) {
-      if (mounted) setState(() => _isPaystackLaunching = false);
-      _onPaymentFailure('Could not open Paystack payment gateway: $e');
+      _showSuccessCard(finalAmount, paymentRef, remainingAfterPayment, isPartial);
+    } else {
+      if (!mounted) return;
+      _onPaymentFailure('Could not submit remittance to ledger. Please check network.');
     }
   }
 
@@ -722,12 +963,12 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
             ),
             const SizedBox(height: 16),
             Text(
-              isPartial ? 'Partial Remittance Verified!' : 'Full Remittance Settled!',
+              isPartial ? 'Partial Remittance Submitted!' : 'Remittance Submitted for DC Approval!',
               style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 6),
             Text(
-              '${CurrencyFormatter.formatNaira(amountPaid)} was auto-reconciled via Paystack and cleared from your cash custody.',
+              '${CurrencyFormatter.formatNaira(amountPaid)} has been submitted. The DC Finance Admin will verify your receipt and credit alert before clearing custody.',
               textAlign: TextAlign.center,
               style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B)),
             ),
@@ -735,9 +976,9 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: const Color(0xFF00A2D3).withValues(alpha: 0.1),
+                color: const Color(0xFF00522A).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF00A2D3).withValues(alpha: 0.3)),
+                border: Border.all(color: const Color(0xFF00522A).withValues(alpha: 0.3)),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -745,7 +986,7 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
                   Text('Reference:', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
                   Text(
                     reference,
-                    style: GoogleFonts.jetBrainsMono(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF00A2D3)),
+                    style: GoogleFonts.jetBrainsMono(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF00522A)),
                   ),
                 ],
               ),
@@ -785,7 +1026,7 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
                   }
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00A2D3),
+                  backgroundColor: const Color(0xFF00522A),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 child: Text('View Official Receipt', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
@@ -813,7 +1054,7 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
                   side: const BorderSide(color: Color(0xFF00A2D3)),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: Text('Done & Return to Remittance Tab', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold, color: const Color(0xFF00A2D3))),
+                child: Text('Done & Return to Remittance Tab', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold, color: const Color(0xFF00522A))),
               ),
             ),
           ],

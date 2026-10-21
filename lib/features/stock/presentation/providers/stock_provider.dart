@@ -772,6 +772,100 @@ class StockNotifier extends StateNotifier<StockState> {
     };
   }
 
+  Future<Map<String, dynamic>> transferStockBetweenRiders({
+    required String productIdOrSku,
+    required String sourceRiderId,
+    required String sourceRiderName,
+    required String destinationRiderId,
+    required String destinationRiderName,
+    required String destinationRiderCode,
+    required int quantity,
+    String? notes,
+  }) async {
+    if (quantity <= 0) {
+      return {'success': false, 'message': 'Quantity must be greater than 0'};
+    }
+
+    final srcIdx = state.riderAllocations.indexWhere((a) =>
+        a.riderId == sourceRiderId &&
+        (a.productId == productIdOrSku ||
+            a.sku.toLowerCase() == productIdOrSku.toLowerCase() ||
+            a.productName.toLowerCase() == productIdOrSku.toLowerCase()));
+
+    if (srcIdx == -1 || state.riderAllocations[srcIdx].inCustodyUnits < quantity) {
+      final available = srcIdx != -1 ? state.riderAllocations[srcIdx].inCustodyUnits : 0;
+      return {
+        'success': false,
+        'message': 'Source rider only has $available units in custody. Requested: $quantity units.',
+      };
+    }
+
+    final srcAlloc = state.riderAllocations[srcIdx];
+    final updatedAllocations = List<RiderStockAllocation>.from(state.riderAllocations);
+
+    // Deduct from source rider
+    updatedAllocations[srcIdx] = srcAlloc.copyWith(
+      inCustodyUnits: srcAlloc.inCustodyUnits - quantity,
+      allocatedUnits: (srcAlloc.allocatedUnits - quantity).clamp(0, 999999),
+    );
+
+    // Add to destination rider
+    final destIdx = updatedAllocations.indexWhere((a) =>
+        a.riderId == destinationRiderId &&
+        (a.productId == srcAlloc.productId ||
+            a.sku.toLowerCase() == srcAlloc.sku.toLowerCase() ||
+            a.productName.toLowerCase() == srcAlloc.productName.toLowerCase()));
+
+    if (destIdx != -1) {
+      final destAlloc = updatedAllocations[destIdx];
+      updatedAllocations[destIdx] = destAlloc.copyWith(
+        inCustodyUnits: destAlloc.inCustodyUnits + quantity,
+        allocatedUnits: destAlloc.allocatedUnits + quantity,
+        allocatedAt: DateTime.now(),
+      );
+    } else {
+      updatedAllocations.add(RiderStockAllocation(
+        id: 'alloc_${DateTime.now().millisecondsSinceEpoch}',
+        riderId: destinationRiderId,
+        riderName: destinationRiderName,
+        riderCode: destinationRiderCode,
+        productId: srcAlloc.productId,
+        productName: srcAlloc.productName,
+        sku: srcAlloc.sku,
+        clientName: srcAlloc.clientName,
+        allocatedUnits: quantity,
+        deliveredUnits: 0,
+        inCustodyUnits: quantity,
+        unitPrice: srcAlloc.unitPrice,
+        allocatedAt: DateTime.now(),
+        fulfillmentType: 'in_field_transfer',
+      ));
+    }
+
+    state = state.copyWith(riderAllocations: updatedAllocations);
+    await _storageService.cacheRiderStockAllocations(updatedAllocations);
+
+    // Persist to Supabase stock_transfers
+    try {
+      final client = Supabase.instance.client;
+      final transferNumber = 'TRF-R2R-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+      await client.from('stock_transfers').insert({
+        'transfer_type': 'rider_to_rider',
+        'transfer_number': transferNumber,
+        'status': 'completed',
+        'notes': '[RIDER TO RIDER] $sourceRiderName transferred $quantity units of ${srcAlloc.productName} to $destinationRiderName. ${notes ?? ""}',
+        'dispatched_by': sourceRiderName,
+        'received_by': destinationRiderName,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+    } catch (_) {}
+
+    return {
+      'success': true,
+      'message': 'Successfully balanced $quantity units of ${srcAlloc.productName} from $sourceRiderName to $destinationRiderName.',
+    };
+  }
+
   /// Transfer stock units directly from current DC warehouse to another Distribution Center
   Future<Map<String, dynamic>> transferStockBetweenDCs({
     required String productIdOrSku,

@@ -25,9 +25,11 @@ class SupabaseConstants {
   // Can be overridden at build-time using:
   //   flutter run --dart-define=SUPABASE_URL=... --dart-define=SUPABASE_ANON_KEY=...
   // Or switched using scripts/switch_supabase_env.py
-  static const String _defaultUrl = originalUrl;
-  static const String _defaultAnonKey = originalAnonKey;
-  static const String _defaultServiceRoleKey = originalServiceRoleKey;
+  static const String _defaultUrl = 'https://hwyqqjilcifxajruusoa.supabase.co';
+  static const String _defaultAnonKey =
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh3eXFxamlsY2lmeGFqcnV1c29hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIxMDE0NzIsImV4cCI6MjEwNzY3NzQ3Mn0.B1epG9i_R1pryMVFo78DcL-Ett21L3HR_4VST34QifA';
+  static const String _defaultServiceRoleKey =
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh3eXFxamlsY2lmeGFqcnV1c29hIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjEwMTQ3MiwiZXhwIjoyMTA3Njc3NDcyfQ.ow0xtvrgq3wUXKlGeIDgRtBrKeirzy9XHN_8s8TCAiI';
 
   static const String supabaseUrl =
       String.fromEnvironment('SUPABASE_URL', defaultValue: _defaultUrl);

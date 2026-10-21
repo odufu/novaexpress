@@ -83,12 +83,32 @@ class UserEntity {
   bool get isPda => isRider && personnelType == 'pda';
   bool get isInHouseRider => isRider && personnelType == 'in_house_rider';
   bool get isDcManager => role == 'dc_manager' || role == 'dc_supervisor' || role == 'super_admin';
-  bool get isDcOperations =>
+  bool get isDcOrdersAdmin =>
       role == 'dc_operations' ||
       role == 'operations_officer' ||
       role == 'dispatcher' ||
       role == 'ops_officer' ||
-      role == 'operations';
+      role == 'operations' ||
+      role == 'dc_orders_admin' ||
+      role == 'orders_admin';
+  bool get isDcStockAdmin =>
+      role == 'dc_stock_admin' ||
+      role == 'dc_stock_officer' ||
+      role == 'stock_admin' ||
+      role == 'stock_officer' ||
+      role == 'inventory_officer';
+  bool get isDcFinanceAdmin =>
+      role == 'dc_finance_admin' ||
+      role == 'dc_finance_officer' ||
+      role == 'finance_admin' ||
+      role == 'finance_officer' ||
+      role == 'remittance_officer';
+  bool get isGeneralAccountant =>
+      role == 'general_accountant' ||
+      role == 'chief_accountant' ||
+      role == 'accountant' ||
+      role == 'finance_director';
+  bool get isDcOperations => isDcOrdersAdmin || isDcStockAdmin || isDcFinanceAdmin;
   bool get isCloser => role == 'closer' || role == 'client_closer';
   bool get isMarketerSupervisor => isSupervisor || role == 'marketing_supervisor' || role == 'supervisor_marketer';
   bool get isMarketer => role == 'marketer' || role == 'digital_marketer' || isMarketerSupervisor;
@@ -96,8 +116,11 @@ class UserEntity {
   bool get isClient => isClientAdmin || isCloser || isMarketer;
 
   String get roleDescription {
+    if (isGeneralAccountant) return 'General Accountant';
     if (isDcManager) return 'DC Operations Supervisor';
-    if (isDcOperations) return 'DC Operations & Dispatch Officer';
+    if (isDcStockAdmin) return 'DC Stock Management Officer';
+    if (isDcFinanceAdmin) return 'DC Finance & Remittance Officer';
+    if (isDcOrdersAdmin) return 'DC Orders & Dispatch Officer';
     if (isCloser) return 'Telesales Closer';
     if (isMarketerSupervisor) return 'Marketing Supervisor';
     if (isMarketer) return 'Digital Marketer';
@@ -108,8 +131,11 @@ class UserEntity {
 
   /// Canonical console route strictly governed by the user's operational role
   String get homeConsoleRoute {
+    if (isGeneralAccountant) return '/accountant';
     if (isDcManager) return '/dc';
-    if (isDcOperations) return '/ops';
+    if (isDcStockAdmin) return '/stock-ops';
+    if (isDcFinanceAdmin) return '/finance-ops';
+    if (isDcOrdersAdmin) return '/ops';
     if (isCloser) return '/closer';
     if (isMarketer) return '/marketer';
     if (isClientAdmin) return '/client';

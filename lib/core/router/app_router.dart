@@ -28,6 +28,9 @@ import '../../features/stock/presentation/pages/stock_history_page.dart';
 import '../../features/users/presentation/pages/user_profile_page.dart';
 import '../../features/dc_console/presentation/pages/dc_console_layout.dart';
 import '../../features/dc_console/presentation/pages/dc_operations_mobile_portal_page.dart';
+import '../../features/dc_console/presentation/pages/dc_finance_operations_page.dart';
+import '../../features/dc_console/presentation/pages/dc_stock_operations_page.dart';
+import '../../features/dc_console/presentation/pages/general_accountant_console_page.dart';
 import '../../features/client_portal/presentation/pages/client_portal_layout.dart';
 import '../../features/client_portal/presentation/pages/closer_mobile_portal_page.dart';
 import '../../features/client_portal/presentation/pages/marketer_mobile_portal_page.dart';
@@ -96,7 +99,10 @@ String? appRouteRedirect({
     }
 
     final isDc = user.isDcManager;
-    final isDcOps = user.isDcOperations;
+    final isDcOps = user.isDcOperations || user.isDcOrdersAdmin;
+    final isDcStock = user.isDcStockAdmin || isDc;
+    final isDcFinance = user.isDcFinanceAdmin || isDc;
+    final isAccountant = user.isGeneralAccountant || isDc;
     final isCloser = user.isCloser;
     final isMarketer = user.isMarketer;
     final isClientAdmin = user.isClientAdmin;
@@ -131,6 +137,39 @@ String? appRouteRedirect({
     if (isDcOps && !matchedLocation.startsWith('/ops')) {
       debugPrint('[AUTH_ROUTER] 🛑 Confining DC Operations Officer "${user.role}" strictly to mobile portal /ops');
       return '/ops';
+    }
+
+    // Stock Admin Console (/stock-ops/**)
+    if (matchedLocation.startsWith('/stock-ops')) {
+      if (!isDcStock) {
+        debugPrint('[AUTH_ROUTER] 🛑 Access Denied: User role "${user.role}" cannot access Stock Console -> Redirecting to $homePath');
+        return homePath;
+      }
+    }
+    if (user.isDcStockAdmin && !matchedLocation.startsWith('/stock-ops')) {
+      return '/stock-ops';
+    }
+
+    // Finance Admin Console (/finance-ops/**)
+    if (matchedLocation.startsWith('/finance-ops')) {
+      if (!isDcFinance) {
+        debugPrint('[AUTH_ROUTER] 🛑 Access Denied: User role "${user.role}" cannot access Finance Console -> Redirecting to $homePath');
+        return homePath;
+      }
+    }
+    if (user.isDcFinanceAdmin && !matchedLocation.startsWith('/finance-ops')) {
+      return '/finance-ops';
+    }
+
+    // General Accountant Console (/accountant/**)
+    if (matchedLocation.startsWith('/accountant')) {
+      if (!isAccountant) {
+        debugPrint('[AUTH_ROUTER] 🛑 Access Denied: User role "${user.role}" cannot access Accountant Console -> Redirecting to $homePath');
+        return homePath;
+      }
+    }
+    if (user.isGeneralAccountant && !matchedLocation.startsWith('/accountant')) {
+      return '/accountant';
     }
 
     // 4. Strict Console Isolation: Client Merchant Portal (/client/**)
@@ -232,6 +271,18 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(path: 'logs', builder: (context, state) => const DCOperationsMobilePortalPage()),
           GoRoute(path: 'profile', builder: (context, state) => const DCOperationsMobilePortalPage()),
         ],
+      ),
+      GoRoute(
+        path: '/stock-ops',
+        builder: (context, state) => const DCStockOperationsPage(),
+      ),
+      GoRoute(
+        path: '/finance-ops',
+        builder: (context, state) => const DCFinanceOperationsPage(),
+      ),
+      GoRoute(
+        path: '/accountant',
+        builder: (context, state) => const GeneralAccountantConsolePage(),
       ),
       GoRoute(
         path: '/f/:formId',

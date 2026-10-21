@@ -12,19 +12,16 @@ import '../../../../core/services/signature_storage_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_logo_widget.dart';
 import '../../../../core/widgets/signature_pad_modal.dart';
-import '../../../auth/domain/entities/user.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../finance/presentation/providers/finance_provider.dart';
 import '../../../notifications/presentation/providers/notifications_provider.dart';
 import '../../../stock/presentation/providers/stock_provider.dart';
 import '../../domain/entities/order.dart';
 import '../providers/orders_provider.dart';
-import '../../../../core/services/paystack_gateway_launcher.dart';
 
 class ConfirmDeliveryPodState {
   final String selectedPaymentMethod;
   final bool hasConfirmedReceipt;
-  final bool paystackTransferVerified;
   final bool isLoading;
   final bool isSuccess;
   final Uint8List? signatureBytes;
@@ -37,7 +34,6 @@ class ConfirmDeliveryPodState {
   const ConfirmDeliveryPodState({
     this.selectedPaymentMethod = 'Cash',
     this.hasConfirmedReceipt = true,
-    this.paystackTransferVerified = false,
     this.isLoading = false,
     this.isSuccess = false,
     this.signatureBytes,
@@ -51,7 +47,6 @@ class ConfirmDeliveryPodState {
   ConfirmDeliveryPodState copyWith({
     String? selectedPaymentMethod,
     bool? hasConfirmedReceipt,
-    bool? paystackTransferVerified,
     bool? isLoading,
     bool? isSuccess,
     Uint8List? signatureBytes,
@@ -64,7 +59,6 @@ class ConfirmDeliveryPodState {
     return ConfirmDeliveryPodState(
       selectedPaymentMethod: selectedPaymentMethod ?? this.selectedPaymentMethod,
       hasConfirmedReceipt: hasConfirmedReceipt ?? this.hasConfirmedReceipt,
-      paystackTransferVerified: paystackTransferVerified ?? this.paystackTransferVerified,
       isLoading: isLoading ?? this.isLoading,
       isSuccess: isSuccess ?? this.isSuccess,
       signatureBytes: signatureBytes ?? this.signatureBytes,
@@ -86,10 +80,6 @@ class ConfirmDeliveryPodNotifier extends StateNotifier<ConfirmDeliveryPodState> 
 
   void setConfirmedReceipt(bool confirmed) {
     state = state.copyWith(hasConfirmedReceipt: confirmed);
-  }
-
-  void setPaystackVerified(bool verified) {
-    state = state.copyWith(paystackTransferVerified: verified);
   }
 
   void setLoading(bool loading) {
@@ -137,7 +127,6 @@ class ConfirmDeliveryPodPage extends ConsumerStatefulWidget {
 class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage> {
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _referenceController = TextEditingController();
-  bool _isPaystackLaunching = false;
 
   @override
   void initState() {
@@ -166,94 +155,32 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
     super.dispose();
   }
 
-  void _launchPaystackCheckout(OrderEntity order, UserEntity? user) {
-    if (!mounted) return;
-    setState(() => _isPaystackLaunching = true);
-
-    final timestamp = DateTime.now().millisecondsSinceEpoch.toString().substring(7);
-    final orderNumClean = order.orderNumber.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '');
-    final refCode = 'PSTK-POD-$orderNumClean-$timestamp';
-    final customerEmail = (order.customerPhone.isNotEmpty)
-        ? '${order.customerPhone.replaceAll(RegExp(r'[^0-9]'), '')}@customer.novaxpress.ng'
-        : 'customer@novaxpress.ng';
-
-    void onPaymentSuccess(String confirmedRef) {
-      if (mounted) {
-        setState(() => _isPaystackLaunching = false);
-        ref.read(confirmDeliveryPodProvider.notifier).setPaystackVerified(true);
-        _referenceController.text = confirmedRef;
-        // Automatically submit & clear order upon successful Paystack payment
-        _submitDelivery();
-      }
-    }
-
-    try {
-      PaystackGatewayLauncher.openPayment(
-        context: context,
-        amount: order.totalAmount,
-        email: customerEmail,
-        reference: refCode,
-        title: 'Paystack Direct Payment',
-        payerName: order.customerName.isNotEmpty ? order.customerName : 'Customer',
-        payerCode: orderNumClean,
-        agentId: user?.deliveryAgentId ?? user?.id,
-        transactionType: 'direct_transfer',
-        onSuccess: onPaymentSuccess,
-        onCancel: () {
-          if (mounted) {
-            setState(() => _isPaystackLaunching = false);
-          }
-        },
-      );
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isPaystackLaunching = false);
-        ref.read(confirmDeliveryPodProvider.notifier).setError('Could not open Paystack checkout: $e');
-      }
-    }
-  }
-
   void _submitDelivery() async {
     final podState = ref.read(confirmDeliveryPodProvider);
-    final isDirectTransfer = podState.selectedPaymentMethod == 'Direct Transfer (Paystack)';
-
-    // If Direct Transfer selected but not yet verified, prompt Paystack checkout directly
-    if (isDirectTransfer && !podState.paystackTransferVerified) {
-      final ordersState = ref.read(ordersProvider);
-      final authState = ref.read(authProvider);
-      final orderObj = ordersState.orders.where((o) => o.id == widget.orderId || o.orderNumber == widget.orderId).firstOrNull;
-      if (orderObj != null) {
-        _launchPaystackCheckout(orderObj, authState.user);
-        return;
-      }
-    }
 
     ref.read(confirmDeliveryPodProvider.notifier).setLoading(true);
 
     try {
       final authState = ref.read(authProvider);
       final agentId = authState.user?.deliveryAgentId ?? authState.user?.id ?? SupabaseConstants.defaultDeliveryAgentId;
-      final paymentMethod = isDirectTransfer ? 'bank_transfer' : 'cash';
+      const paymentMethod = 'cash';
       final amount = double.tryParse(_amountController.text.trim()) ?? 0.0;
       final refNo = _referenceController.text.trim();
-      final paymentRef = refNo.isNotEmpty ? refNo : 'PAY-${DateTime.now().millisecondsSinceEpoch}';
       final riderLoc = ref.read(riderLocationProvider);
       final ordersState = ref.read(ordersProvider);
       final orderObj = ordersState.orders.where((o) => o.id == widget.orderId || o.orderNumber == widget.orderId).firstOrNull;
       final gatePin = orderObj?.effectiveGatePin ?? 'GT-${(widget.orderId.length >= 4 ? widget.orderId.substring(widget.orderId.length - 4) : "7182").toUpperCase()}';
 
-      final notes = isDirectTransfer
-          ? '[POD Paid via Paystack Direct Transfer • Ref: $paymentRef • Gate PIN: $gatePin • GPS Proof: ${riderLoc.latitude.toStringAsFixed(5)}°, ${riderLoc.longitude.toStringAsFixed(5)}° (±${riderLoc.accuracyMeters.toStringAsFixed(1)}m)] ₦0 cash held by PDA. Commission credited to My Balance.'
-          : (refNo.isNotEmpty
-              ? '[POD Collected via Cash (Ref: $refNo) • Gate PIN: $gatePin • GPS Proof: ${riderLoc.latitude.toStringAsFixed(5)}°, ${riderLoc.longitude.toStringAsFixed(5)}° (±${riderLoc.accuracyMeters.toStringAsFixed(1)}m)] Cash in custody.'
-              : '[POD Collected via Cash • Gate PIN: $gatePin • GPS Proof: ${riderLoc.latitude.toStringAsFixed(5)}°, ${riderLoc.longitude.toStringAsFixed(5)}° (±${riderLoc.accuracyMeters.toStringAsFixed(1)}m)] Cash in custody.');
+      final notes = refNo.isNotEmpty
+          ? '[POD Collected via Cash (Ref: $refNo) • Gate PIN: $gatePin • GPS Proof: ${riderLoc.latitude.toStringAsFixed(5)}°, ${riderLoc.longitude.toStringAsFixed(5)}° (±${riderLoc.accuracyMeters.toStringAsFixed(1)}m)] Cash in custody.'
+          : '[POD Collected via Cash • Gate PIN: $gatePin • GPS Proof: ${riderLoc.latitude.toStringAsFixed(5)}°, ${riderLoc.longitude.toStringAsFixed(5)}° (±${riderLoc.accuracyMeters.toStringAsFixed(1)}m)] Cash in custody.';
 
       await ref.read(ordersProvider.notifier).confirmDeliveryPod(
             orderId: widget.orderId,
             agentId: agentId,
-            paymentType: isDirectTransfer ? 'prepaid' : 'pay_on_delivery',
+            paymentType: 'pay_on_delivery',
             paymentMethod: paymentMethod,
-            amountCollected: isDirectTransfer ? 0.0 : amount,
+            amountCollected: amount,
             customerSignatureUrl: podState.signatureUrl,
             photoProofUrl: podState.photoUrl,
             gatePassCode: gatePin,
@@ -279,9 +206,7 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
 
       ref.read(notificationsProvider.notifier).emitNotification(
             title: 'Delivery POD Confirmed 🎉',
-            message: isDirectTransfer
-                ? 'Order $displayOrderNo delivered via Paystack direct transfer. Earning credited to My Balance.'
-                : 'Order $displayOrderNo was successfully delivered. Net collection of ${CurrencyFormatter.formatNaira(amount)} recorded.',
+            message: 'Order $displayOrderNo was successfully delivered. Net collection of ${CurrencyFormatter.formatNaira(amount)} recorded in cash custody.',
             category: 'delivery',
             actionRoute: '/orders',
           );
@@ -367,13 +292,11 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
           ));
 
     final podState = ref.watch(confirmDeliveryPodProvider);
-    final isDirectTransfer = podState.selectedPaymentMethod == 'Direct Transfer (Paystack)';
 
     final commissionRate = user?.commissionRate ?? 1000.0;
     final transportAllowance = user?.isPda == true
         ? (user?.transportAllowance ?? 1500.0)
         : (user?.fuelAllowance ?? 800.0);
-    final totalRiderCredit = commissionRate + transportAllowance;
 
     final enteredCash = double.tryParse(_amountController.text.trim()) ?? order.totalAmount;
     final cashTransferFee = TransactionFeeCalculator.calculateTransferFee(enteredCash);
@@ -415,22 +338,20 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                       height: 84,
                       child: CircularProgressIndicator(
                         strokeWidth: 4,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          isDirectTransfer ? const Color(0xFF00A2D3) : AppColors.orange,
-                        ),
-                        backgroundColor: (isDirectTransfer ? const Color(0xFF00A2D3) : AppColors.orange).withValues(alpha: 0.15),
+                        valueColor: const AlwaysStoppedAnimation<Color>(AppColors.orange),
+                        backgroundColor: AppColors.orange.withValues(alpha: 0.15),
                       ),
                     ),
-                    Icon(
-                      isDirectTransfer ? Icons.bolt_rounded : Icons.local_shipping_rounded,
+                    const Icon(
+                      Icons.local_shipping_rounded,
                       size: 38,
-                      color: isDirectTransfer ? const Color(0xFF00A2D3) : AppColors.orange,
+                      color: AppColors.orange,
                     ),
                   ],
                 ),
                 const SizedBox(height: 28),
                 Text(
-                  isDirectTransfer ? 'Verifying & Reconciling Payment...' : 'Confirming POD Delivery...',
+                  'Confirming POD Delivery...',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 20,
@@ -440,9 +361,7 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  isDirectTransfer
-                      ? 'Reconciling Paystack virtual account transfer, updating distribution center ledger, and crediting your earnings to "My Balance"...'
-                      : 'Logging customer digital signature, updating inventory quantities, and preparing cash remittance ledger...',
+                  'Logging customer digital signature, updating inventory quantities, and preparing cash remittance ledger...',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.inter(
                     fontSize: 13,
@@ -629,9 +548,7 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  isDirectTransfer
-                      ? 'Payment of ${CurrencyFormatter.formatNaira(order.totalAmount)} was paid directly to NovaXpress via Paystack.\n(₦0.00 cash held by you).'
-                      : 'Shipment #${order.orderNumber} successfully marked as delivered. ₦${order.totalAmount.toStringAsFixed(0)} cash in custody for remittance.',
+                  'Shipment #${order.orderNumber} successfully marked as delivered. ${CurrencyFormatter.formatNaira(order.totalAmount)} cash in custody for remittance.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 13.5,
@@ -651,9 +568,7 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                   child: Column(
                     children: [
                       Text(
-                        isDirectTransfer
-                            ? 'CREDITED TO YOUR "MY BALANCE"'
-                            : 'YOUR ACCRUED EARNINGS FOR THIS DELIVERY',
+                        'YOUR ACCRUED EARNINGS FOR THIS DELIVERY',
                         style: GoogleFonts.jetBrainsMono(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
@@ -830,292 +745,66 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
             ),
             const SizedBox(height: 18),
 
-            // Payment Method Selector: Exactly 2 options (Cash vs Direct Transfer Paystack)
-            Text(
-              'Select Customer Payment Method',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: theme.colorScheme.onSurface,
+            // Payment Method: Enforced Cash POD
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF00522A).withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF00522A).withValues(alpha: 0.25)),
               ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => ref.read(confirmDeliveryPodProvider.notifier).setPaymentMethod('Cash'),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      decoration: BoxDecoration(
-                        color: !isDirectTransfer
-                            ? const Color(0xFF00522A)
-                            : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: !isDirectTransfer
-                              ? const Color(0xFF00522A)
-                              : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
-                          width: !isDirectTransfer ? 2 : 1,
-                        ),
-                      ),
-                      child: Center(
-                        child: Text(
-                          '💵 Cash',
-                          style: TextStyle(
-                            color: !isDirectTransfer ? Colors.white : theme.colorScheme.onSurface,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00522A),
+                      borderRadius: BorderRadius.circular(8),
                     ),
+                    child: const Icon(Icons.payments_rounded, color: Colors.white, size: 20),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => ref.read(confirmDeliveryPodProvider.notifier).setPaymentMethod('Direct Transfer (Paystack)'),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
-                      decoration: BoxDecoration(
-                        color: isDirectTransfer
-                            ? const Color(0xFF00A2D3)
-                            : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                            color: isDirectTransfer
-                                ? const Color(0xFF00A2D3)
-                                : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
-                            width: isDirectTransfer ? 2 : 1),
-                      ),
-                      child: Center(
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.bolt_rounded,
-                                size: 16,
-                                color: isDirectTransfer ? Colors.white : const Color(0xFF00A2D3),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                'Direct Transfer (Paystack)',
-                                style: TextStyle(
-                                  color: isDirectTransfer ? Colors.white : theme.colorScheme.onSurface,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // DYNAMIC SECTION A: DIRECT PAYSTACK PAYMENT BREAKDOWN CARD (Streamlined Minimalist)
-            if (isDirectTransfer) ...[
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: isDark
-                        ? [const Color(0xFF0F172A), const Color(0xFF1E293B)]
-                        : [const Color(0xFFE0F2FE), const Color(0xFFBAE6FD)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFF00A2D3).withValues(alpha: 0.6)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF00A2D3).withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(8),
+                        Text(
+                          'Payment Method: Cash POD',
+                          style: GoogleFonts.inter(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF00522A),
                           ),
-                          child: const Icon(Icons.bolt_rounded, color: Color(0xFF00A2D3), size: 20),
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'PAYSTACK PAYMENT BREAKDOWN',
-                                style: GoogleFonts.jetBrainsMono(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.8,
-                                  color: const Color(0xFF00A2D3),
-                                ),
-                              ),
-                              Text(
-                                'Direct settlement to company account • ₦0.00 cash held by rider',
-                                style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
-                              ),
-                            ],
+                        Text(
+                          'Collect cash from customer before handing over package.',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 14),
-
-                    // Breakdown List with Icons
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF0F172A) : Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                children: [
-                                  const Icon(Icons.shopping_bag_outlined, size: 14, color: Color(0xFF64748B)),
-                                  const SizedBox(width: 6),
-                                  Text('Total Customer Payment (Paystack)', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-                                ],
-                              ),
-                              Text(CurrencyFormatter.formatNaira(order.totalAmount), style: GoogleFonts.jetBrainsMono(fontSize: 13, fontWeight: FontWeight.bold)),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                children: [
-                                  const Icon(Icons.account_balance_outlined, size: 14, color: Color(0xFF00A2D3)),
-                                  const SizedBox(width: 6),
-                                  Text('Settled Directly to Company', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-                                ],
-                              ),
-                              Text(CurrencyFormatter.formatNaira(order.totalAmount), style: GoogleFonts.jetBrainsMono(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF00A2D3))),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                children: [
-                                  const Icon(Icons.payments_outlined, size: 14, color: Color(0xFF64748B)),
-                                  const SizedBox(width: 6),
-                                  Text('Physical Cash Held by Rider', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-                                ],
-                              ),
-                              Text('₦0.00', style: GoogleFonts.jetBrainsMono(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF64748B))),
-                            ],
-                          ),
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 8),
-                            child: Divider(height: 1),
-                          ),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                children: [
-                                  const Icon(Icons.percent_rounded, size: 14, color: Color(0xFF16A34A)),
-                                  const SizedBox(width: 6),
-                                  Text('Rider Commission', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-                                ],
-                              ),
-                              Text('+${CurrencyFormatter.formatNaira(commissionRate)}', style: GoogleFonts.jetBrainsMono(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF16A34A))),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                children: [
-                                  const Icon(Icons.local_shipping_outlined, size: 14, color: Color(0xFF16A34A)),
-                                  const SizedBox(width: 6),
-                                  Text('Transport / Fuel Allowance', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-                                ],
-                              ),
-                              Text('+${CurrencyFormatter.formatNaira(transportAllowance)}', style: GoogleFonts.jetBrainsMono(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF16A34A))),
-                            ],
-                          ),
-                        ],
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00522A),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'CASH POD',
+                      style: GoogleFonts.jetBrainsMono(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
                     ),
-                    const SizedBox(height: 10),
-
-                    // "My Balance" Credit Box
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF10B981).withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Row(
-                              children: [
-                                const Icon(Icons.account_balance_wallet_rounded, size: 18, color: Color(0xFF047857)),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'RETURNING TO "MY BALANCE"',
-                                        style: GoogleFonts.jetBrainsMono(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                          color: const Color(0xFF047857),
-                                          letterSpacing: 0.5,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      Text(
-                                        'Credited to your balance upon payment',
-                                        style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF065F46)),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            '+${CurrencyFormatter.formatNaira(totalRiderCredit)}',
-                            style: GoogleFonts.jetBrainsMono(fontSize: 15, fontWeight: FontWeight.w900, color: const Color(0xFF047857)),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-            ] else ...[
-              // DYNAMIC SECTION B: CASH COLLECTION FIELD & REMITTANCE BREAKDOWN CARD
+            ),
+            const SizedBox(height: 16),
               Text(
                 'Enter Physical Cash Collected',
                 style: TextStyle(
@@ -1307,7 +996,6 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
                 ),
               ),
               const SizedBox(height: 16),
-            ],
 
             // Digital Signature Section (Tappable Modal Signature Pad)
             Row(
@@ -1686,61 +1374,34 @@ class _ConfirmDeliveryPodPageState extends ConsumerState<ConfirmDeliveryPodPage>
             ),
             const SizedBox(height: 20),
 
-            // Single Main Action Button (Pay via Paystack / Confirm Delivery)
+            // Single Main Action Button (Confirm Cash Collection & POD)
             (() {
-              final isButtonDisabled = _isPaystackLaunching || podState.isLoading || !podState.hasConfirmedReceipt;
+              final isButtonDisabled = podState.isLoading || !podState.hasConfirmedReceipt;
               return SizedBox(
                 width: double.infinity,
                 height: 52,
                 child: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: isDirectTransfer
-                        ? (podState.paystackTransferVerified ? const Color(0xFF16A34A) : const Color(0xFF00A2D3))
-                        : const Color(0xFF00522A),
+                    backgroundColor: const Color(0xFF00522A),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                   onPressed: isButtonDisabled ? null : _submitDelivery,
-                  icon: (_isPaystackLaunching || podState.isLoading)
+                  icon: podState.isLoading
                       ? const SizedBox.shrink()
-                      : Icon(
-                          isDirectTransfer
-                              ? (podState.paystackTransferVerified ? Icons.check_circle_rounded : Icons.bolt_rounded)
-                              : Icons.task_alt_rounded,
-                          size: 20,
-                        ),
-                  label: _isPaystackLaunching
-                      ? Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const SizedBox(
-                              height: 18,
-                              width: 18,
-                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                            ),
-                            const SizedBox(width: 10),
-                            Text(
-                              'Initializing Paystack Gateway...',
-                              style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14),
-                            ),
-                          ],
+                      : const Icon(Icons.task_alt_rounded, size: 20),
+                  label: podState.isLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                         )
-                      : (podState.isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                            )
-                          : Text(
-                              isDirectTransfer
-                                  ? (podState.paystackTransferVerified
-                                      ? 'Confirm & Complete Delivery (Verified ✓)'
-                                      : 'Pay via Paystack / Confirm Delivery')
-                                  : 'Confirm Cash Collection & POD',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                            )),
+                      : const Text(
+                          'Confirm Cash Collection & POD',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                        ),
                 ),
               );
             }()),
