@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/helpers/formatters.dart';
 import '../../../../core/widgets/user_avatar_widget.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../finance/domain/entities/remittance.dart';
 import '../../../finance/presentation/providers/finance_provider.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
@@ -75,7 +76,12 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
     BuildContext context,
     DCFleetDriver driver,
     List<RemittanceEntity> riderPending,
-    double unrequestedAmount,
+    double grossCustody,
+    double unrequestedNet,
+    double commDeduction,
+    double fuelDeduction,
+    double posDeduction,
+    int deliveredOrdersCount,
     bool isDark,
   ) {
     final allOrders = ref.read(ordersProvider).orders;
@@ -88,7 +94,7 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
-        height: MediaQuery.of(context).size.height * 0.85,
+        height: MediaQuery.of(context).size.height * 0.88,
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF0F172A) : Colors.white,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -150,7 +156,7 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
               child: ListView(
                 padding: const EdgeInsets.all(20),
                 children: [
-                  // 1. Total Cash Liability Card
+                  // 1. Financial Deduction Breakdown Card (Accounting for Commission, Fuel & POS Fee)
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -161,44 +167,53 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'TOTAL FIELD CASH IN CUSTODY',
-                          style: GoogleFonts.jetBrainsMono(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF64748B),
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          CurrencyFormatter.formatNaira(driver.cashInCustody),
-                          style: GoogleFonts.jetBrainsMono(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w900,
-                            color: driver.cashInCustody > 0
-                                ? const Color(0xFFDC2626)
-                                : const Color(0xFF16A34A),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
                         Row(
                           children: [
-                            Expanded(
-                              child: _buildMiniStat(
-                                'Requested',
-                                CurrencyFormatter.formatNaira(riderPending.fold(0.0, (s, r) => s + r.amount)),
-                                const Color(0xFFEA580C),
-                                isDark,
-                              ),
+                            const Icon(Icons.calculate_outlined, size: 16, color: Color(0xFF00522A)),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Remittance Calculation & Deductions',
+                              style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold),
                             ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: _buildMiniStat(
-                                'Unrequested',
-                                CurrencyFormatter.formatNaira(unrequestedAmount),
-                                const Color(0xFFDC2626),
-                                isDark,
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        _buildBreakdownRow('Gross Orders Collection', CurrencyFormatter.formatNaira(grossCustody), isDark),
+                        const SizedBox(height: 6),
+                        _buildBreakdownRow(
+                          'Less: Delivery Commission ($deliveredOrdersCount orders)',
+                          '-${CurrencyFormatter.formatNaira(commDeduction)}',
+                          isDark,
+                          isDeduction: true,
+                        ),
+                        const SizedBox(height: 6),
+                        _buildBreakdownRow(
+                          'Less: Fuel & Route Allowance',
+                          '-${CurrencyFormatter.formatNaira(fuelDeduction)}',
+                          isDark,
+                          isDeduction: true,
+                        ),
+                        const SizedBox(height: 6),
+                        _buildBreakdownRow(
+                          'Less: POS / Bank Transfer Fee',
+                          '-${CurrencyFormatter.formatNaira(posDeduction)}',
+                          isDark,
+                          isDeduction: true,
+                        ),
+                        const Divider(height: 20),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Net Remittance Due to DC:',
+                              style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
+                            ),
+                            Text(
+                              CurrencyFormatter.formatNaira(unrequestedNet),
+                              style: GoogleFonts.jetBrainsMono(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                                color: unrequestedNet > 0 ? const Color(0xFF00522A) : const Color(0xFF16A34A),
                               ),
                             ),
                           ],
@@ -326,7 +341,7 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Unrequested Field Cash Liability',
+                          'Unrequested Net Cash Payable',
                           style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -337,12 +352,12 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: unrequestedAmount > 0
+                      color: unrequestedNet > 0
                           ? const Color(0xFFDC2626).withValues(alpha: isDark ? 0.12 : 0.05)
                           : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC)),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: unrequestedAmount > 0
+                        color: unrequestedNet > 0
                             ? const Color(0xFFDC2626).withValues(alpha: 0.3)
                             : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                       ),
@@ -354,11 +369,11 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              CurrencyFormatter.formatNaira(unrequestedAmount),
+                              CurrencyFormatter.formatNaira(unrequestedNet),
                               style: GoogleFonts.jetBrainsMono(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w900,
-                                color: unrequestedAmount > 0
+                                color: unrequestedNet > 0
                                     ? const Color(0xFFDC2626)
                                     : const Color(0xFF16A34A),
                               ),
@@ -396,7 +411,7 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
                             ),
                           ),
                         ),
-                        if (unrequestedAmount > 0) ...[
+                        if (unrequestedNet > 0) ...[
                           const SizedBox(height: 14),
                           SizedBox(
                             width: double.infinity,
@@ -440,26 +455,20 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
     );
   }
 
-  Widget _buildMiniStat(String label, String value, Color color, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: isDark ? 0.12 : 0.06),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B), fontWeight: FontWeight.w600)),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            style: GoogleFonts.jetBrainsMono(fontSize: 13, fontWeight: FontWeight.bold, color: color),
-            overflow: TextOverflow.ellipsis,
+  Widget _buildBreakdownRow(String label, String value, bool isDark, {bool isDeduction = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: GoogleFonts.inter(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))),
+        Text(
+          value,
+          style: GoogleFonts.jetBrainsMono(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+            color: isDeduction ? const Color(0xFFEF4444) : (isDark ? Colors.white : const Color(0xFF0F172A)),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -476,30 +485,79 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
     final isDark = theme.brightness == Brightness.dark;
     final financeState = ref.watch(financeProvider);
     final dcState = ref.watch(dcConsoleProvider);
+    final authState = ref.watch(authProvider);
+    final ordersState = ref.watch(ordersProvider);
+
+    final currentUser = authState.user;
+    final officerName = currentUser != null && currentUser.firstName.isNotEmpty
+        ? currentUser.firstName
+        : (currentUser?.fullName.isNotEmpty == true ? currentUser!.fullName.split(' ').first : 'Officer');
 
     final allRemittances = financeState.remittances;
     final pendingRemittances = allRemittances.where((r) => r.isPending).toList();
     final approvedRemittances = allRemittances.where((r) => !r.isPending).toList();
 
     final allDrivers = dcState.drivers;
-    final double totalFieldCashLiability = allDrivers.fold(
-      0.0,
-      (sum, d) => sum + (d.cashInCustody > 0 ? d.cashInCustody : 0.0),
-    );
+    final allOrders = ordersState.orders;
+
+    // Calculate Gross and Net Field Liabilities accounting for Commissions, Fuel, and POS
+    double totalNetFieldLiability = 0.0;
+
+    for (final d in allDrivers) {
+      if (d.cashInCustody <= 0) continue;
+
+      final riderDelivered = allOrders.where((o) =>
+        (o.deliveryAgentId == d.id || o.deliveryAgentId == d.driverCode) && o.isDelivered
+      ).toList();
+      final count = riderDelivered.isNotEmpty ? riderDelivered.length : 1;
+      final commRate = d.commissionRate > 0 ? d.commissionRate : 1000.0;
+      final fuelRate = d.transportAllowance > 0 ? d.transportAllowance : 1500.0;
+      final comm = count * commRate;
+      final fuel = count > 0 ? fuelRate : 0.0;
+      const pos = 350.0;
+      final net = (d.cashInCustody - comm - fuel - pos).clamp(0.0, double.infinity);
+      totalNetFieldLiability += net;
+    }
+
     final double totalPendingVerification = pendingRemittances.fold(
       0.0,
       (sum, r) => sum + r.amount,
     );
 
     final now = DateTime.now();
-    final double totalApprovedToday = approvedRemittances.where((r) {
+    final approvedToday = approvedRemittances.where((r) {
       return r.createdAt.year == now.year &&
           r.createdAt.month == now.month &&
           r.createdAt.day == now.day;
-    }).fold(0.0, (sum, r) => sum + r.amount);
+    }).toList();
+
+    // Personalized KPIs to measure this finance officer's works
+    final myClearedToday = approvedToday.where((r) {
+      final myId = currentUser?.id ?? '';
+      final myName = currentUser?.fullName.toLowerCase() ?? '';
+      return (r.verifiedByUserId != null && r.verifiedByUserId == myId) ||
+          (r.verifiedByName != null && r.verifiedByName!.toLowerCase() == myName);
+    }).toList();
+
+    final double myClearedTodayAmount = myClearedToday.isNotEmpty
+        ? myClearedToday.fold(0.0, (s, r) => s + r.amount)
+        : approvedToday.fold(0.0, (s, r) => s + r.amount);
+
+    final int myClearedCount = myClearedToday.isNotEmpty
+        ? myClearedToday.length
+        : approvedToday.length;
+
+    final int totalProcessedToday = myClearedCount + pendingRemittances.length;
+    final int clearanceRate = totalProcessedToday > 0
+        ? ((myClearedCount / totalProcessedToday) * 100).round()
+        : 100;
 
     final currentDc = dcState.distributionCenters.where((d) => d.id == dcState.activeHubId).firstOrNull ??
         dcState.distributionCenters.firstOrNull;
+
+    // Time-based greeting
+    final hour = now.hour;
+    final timeGreeting = hour < 12 ? 'morning' : (hour < 17 ? 'afternoon' : 'evening');
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0B132B) : const Color(0xFFF8FAFC),
@@ -584,53 +642,124 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
       ),
       body: Column(
         children: [
-          // KPI Metric Header - Horizontally Scrollable & Overflow-Free
+          // Personalized Finance Ops Dashboard & 2x2 Fixed KPI Grid (Only on Tabs 0, 1, 2)
           if (_activeTab != 3)
             Container(
-              height: 98,
-              padding: const EdgeInsets.symmetric(vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF1E293B) : Colors.white,
                 border: Border(bottom: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
               ),
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SizedBox(
-                    width: 175,
-                    child: _buildKpiCard(
-                      'PENDING APPROVAL',
-                      CurrencyFormatter.formatNaira(totalPendingVerification),
-                      '${pendingRemittances.length} submissions waiting',
-                      Icons.hourglass_top_rounded,
-                      const Color(0xFFEA580C),
-                      isDark,
-                    ),
+                  // 1. Personalized Greeting & Shift Status
+                  Row(
+                    children: [
+                      UserAvatarWidget(
+                        fullName: currentUser?.fullName ?? 'Finance Admin',
+                        radius: 17,
+                        showBorder: true,
+                        borderColor: const Color(0xFF00522A),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Good $timeGreeting, $officerName! 👋',
+                              style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              'Finance Ops Terminal • Verification Shift Active',
+                              style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF10B981),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              'Online',
+                              style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF10B981)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 10),
-                  SizedBox(
-                    width: 185,
-                    child: _buildKpiCard(
-                      'FIELD CASH LIABILITY',
-                      CurrencyFormatter.formatNaira(totalFieldCashLiability),
-                      'Held by active fleet riders',
-                      Icons.payments_rounded,
-                      const Color(0xFFDC2626),
-                      isDark,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  SizedBox(
-                    width: 175,
-                    child: _buildKpiCard(
-                      'CLEARED TODAY',
-                      CurrencyFormatter.formatNaira(totalApprovedToday),
-                      'Verified & banked',
-                      Icons.verified_rounded,
-                      const Color(0xFF16A34A),
-                      isDark,
-                    ),
+                  const SizedBox(height: 12),
+
+                  // 2. Responsive 2x2 KPI Grid (No Horizontal Scroll - Zero Overflows)
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final cardWidth = (constraints.maxWidth - 10) / 2;
+                      return Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: [
+                          _buildGridKpiCard(
+                            'APPROVALS QUEUE',
+                            CurrencyFormatter.formatNaira(totalPendingVerification),
+                            '${pendingRemittances.length} submissions waiting',
+                            Icons.hourglass_top_rounded,
+                            const Color(0xFFEA580C),
+                            cardWidth,
+                            isDark,
+                            onTap: () => setState(() => _activeTab = 0),
+                          ),
+                          _buildGridKpiCard(
+                            'VERIFIED TODAY',
+                            CurrencyFormatter.formatNaira(myClearedTodayAmount),
+                            '$myClearedCount cleared by you',
+                            Icons.verified_rounded,
+                            const Color(0xFF16A34A),
+                            cardWidth,
+                            isDark,
+                            onTap: () => setState(() => _activeTab = 2),
+                          ),
+                          _buildGridKpiCard(
+                            'NET FIELD CASH',
+                            CurrencyFormatter.formatNaira(totalNetFieldLiability),
+                            'After rider commissions',
+                            Icons.account_balance_wallet_rounded,
+                            const Color(0xFFDC2626),
+                            cardWidth,
+                            isDark,
+                            onTap: () => setState(() => _activeTab = 1),
+                          ),
+                          _buildGridKpiCard(
+                            'CLEARANCE VELOCITY',
+                            '$clearanceRate%',
+                            '$myClearedCount of $totalProcessedToday processed',
+                            Icons.insights_rounded,
+                            const Color(0xFF7C3AED),
+                            cardWidth,
+                            isDark,
+                            onTap: () => setState(() => _activeTab = 2),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ],
               ),
@@ -638,7 +767,14 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
 
           // Main Tab Body
           Expanded(
-            child: _buildActiveTabBody(pendingRemittances, allDrivers, approvedRemittances, currentDc, isDark),
+            child: _buildActiveTabBody(
+              pendingRemittances,
+              allDrivers,
+              approvedRemittances,
+              allOrders,
+              currentDc,
+              isDark,
+            ),
           ),
         ],
       ),
@@ -649,6 +785,7 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
     List<RemittanceEntity> pendingRemittances,
     List<DCFleetDriver> allDrivers,
     List<RemittanceEntity> approvedRemittances,
+    List<dynamic> allOrders,
     DistributionCenter? currentDc,
     bool isDark,
   ) {
@@ -656,7 +793,7 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
       case 0:
         return _buildApprovalsQueueView(pendingRemittances, allDrivers, isDark);
       case 1:
-        return _buildRiderLiabilitiesView(allDrivers, pendingRemittances, isDark);
+        return _buildRiderLiabilitiesView(allDrivers, pendingRemittances, allOrders, isDark);
       case 2:
         return _buildAuditHistoryView(approvedRemittances, allDrivers, isDark);
       case 3:
@@ -672,59 +809,73 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
     }
   }
 
-  Widget _buildKpiCard(
+  Widget _buildGridKpiCard(
     String label,
     String value,
     String subtitle,
     IconData icon,
     Color color,
-    bool isDark,
-  ) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: isDark ? 0.12 : 0.06),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withValues(alpha: 0.25)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Row(
+    double width,
+    bool isDark, {
+    VoidCallback? onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: width,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: isDark ? 0.12 : 0.06),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: color.withValues(alpha: 0.25)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 14, color: color),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  label,
-                  style: GoogleFonts.jetBrainsMono(
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                    letterSpacing: 0.5,
+              Row(
+                children: [
+                  Icon(icon, size: 14, color: color),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: GoogleFonts.jetBrainsMono(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.bold,
+                        color: color,
+                        letterSpacing: 0.3,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
                   ),
-                  overflow: TextOverflow.ellipsis,
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                value,
+                style: GoogleFonts.jetBrainsMono(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w900,
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
                 ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B)),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
               ),
             ],
           ),
-          const SizedBox(height: 3),
-          Text(
-            value,
-            style: GoogleFonts.jetBrainsMono(
-              fontSize: 14.5,
-              fontWeight: FontWeight.w900,
-              color: isDark ? Colors.white : const Color(0xFF0F172A),
-            ),
-            overflow: TextOverflow.ellipsis,
-          ),
-          Text(
-            subtitle,
-            style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B)),
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -826,7 +977,7 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
                         ),
                       ),
                       Text(
-                        'Tap to inspect full details ›',
+                        'Tap to inspect breakdown ›',
                         style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF94A3B8)),
                       ),
                     ],
@@ -937,7 +1088,7 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
                   ),
                   const SizedBox(height: 12),
 
-                  // Action Button (Accounts can perform clearance action on requested remittances)
+                  // Action Buttons
                   Row(
                     children: [
                       if (hasReceipt)
@@ -979,11 +1130,12 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
   }
 
   // ==========================================
-  // TAB 2: RIDER CASH LIABILITIES (UNREQUESTED CASH + SUMMARY)
+  // TAB 2: RIDER CASH LIABILITIES (DEDUCTIONS ACCOUNTED FOR)
   // ==========================================
   Widget _buildRiderLiabilitiesView(
     List<DCFleetDriver> drivers,
     List<RemittanceEntity> pendingRemittances,
+    List<dynamic> allOrders,
     bool isDark,
   ) {
     var filtered = drivers;
@@ -1037,13 +1189,38 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
                 r.deliveryAgentId == d.id || r.deliveryAgentId == d.driverCode
               ).toList();
               final double requestedAmount = riderPending.fold(0.0, (s, r) => s + r.amount);
-              final double unrequestedAmount = (d.cashInCustody - requestedAmount).clamp(0.0, double.infinity);
+
+              // Calculate Deductions (Commission, Fuel & POS Fee)
+              final riderDelivered = allOrders.where((o) =>
+                (o.deliveryAgentId == d.id || o.deliveryAgentId == d.driverCode) && o.isDelivered
+              ).toList();
+              final orderCount = riderDelivered.isNotEmpty ? riderDelivered.length : (hasLiability ? 1 : 0);
+              final commRate = d.commissionRate > 0 ? d.commissionRate : 1000.0;
+              final fuelRate = d.transportAllowance > 0 ? d.transportAllowance : 1500.0;
+              final commDeduction = orderCount * commRate;
+              final fuelDeduction = orderCount > 0 ? fuelRate : 0.0;
+              final posDeduction = d.cashInCustody > 0 ? 350.0 : 0.0;
+              final double totalDeductions = commDeduction + fuelDeduction + posDeduction;
+
+              final double netRemittable = (d.cashInCustody - totalDeductions).clamp(0.0, double.infinity);
+              final double unrequestedNet = (netRemittable - requestedAmount).clamp(0.0, double.infinity);
 
               return Material(
                 color: Colors.transparent,
                 child: InkWell(
                   borderRadius: BorderRadius.circular(12),
-                  onTap: () => _openRiderCashDossier(context, d, riderPending, unrequestedAmount, isDark),
+                  onTap: () => _openRiderCashDossier(
+                    context,
+                    d,
+                    riderPending,
+                    d.cashInCustody,
+                    unrequestedNet,
+                    commDeduction,
+                    fuelDeduction,
+                    posDeduction,
+                    orderCount,
+                    isDark,
+                  ),
                   child: Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
@@ -1095,8 +1272,9 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    d.phone,
+                                    '${d.phone} • Gross: ${CurrencyFormatter.formatNaira(d.cashInCustody)}',
                                     style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ],
                               ),
@@ -1106,7 +1284,7 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
                                 Text(
-                                  CurrencyFormatter.formatNaira(d.cashInCustody),
+                                  CurrencyFormatter.formatNaira(netRemittable),
                                   style: GoogleFonts.jetBrainsMono(
                                     fontSize: 14.5,
                                     fontWeight: FontWeight.bold,
@@ -1116,7 +1294,7 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
                                   ),
                                 ),
                                 Text(
-                                  hasLiability ? 'Field Cash' : 'Cleared (₦0)',
+                                  hasLiability ? 'Net Payable' : 'Cleared (₦0)',
                                   style: GoogleFonts.inter(
                                     fontSize: 10,
                                     fontWeight: FontWeight.w600,
@@ -1154,7 +1332,7 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
                                 ),
                                 const SizedBox(width: 6),
                               ],
-                              if (unrequestedAmount > 0)
+                              if (unrequestedNet > 0)
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
@@ -1163,12 +1341,12 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
                                     border: Border.all(color: const Color(0xFFDC2626).withValues(alpha: 0.25)),
                                   ),
                                   child: Text(
-                                    '🛑 ₦${CurrencyFormatter.formatNaira(unrequestedAmount).replaceAll('₦', '')} Unrequested',
+                                    '🛑 ₦${CurrencyFormatter.formatNaira(unrequestedNet).replaceAll('₦', '')} Unrequested',
                                     style: GoogleFonts.jetBrainsMono(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFFDC2626)),
                                   ),
                                 ),
                               const Spacer(),
-                              Text('Tap for breakdown ›', style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF94A3B8))),
+                              Text('Tap for ledger ›', style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF94A3B8))),
                             ],
                           ),
                         ],

@@ -107,6 +107,15 @@ class DCRemittanceDetailModal extends ConsumerStatefulWidget {
     DCFleetDriver? driver,
     List<OrderEntity> orders = const [],
   }) {
+    final orderCount = orders.isNotEmpty ? orders.length : (rem.ordersCount > 0 ? rem.ordersCount : 1);
+    final double commRate = driver?.commissionRate != null && driver!.commissionRate > 0 ? driver.commissionRate : 1000.0;
+    final double transportRate = driver?.transportAllowance != null && driver!.transportAllowance > 0 ? driver.transportAllowance : 1500.0;
+
+    final double comm = rem.commissionDeducted > 0 ? rem.commissionDeducted : (orderCount * commRate);
+    final double trans = rem.transportAllowanceDeducted > 0 ? rem.transportAllowanceDeducted : (orderCount > 0 ? transportRate : 0.0);
+    final double pos = rem.posFee > 0 ? rem.posFee : (rem.amount > 0 ? 350.0 : 0.0);
+    final double gross = rem.grossCollections > 0 ? rem.grossCollections : (rem.amount + comm + trans + pos);
+
     final item = DCRemittanceLifecycleItem(
       id: rem.id,
       referenceNumber: rem.referenceNumber.isNotEmpty
@@ -121,11 +130,11 @@ class DCRemittanceDetailModal extends ConsumerStatefulWidget {
       status: rem.isPending ? 'pending' : (rem.isVerified ? 'verified' : rem.status),
       openingDate: rem.createdAt,
       closingDate: rem.verifiedAt,
-      grossAmount: rem.grossCollections > 0 ? rem.grossCollections : rem.amount,
-      commissionAmount: rem.commissionDeducted,
-      transportAllowance: rem.transportAllowanceDeducted,
+      grossAmount: gross,
+      commissionAmount: comm,
+      transportAllowance: trans,
       failedStipends: rem.failedStipendsDeducted,
-      posFee: rem.posFee,
+      posFee: pos,
       netAmount: rem.amount,
       orders: orders,
       paymentMethod: rem.paymentMethod,
@@ -142,6 +151,18 @@ class DCRemittanceDetailModal extends ConsumerStatefulWidget {
     DCFleetDriver driver,
     List<OrderEntity> orders,
   ) {
+    final deliveredOrders = orders.where((o) => o.isDelivered || o.status == 'delivered').toList();
+    final double gross = driver.cashInCustody > 0
+        ? driver.cashInCustody
+        : deliveredOrders.fold(0.0, (s, o) => s + o.totalAmount);
+    final int count = deliveredOrders.isNotEmpty ? deliveredOrders.length : (gross > 0 ? 1 : 0);
+    final double commRate = driver.commissionRate > 0 ? driver.commissionRate : 1000.0;
+    final double transportRate = driver.transportAllowance > 0 ? driver.transportAllowance : 1500.0;
+    final double commDeducted = count * commRate;
+    final double fuelDeducted = count > 0 ? transportRate : 0.0;
+    final double posDeducted = gross > 0 ? 350.0 : 0.0;
+    final double netAmount = (gross - commDeducted - fuelDeducted - posDeducted).clamp(0.0, double.infinity);
+
     final item = DCRemittanceLifecycleItem(
       id: 'unrequested-${driver.id}',
       referenceNumber: 'UNREQ-${driver.driverCode}',
@@ -153,14 +174,15 @@ class DCRemittanceDetailModal extends ConsumerStatefulWidget {
       type: 'cash_pod',
       status: 'unrequested',
       openingDate: DateTime.now(),
-      grossAmount: driver.cashInCustody,
-      commissionAmount: 0.0,
-      transportAllowance: 0.0,
-      netAmount: driver.cashInCustody,
+      grossAmount: gross,
+      commissionAmount: commDeducted,
+      transportAllowance: fuelDeducted,
+      posFee: posDeducted,
+      netAmount: netAmount,
       orders: orders,
       paymentMethod: 'cash_to_dc',
       depositReceiptUrl: null,
-      notes: 'Field cash held in custody. Rider has not submitted a remittance clearance request.',
+      notes: 'Field cash held in custody. Delivery commission, fuel allowance, and transfer fee are accounted for in net remittance payable.',
     );
     show(context, item);
   }
@@ -1420,9 +1442,13 @@ class _DCRemittanceDetailModalState extends ConsumerState<DCRemittanceDetailModa
                         style: GoogleFonts.jetBrainsMono(fontSize: 12.5, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
                       ),
                       const SizedBox(width: 6),
-                      Text(
-                        '• ${order.customerName}',
-                        style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                      Flexible(
+                        child: Text(
+                          '• ${order.customerName}',
+                          style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
                       ),
                     ],
                   ),
