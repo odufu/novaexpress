@@ -158,8 +158,8 @@ class _DCStockOperationsPageState extends ConsumerState<DCStockOperationsPage> {
           // KPI Metric Header - Horizontally Scrollable & Overflow-Free (only on Operational Tabs)
           if (_activeTab != 4)
             Container(
-              height: 84,
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              height: 98,
+              padding: const EdgeInsets.symmetric(vertical: 6),
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF1E293B) : Colors.white,
                 border: Border(bottom: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
@@ -266,7 +266,7 @@ class _DCStockOperationsPageState extends ConsumerState<DCStockOperationsPage> {
     bool isDark,
   ) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: color.withValues(alpha: isDark ? 0.12 : 0.06),
         borderRadius: BorderRadius.circular(10),

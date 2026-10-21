@@ -68,11 +68,6 @@ class DCRemittanceLifecycleItem {
   });
 
   bool get isDirectTransfer => type == 'direct_transfer';
-  bool get isAwaitingRemittance =>
-      status == 'awaiting_remittance' ||
-      status == 'pending' ||
-      status == 'pending_audit' ||
-      status == 'submitted';
   bool get isVerified =>
       status == 'verified' ||
       status == 'direct_settled' ||
@@ -82,6 +77,9 @@ class DCRemittanceLifecycleItem {
       status == 'pending' ||
       status == 'pending_audit' ||
       status == 'submitted';
+  bool get isRequestedForClearance => isPendingApproval;
+  bool get isUnrequested => !isVerified && !isPendingApproval;
+  bool get isAwaitingRemittance => isPendingApproval;
   int get orderCount => orders.length;
   double get totalDeductions =>
       commissionAmount + transportAllowance + failedStipends + posFee;
@@ -94,6 +92,78 @@ class DCRemittanceDetailModal extends ConsumerStatefulWidget {
     super.key,
     required this.remittance,
   });
+
+  static void show(BuildContext context, DCRemittanceLifecycleItem item) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => DCRemittanceDetailModal(remittance: item),
+    );
+  }
+
+  static void showFromRemittanceEntity(
+    BuildContext context,
+    RemittanceEntity rem, {
+    DCFleetDriver? driver,
+    List<OrderEntity> orders = const [],
+  }) {
+    final item = DCRemittanceLifecycleItem(
+      id: rem.id,
+      referenceNumber: rem.referenceNumber.isNotEmpty
+          ? rem.referenceNumber
+          : (rem.id.length > 8 ? 'REM-${rem.id.substring(0, 8).toUpperCase()}' : 'REM-PENDING'),
+      riderId: rem.deliveryAgentId,
+      riderName: driver?.name ?? rem.payerName ?? 'Fleet Rider',
+      riderCode: driver?.driverCode ?? 'RDR',
+      riderAvatarUrl: driver?.avatarUrl,
+      riderPhone: driver?.phone,
+      type: 'cash_pod',
+      status: rem.isPending ? 'pending' : (rem.isVerified ? 'verified' : rem.status),
+      openingDate: rem.createdAt,
+      closingDate: rem.verifiedAt,
+      grossAmount: rem.grossCollections > 0 ? rem.grossCollections : rem.amount,
+      commissionAmount: rem.commissionDeducted,
+      transportAllowance: rem.transportAllowanceDeducted,
+      failedStipends: rem.failedStipendsDeducted,
+      posFee: rem.posFee,
+      netAmount: rem.amount,
+      orders: orders,
+      paymentMethod: rem.paymentMethod,
+      depositReceiptUrl: rem.depositReceiptUrl,
+      verifiedByName: rem.verifiedByName,
+      verifiedAt: rem.verifiedAt,
+      notes: rem.notes,
+    );
+    show(context, item);
+  }
+
+  static void showUnrequestedRiderCash(
+    BuildContext context,
+    DCFleetDriver driver,
+    List<OrderEntity> orders,
+  ) {
+    final item = DCRemittanceLifecycleItem(
+      id: 'unrequested-${driver.id}',
+      referenceNumber: 'UNREQ-${driver.driverCode}',
+      riderId: driver.id,
+      riderName: driver.name,
+      riderCode: driver.driverCode,
+      riderAvatarUrl: driver.avatarUrl,
+      riderPhone: driver.phone,
+      type: 'cash_pod',
+      status: 'unrequested',
+      openingDate: DateTime.now(),
+      grossAmount: driver.cashInCustody,
+      commissionAmount: 0.0,
+      transportAllowance: 0.0,
+      netAmount: driver.cashInCustody,
+      orders: orders,
+      paymentMethod: 'cash_to_dc',
+      depositReceiptUrl: null,
+      notes: 'Field cash held in custody. Rider has not submitted a remittance clearance request.',
+    );
+    show(context, item);
+  }
 
   @override
   ConsumerState<DCRemittanceDetailModal> createState() => _DCRemittanceDetailModalState();
@@ -109,6 +179,15 @@ class _DCRemittanceDetailModalState extends ConsumerState<DCRemittanceDetailModa
 
   Future<void> _verifyAndSettleRemittance(BuildContext context) async {
     final rem = widget.remittance;
+    if (!rem.isPendingApproval) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cannot clear remittance: Rider has not requested clearance for this cash yet.'),
+          backgroundColor: Color(0xFFEF4444),
+        ),
+      );
+      return;
+    }
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
 
@@ -388,6 +467,52 @@ class _DCRemittanceDetailModalState extends ConsumerState<DCRemittanceDetailModa
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Clearance Status Notice Banner
+                    if (rem.isUnrequested)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        margin: const EdgeInsets.only(bottom: 14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEF4444).withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.block_rounded, color: Color(0xFFEF4444), size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'UNREQUESTED FOR CLEARANCE\nThis cash is held in the field. The rider has NOT requested clearance. Accounts can only perform actions on remittances requested for clearance.',
+                                style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFFEF4444), height: 1.35, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else if (rem.isPendingApproval)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        margin: const EdgeInsets.only(bottom: 14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEA580C).withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFEA580C).withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.hourglass_top_rounded, color: Color(0xFFEA580C), size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'REQUESTED FOR CLEARANCE\nRider has submitted this remittance for clearance. Verify the attached bank deposit receipt or cash handover before approving.',
+                                style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFFEA580C), height: 1.35, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
                     // A. Rider & Timestamp Meta Strip (Interactive Tap -> Opens DCRiderDetailModal)
                     Material(
                       color: Colors.transparent,
@@ -880,7 +1005,7 @@ class _DCRemittanceDetailModalState extends ConsumerState<DCRemittanceDetailModa
                     ),
                   );
 
-                  final clearActionWidget = rem.isAwaitingRemittance
+                  final clearActionWidget = rem.isPendingApproval
                       ? ElevatedButton.icon(
                           onPressed: _isProcessing ? null : () => _verifyAndSettleRemittance(context),
                           icon: _isProcessing
@@ -897,28 +1022,51 @@ class _DCRemittanceDetailModalState extends ConsumerState<DCRemittanceDetailModa
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
                         )
-                      : Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF10B981).withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 15),
-                              const SizedBox(width: 6),
-                              Flexible(
-                                child: Text(
-                                  'Cleared into DC Treasury',
-                                  style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color(0xFF10B981)),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                      : (rem.isVerified
+                          ? Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
                               ),
-                            ],
-                          ),
-                        );
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 15),
+                                  const SizedBox(width: 6),
+                                  Flexible(
+                                    child: Text(
+                                      'Cleared into DC Treasury',
+                                      style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color(0xFF10B981)),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEF4444).withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.3)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.block_rounded, color: Color(0xFFEF4444), size: 15),
+                                  const SizedBox(width: 6),
+                                  Flexible(
+                                    child: Text(
+                                      'Unrequested • No Action',
+                                      style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFFEF4444)),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ));
 
                   if (isNarrowActions) {
                     return Row(
@@ -973,11 +1121,11 @@ class _DCRemittanceDetailModalState extends ConsumerState<DCRemittanceDetailModa
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
-          color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+          color: const Color(0xFFEA580C).withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.4)),
+          border: Border.all(color: const Color(0xFFEA580C).withValues(alpha: 0.4)),
         ),
-        child: Text('⏳ AWAITING DC APPROVAL', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFFF59E0B))),
+        child: Text('⏳ REQUESTED FOR CLEARANCE', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFFEA580C))),
       );
     }
     return Container(
@@ -987,7 +1135,7 @@ class _DCRemittanceDetailModalState extends ConsumerState<DCRemittanceDetailModa
         borderRadius: BorderRadius.circular(6),
         border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.4)),
       ),
-      child: Text('🔴 NOT REMITTED', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFFEF4444))),
+      child: Text('🛑 UNREQUESTED FOR CLEARANCE', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFFEF4444))),
     );
   }
 
