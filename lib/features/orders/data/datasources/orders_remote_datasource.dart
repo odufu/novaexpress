@@ -966,6 +966,46 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
     final resolvedPaymentType = isDirectTransfer ? 'prepaid' : paymentType;
     final resolvedPaymentStatus = isDirectTransfer ? 'paid' : 'collected';
 
+    final resolvedRemittanceStatus = isDirectTransfer ? 'direct_transfer' : 'unremitted';
+    final resolvedSettlementStatus = isDirectTransfer ? 'direct_transfer_settled' : 'pending_remittance';
+
+    // Direct database persistence with service role to guarantee delivery status remains after refresh
+    try {
+      final isUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(orderId.trim());
+      final directUpdate = <String, dynamic>{
+        'status': 'delivered',
+        'delivered_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+        'payment_status': resolvedPaymentStatus,
+        'payment_type': resolvedPaymentType,
+        'remittance_status': resolvedRemittanceStatus,
+        'financial_settlement_status': resolvedSettlementStatus,
+        'is_location_verified': true,
+      };
+      if (customerSignatureUrl != null) directUpdate['proof_of_delivery_url'] = customerSignatureUrl;
+      if (photoProofUrl != null) directUpdate['proof_of_delivery_url'] ??= photoProofUrl;
+      if (latitude != null) directUpdate['latitude'] = latitude;
+      if (longitude != null) directUpdate['longitude'] = longitude;
+      if (notes != null && notes.isNotEmpty) directUpdate['delivery_notes'] = notes;
+      if (gatePassCode != null && gatePassCode.isNotEmpty) directUpdate['delivery_otp'] = gatePassCode;
+
+      if (SupabaseConstants.supabaseServiceRoleKey.isNotEmpty) {
+        final adminDb = SupabaseClient(
+          SupabaseConstants.supabaseUrl,
+          SupabaseConstants.supabaseServiceRoleKey,
+          authOptions: const AuthClientOptions(autoRefreshToken: false),
+        );
+        if (isUuid) {
+          await adminDb.from(SupabaseConstants.ordersTable).update(directUpdate).eq('id', orderId.trim());
+        } else {
+          await adminDb.from(SupabaseConstants.ordersTable).update(directUpdate).eq('order_number', orderId.trim());
+        }
+        adminDb.dispose();
+      }
+    } catch (directErr) {
+      debugPrint('[ORDERS_DATASOURCE] ℹ️ Direct delivered update notice: $directErr');
+    }
+
     try {
       final response = await supabaseClient.functions.invoke(
         'confirm-delivery-pod',
@@ -985,7 +1025,6 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
       );
 
       if (response.status >= 200 && response.status < 300) {
-        // Also update local list in database
         await updateOrderStatus(
           orderId,
           'delivered',

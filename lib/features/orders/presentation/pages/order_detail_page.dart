@@ -181,7 +181,13 @@ class OrderDetailPage extends ConsumerWidget {
     final isDc = currentUser?.isDcManager == true;
     final isCloser = currentUser?.isCloser == true;
     final isClientAdmin = currentUser?.isClientAdmin == true;
-    final isRider = currentUser?.isRider == true || (!isDc && !isCloser && !isClientAdmin);
+    final isRider = currentUser?.isRider == true ||
+        currentUser?.isPda == true ||
+        (currentUser != null && (currentUser.role.toLowerCase().contains('rider') ||
+            currentUser.role.toLowerCase().contains('agent') ||
+            currentUser.role.toLowerCase().contains('driver'))) ||
+        (!isDc && !isCloser && !isClientAdmin);
+    final isRiderUser = isRider;
 
     OrderEntity? matchedOrder;
     for (final o in ordersState.orders) {
@@ -318,11 +324,12 @@ class OrderDetailPage extends ConsumerWidget {
         ),
         centerTitle: true,
         actions: [
-          IconButton(
-            tooltip: 'Edit Order & Package Deal',
-            icon: const Icon(Icons.edit_note_rounded, color: Color(0xFFF37021)),
-            onPressed: () => ClientEditOrderModal.show(context, order),
-          ),
+          if (!isRiderUser)
+            IconButton(
+              tooltip: 'Edit Order & Package Deal',
+              icon: const Icon(Icons.edit_note_rounded, color: Color(0xFFF37021)),
+              onPressed: () => ClientEditOrderModal.show(context, order),
+            ),
           IconButton(
             tooltip: 'Refresh',
             icon: Icon(Icons.refresh_rounded, color: theme.colorScheme.onSurface),
@@ -739,8 +746,8 @@ class OrderDetailPage extends ConsumerWidget {
                   ),
                   const SizedBox(height: 8),
 
-                  // Actions: Edit Deal / Units & Add Upsell Item Action
-                  if (order.status != 'delivered' && order.status != 'cancelled')
+                  // Actions: Edit Deal / Units & Add Upsell Item Action (strictly forbidden for riders)
+                  if (!isRider && order.status != 'delivered' && order.status != 'cancelled')
                     Row(
                       children: [
                         Expanded(

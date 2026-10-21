@@ -223,41 +223,8 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
 
   List<OrderEntity> _sortOrdersByOperationalPriority(List<OrderEntity> rawOrders) {
     final list = [...rawOrders];
-    list.sort((a, b) {
-      int getOrderPriority(OrderEntity o) {
-        switch (o.status.toLowerCase()) {
-          case 'in_transit':
-          case 'picked_up':
-            return 0; // Top: Active in progress
-          case 'pending':
-          case 'assigned':
-          case 'accepted':
-          case 'new':
-            return 1; // Next: Pending dispatch
-          case 'call_back':
-          case 'contacting':
-          case 'upsell_pending':
-            return 2; // Next: Call back
-          case 'delivered':
-            // Prioritize cash in vehicle custody awaiting remittance before already settled/remitted orders
-            final isAwaitingRemittance = o.isUnremitted && !o.isDirectTransfer;
-            return isAwaitingRemittance ? 3 : 4;
-          case 'failed':
-          case 'cancelled':
-          case 'returned':
-            return 5; // Bottom
-          default:
-            return 2;
-        }
-      }
-
-      final pA = getOrderPriority(a);
-      final pB = getOrderPriority(b);
-      if (pA != pB) {
-        return pA.compareTo(pB);
-      }
-      return b.createdAt.compareTo(a.createdAt);
-    });
+    // Strictly chronological: newest orders are displayed at the very top
+    list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return list;
   }
 

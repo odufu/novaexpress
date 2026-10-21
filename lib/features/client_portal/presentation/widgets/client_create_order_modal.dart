@@ -54,6 +54,9 @@ class _ClientCreateOrderModalState extends ConsumerState<ClientCreateOrderModal>
   String? _selectedLga = 'Abuja Municipal (AMAC)';
   List<String> _availableLgas = [];
 
+  late final TextEditingController _quantityController;
+  late final TextEditingController _priceController;
+
   CatalogProduct? _selectedProduct;
   ProductPackage? _selectedPackage;
   int _quantity = 1;
@@ -67,6 +70,8 @@ class _ClientCreateOrderModalState extends ConsumerState<ClientCreateOrderModal>
   @override
   void initState() {
     super.initState();
+    _quantityController = TextEditingController(text: _quantity.toString());
+    _priceController = TextEditingController(text: _price.toStringAsFixed(0));
     _initProductAndState();
   }
 
@@ -90,6 +95,9 @@ class _ClientCreateOrderModalState extends ConsumerState<ClientCreateOrderModal>
           _price = _selectedProduct!.defaultUnitPrice;
         }
       }
+
+      _quantityController.text = _quantity.toString();
+      _priceController.text = _price.toStringAsFixed(0);
 
       if (_selectedProduct!.coveringStates.isNotEmpty) {
         final hasCurrentState = _selectedProduct!.coveringStates.any(
@@ -130,6 +138,8 @@ class _ClientCreateOrderModalState extends ConsumerState<ClientCreateOrderModal>
         _quantity = _selectedPackage!.quantity;
         _price = _selectedPackage!.packagePrice;
       }
+      _quantityController.text = _quantity.toString();
+      _priceController.text = _price.toStringAsFixed(0);
       if (_selectedProduct!.coveringStates.isNotEmpty) {
         _selectedState = _selectedProduct!.coveringStates.first;
         _loadLgas();
@@ -144,6 +154,8 @@ class _ClientCreateOrderModalState extends ConsumerState<ClientCreateOrderModal>
     _customerAltPhoneController.dispose();
     _addressController.dispose();
     _notesController.dispose();
+    _quantityController.dispose();
+    _priceController.dispose();
     super.dispose();
   }
 
@@ -162,6 +174,8 @@ class _ClientCreateOrderModalState extends ConsumerState<ClientCreateOrderModal>
         _quantity = 1;
         _price = prod.defaultUnitPrice;
       }
+      _quantityController.text = _quantity.toString();
+      _priceController.text = _price.toStringAsFixed(0);
 
       if (prod.coveringStates.isNotEmpty) {
         final hasCurrentState = prod.coveringStates.any(
@@ -181,6 +195,8 @@ class _ClientCreateOrderModalState extends ConsumerState<ClientCreateOrderModal>
       _selectedPackage = pkg;
       _quantity = pkg.quantity;
       _price = pkg.packagePrice;
+      _quantityController.text = pkg.quantity.toString();
+      _priceController.text = pkg.packagePrice.toStringAsFixed(0);
     });
   }
 
@@ -239,6 +255,10 @@ class _ClientCreateOrderModalState extends ConsumerState<ClientCreateOrderModal>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: const Color(0xFF0D9488),
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.only(bottom: 90, left: 16, right: 16),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            duration: const Duration(seconds: 3),
             content: Row(
               children: [
                 const Icon(Icons.check_circle_rounded, color: Colors.white),
@@ -556,13 +576,13 @@ class _ClientCreateOrderModalState extends ConsumerState<ClientCreateOrderModal>
                       builder: (context, constraints) {
                         final isRow = constraints.maxWidth >= 450;
                         final qtyField = TextFormField(
-                          initialValue: _quantity.toString(),
+                          controller: _quantityController,
                           decoration: _inputDecoration('Quantity (Physical Units)', prefixIcon: Icons.format_list_numbered),
                           keyboardType: TextInputType.number,
                           onChanged: (v) {
                             final parsed = int.tryParse(v);
                             if (parsed != null && parsed > 0) {
-                              setState(() => _quantity = parsed);
+                              _quantity = parsed;
                             }
                           },
                           validator: (v) {
@@ -574,18 +594,17 @@ class _ClientCreateOrderModalState extends ConsumerState<ClientCreateOrderModal>
                         );
 
                         final priceField = TextFormField(
-                          key: ValueKey(_price),
-                          initialValue: _price.toStringAsFixed(0),
+                          controller: _priceController,
                           decoration: _inputDecoration('Total Order Amount (₦)', prefixIcon: Icons.payments_outlined),
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           onChanged: (v) {
-                            final parsed = double.tryParse(v);
+                            final parsed = double.tryParse(v.replaceAll(',', ''));
                             if (parsed != null && parsed >= 0) {
                               _price = parsed;
                             }
                           },
                           validator: (v) {
-                            if (v == null || double.tryParse(v) == null || double.parse(v) < 0) {
+                            if (v == null || double.tryParse(v.replaceAll(',', '')) == null || double.parse(v.replaceAll(',', '')) < 0) {
                               return 'Enter valid amount';
                             }
                             return null;

@@ -1446,6 +1446,9 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
       return true;
     }).toList();
 
+    // Sort strictly chronological: newest orders at the top
+    filtered.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
     return Column(
       children: [
         if (isWideScreen)
@@ -1673,7 +1676,7 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                       );
                     } else {
                       return ListView.separated(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
                         itemCount: filtered.length,
                         separatorBuilder: (_, __) => const SizedBox(height: 12),
                         itemBuilder: (context, index) {

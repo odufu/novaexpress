@@ -158,9 +158,12 @@ class _ClientEditOrderModalState extends ConsumerState<ClientEditOrderModal> {
       _selectedPackage = pkg;
       _isCustomPackage = (pkg == null);
       if (pkg != null) {
-        _paidQuantityController.text = pkg.paidQuantity.toString();
-        _freeQuantityController.text = pkg.freeQuantity.toString();
-        _totalQuantityController.text = pkg.quantity.toString();
+        final totalQty = pkg.quantity > 0 ? pkg.quantity : (pkg.paidQuantity + pkg.freeQuantity);
+        final freeQty = pkg.freeQuantity >= 0 ? pkg.freeQuantity : 0;
+        final paidQty = pkg.paidQuantity > 0 ? pkg.paidQuantity : (totalQty - freeQty);
+        _paidQuantityController.text = (paidQty > 0 ? paidQty : 1).toString();
+        _freeQuantityController.text = freeQty.toString();
+        _totalQuantityController.text = (totalQty > 0 ? totalQty : 1).toString();
         _priceController.text = pkg.packagePrice.toStringAsFixed(0);
       }
     });
