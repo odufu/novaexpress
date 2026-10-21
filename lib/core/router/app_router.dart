@@ -99,7 +99,7 @@ String? appRouteRedirect({
     }
 
     final isDc = user.isDcManager;
-    final isDcOps = user.isDcOperations || user.isDcOrdersAdmin;
+    final isDcOrders = user.isDcOrdersAdmin;
     final isDcStock = user.isDcStockAdmin || isDc;
     final isDcFinance = user.isDcFinanceAdmin || isDc;
     final isAccountant = user.isGeneralAccountant || isDc;
@@ -127,15 +127,15 @@ String? appRouteRedirect({
 
     // 3. Strict Console Isolation: DC Operations Strictly Mobile Portal (/ops/**)
     if (matchedLocation.startsWith('/ops')) {
-      if (!isDcOps) {
+      if (!isDcOrders && !isDc) {
         debugPrint('[AUTH_ROUTER] 🛑 Access Denied: User role "${user.role}" cannot access Operations Portal -> Redirecting to $homePath');
         return homePath;
       }
     }
 
-    // Operations personnel are strictly confined to /ops
-    if (isDcOps && !matchedLocation.startsWith('/ops')) {
-      debugPrint('[AUTH_ROUTER] 🛑 Confining DC Operations Officer "${user.role}" strictly to mobile portal /ops');
+    // Orders & Dispatch officers are strictly confined to /ops
+    if (user.isDcOrdersAdmin && !matchedLocation.startsWith('/ops')) {
+      debugPrint('[AUTH_ROUTER] 🛑 Confining DC Orders & Dispatch Officer "${user.role}" strictly to mobile portal /ops');
       return '/ops';
     }
 

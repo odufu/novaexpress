@@ -184,6 +184,7 @@ class DCConsoleRepositoryImpl implements DCConsoleRepository {
       password: password,
       staffCode: staffCode,
       authDataSource: authDataSource,
+      role: role,
     );
 
     final cached = await _storageService.getCachedOperationsOfficers() ?? [];

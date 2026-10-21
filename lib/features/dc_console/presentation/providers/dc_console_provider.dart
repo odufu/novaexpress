@@ -1827,7 +1827,7 @@ class DCConsoleNotifier extends StateNotifier<DCConsoleState> {
         firstName: fName,
         lastName: lName,
         phone: cleanPhone,
-        role: 'dc_operations',
+        role: role,
         deliveryAgentId: null,
         deliveryAgentCode: effectiveCode,
         distributionCenterId: targetDcId,

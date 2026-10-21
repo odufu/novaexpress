@@ -1423,7 +1423,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       firstName: firstName,
       lastName: lastName,
       phone: phone,
-      role: 'dc_operations',
+      role: role,
       deliveryAgentId: null,
       deliveryAgentCode: effectiveCode,
       distributionCenterId: effectiveDcId,
