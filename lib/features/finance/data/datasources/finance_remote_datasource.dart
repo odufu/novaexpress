@@ -307,18 +307,21 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
         try {
           final oRes = await dbClient.from('orders').select('delivery_notes').eq('id', oId).limit(1);
           final existingNotes = (oRes as List).isNotEmpty ? (oRes.first['delivery_notes']?.toString() ?? '') : '';
-          final tag = actualIsPartial
-              ? '[PARTIAL REMITTANCE: $ref | Paid: ₦$amount]'
-              : '[REMITTED: $ref | Amount: ₦$amount]';
+          final tag = isPaystack
+              ? '[REMITTED VIA PAYSTACK: $ref | Amount: ₦$amount]'
+              : (actualIsPartial
+                  ? '[PARTIAL REMITTANCE SUBMITTED: $ref | Paid: ₦$amount]'
+                  : '[PENDING CLEARANCE: $ref | Amount: ₦$amount]');
           final updatedNotes = existingNotes.contains(ref)
               ? existingNotes
               : '$existingNotes $tag'.trim();
           await dbClient.from('orders').update({
-            'payment_status': actualIsPartial ? 'collected' : 'remitted',
+            'payment_status': isPaystack ? 'remitted' : 'collected',
+            'remittance_status': isPaystack ? 'cleared' : 'pending_clearance',
             'delivery_notes': updatedNotes,
             'updated_at': DateTime.now().toIso8601String(),
           }).eq('id', oId);
-          debugPrint('[FINANCE_DATASOURCE] 📋 Marked order $oId payment_status as ${actualIsPartial ? "collected" : "remitted"} in Supabase DB.');
+          debugPrint('[FINANCE_DATASOURCE] 📋 Marked order $oId remittance_status as ${isPaystack ? "cleared" : "pending_clearance"} in Supabase DB.');
         } catch (ordErr) {
           debugPrint('[FINANCE_DATASOURCE] ℹ️ order update notice: $ordErr');
         }

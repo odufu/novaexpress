@@ -15,6 +15,7 @@ import '../../domain/entities/distribution_center.dart';
 import '../providers/dc_console_provider.dart';
 import '../widgets/dc_remittance_detail_modal.dart';
 import '../widgets/dc_staff_profile_settings_tab.dart';
+import '../widgets/dc_audit_logs_tab_view.dart';
 
 class DCFinanceOperationsPage extends ConsumerStatefulWidget {
   const DCFinanceOperationsPage({super.key});
@@ -579,6 +580,28 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
           ],
         ),
         actions: [
+          IconButton(
+            tooltip: 'DC Activity Logs',
+            icon: const Icon(Icons.manage_history_rounded),
+            onPressed: () {
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (ctx) => Container(
+                  height: MediaQuery.of(context).size.height * 0.9,
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF0B132B) : const Color(0xFFF8FAFC),
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                    child: DCAuditLogsTabView(officerDc: currentDc, isDark: isDark),
+                  ),
+                ),
+              );
+            },
+          ),
           IconButton(
             tooltip: 'Refresh Data',
             icon: const Icon(Icons.refresh_rounded),

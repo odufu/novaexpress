@@ -18,6 +18,7 @@ import '../../domain/entities/dc_fleet_driver.dart';
 import '../../domain/entities/distribution_center.dart';
 import '../providers/dc_console_provider.dart';
 import '../widgets/dc_staff_profile_settings_tab.dart';
+import '../widgets/dc_audit_logs_tab_view.dart';
 import 'dc_expenditures_page.dart';
 
 class DCOperationsMobilePortalPage extends ConsumerStatefulWidget {
@@ -1227,8 +1228,8 @@ class _DCOperationsMobilePortalPageState
                 label: 'Riders & Fleet',
               ),
               BottomNavigationBarItem(
-                icon: Icon(Icons.history_rounded),
-                label: 'Routing Logs',
+                icon: Icon(Icons.manage_history_rounded),
+                label: 'Activity Logs',
               ),
               BottomNavigationBarItem(
                 icon: Icon(Icons.person_outline_rounded),
@@ -2171,83 +2172,9 @@ class _DCOperationsMobilePortalPageState
   // TAB 2: ROUTING LOGS
   // ---------------------------------------------------------------------------
   Widget _buildActivityLogsTab(DistributionCenter officerDc, bool isDark) {
-    final allOrders = ref.watch(ordersProvider).orders.where((order) {
-      return OrderRoutingService.doesOrderBelongToDc(
-        order: order,
-        currentDc: officerDc,
-        allDcs: ref.watch(dcConsoleProvider).distributionCenters,
-      );
-    }).toList();
-
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 120),
-      children: [
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF151D36) : Colors.white,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.timeline_rounded, color: Color(0xFF0D9488), size: 20),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Live Order Activity & Dispatch Trail for ${officerDc.name}',
-                  style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-        ...allOrders.take(15).map((order) {
-          return Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF151D36) : Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0D9488).withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.check_circle_outline_rounded, size: 16, color: Color(0xFF0D9488)),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Order #${order.orderNumber} - ${order.customerName}',
-                        style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        order.deliveryAgentName != null
-                            ? 'Dispatched to ${order.deliveryAgentName} (${order.status})'
-                            : 'Pending dispatch assignment',
-                        style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
-                      ),
-                    ],
-                  ),
-                ),
-                Text(
-                  DateFormat('hh:mm a').format(order.createdAt),
-                  style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
-                ),
-              ],
-            ),
-          );
-        }),
-      ],
+    return DCAuditLogsTabView(
+      officerDc: officerDc,
+      isDark: isDark,
     );
   }
 

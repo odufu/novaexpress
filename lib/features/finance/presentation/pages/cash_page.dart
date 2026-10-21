@@ -92,7 +92,7 @@ class _CashPageState extends ConsumerState<CashPage> {
     final double recentPosFee = (recentCollected > 0 && dcFinanceSettings.isPosFeeReimbursable)
         ? dcFinanceSettings.computePosFee(recentCollected)
         : 0.0;
-    final double recentToRemit = mostRecentOrder != null && mostRecentOrder.isCashPod && !mostRecentOrder.isRemitted
+    final double recentToRemit = mostRecentOrder != null && mostRecentOrder.isCashPod && !mostRecentOrder.isRemitted && !mostRecentOrder.isPendingClearance
         ? (recentCollected - recentCommission - recentTransport - recentPosFee).clamp(0.0, double.infinity)
         : 0.0;
 
@@ -346,7 +346,20 @@ class _CashPageState extends ConsumerState<CashPage> {
                                               style: GoogleFonts.inter(fontSize: 8, fontWeight: FontWeight.bold, color: const Color(0xFFFB923C)),
                                             ),
                                           )
-                                        else if (toRemit == 0 && (approvedRemittances.isNotEmpty || financeState.remittances.isNotEmpty))
+                                         else if (pendingRemittances.isNotEmpty)
+                                           Container(
+                                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                             decoration: BoxDecoration(
+                                               color: const Color(0xFFF59E0B).withValues(alpha: 0.2),
+                                               borderRadius: BorderRadius.circular(10),
+                                               border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.4)),
+                                             ),
+                                             child: Text(
+                                               'CLEARANCE PENDING ()',
+                                               style: GoogleFonts.inter(fontSize: 8, fontWeight: FontWeight.bold, color: const Color(0xFFFBBF24)),
+                                             ),
+                                           )
+                                         else if (toRemit == 0 && approvedRemittances.isNotEmpty)
                                           Container(
                                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                                             decoration: BoxDecoration(
@@ -501,7 +514,45 @@ class _CashPageState extends ConsumerState<CashPage> {
                                               ),
                                             ),
                                           ),
-                                        ],
+                                                                                  if (mostRecentOrder.isPendingClearance || (pendingRemittances.isNotEmpty && !mostRecentOrder.isRemitted)) ...[
+
+                                            const SizedBox(width: 4),
+
+                                            Container(
+
+                                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+
+                                              decoration: BoxDecoration(
+
+                                                color: const Color(0xFFF59E0B).withValues(alpha: 0.2),
+
+                                                borderRadius: BorderRadius.circular(3),
+
+                                                border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.4)),
+
+                                              ),
+
+                                              child: Text(
+
+                                                'AWAITING CLEARANCE',
+
+                                                style: GoogleFonts.inter(
+
+                                                  fontSize: 7.5,
+
+                                                  fontWeight: FontWeight.bold,
+
+                                                  color: const Color(0xFFFBBF24),
+
+                                                ),
+
+                                              ),
+
+                                            ),
+
+                                          ],
+
+],
                                         if (latestRemittance != null && latestRemittance.isPartialRemittance) ...[
                                           const SizedBox(width: 4),
                                           Container(
@@ -539,8 +590,10 @@ class _CashPageState extends ConsumerState<CashPage> {
                                         icon: Icons.near_me_outlined,
                                         iconColor: const Color(0xFFFB923C),
                                         amountColor: const Color(0xFFFB923C),
-                                        label: 'To Remit',
-                                        amount: recentToRemit,
+                                         label: (mostRecentOrder != null && mostRecentOrder.isPendingClearance) ? 'In Clearance' : 'To Remit',
+                                         amount: (mostRecentOrder != null && mostRecentOrder.isPendingClearance)
+                                             ? (recentCollected - recentCommission - recentTransport - recentPosFee).clamp(0.0, double.infinity)
+                                             : recentToRemit,
                                       ),
                                     ),
                                     _buildVerticalSeparator(),
@@ -899,82 +952,186 @@ class _CashPageState extends ConsumerState<CashPage> {
                               ),
                             ),
                           )
-                        : Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF064E3B) : const Color(0xFF065F46),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: const Color(0xFF10B981).withValues(alpha: isDark ? 0.3 : 0.5),
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFF064E3B).withValues(alpha: isDark ? 0.35 : 0.2),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              children: [
-                                Container(width: 4, height: 44, color: const Color(0xFF10B981)),
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.all(8),
+                        : (pendingRemittances.isNotEmpty
+                            ? InkWell(
+                                onTap: () => context.push('/cash/history'),
+                                borderRadius: BorderRadius.circular(16),
+                                child: Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(14),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.15),
-                                    shape: BoxShape.circle,
+                                    color: isDark ? const Color(0xFF78350F).withValues(alpha: 0.45) : const Color(0xFFFEF3C7),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: const Color(0xFFF59E0B).withValues(alpha: isDark ? 0.4 : 0.8),
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(0xFFB45309).withValues(alpha: isDark ? 0.25 : 0.12),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
                                   ),
-                                  child: const Icon(Icons.check_circle_outline_rounded, color: Colors.white, size: 22),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                  child: Row(
                                     children: [
-                                      Text(
-                                        'REMITTANCES RECONCILED',
-                                        style: GoogleFonts.jetBrainsMono(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                          color: const Color(0xFFA7F3D0),
-                                          letterSpacing: 0.8,
+                                      Container(width: 4, height: 48, color: const Color(0xFFF59E0B)),
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF59E0B).withValues(alpha: 0.2),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(Icons.hourglass_top_rounded, color: Color(0xFFD97706), size: 22),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Flexible(
+                                                  child: Text(
+                                                    'AWAITING FINANCE CLEARANCE',
+                                                    style: GoogleFonts.jetBrainsMono(
+                                                      fontSize: 9.5,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: isDark ? const Color(0xFFFDE68A) : const Color(0xFF92400E),
+                                                      letterSpacing: 0.8,
+                                                    ),
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFFF59E0B).withValues(alpha: 0.2),
+                                                    borderRadius: BorderRadius.circular(4),
+                                                  ),
+                                                  child: Text(
+                                                    'SUBMITTED',
+                                                    style: GoogleFonts.inter(fontSize: 8, fontWeight: FontWeight.bold, color: const Color(0xFFB45309)),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              CurrencyFormatter.formatNaira(pendingRemittances.fold(0.0, (s, r) => s + r.amount)),
+                                              style: GoogleFonts.inter(
+                                                fontSize: 20,
+                                                fontWeight: FontWeight.bold,
+                                                color: isDark ? Colors.white : const Color(0xFF78350F),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 1),
+                                            Text(
+                                              '${pendingRemittances.first.referenceNumber} • Clearance pending from DC Financial Ops',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: isDark ? Colors.white70 : const Color(0xFF92400E),
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ],
                                         ),
                                       ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        '₦0.00',
-                                        style: GoogleFonts.inter(
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white,
+                                      OutlinedButton(
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: isDark ? Colors.white : const Color(0xFF92400E),
+                                          side: BorderSide(color: isDark ? Colors.white60 : const Color(0xFFB45309)),
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                         ),
-                                      ),
-                                      const SizedBox(height: 1),
-                                      const Text(
-                                        'All collections accounted for.',
-                                        style: TextStyle(fontSize: 11, color: Colors.white70),
+                                        onPressed: () => context.push('/cash/history'),
+                                        child: Text(
+                                          'Track Status',
+                                          style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 11),
+                                        ),
                                       ),
                                     ],
                                   ),
                                 ),
-                                OutlinedButton(
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: Colors.white,
-                                    side: const BorderSide(color: Colors.white70),
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              )
+                            : Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  color: isDark ? const Color(0xFF064E3B) : const Color(0xFF065F46),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: const Color(0xFF10B981).withValues(alpha: isDark ? 0.3 : 0.5),
                                   ),
-                                  onPressed: () => context.push('/cash/history'),
-                                  child: Text(
-                                    'History',
-                                    style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 11.5),
-                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFF064E3B).withValues(alpha: isDark ? 0.35 : 0.2),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
-                          ),
+                                child: Row(
+                                  children: [
+                                    Container(width: 4, height: 44, color: const Color(0xFF10B981)),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withValues(alpha: 0.15),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(Icons.check_circle_outline_rounded, color: Colors.white, size: 22),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'REMITTANCES RECONCILED',
+                                            style: GoogleFonts.jetBrainsMono(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                              color: const Color(0xFFA7F3D0),
+                                              letterSpacing: 0.8,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            '₦0.00',
+                                            style: GoogleFonts.inter(
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 1),
+                                          const Text(
+                                            'All collections accounted for.',
+                                            style: TextStyle(fontSize: 11, color: Colors.white70),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    OutlinedButton(
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: Colors.white,
+                                        side: const BorderSide(color: Colors.white70),
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                      ),
+                                      onPressed: () => context.push('/cash/history'),
+                                      child: Text(
+                                        'History',
+                                        style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 11.5),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )),
                     const SizedBox(height: 18),
 
                     // REMITTANCE HISTORY SECTION (DYNAMIC LIST FROM FINANCE PROVIDER)

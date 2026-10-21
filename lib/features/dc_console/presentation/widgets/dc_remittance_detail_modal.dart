@@ -1,3 +1,4 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -328,13 +329,28 @@ class _DCRemittanceDetailModalState extends ConsumerState<DCRemittanceDetailModa
         );
       }
 
-      // Mark orders as remitted/cleared in local state
+      // Mark orders as remitted/cleared in local state and DB
       for (final order in rem.orders) {
         await ref.read(ordersProvider.notifier).updateOrderPaymentStatus(
           orderId: order.id,
-          paymentStatus: 'collected',
+          paymentStatus: 'remitted',
           remittanceStatus: 'cleared',
         );
+        try {
+          final oRes = await Supabase.instance.client.from('orders').select('delivery_notes').eq('id', order.id).limit(1);
+          final notes = (oRes as List).isNotEmpty ? (oRes.first['delivery_notes']?.toString() ?? '') : '';
+          final tag = '[REMITTANCE CLEARED: ${rem.referenceNumber}]';
+          final updatedNotes = notes.contains(rem.referenceNumber)
+              ? notes.replaceAll(RegExp(r'\[PENDING CLEARANCE:[^\]]+\]'), tag)
+              : '$notes $tag'.trim();
+          await Supabase.instance.client.from('orders').update({
+            'payment_status': 'remitted',
+            'remittance_status': 'cleared',
+            'financial_settlement_status': 'cash_remitted_verified',
+            'delivery_notes': updatedNotes,
+            'updated_at': DateTime.now().toIso8601String(),
+          }).eq('id', order.id);
+        } catch (_) {}
       }
 
       // Reload live DC & Finance state

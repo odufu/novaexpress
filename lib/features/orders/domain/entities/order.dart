@@ -213,24 +213,52 @@ class OrderEntity {
     final ps = paymentStatus.toLowerCase();
     final fs = financialSettlementStatus.toLowerCase();
     final notes = (deliveryNotes ?? '').toLowerCase();
+
+    // If awaiting clearance or unremitted, it must NEVER be considered cleared
+    if (rs == 'pending_clearance' ||
+        rs == 'pending_verification' ||
+        rs == 'submitted' ||
+        rs == 'unremitted' ||
+        rs == 'pending') {
+      return false;
+    }
+    if (notes.contains('[pending clearance') ||
+        notes.contains('[submitted for remittance') ||
+        notes.contains('[partial remittance')) {
+      return false;
+    }
+
     return rs == 'cleared' ||
-        rs == 'remitted' ||
-        ps == 'remitted' ||
         fs == 'cash_remitted_verified' ||
-        notes.contains('[remitted');
+        notes.contains('[remittance approved') ||
+        notes.contains('[remittance cleared') ||
+        (rs == 'remitted' && ps == 'remitted');
+  }
+
+  bool get isPendingClearance {
+    if (isDirectTransfer) return false;
+    if (isRemitted) return false;
+    final rs = remittanceStatus.toLowerCase();
+    final notes = (deliveryNotes ?? '').toLowerCase();
+    return rs == 'pending_clearance' ||
+        rs == 'pending_verification' ||
+        rs == 'submitted' ||
+        notes.contains('[pending clearance') ||
+        notes.contains('[submitted for remittance');
   }
 
   bool get isUnremitted {
     if (!isDelivered) return false;
     if (isDirectTransfer) return false;
     if (isRemitted) return false;
+    if (isPendingClearance) return false;
     final rs = remittanceStatus.toLowerCase();
     return rs == 'unremitted' || rs == 'pending' || rs.isEmpty;
   }
 
   bool get isPendingVerification {
     if (isRemitted) return false;
-    return remittanceStatus.toLowerCase() == 'pending_verification';
+    return isPendingClearance || remittanceStatus.toLowerCase() == 'pending_verification';
   }
 
   String? get merchantId => clientId;
