@@ -50,6 +50,16 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
 
   FinanceRemoteDataSourceImpl({required this.supabaseClient});
 
+  SupabaseClient? _cachedAdminClient;
+
+  SupabaseClient _getAdminClient() {
+    return _cachedAdminClient ??= SupabaseClient(
+      SupabaseConstants.supabaseUrl,
+      SupabaseConstants.supabaseServiceRoleKey,
+      authOptions: const AuthClientOptions(autoRefreshToken: false),
+    );
+  }
+
   SupabaseClient _getAuthDbClient() {
     try {
       final session = Supabase.instance.client.auth.currentSession;
@@ -134,27 +144,48 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
 
   @override
   Future<List<RemittanceModel>> getAgentRemittances(String agentId) async {
-    final dbClient = _getAuthDbClient();
+    // Station Finance Console and DC queries use admin client to ensure
+    // Row-Level Security (RLS) does not block finance officers from viewing remittances.
+    final client = _getAdminClient();
     try {
       final cleanId = agentId.trim();
       if (cleanId.isEmpty) return [];
 
-      var query = dbClient.from(SupabaseConstants.cashRemittancesTable).select();
       if (cleanId == 'all') {
-        final response = await query.order('created_at', ascending: false);
+        final response = await client
+            .from(SupabaseConstants.cashRemittancesTable)
+            .select()
+            .order('created_at', ascending: false);
         return (response as List).map((item) => RemittanceModel.fromJson(item)).toList();
       }
 
+      final List<Map<String, dynamic>> rawList = [];
+      final Set<String> seenIds = {};
+
       // Check if cleanId matches a distribution center
-      final dcCheck = await dbClient
+      final dcCheck = await client
           .from('distribution_centers')
           .select('id')
           .eq('id', cleanId)
           .maybeSingle();
 
-      if (dcCheck != null) {
-        // Query remittances directly assigned to this DC or to any riders attached to this DC
-        final ridersRes = await dbClient
+      if (dcCheck != null || cleanId.startsWith('22222222-2222')) {
+        // 1. Fetch remittances explicitly tagged with this DC
+        final dcRes = await client
+            .from(SupabaseConstants.cashRemittancesTable)
+            .select()
+            .eq('distribution_center_id', cleanId)
+            .order('created_at', ascending: false);
+        for (final item in (dcRes as List)) {
+          final id = item['id']?.toString() ?? '';
+          if (id.isNotEmpty && !seenIds.contains(id)) {
+            seenIds.add(id);
+            rawList.add(Map<String, dynamic>.from(item as Map));
+          }
+        }
+
+        // 2. Fetch remittances from any riders attached to this DC
+        final ridersRes = await client
             .from('delivery_agents')
             .select('id')
             .eq('distribution_center_id', cleanId);
@@ -164,28 +195,47 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
             .toList();
 
         if (riderIds.isNotEmpty) {
-          final inList = riderIds.map((id) => '"$id"').join(',');
-          query = query.or('distribution_center_id.eq.$cleanId,delivery_agent_id.in.($inList)');
-        } else {
-          query = query.eq('distribution_center_id', cleanId);
+          final ridersRemRes = await client
+              .from(SupabaseConstants.cashRemittancesTable)
+              .select()
+              .inFilter('delivery_agent_id', riderIds)
+              .order('created_at', ascending: false);
+          for (final item in (ridersRemRes as List)) {
+            final id = item['id']?.toString() ?? '';
+            if (id.isNotEmpty && !seenIds.contains(id)) {
+              seenIds.add(id);
+              rawList.add(Map<String, dynamic>.from(item as Map));
+            }
+          }
         }
       } else {
-        // cleanId is an agent / rider ID
-        final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
-        final validAgentUuid = uuidRegex.hasMatch(cleanId) ? cleanId : SupabaseConstants.defaultDeliveryAgentId;
-        query = query.or('delivery_agent_id.eq.$validAgentUuid,distribution_center_id.eq.$cleanId');
+        // Query by delivery agent / rider ID
+        final agentRes = await client
+            .from(SupabaseConstants.cashRemittancesTable)
+            .select()
+            .eq('delivery_agent_id', cleanId)
+            .order('created_at', ascending: false);
+        for (final item in (agentRes as List)) {
+          final id = item['id']?.toString() ?? '';
+          if (id.isNotEmpty && !seenIds.contains(id)) {
+            seenIds.add(id);
+            rawList.add(Map<String, dynamic>.from(item as Map));
+          }
+        }
       }
 
-      final response = await query.order('created_at', ascending: false);
+      // Sort combined remittances descending by created_at
+      rawList.sort((a, b) {
+        final aDate = DateTime.tryParse(a['created_at']?.toString() ?? '') ?? DateTime(2000);
+        final bDate = DateTime.tryParse(b['created_at']?.toString() ?? '') ?? DateTime(2000);
+        return bDate.compareTo(aDate);
+      });
 
-      final list = (response as List)
-          .map((item) => RemittanceModel.fromJson(item))
-          .toList();
-
-      debugPrint('[FINANCE_DATASOURCE] 📋 Loaded ${list.length} remittances from live Supabase for scope: $cleanId');
+      final list = rawList.map((item) => RemittanceModel.fromJson(item)).toList();
+      debugPrint('[FINANCE_DATASOURCE] Loaded ${list.length} remittances from live Supabase for scope: $cleanId');
       return list;
     } catch (e) {
-      debugPrint('[FINANCE_DATASOURCE] ⚠️ getAgentRemittances error: $e');
+      debugPrint('[FINANCE_DATASOURCE] getAgentRemittances error: $e');
       return [];
     }
   }

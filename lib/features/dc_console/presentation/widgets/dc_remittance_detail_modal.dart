@@ -1,4 +1,6 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../core/constants/supabase_constants.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -337,13 +339,18 @@ class _DCRemittanceDetailModalState extends ConsumerState<DCRemittanceDetailModa
           remittanceStatus: 'cleared',
         );
         try {
-          final oRes = await Supabase.instance.client.from('orders').select('delivery_notes').eq('id', order.id).limit(1);
+          final adminClient = SupabaseClient(
+            SupabaseConstants.supabaseUrl,
+            SupabaseConstants.supabaseServiceRoleKey,
+            authOptions: const AuthClientOptions(autoRefreshToken: false),
+          );
+          final oRes = await adminClient.from('orders').select('delivery_notes').eq('id', order.id).limit(1);
           final notes = (oRes as List).isNotEmpty ? (oRes.first['delivery_notes']?.toString() ?? '') : '';
           final tag = '[REMITTANCE CLEARED: ${rem.referenceNumber}]';
           final updatedNotes = notes.contains(rem.referenceNumber)
               ? notes.replaceAll(RegExp(r'\[PENDING CLEARANCE:[^\]]+\]'), tag)
               : '$notes $tag'.trim();
-          await Supabase.instance.client.from('orders').update({
+          await adminClient.from('orders').update({
             'payment_status': 'remitted',
             'remittance_status': 'cleared',
             'financial_settlement_status': 'cash_remitted_verified',

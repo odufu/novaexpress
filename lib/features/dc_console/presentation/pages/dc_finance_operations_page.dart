@@ -38,7 +38,11 @@ class _DCFinanceOperationsPageState extends ConsumerState<DCFinanceOperationsPag
   }
 
   void _loadData() {
-    final activeHubId = ref.read(dcConsoleProvider).activeHubId;
+    final currentUser = ref.read(authProvider).user;
+    final dcState = ref.read(dcConsoleProvider);
+    final activeHubId = dcState.activeHubId.isNotEmpty
+        ? dcState.activeHubId
+        : (currentUser?.distributionCenterId ?? '22222222-2222-4222-8222-222222222222');
     ref.read(financeProvider.notifier).loadRemittances(activeHubId);
     ref.read(dcConsoleProvider.notifier).loadDriversFromDatabase();
     ref.read(dcConsoleProvider.notifier).loadTransactionsFromDatabase();
