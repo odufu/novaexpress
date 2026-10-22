@@ -7,34 +7,19 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../dc_console/presentation/providers/dc_console_provider.dart';
 import '../../data/datasources/stock_remote_datasource.dart';
 import '../../data/repositories/stock_repository_impl.dart';
+import '../../domain/entities/inbound_stock_request.dart';
 import '../../domain/entities/rider_stock_allocation.dart';
 import '../../domain/entities/stock_item.dart';
 import '../../domain/entities/stock_transfer_record.dart';
 import '../../domain/repositories/stock_repository.dart';
+
+export '../../domain/entities/inbound_stock_request.dart';
 
 enum StockFilter {
   all,
   available,
   lowStock,
   outOfStock,
-}
-
-class InboundStockRequest {
-  final String requestId;
-  final String dcName;
-  final String status; // 'Awaiting DC Review', 'Partially Approved', 'Ready for Collection', 'Completed'
-  final DateTime? requestDate;
-  final Map<String, int> requestedQuantities;
-  final Map<String, int> approvedQuantities;
-
-  const InboundStockRequest({
-    required this.requestId,
-    required this.dcName,
-    required this.status,
-    this.requestDate,
-    required this.requestedQuantities,
-    required this.approvedQuantities,
-  });
 }
 
 class StockState {
@@ -401,6 +386,7 @@ class StockNotifier extends StateNotifier<StockState> {
         );
         _storageService.cacheStockItems(items);
         _storageService.cacheRiderStockAllocations(allocations);
+        await fetchStockRequests(targetDcId);
       }
     } catch (e) {
       debugPrint('[STOCK_PROVIDER] ❌ fetchStockItems error: $e');
@@ -423,6 +409,19 @@ class StockNotifier extends StateNotifier<StockState> {
     }
   }
 
+  Future<void> fetchStockRequests([String? dcId]) async {
+    try {
+      final remoteReqs = await repository.fetchStockRequests(dcId);
+      if (remoteReqs.isNotEmpty) {
+        final Set<String> remoteIds = remoteReqs.map((r) => r.requestId).toSet();
+        final localOnly = state.inboundRequests.where((r) => !remoteIds.contains(r.requestId)).toList();
+        state = state.copyWith(inboundRequests: [...remoteReqs, ...localOnly]);
+      }
+    } catch (e) {
+      debugPrint('[STOCK_PROVIDER] ⚠️ fetchStockRequests error: $e');
+    }
+  }
+
   void clearError() {
     state = state.copyWith(errorMessage: null);
   }
@@ -435,23 +434,148 @@ class StockNotifier extends StateNotifier<StockState> {
     state = state.copyWith(activeFilter: filter);
   }
 
-  void addStockRequest({
+  Future<void> addStockRequest({
     required String dcName,
     required Map<String, int> quantities,
-  }) {
+    String? riderId,
+    String? riderName,
+    String? riderCode,
+    String? notes,
+    List<StockRequestItemModel>? items,
+  }) async {
     final newReqId = 'REQ-${(10000 + state.inboundRequests.length + 1).toString().substring(1)}';
     final newRequest = InboundStockRequest(
       requestId: newReqId,
       dcName: dcName,
-      status: 'Awaiting DC Review',
+      riderId: riderId,
+      riderName: riderName ?? 'Delivery Agent',
+      riderCode: riderCode ?? 'PDA-RIDER',
+      notes: notes,
+      status: 'pending',
       requestDate: DateTime.now(),
       requestedQuantities: quantities,
       approvedQuantities: quantities,
+      items: items ?? [],
     );
 
     state = state.copyWith(
       inboundRequests: [newRequest, ...state.inboundRequests],
     );
+
+    // Asynchronously log to Supabase stock_requests table
+    try {
+      final client = Supabase.instance.client;
+      final srRes = await client.from('stock_requests').insert({
+        'request_number': newReqId,
+        if (riderId != null) 'delivery_agent_id': riderId,
+        'status': 'pending',
+        'request_type': 'restock',
+        'notes': notes ?? 'Restock request submitted via app',
+        'created_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+      }).select('id').single();
+
+      final srId = srRes['id']?.toString() ?? '';
+      if (srId.isNotEmpty && items != null && items.isNotEmpty) {
+        for (final item in items) {
+          if (item.productId.isNotEmpty && item.requestedQuantity > 0) {
+            await client.from('stock_request_items').insert({
+              'stock_request_id': srId,
+              'product_id': item.productId,
+              'requested_quantity': item.requestedQuantity,
+              'approved_quantity': item.requestedQuantity,
+            });
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<Map<String, dynamic>> fulfillStockRequest({
+    required String requestId,
+    required String fulfillmentMode, // 'dc_warehouse' or 'rider_transfer'
+    required String destinationRiderId,
+    required String destinationRiderName,
+    required String destinationRiderCode,
+    String? sourceRiderId,
+    String? sourceRiderName,
+    required List<Map<String, dynamic>> items,
+    String? dcId,
+    String? notes,
+  }) async {
+    try {
+      if (fulfillmentMode == 'dc_warehouse') {
+        for (final it in items) {
+          final pId = it['productId']?.toString() ?? it['product_id']?.toString() ?? '';
+          final qty = (it['quantity'] as num?)?.toInt() ?? 0;
+          if (pId.isNotEmpty && qty > 0) {
+            final res = await assignStockToRider(
+              productIdOrSku: pId,
+              riderId: destinationRiderId,
+              riderName: destinationRiderName,
+              riderCode: destinationRiderCode,
+              quantity: qty,
+              distributionCenterId: dcId,
+            );
+            if (res['success'] != true) {
+              return res;
+            }
+          }
+        }
+      } else if (fulfillmentMode == 'rider_transfer') {
+        if (sourceRiderId == null || sourceRiderName == null) {
+          return {'success': false, 'message': 'Source rider required for in-field stock rebalancing.'};
+        }
+        for (final it in items) {
+          final pId = it['productId']?.toString() ?? it['product_id']?.toString() ?? '';
+          final qty = (it['quantity'] as num?)?.toInt() ?? 0;
+          if (pId.isNotEmpty && qty > 0) {
+            final r2rRes = await transferStockBetweenRiders(
+              productIdOrSku: pId,
+              sourceRiderId: sourceRiderId,
+              sourceRiderName: sourceRiderName,
+              destinationRiderId: destinationRiderId,
+              destinationRiderName: destinationRiderName,
+              destinationRiderCode: destinationRiderCode,
+              quantity: qty,
+              notes: notes ?? 'Fulfillment of restock request #$requestId',
+            );
+            if (r2rRes['success'] != true) {
+              return r2rRes;
+            }
+          }
+        }
+      }
+
+      // Persist fulfillment status to backend
+      try {
+        await repository.fulfillStockRequest(
+          requestId: requestId,
+          status: 'fulfilled',
+          notes: notes,
+        );
+      } catch (_) {}
+
+      // Update in local state
+      final updatedReqs = state.inboundRequests.map((r) {
+        if (r.id == requestId || r.requestId == requestId) {
+          return r.copyWith(status: 'fulfilled');
+        }
+        return r;
+      }).toList();
+      state = state.copyWith(inboundRequests: updatedReqs);
+
+      // Refresh items and allocations
+      await fetchStockItems(null, dcId);
+
+      return {
+        'success': true,
+        'message': 'Restock request successfully fulfilled via ${fulfillmentMode == 'dc_warehouse' ? 'DC Warehouse Stock' : 'Rider Rebalancing ($sourceRiderName)'}.',
+      };
+    } catch (e) {
+      debugPrint('[STOCK_PROVIDER] ⚠️ fulfillStockRequest error: $e');
+      return {'success': false, 'message': 'Fulfillment failed: $e'};
+    }
   }
 
   void completeStockHandover(String requestId) {

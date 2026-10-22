@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/supabase_constants.dart';
+import '../../domain/entities/inbound_stock_request.dart';
 import '../../domain/entities/rider_stock_allocation.dart';
 import '../../domain/entities/stock_item.dart';
 import '../../domain/entities/stock_transfer_record.dart';
@@ -178,6 +179,12 @@ abstract class StockRemoteDataSource {
     required List<Map<String, dynamic>> items,
     String? dcId,
     String? riderId,
+    String? notes,
+  });
+  Future<List<InboundStockRequest>> fetchStockRequests([String? dcId]);
+  Future<Map<String, dynamic>> fulfillStockRequest({
+    required String requestId,
+    required String status,
     String? notes,
   });
 }
@@ -2271,6 +2278,48 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
     } catch (e) {
       debugPrint('[STOCK_DATASOURCE] ⚠️ submitDetailedInventoryAudit error: $e');
       throw Exception('Failed to persist inventory audit: $e');
+    }
+  }
+
+  @override
+  Future<List<InboundStockRequest>> fetchStockRequests([String? dcId]) async {
+    final client = _getAuthDbClient();
+    try {
+      var query = client
+          .from('stock_requests')
+          .select('id, request_number, delivery_agent_id, distribution_center_id, status, request_type, notes, created_at, stock_request_items(id, product_id, requested_quantity, approved_quantity, products(id, name, sku, base_price)), delivery_agents(id, agent_code, users(first_name, last_name, phone_number))');
+      if (dcId != null && dcId.isNotEmpty) {
+        query = query.eq('distribution_center_id', dcId);
+      }
+      final response = await query.order('created_at', ascending: false);
+      final list = (response as List)
+          .map((item) => InboundStockRequest.fromJson(Map<String, dynamic>.from(item as Map)))
+          .toList();
+      debugPrint('[STOCK_DATASOURCE] 📋 Loaded ${list.length} stock requests from live Supabase.');
+      return list;
+    } catch (e) {
+      debugPrint('[STOCK_DATASOURCE] ⚠️ fetchStockRequests error: $e');
+      return [];
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> fulfillStockRequest({
+    required String requestId,
+    required String status,
+    String? notes,
+  }) async {
+    final client = _getAuthDbClient();
+    try {
+      await client.from('stock_requests').update({
+        'status': status,
+        'updated_at': DateTime.now().toIso8601String(),
+        if (notes != null && notes.isNotEmpty) 'notes': notes,
+      }).eq('id', requestId);
+      return {'success': true, 'message': 'Stock request marked as $status.'};
+    } catch (e) {
+      debugPrint('[STOCK_DATASOURCE] ⚠️ fulfillStockRequest error: $e');
+      return {'success': false, 'message': e.toString()};
     }
   }
 }

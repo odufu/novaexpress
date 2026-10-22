@@ -1,3 +1,4 @@
+import '../entities/inbound_stock_request.dart';
 import '../entities/rider_stock_allocation.dart';
 import '../entities/stock_item.dart';
 import '../entities/stock_transfer_record.dart';
@@ -173,6 +174,12 @@ abstract class StockRepository {
     required List<Map<String, dynamic>> items,
     String? dcId,
     String? riderId,
+    String? notes,
+  });
+  Future<List<InboundStockRequest>> fetchStockRequests([String? dcId]);
+  Future<Map<String, dynamic>> fulfillStockRequest({
+    required String requestId,
+    required String status,
     String? notes,
   });
 }

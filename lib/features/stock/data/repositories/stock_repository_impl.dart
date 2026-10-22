@@ -1,3 +1,4 @@
+import '../../domain/entities/inbound_stock_request.dart';
 import '../../domain/entities/rider_stock_allocation.dart';
 import '../../domain/entities/stock_item.dart';
 import '../../domain/entities/stock_transfer_record.dart';
@@ -418,6 +419,24 @@ class StockRepositoryImpl implements StockRepository {
       items: items,
       dcId: dcId,
       riderId: riderId,
+      notes: notes,
+    );
+  }
+
+  @override
+  Future<List<InboundStockRequest>> fetchStockRequests([String? dcId]) async {
+    return await remoteDataSource.fetchStockRequests(dcId);
+  }
+
+  @override
+  Future<Map<String, dynamic>> fulfillStockRequest({
+    required String requestId,
+    required String status,
+    String? notes,
+  }) async {
+    return await remoteDataSource.fulfillStockRequest(
+      requestId: requestId,
+      status: status,
       notes: notes,
     );
   }
