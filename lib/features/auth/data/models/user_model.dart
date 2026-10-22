@@ -91,7 +91,7 @@ class UserModel extends UserEntity {
           json['profile_photo_url']?.toString() ??
           json['avatar']?.toString() ??
           json['image_url']?.toString(),
-      isSupervisor: json['is_supervisor'] == true || json['is_supervisor'] == 'true' || json['role'] == 'marketing_supervisor' || json['role'] == 'supervisor_marketer',
+      isSupervisor: json['is_supervisor'] == true || json['is_supervisor'] == 'true' || json['role'] == 'marketing_supervisor' || json['role'] == 'supervisor_marketer' || json['role'] == 'sales_supervisor' || json['role'] == 'closer_supervisor' || json['role'] == 'sales_rep_supervisor',
     );
   }
 

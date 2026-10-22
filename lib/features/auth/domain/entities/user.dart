@@ -109,13 +109,20 @@ class UserEntity {
       role == 'accountant' ||
       role == 'finance_director';
   bool get isDcOperations => isDcOrdersAdmin || isDcStockAdmin || isDcFinanceAdmin;
-  bool get isCloser => role == 'closer' || role == 'client_closer';
+  bool get isCloserSupervisor =>
+      (isCloserRaw && isSupervisor) ||
+      role == 'sales_supervisor' ||
+      role == 'closer_supervisor' ||
+      role == 'sales_rep_supervisor';
+  bool get isCloserRaw => role == 'closer' || role == 'client_closer';
+  bool get isCloser => isCloserRaw || isCloserSupervisor;
   bool get isMarketerSupervisor => isSupervisor || role == 'marketing_supervisor' || role == 'supervisor_marketer';
   bool get isMarketer => role == 'marketer' || role == 'digital_marketer' || isMarketerSupervisor;
   bool get isClientAdmin => role == 'client' || role == 'merchant' || role == 'seller';
   bool get isClient => isClientAdmin || isCloser || isMarketer;
 
   String get roleDescription {
+    if (isCloserSupervisor) return 'Merchant Sales Rep Supervisor';
     if (isGeneralAccountant) return 'General Accountant';
     if (isDcManager) return 'DC Operations Supervisor';
     if (isDcStockAdmin) return 'DC Stock Management Officer';
@@ -131,6 +138,7 @@ class UserEntity {
 
   /// Canonical console route strictly governed by the user's operational role
   String get homeConsoleRoute {
+    if (isCloserSupervisor) return '/sales-supervisor';
     if (isGeneralAccountant) return '/accountant';
     if (isDcManager) return '/dc';
     if (isDcStockAdmin) return '/stock-ops';

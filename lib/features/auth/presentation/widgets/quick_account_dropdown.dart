@@ -52,6 +52,17 @@ class QuickAccountDropdown extends StatefulWidget {
 
   static const List<QuickAccountOption> secondaryAccounts = [
     QuickAccountOption(
+      roleKey: 'sales_supervisor',
+      title: 'Merchant Sales Rep Supervisor',
+      personName: 'Amaka Chioma (Supervisor)',
+      badge: 'Supervisor (/sales-supervisor)',
+      email: 'sales.supervisor@novaxpress.ng',
+      password: 'Password123!',
+      icon: Icons.verified_user_rounded,
+      themeColor: Color(0xFFF37021),
+      isSecondary: true,
+    ),
+    QuickAccountOption(
       roleKey: 'dc_finance_admin',
       title: 'DC Finance & Remittances Officer',
       personName: 'Joel Finances',

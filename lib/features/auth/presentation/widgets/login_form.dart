@@ -34,6 +34,16 @@ class _DevAccountOption {
 
 const List<_DevAccountOption> _devTestAccounts = [
   _DevAccountOption(
+    name: 'Amaka Chioma (Sales Supervisor)',
+    code: 'SUP-SALES-01',
+    roleBadge: 'SALES SUP',
+    email: 'sales.supervisor@novaxpress.ng',
+    password: 'Password123!',
+    portalRoute: '/sales-supervisor (Supervisor Console)',
+    icon: Icons.verified_user_rounded,
+    roleColor: Color(0xFFF37021),
+  ),
+  _DevAccountOption(
     name: 'Ahmed Bello (Grand DC Supervisor)',
     code: 'DC-MGR-WUSE-01',
     roleBadge: 'DC MANAGER',

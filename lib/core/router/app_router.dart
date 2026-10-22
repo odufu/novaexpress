@@ -33,6 +33,7 @@ import '../../features/dc_console/presentation/pages/dc_stock_operations_page.da
 import '../../features/dc_console/presentation/pages/general_accountant_console_page.dart';
 import '../../features/client_portal/presentation/pages/client_portal_layout.dart';
 import '../../features/client_portal/presentation/pages/closer_mobile_portal_page.dart';
+import '../../features/client_portal/presentation/pages/merchant_sales_supervisor_page.dart';
 import '../../features/client_portal/presentation/pages/marketer_mobile_portal_page.dart';
 import '../../features/client_portal/presentation/pages/public_lead_form_page.dart';
 import '../../presentation/presentation_root.dart';
@@ -150,6 +151,15 @@ String? appRouteRedirect({
       return '/stock-ops';
     }
 
+    // Sales Supervisor Console (/sales-supervisor/**)
+    if (matchedLocation.startsWith('/sales-supervisor')) {
+      if (!user.isCloserSupervisor && !user.isClientAdmin) {
+        return homePath;
+      }
+    }
+    if (user.isCloserSupervisor && !matchedLocation.startsWith('/sales-supervisor') && !matchedLocation.startsWith('/closer')) {
+      return '/sales-supervisor';
+    }
     // Finance Admin Console (/finance-ops/**)
     if (matchedLocation.startsWith('/finance-ops')) {
       if (!isDcFinance) {
@@ -253,6 +263,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/',
         builder: (context, state) => const MainBottomNavShell(),
+      ),
+      GoRoute(
+        path: '/sales-supervisor',
+        builder: (context, state) => const MerchantSalesSupervisorPage(),
       ),
       GoRoute(
         path: '/closer',

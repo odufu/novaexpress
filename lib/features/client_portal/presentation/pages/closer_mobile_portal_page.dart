@@ -19,6 +19,7 @@ import '../widgets/client_convert_lead_modal.dart';
 import '../widgets/client_create_order_modal.dart';
 import '../widgets/client_order_tracking_modal.dart';
 import '../widgets/client_edit_order_modal.dart';
+import '../widgets/request_upg_modal.dart';
 import '../widgets/closer_create_package_modal.dart';
 import '../../../orders/presentation/widgets/smart_order_paste_modal.dart';
 import '../../../dc_console/domain/entities/product_package.dart';
@@ -2087,6 +2088,31 @@ class _CloserMobilePortalPageState extends ConsumerState<CloserMobilePortalPage>
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                       side: const BorderSide(color: Color(0xFFF37021), width: 1.2),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+
+                // 4b. Request Package UPG (Upsell)
+                IconButton(
+                  tooltip: 'Request Package UPG (Upgrade)',
+                  onPressed: () {
+                    final currentUser = ref.read(authProvider).user;
+                    RequestUpgModal.show(
+                      context,
+                      order: order,
+                      closerId: currentUser?.id ?? '',
+                      closerName: currentUser?.fullName ?? 'Sales Rep',
+                      closerCode: currentUser?.closerCode ?? 'CLS',
+                      isSupervisor: currentUser?.isCloserSupervisor == true,
+                    );
+                  },
+                  icon: const Icon(Icons.upgrade_rounded, size: 20, color: Color(0xFF10B981)),
+                  style: IconButton.styleFrom(
+                    backgroundColor: const Color(0xFF10B981).withValues(alpha: 0.12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: const BorderSide(color: Color(0xFF10B981), width: 1.2),
                     ),
                   ),
                 ),

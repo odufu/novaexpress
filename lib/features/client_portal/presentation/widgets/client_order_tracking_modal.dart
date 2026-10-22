@@ -10,6 +10,8 @@ import '../../../dc_console/domain/entities/distribution_center.dart';
 import '../../../dc_console/presentation/providers/dc_console_provider.dart';
 import '../../../orders/domain/entities/order.dart';
 import '../../../orders/presentation/providers/orders_provider.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
+import 'request_upg_modal.dart';
 import '../../../pipeline_chat/presentation/widgets/order_pipeline_chat_sheet.dart';
 
 class ClientOrderTrackingModal extends ConsumerWidget {
@@ -317,15 +319,43 @@ class ClientOrderTrackingModal extends ConsumerWidget {
                       ),
                     ],
                   ),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0D9488),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Close Tracking'),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    alignment: WrapAlignment.end,
+                    children: [
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF10B981),
+                          side: const BorderSide(color: Color(0xFF10B981)),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        icon: const Icon(Icons.upgrade_rounded, size: 18),
+                        label: const Text('Upgrade (UPG)'),
+                        onPressed: () {
+                          final currentUser = ref.read(authProvider).user;
+                          RequestUpgModal.show(
+                            context,
+                            order: currentOrder,
+                            closerId: currentUser?.id ?? '',
+                            closerName: currentUser?.fullName ?? 'Staff',
+                            closerCode: currentUser?.closerCode ?? 'REP',
+                            isSupervisor: currentUser?.isCloserSupervisor == true,
+                          );
+                        },
+                      ),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0D9488),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Close Tracking'),
+                      ),
+                    ],
                   ),
                 ],
               ),
