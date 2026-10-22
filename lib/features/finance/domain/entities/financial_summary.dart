@@ -94,9 +94,22 @@ class FinancialSummary {
         .where((r) => r.isPending && !r.isVerified)
         .fold(0.0, (acc, r) => acc + r.amount);
 
-    // Unremitted delivered cash orders (orders not yet remitted)
+    // Identify order IDs already attached to any pending or submitted remittance
+    final pendingRemittanceOrderIds = <String>{};
+    for (final r in remittances.where((r) => r.isPending || r.status.toLowerCase() == 'submitted')) {
+      for (final ao in r.associatedOrders) {
+        if (ao.orderId.isNotEmpty) pendingRemittanceOrderIds.add(ao.orderId);
+        if (ao.orderNumber.isNotEmpty) pendingRemittanceOrderIds.add(ao.orderNumber);
+      }
+    }
+
+    // Unremitted delivered cash orders (strictly excluding orders awaiting clearance or already remitted)
     final unremittedDeliveredCashOrders = deliveredCashOrders
-        .where((o) => !o.isRemitted && o.paymentStatus.toLowerCase() != 'remitted' && o.remittanceStatus.toLowerCase() != 'remitted')
+        .where((o) =>
+            o.isUnremitted &&
+            !o.isPendingClearance &&
+            !pendingRemittanceOrderIds.contains(o.id) &&
+            !pendingRemittanceOrderIds.contains(o.orderNumber))
         .toList();
 
     double pendingRemittanceToDC = 0.0;

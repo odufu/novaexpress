@@ -120,11 +120,24 @@ class _LogRemittancePageState extends ConsumerState<LogRemittancePage> {
         : (user?.transportAllowance ?? 1500.0);
     final failedStipendRate = user?.failedDeliveryAllowance ?? (user?.isPda == true ? 500.0 : 300.0);
 
+    final pendingRemittanceOrderIds = <String>{};
+    for (final r in financeState.remittances.where((r) => r.isPending || r.status.toLowerCase() == 'submitted')) {
+      for (final ao in r.associatedOrders) {
+        if (ao.orderId.isNotEmpty) pendingRemittanceOrderIds.add(ao.orderId);
+        if (ao.orderNumber.isNotEmpty) pendingRemittanceOrderIds.add(ao.orderNumber);
+      }
+    }
+
     final deliveredOrders = ordersState.orders.where((o) => o.isDelivered).toList();
     final unremittedDeliveredOrders = deliveredOrders
-        .where((o) => !o.isRemitted && o.paymentStatus.toLowerCase() != 'remitted')
+        .where((o) =>
+            o.isCashPod &&
+            o.isUnremitted &&
+            !o.isPendingClearance &&
+            !pendingRemittanceOrderIds.contains(o.id) &&
+            !pendingRemittanceOrderIds.contains(o.orderNumber))
         .toList();
-    final unremittedCashOrders = unremittedDeliveredOrders.where((o) => o.isCashPod).toList();
+    final unremittedCashOrders = unremittedDeliveredOrders;
     final failedOrders = ordersState.orders.where((o) => o.status == 'failed' || o.status == 'failed_attempt').toList();
 
     final double batchGrossCash = unremittedCashOrders.fold(0.0, (acc, o) => acc + o.totalAmount);

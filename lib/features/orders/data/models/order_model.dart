@@ -131,10 +131,16 @@ class OrderModel extends OrderEntity {
         lowerNotes.contains('₦0 cash held') ||
         lowerNotes.contains('transfer verified');
 
-    if (notes.contains('[REMITTED') ||
-        pStatus == 'remitted' ||
-        pStatus == 'cleared' ||
+    if (rStatus.toLowerCase() == 'pending_clearance' ||
+        rStatus.toLowerCase() == 'submitted' ||
+        lowerNotes.contains('[pending clearance') ||
+        lowerNotes.contains('[submitted for remittance')) {
+      rStatus = 'pending_clearance';
+    } else if (notes.contains('[REMITTANCE CLEARED') ||
+        (rStatus.toLowerCase() == 'cleared' && pStatus == 'remitted') ||
         fsStatus == 'cash_remitted_verified') {
+      rStatus = 'cleared';
+    } else if (notes.contains('[REMITTED') && !lowerNotes.contains('[pending')) {
       rStatus = 'remitted';
     } else if (isDirectTransferNotes || pType == 'paystack' || pType == 'direct_transfer' || pType == 'prepaid' || pStatus == 'transfer_verified') {
       rStatus = 'direct_transfer';
