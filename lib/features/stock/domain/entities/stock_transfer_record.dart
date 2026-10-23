@@ -187,6 +187,8 @@ class StockTransferRecord {
   bool get isDcToRider => transferType == 'dc_to_rider';
   bool get isRiderReturn => transferType == 'rider_return';
   bool get isInterDc => transferType == 'inter_dc' || transferType == 'dc_to_dc';
+  String get sourceDcName => sourceWarehouseName ?? 'Origin DC';
+  String get destinationDcName => destinationWarehouseName ?? 'Destination DC';
 
   bool get isPendingReception =>
       status == 'dispatched' || status == 'in_transit' || status == 'pending_dc_acceptance';

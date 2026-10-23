@@ -350,13 +350,19 @@ class _DCUnifiedInboundModalState extends ConsumerState<DCUnifiedInboundModal>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 8,
+                runSpacing: 4,
                 children: [
-                  Row(
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                         decoration: BoxDecoration(
                           color: channelColor.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(6),
@@ -364,15 +370,14 @@ class _DCUnifiedInboundModalState extends ConsumerState<DCUnifiedInboundModal>
                         child: Text(
                           trf.transferNumber,
                           style: GoogleFonts.jetBrainsMono(
-                            fontSize: 11,
+                            fontSize: 10.5,
                             fontWeight: FontWeight.bold,
                             color: channelColor,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
                         decoration: BoxDecoration(
                           color: Colors.amber.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(6),
@@ -388,12 +393,19 @@ class _DCUnifiedInboundModalState extends ConsumerState<DCUnifiedInboundModal>
                       ),
                     ],
                   ),
-                  Text(
-                    '$totalQty units',
-                    style: GoogleFonts.jetBrainsMono(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w900,
-                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                    decoration: BoxDecoration(
+                      color: channelColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      '$totalQty Units',
+                      style: GoogleFonts.jetBrainsMono(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                        color: channelColor,
+                      ),
                     ),
                   ),
                 ],
