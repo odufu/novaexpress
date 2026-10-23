@@ -59,6 +59,35 @@ class StockRepositoryImpl implements StockRepository {
   }
 
   @override
+  Future<Map<String, dynamic>> initiateRiderToRiderTransfer({
+    required String productId,
+    required String productName,
+    required String sku,
+    required int quantity,
+    required String senderRiderId,
+    required String senderRiderName,
+    required String senderRiderCode,
+    required String recipientRiderId,
+    required String recipientRiderName,
+    required String recipientRiderCode,
+    String? notes,
+  }) async {
+    return await remoteDataSource.initiateRiderToRiderTransfer(
+      productId: productId,
+      productName: productName,
+      sku: sku,
+      quantity: quantity,
+      senderRiderId: senderRiderId,
+      senderRiderName: senderRiderName,
+      senderRiderCode: senderRiderCode,
+      recipientRiderId: recipientRiderId,
+      recipientRiderName: recipientRiderName,
+      recipientRiderCode: recipientRiderCode,
+      notes: notes,
+    );
+  }
+
+  @override
   Future<Map<String, dynamic>> assignStockToRider({
     required String productIdOrSku,
     required String riderId,

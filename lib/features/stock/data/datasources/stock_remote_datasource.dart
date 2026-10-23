@@ -38,6 +38,20 @@ abstract class StockRemoteDataSource {
     List<String>? coveringStates,
     Map<String, int>? dcStocks,
   });
+  Future<Map<String, dynamic>> initiateRiderToRiderTransfer({
+    required String productId,
+    required String productName,
+    required String sku,
+    required int quantity,
+    required String senderRiderId,
+    required String senderRiderName,
+    required String senderRiderCode,
+    required String recipientRiderId,
+    required String recipientRiderName,
+    required String recipientRiderCode,
+    String? notes,
+  });
+
   Future<Map<String, dynamic>> assignStockToRider({
     required String productIdOrSku,
     required String riderId,
@@ -801,6 +815,85 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
   }
 
   @override
+  Future<Map<String, dynamic>> initiateRiderToRiderTransfer({
+    required String productId,
+    required String productName,
+    required String sku,
+    required int quantity,
+    required String senderRiderId,
+    required String senderRiderName,
+    required String senderRiderCode,
+    required String recipientRiderId,
+    required String recipientRiderName,
+    required String recipientRiderCode,
+    String? notes,
+  }) async {
+    final dbClient = _getAuthDbClient();
+    const compId = '11111111-1111-4111-8111-111111111111';
+    final wbNumber = 'WB-R2R-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
+
+    try {
+      String? recipientWarehouseId;
+      try {
+        final wRes = await dbClient
+            .from('warehouses')
+            .select('id')
+            .eq('rider_id', recipientRiderId)
+            .limit(1);
+        if ((wRes as List).isNotEmpty) {
+          recipientWarehouseId = wRes.first['id'].toString();
+        }
+      } catch (_) {}
+
+      final trf = await dbClient.from('stock_transfers').insert({
+        'waybill_number': wbNumber,
+        'transfer_number': wbNumber,
+        'company_id': compId,
+        'transfer_type': 'rider_to_rider',
+        'destination_warehouse_id': recipientWarehouseId,
+        'dispatched_by': senderRiderId,
+        'status': 'pending_rider_acceptance',
+        'notes': notes ?? 'Peer handover from $senderRiderName ($senderRiderCode) to $recipientRiderName ($recipientRiderCode)',
+      }).select().single();
+
+      final trfId = trf['id'].toString();
+
+      await dbClient.from('stock_transfer_items').insert({
+        'transfer_id': trfId,
+        'product_id': productId,
+        'quantity_shipped': quantity,
+        'quantity_received': 0,
+      });
+
+      try {
+        await dbClient.from('notifications').insert({
+          'company_id': compId,
+          'delivery_agent_id': recipientRiderId,
+          'title': 'Incoming Stock from Rider! 📦',
+          'message': 'Rider $senderRiderName has sent you $quantity units of $productName. Tap to accept custody.',
+          'category': 'inventory',
+          'action_route': '/stock',
+          'is_read': false,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+      } catch (_) {}
+
+      return {
+        'success': true,
+        'transferId': trfId,
+        'transferNumber': wbNumber,
+        'message': 'Transfer request dispatched to $recipientRiderName ($recipientRiderCode). Awaiting recipient acceptance.',
+      };
+    } catch (e) {
+      debugPrint('[STOCK_DATASOURCE] ⚠️ initiateRiderToRiderTransfer error: $e');
+      return {
+        'success': false,
+        'message': 'Failed to initiate transfer: $e',
+      };
+    }
+  }
+
+  @override
   Future<Map<String, dynamic>> assignStockToRider({
     required String productIdOrSku,
     required String riderId,
@@ -942,7 +1035,7 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
           'source_dc_id': resolvedDcId,
           'destination_warehouse_id': riderWarehouseId,
           'dispatched_by': validDispatchedBy,
-          'status': 'completed',
+          'status': 'pending_rider_acceptance',
           'notes': 'DC Handover to $riderName ($riderCode)',
         }).select().single();
 
@@ -952,7 +1045,7 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
           'transfer_id': trfId,
           'product_id': resolvedProdId,
           'quantity_shipped': quantity,
-          'quantity_received': quantity,
+          'quantity_received': 0,
         });
 
         debugPrint('[STOCK_DATASOURCE] 🚀 Live Supabase stock transfer created: $trfId | Waybill: $wbNumber (DC: $resolvedDcId, Warehouse: $riderWarehouseId)');

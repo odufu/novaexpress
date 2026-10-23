@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/widgets/user_avatar_widget.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../stock/domain/entities/stock_item.dart';
 import '../../../stock/domain/entities/rider_stock_allocation.dart';
 import '../../../stock/presentation/providers/stock_provider.dart';
@@ -47,6 +48,7 @@ class DCStockOperationsPage extends ConsumerStatefulWidget {
 class _DCStockOperationsPageState extends ConsumerState<DCStockOperationsPage> {
   int _activeTab = 0; // 0: Assign & Requests, 1: Rider Balancing, 2: DC Transfers, 3: Damaged Returns, 4: Profile & Settings
   int _tab0Segment = 0; // 0: In-Field Custody, 1: Restock Requests
+  int _returnsSegment = 0; // 0: Pending Rider Returns, 1: Damaged Quarantine
   String _requestFilter = 'all'; // 'all', 'pending', 'fulfilled'
   final TextEditingController _searchController = TextEditingController();
 
@@ -2050,12 +2052,16 @@ class _DCStockOperationsPageState extends ConsumerState<DCStockOperationsPage> {
     bool isDark,
   ) {
     final damagedItems = warehouseItems.where((i) => i.complaintCount > 0).toList();
+    final stockState = ref.watch(stockProvider);
+    final pendingReturns = stockState.stockTransfers.where((t) =>
+        (t.transferType == 'rider_return' || t.isRiderReturn) &&
+        (t.status == 'pending_dc_acceptance' || t.status == 'in_transit' || t.status == 'dispatched')).toList();
 
     return Column(
       children: [
-        // Action Bar (Overflow-Proof with Expanded)
+        // Segment Bar: Pending Returns vs Damaged SKUs
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF1E293B) : Colors.white,
             border: Border(bottom: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
@@ -2063,28 +2069,230 @@ class _DCStockOperationsPageState extends ConsumerState<DCStockOperationsPage> {
           child: Row(
             children: [
               Expanded(
-                child: Text(
-                  'Damaged & Quarantine (${damagedItems.length} SKUs)',
-                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                child: Row(
+                  children: [
+                    GestureDetector(
+                      onTap: () => setState(() => _returnsSegment = 0),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: _returnsSegment == 0
+                              ? const Color(0xFF0284C7)
+                              : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9)),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Text(
+                              'Incoming Returns',
+                              style: GoogleFonts.inter(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.bold,
+                                color: _returnsSegment == 0 ? Colors.white : const Color(0xFF64748B),
+                              ),
+                            ),
+                            if (pendingReturns.isNotEmpty) ...[
+                              const SizedBox(width: 5),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  '${pendingReturns.length}',
+                                  style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF0284C7)),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () => setState(() => _returnsSegment = 1),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: _returnsSegment == 1
+                              ? const Color(0xFFDC2626)
+                              : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9)),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          'Quarantine & Damaged (${damagedItems.length})',
+                          style: GoogleFonts.inter(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.bold,
+                            color: _returnsSegment == 1 ? Colors.white : const Color(0xFF64748B),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 8),
-              ElevatedButton.icon(
-                onPressed: () => _openSpoilageModal(context, warehouseItems, drivers, isDark),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFDC2626),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              if (_returnsSegment == 1)
+                ElevatedButton.icon(
+                  onPressed: () => _openSpoilageModal(context, warehouseItems, drivers, isDark),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFDC2626),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  icon: const Icon(Icons.report_problem_rounded, size: 14),
+                  label: const Text('Log Damaged', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5)),
                 ),
-                icon: const Icon(Icons.report_problem_rounded, size: 15),
-                label: const Text('Log Damaged Return', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-              ),
             ],
           ),
         ),
+        if (_returnsSegment == 0)
+          Expanded(
+            child: pendingReturns.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.assignment_turned_in_outlined, size: 48, color: Color(0xFF16A34A)),
+                        const SizedBox(height: 12),
+                        Text('No Pending Rider Returns', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 15)),
+                        const SizedBox(height: 4),
+                        const Text('When riders drop off unsold stock at the hub, transfers will appear here for verification.', style: TextStyle(fontSize: 12, color: Colors.grey), textAlign: TextAlign.center),
+                      ],
+                    ),
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.all(12),
+                    itemCount: pendingReturns.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    itemBuilder: (context, index) {
+                      final ret = pendingReturns[index];
+                      final itemsSummary = ret.items.map((i) => '${i.quantity}x ${i.productName}').join(', ');
+
+                      return Container(
+                        padding: const EdgeInsets.all(13),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.3), width: 1.2),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF0284C7).withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        ret.transferNumber,
+                                        style: GoogleFonts.jetBrainsMono(fontSize: 10.5, fontWeight: FontWeight.bold, color: const Color(0xFF0284C7)),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'From: ${ret.senderName ?? "Rider"}',
+                                      style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.amber.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: const Text('AWAITING VERIFICATION', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.amber)),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Returned Items: $itemsSummary',
+                              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600),
+                            ),
+                            if (ret.notes != null && ret.notes!.isNotEmpty) ...[
+                              const SizedBox(height: 3),
+                              Text(
+                                'Rider Note: ${ret.notes}',
+                                style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                              ),
+                            ],
+                            const SizedBox(height: 10),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF16A34A),
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                ),
+                                onPressed: () async {
+                                  final confirmed = await showDialog<bool>(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      title: Row(
+                                        children: [
+                                          const Icon(Icons.verified_rounded, color: Color(0xFF16A34A)),
+                                          const SizedBox(width: 8),
+                                          const Text('Confirm Stock Return Receipt'),
+                                        ],
+                                      ),
+                                      content: Text(
+                                        'Have you physically inspected and verified $itemsSummary returned by ${ret.senderName ?? "Rider"} back into the DC warehouse shelf?\n\nProceed?',
+                                        style: GoogleFonts.inter(fontSize: 13),
+                                      ),
+                                      actions: [
+                                        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                                        ElevatedButton(
+                                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF16A34A), foregroundColor: Colors.white),
+                                          onPressed: () => Navigator.pop(ctx, true),
+                                          child: const Text('Yes, Confirm & Restock'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+
+                                  if (confirmed == true) {
+                                    final totalQty = ret.items.fold<int>(0, (sum, i) => sum + i.quantity);
+                                    final user = ref.read(authProvider).user;
+                                    await ref.read(stockProvider.notifier).receiveRiderReturn(
+                                      returnId: ret.id,
+                                      dcId: user?.distributionCenterId ?? '22222222-2222-4222-8222-222222222222',
+                                      receiverId: user?.id ?? '',
+                                      verifiedQuantity: totalQty,
+                                    );
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          backgroundColor: Color(0xFF16A34A),
+                                          content: Text('Return verified! Stock restocked to warehouse inventory.'),
+                                        ),
+                                      );
+                                      _loadStockData();
+                                    }
+                                  }
+                                },
+                                icon: const Icon(Icons.check_circle_rounded, size: 16),
+                                label: const Text('Verify & Accept Stock to Warehouse', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+          )
+        else
 
         Expanded(
           child: damagedItems.isEmpty

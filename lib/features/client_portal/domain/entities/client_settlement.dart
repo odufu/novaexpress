@@ -63,7 +63,13 @@ class ClientSettlement {
   bool get isRemitted =>
       status.toLowerCase() == 'remitted' ||
       status.toLowerCase() == 'pending_approval' ||
-      status.toLowerCase() == 'pending_merchant_approval';
+      status.toLowerCase() == 'pending_merchant_approval' ||
+      status.toLowerCase() == 'pending_merchant_confirmation' ||
+      status.toLowerCase() == 'disbursed';
+  bool get isRejected =>
+      status.toLowerCase() == 'rejected' ||
+      status.toLowerCase() == 'disputed' ||
+      status.toLowerCase() == 'declined';
   bool get hasReceipt => proofOfPaymentUrl != null && proofOfPaymentUrl!.trim().isNotEmpty;
 
   ClientSettlement copyWith({

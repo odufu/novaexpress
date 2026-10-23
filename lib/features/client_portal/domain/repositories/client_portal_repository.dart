@@ -255,6 +255,13 @@ abstract class ClientPortalRepository {
     String? notes,
   });
 
+  Future<bool> rejectSettlement({
+    required String settlementId,
+    required String clientId,
+    required String reason,
+    String? proofUrl,
+  });
+
   // --- Inventory & Landed Cost Supply Management ---
   Future<List<ClientSupplier>> getSuppliers(String clientId);
   Future<ClientSupplier> createSupplier(ClientSupplier supplier);

@@ -221,6 +221,13 @@ abstract class ClientPortalRemoteDataSource {
     String? notes,
   });
 
+  Future<bool> rejectSettlement({
+    required String settlementId,
+    required String clientId,
+    required String reason,
+    String? proofUrl,
+  });
+
   // --- Inventory & Landed Cost Supply Management ---
   Future<List<ClientSupplier>> fetchSuppliers(String clientId);
   Future<ClientSupplier> createSupplier(ClientSupplier supplier);
@@ -1042,6 +1049,28 @@ class ClientPortalRemoteDataSourceImpl implements ClientPortalRemoteDataSource {
       return true;
     } catch (e) {
       debugPrint('[CLIENT_PORTAL] ❌ approveSettlement error: $e');
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> rejectSettlement({
+    required String settlementId,
+    required String clientId,
+    required String reason,
+    String? proofUrl,
+  }) async {
+    final adminDb = _getAdminClient();
+    try {
+      final note = '[MERCHANT_REJECTED]: $reason${proofUrl != null ? " | Proof: $proofUrl" : ""}';
+      await adminDb.from('client_settlements').update({
+        'status': 'rejected',
+        'notes': note,
+      }).eq('id', settlementId);
+      debugPrint('[CLIENT_PORTAL] 🚫 Settlement rejected/disputed: $settlementId');
+      return true;
+    } catch (e) {
+      debugPrint('[CLIENT_PORTAL] ❌ rejectSettlement error: $e');
       return false;
     }
   }

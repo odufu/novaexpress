@@ -745,6 +745,7 @@ class _GeneralAccountantConsolePageState
                   ),
                 ],
               ),
+
             ],
           ),
         );
@@ -1155,9 +1156,12 @@ class _GeneralAccountantConsolePageState
             color: isDark ? const Color(0xFF1E293B) : Colors.white,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: isCompleted
-                  ? (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))
-                  : const Color(0xFF2563EB).withValues(alpha: 0.4),
+              color: s.isRejected
+                  ? const Color(0xFFDC2626)
+                  : (isCompleted
+                      ? (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))
+                      : const Color(0xFF2563EB).withValues(alpha: 0.4)),
+              width: s.isRejected ? 1.5 : 1.0,
             ),
           ),
           child: Column(
@@ -1580,7 +1584,7 @@ class _GeneralAccountantConsolePageState
                             'destination_account_name': group.accountName,
                             'payout_reference': refController.text.trim(),
                             'proof_of_payment_url': proofUrl,
-                            'status': 'completed',
+                            'status': 'pending_merchant_confirmation',
                             'notes': 'Reconciled to ${group.clientName} (${group.clientEmail}). DC Interest retained: ₦${group.totalDcCenterInterest.toStringAsFixed(2)}',
                             'settled_at': DateTime.now().toIso8601String(),
                             'created_at': DateTime.now().toIso8601String(),

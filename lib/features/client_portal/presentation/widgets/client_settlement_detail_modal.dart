@@ -5,6 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/theme_provider.dart';
+import 'package:file_picker/file_picker.dart';
+import '../../../../core/services/signature_storage_service.dart';
 import '../../domain/entities/client_settlement.dart';
 import '../providers/client_portal_provider.dart';
 
@@ -351,6 +353,157 @@ class _ClientSettlementDetailModalState extends ConsumerState<ClientSettlementDe
       }
     } finally {
       if (mounted) setState(() => _isApproving = false);
+    }
+  }
+
+  Future<void> _handleMerchantDecline() async {
+    final reasonCtrl = TextEditingController();
+    String? proofUrl;
+    bool isUploading = false;
+
+    final result = await showDialog<Map<String, dynamic>?>(
+      context: context,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDC2626).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.gavel_rounded, color: Color(0xFFDC2626), size: 20),
+                ),
+                const SizedBox(width: 10),
+                const Text('Dispute / Reject Settlement'),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Please specify why you are declining settlement batch (${_settlement.settlementNumber}):',
+                    style: GoogleFonts.inter(fontSize: 12.5),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: reasonCtrl,
+                    maxLines: 3,
+                    decoration: InputDecoration(
+                      hintText: 'e.g. Bank credit not received / Amount differs from actual statement...',
+                      filled: true,
+                      fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text('Attach Proof / Statement Screenshot (Optional)', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 5),
+                  GestureDetector(
+                    onTap: () async {
+                      try {
+                        final picked = await FilePickerPlatform.instance.pickFiles(type: FileType.custom, allowedExtensions: ['jpg', 'png', 'pdf']);
+                        if (picked.isNotEmpty) {
+                          setDialogState(() => isUploading = true);
+                          final file = picked.first;
+                          final bytes = await file.readAsBytes();
+                          if (bytes.isNotEmpty) {
+                            final url = await SignatureStorageService.uploadSettlementReceipt(
+                              bytes: bytes,
+                              settlementNumber: 'DISPUTE-${_settlement.settlementNumber}',
+                              extension: file.extension ?? 'png',
+                            );
+                            setDialogState(() {
+                              proofUrl = url;
+                              isUploading = false;
+                            });
+                          }
+                        }
+                      } catch (_) {
+                        setDialogState(() => isUploading = false);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: proofUrl != null ? const Color(0xFF16A34A) : const Color(0xFFCBD5E1)),
+                      ),
+                      child: isUploading
+                          ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+                          : Row(
+                              children: [
+                                Icon(proofUrl != null ? Icons.check_circle_rounded : Icons.add_photo_alternate_rounded,
+                                    color: proofUrl != null ? const Color(0xFF16A34A) : const Color(0xFF64748B), size: 18),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    proofUrl != null ? 'Dispute Evidence Attached ✓' : 'Tap to attach statement screenshot',
+                                    style: TextStyle(fontSize: 11.5, color: proofUrl != null ? const Color(0xFF16A34A) : Colors.grey),
+                                  ),
+                                ),
+                              ],
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, null),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFDC2626),
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () {
+                  final reason = reasonCtrl.text.trim();
+                  if (reason.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Please state the reason for declining.')),
+                    );
+                    return;
+                  }
+                  Navigator.pop(ctx, {'reason': reason, 'proofUrl': proofUrl});
+                },
+                child: const Text('Confirm Rejection'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (result == null) return;
+
+    setState(() => _isApproving = true);
+    final res = await ref.read(clientPortalProvider.notifier).rejectSettlement(
+      settlementId: _settlement.id,
+      reason: result['reason'] as String,
+      proofUrl: result['proofUrl'] as String?,
+    );
+    setState(() => _isApproving = false);
+
+    if (mounted && context.mounted) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: res ? const Color(0xFFF59E0B) : const Color(0xFFDC2626),
+          content: Text(res ? 'Settlement declined and flagged for the accountant to rectify.' : 'Failed to record dispute.'),
+        ),
+      );
     }
   }
 
@@ -1212,21 +1365,37 @@ Receipt URL          : ${_settlement.proofOfPaymentUrl ?? "N/A"}
             ),
           ),
           if (!widget.isDcView && isRemitted) ...[
-            ElevatedButton.icon(
-              onPressed: _isApproving ? null : _handleMerchantApprove,
-              icon: _isApproving
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.check_circle_rounded, size: 18),
-              label: Text(
-                _isApproving ? 'Approving...' : 'Approve & Confirm Settlement Payout',
-                style: GoogleFonts.inter(fontWeight: FontWeight.bold),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF10B981),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _isApproving ? null : _handleMerchantDecline,
+                  icon: const Icon(Icons.close_rounded, size: 16, color: Color(0xFFDC2626)),
+                  label: const Text('Decline / Dispute', style: TextStyle(color: Color(0xFFDC2626), fontWeight: FontWeight.bold)),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFFDC2626), width: 1.2),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+                ElevatedButton.icon(
+                  onPressed: _isApproving ? null : _handleMerchantApprove,
+                  icon: _isApproving
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.check_circle_rounded, size: 18),
+                  label: Text(
+                    _isApproving ? 'Processing...' : 'Approve & Confirm Receipt',
+                    style: GoogleFonts.inter(fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF10B981),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ],
             ),
           ] else ...[
             ElevatedButton(

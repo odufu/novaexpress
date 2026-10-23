@@ -3388,6 +3388,35 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
     return success;
   }
 
+  /// Declines / disputes a settlement batch and updates status to rejected
+  Future<bool> rejectSettlement({
+    required String settlementId,
+    required String reason,
+    String? proofUrl,
+  }) async {
+    final clientId = state.clientProfile.id;
+    final success = await _repository.rejectSettlement(
+      settlementId: settlementId,
+      clientId: clientId,
+      reason: reason,
+      proofUrl: proofUrl,
+    );
+    if (success) {
+      final updatedSettlements = state.settlements.map((s) {
+        if (s.id == settlementId) {
+          return s.copyWith(
+            status: 'rejected',
+            notes: '[MERCHANT_REJECTED]: $reason${proofUrl != null ? " | Proof: $proofUrl" : ""}',
+          );
+        }
+        return s;
+      }).toList();
+      state = state.copyWith(settlements: updatedSettlements);
+      await loadClientData();
+    }
+    return success;
+  }
+
   static String _generateUuid() {
     final random = math.Random.secure();
     final values = List<int>.generate(16, (i) => random.nextInt(256));

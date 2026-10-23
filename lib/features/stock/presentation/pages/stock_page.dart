@@ -10,6 +10,7 @@ import '../../../../core/widgets/product_image_widget.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../notifications/presentation/providers/notifications_provider.dart';
 import '../widgets/return_stock_modal.dart';
+import '../widgets/share_stock_with_rider_modal.dart';
 import '../widgets/stock_barcode_search_modal.dart';
 import '../../domain/entities/stock_item.dart';
 import '../providers/stock_provider.dart';
@@ -35,7 +36,6 @@ class _StockPageState extends ConsumerState<StockPage> {
         ref.read(stockProvider.notifier).fetchStockTransfers(
               riderId: agentId,
               status: 'pending_rider_acceptance',
-              transferType: 'dc_to_rider',
             );
       } else {
         ref.read(stockProvider.notifier).fetchStockItems();
@@ -66,7 +66,6 @@ class _StockPageState extends ConsumerState<StockPage> {
         stockNotifier.fetchStockTransfers(
           riderId: newAgentId,
           status: 'pending_rider_acceptance',
-          transferType: 'dc_to_rider',
         );
       }
     });
@@ -152,7 +151,9 @@ class _StockPageState extends ConsumerState<StockPage> {
             ),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             onSelected: (val) {
-              if (val == 'return') {
+              if (val == 'share_rider') {
+                ShareStockWithRiderModal.show(context);
+              } else if (val == 'return') {
                 ReturnStockModal.show(context);
               } else if (val == 'reconcile') {
                 context.push('/stock/audit');
@@ -161,6 +162,16 @@ class _StockPageState extends ConsumerState<StockPage> {
               }
             },
             itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'share_rider',
+                child: Row(
+                  children: [
+                    Icon(Icons.swap_horiz_rounded, size: 18, color: Color(0xFF2563EB)),
+                    SizedBox(width: 10),
+                    Text('Share Stock with Rider'),
+                  ],
+                ),
+              ),
               const PopupMenuItem(
                 value: 'return',
                 child: Row(
@@ -212,7 +223,6 @@ class _StockPageState extends ConsumerState<StockPage> {
             await stockNotifier.fetchStockTransfers(
               riderId: agentId,
               status: 'pending_rider_acceptance',
-              transferType: 'dc_to_rider',
             );
           }
         },
@@ -302,24 +312,109 @@ class _StockPageState extends ConsumerState<StockPage> {
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF2563EB),
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: Color(0xFFDC2626)),
+                                foregroundColor: const Color(0xFFDC2626),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                padding: const EdgeInsets.symmetric(vertical: 11),
+                              ),
+                              onPressed: () async {
+                                final confirmed = await showDialog<bool>(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    title: const Text('Decline Incoming Stock?'),
+                                    content: Text('Are you sure you want to decline this transfer of ${trf.totalQuantityRequested} units (${trf.transferNumber})? The stock will remain with the sender.'),
+                                    actions: [
+                                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                                      ElevatedButton(
+                                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFDC2626), foregroundColor: Colors.white),
+                                        onPressed: () => Navigator.pop(ctx, true),
+                                        child: const Text('Decline'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (confirmed == true) {
+                                  await stockNotifier.rejectRiderStockHandover(transferId: trf.id, riderId: agentId);
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Stock transfer declined.')));
+                                  }
+                                }
+                              },
+                              child: const Text('Decline', style: TextStyle(fontWeight: FontWeight.bold)),
+                            ),
                           ),
-                          onPressed: () {
-                            context.push('/stock/handover/${trf.id}');
-                          },
-                          icon: const Icon(Icons.verified_rounded, size: 18),
-                          label: const Text(
-                            'Count & Sign Acceptance on Glass',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            flex: 2,
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF16A34A),
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                padding: const EdgeInsets.symmetric(vertical: 11),
+                              ),
+                              onPressed: () async {
+                                final itemsText = trf.items.map((i) => '${i.quantity}x ${i.productName}').join(', ');
+                                final sourceName = trf.senderName ?? 'Distribution Center';
+                                final confirmed = await showDialog<bool>(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    title: Row(
+                                      children: [
+                                        const Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A)),
+                                        const SizedBox(width: 8),
+                                        const Text('Accept Stock Custody'),
+                                      ],
+                                    ),
+                                    content: Text(
+                                      'You are receiving $itemsText from $sourceName.\n\nDo you confirm physical receipt of these units into your vehicle custody?\n\nProceed?',
+                                      style: GoogleFonts.inter(fontSize: 13.5),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(ctx, false),
+                                        child: const Text('Cancel'),
+                                      ),
+                                      ElevatedButton(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(0xFF16A34A),
+                                          foregroundColor: Colors.white,
+                                        ),
+                                        onPressed: () => Navigator.pop(ctx, true),
+                                        child: const Text('Yes, Confirm & Accept'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+
+                                if (confirmed == true) {
+                                  final verifiedItems = trf.items.map((i) => {'item_id': i.id, 'quantity_received': i.quantity}).toList();
+                                  await stockNotifier.acceptRiderStockHandover(
+                                    transferId: trf.id,
+                                    riderId: agentId,
+                                    riderName: user?.fullName ?? 'Rider',
+                                    verifiedItems: verifiedItems,
+                                  );
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        backgroundColor: Color(0xFF16A34A),
+                                        content: Text('Stock successfully accepted into your vehicle custody! ✓'),
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                              icon: const Icon(Icons.check_rounded, size: 18),
+                              label: const Text('Accept Stock', style: TextStyle(fontWeight: FontWeight.bold)),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
                     ],
                   ),

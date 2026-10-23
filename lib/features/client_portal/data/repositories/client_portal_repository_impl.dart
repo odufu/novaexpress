@@ -568,6 +568,25 @@ class ClientPortalRepositoryImpl implements ClientPortalRepository {
     }
   }
 
+  @override
+  Future<bool> rejectSettlement({
+    required String settlementId,
+    required String clientId,
+    required String reason,
+    String? proofUrl,
+  }) async {
+    try {
+      return await _remoteDataSource.rejectSettlement(
+        settlementId: settlementId,
+        clientId: clientId,
+        reason: reason,
+        proofUrl: proofUrl,
+      );
+    } catch (_) {
+      return false;
+    }
+  }
+
   // --- Inventory & Landed Cost Supply Management ---
 
   @override

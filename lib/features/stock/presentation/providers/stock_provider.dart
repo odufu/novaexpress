@@ -792,6 +792,44 @@ class StockNotifier extends StateNotifier<StockState> {
   }
 
   /// Assign stock directly from DC warehouse to a rider's custody
+  /// Rider initiates peer-to-peer stock transfer to another rider
+  Future<Map<String, dynamic>> initiateRiderToRiderTransfer({
+    required String productId,
+    required String productName,
+    required String sku,
+    required int quantity,
+    required String senderRiderId,
+    required String senderRiderName,
+    required String senderRiderCode,
+    required String recipientRiderId,
+    required String recipientRiderName,
+    required String recipientRiderCode,
+    String? notes,
+  }) async {
+    try {
+      final res = await repository.initiateRiderToRiderTransfer(
+        productId: productId,
+        productName: productName,
+        sku: sku,
+        quantity: quantity,
+        senderRiderId: senderRiderId,
+        senderRiderName: senderRiderName,
+        senderRiderCode: senderRiderCode,
+        recipientRiderId: recipientRiderId,
+        recipientRiderName: recipientRiderName,
+        recipientRiderCode: recipientRiderCode,
+        notes: notes,
+      );
+
+      // Refresh transfers for sender
+      await fetchStockTransfers(riderId: senderRiderId);
+      return res;
+    } catch (e) {
+      debugPrint('[STOCK_PROVIDER] ⚠️ initiateRiderToRiderTransfer error: $e');
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
   Future<Map<String, dynamic>> assignStockToRider({
     required String productIdOrSku,
     required String riderId,

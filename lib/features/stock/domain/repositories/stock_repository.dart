@@ -25,6 +25,20 @@ abstract class StockRepository {
     List<String>? coveringStates,
     Map<String, int>? dcStocks,
   });
+  Future<Map<String, dynamic>> initiateRiderToRiderTransfer({
+    required String productId,
+    required String productName,
+    required String sku,
+    required int quantity,
+    required String senderRiderId,
+    required String senderRiderName,
+    required String senderRiderCode,
+    required String recipientRiderId,
+    required String recipientRiderName,
+    required String recipientRiderCode,
+    String? notes,
+  });
+
   Future<Map<String, dynamic>> assignStockToRider({
     required String productIdOrSku,
     required String riderId,
