@@ -269,32 +269,33 @@ class _StockPageState extends ConsumerState<StockPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.draw_rounded, color: Color(0xFF3B82F6), size: 20),
-                              const SizedBox(width: 8),
-                              Text(
-                                'HANDOVER AWAITING ACCEPTANCE',
-                                style: GoogleFonts.jetBrainsMono(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: const Color(0xFF3B82F6),
-                                  letterSpacing: 0.5,
-                                ),
+                          const Icon(Icons.draw_rounded, color: Color(0xFF3B82F6), size: 18),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'HANDOVER AWAITING ACCEPTANCE',
+                              style: GoogleFonts.jetBrainsMono(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFF3B82F6),
+                                letterSpacing: 0.2,
                               ),
-                            ],
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
+                          const SizedBox(width: 6),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
                               color: const Color(0xFF3B82F6),
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(8),
                             ),
                             child: const Text(
                               'SIGNATURE REQUIRED',
-                              style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                              style: TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold),
                             ),
                           ),
                         ],
@@ -368,7 +369,13 @@ class _StockPageState extends ConsumerState<StockPage> {
                                       children: [
                                         const Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A)),
                                         const SizedBox(width: 8),
-                                        const Text('Accept Stock Custody'),
+                                        Expanded(
+                                          child: Text(
+                                            'Accept Stock Custody',
+                                            style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
                                       ],
                                     ),
                                     content: Text(
@@ -990,15 +997,18 @@ class _SummaryMetricCard extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               Flexible(
-                child: Text(
-                  '$count',
-                  style: GoogleFonts.inter(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: theme.colorScheme.onSurface,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '$count',
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                    maxLines: 1,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],

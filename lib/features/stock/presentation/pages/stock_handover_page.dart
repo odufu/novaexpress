@@ -170,7 +170,12 @@ class _StockHandoverPageState extends ConsumerState<StockHandoverPage> {
           children: [
             const Icon(Icons.cancel_outlined, color: Color(0xFFEF4444), size: 22),
             const SizedBox(width: 8),
-            const Text('Reject Stock Handover'),
+            const Expanded(
+              child: Text(
+                'Reject Stock Handover',
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
         content: Column(

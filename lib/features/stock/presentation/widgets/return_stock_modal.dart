@@ -609,7 +609,13 @@ class _ReturnStockModalState extends ConsumerState<ReturnStockModal> {
           children: [
             const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 24),
             const SizedBox(width: 10),
-            Text('Return Handshake Created', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
+            Expanded(
+              child: Text(
+                'Return Handshake Created',
+                style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
         content: Column(
