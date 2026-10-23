@@ -11,6 +11,12 @@ import '../../domain/entities/dc_fleet_driver.dart';
 import '../../domain/entities/distribution_center.dart';
 import '../providers/dc_console_provider.dart';
 import '../widgets/dc_staff_profile_settings_tab.dart';
+import '../../domain/entities/dc_stock_velocity.dart';
+import '../widgets/dc_unified_inbound_modal.dart';
+import '../widgets/dc_product_detail_modal.dart';
+import '../widgets/dc_notify_merchant_restock_modal.dart';
+import '../../../stock/domain/entities/stock_transfer_record.dart';
+
 
 class RiderStockSummary {
   final String riderId;
@@ -51,6 +57,9 @@ class _DCStockOperationsPageState extends ConsumerState<DCStockOperationsPage> {
   int _returnsSegment = 0; // 0: Pending Rider Returns, 1: Damaged Quarantine
   String _requestFilter = 'all'; // 'all', 'pending', 'fulfilled'
   final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _productSearchController = TextEditingController();
+  String _productAlertFilter = 'all'; // 'all', 'critical', 'warning', 'healthy'
+  String _inboundChannelFilter = 'all'; // 'all', 'merchant', 'dc', 'rider'
 
   @override
   void initState() {
@@ -72,6 +81,7 @@ class _DCStockOperationsPageState extends ConsumerState<DCStockOperationsPage> {
   @override
   void dispose() {
     _searchController.dispose();
+    _productSearchController.dispose();
     super.dispose();
   }
 
@@ -162,12 +172,40 @@ class _DCStockOperationsPageState extends ConsumerState<DCStockOperationsPage> {
     final drivers = dcState.drivers;
     final dcs = dcState.distributionCenters;
     final inboundRequests = stockState.inboundRequests;
+    final transfers = stockState.stockTransfers;
+
+    // Filter incoming inbounds destined for this DC
+    final pendingInbounds = transfers.where((t) {
+      final isDestMatch = t.destinationDcId == null || t.destinationDcId == dcState.activeHubId;
+      final isPending = t.status != 'completed' && t.status != 'rejected';
+      return (t.isClientSupply || t.isInterDc || t.isRiderReturn ||
+              t.transferType == 'client_supply' || t.transferType == 'dc_to_dc' || t.transferType == 'rider_return') &&
+          isDestMatch && isPending;
+    }).toList();
+
+    // Compute Product Velocities & Restock Alerts
+    final List<DCStockVelocity> productVelocities = warehouseItems.map((item) {
+      final inField = riderAllocations
+          .where((a) => a.productId == item.id)
+          .fold(0, (sum, a) => sum + a.inCustodyUnits);
+      return DCStockVelocity.calculate(
+        product: item,
+        dcShelfStock: item.availableCount,
+        inFieldCustody: inField,
+        deliveredUnits: item.deliveredCount,
+      );
+    }).toList();
 
     final int totalWarehouseUnits = warehouseItems.fold(0, (sum, i) => sum + i.availableCount);
     final int totalFieldCustodyUnits = riderAllocations.fold(0, (sum, a) => sum + a.inCustodyUnits);
     final int totalDamagedUnits = warehouseItems.fold(0, (sum, i) => sum + i.complaintCount);
     final int pendingRequestsCount = inboundRequests.where((r) => r.isPending).length;
-    final interDcTransfers = stockState.stockTransfers.where((t) => t.isInterDc).toList();
+    final interDcTransfers = transfers.where((t) => t.isInterDc).toList();
+    final double totalDailyBurnRate = productVelocities.fold(0.0, (sum, v) => sum + v.dailyBurnRate);
+    final int restockAlertsCount = productVelocities.where((v) =>
+        v.severity == RestockAlertSeverity.critical ||
+        v.severity == RestockAlertSeverity.warning).length;
+    final criticalItems = productVelocities.where((v) => v.severity == RestockAlertSeverity.critical).toList();
 
     final currentDc = dcState.distributionCenters.where((d) => d.id == dcState.activeHubId).firstOrNull ??
         dcState.distributionCenters.firstOrNull;
@@ -228,12 +266,12 @@ class _DCStockOperationsPageState extends ConsumerState<DCStockOperationsPage> {
             items: [
               BottomNavigationBarItem(
                 icon: Badge(
-                  isLabelVisible: pendingRequestsCount > 0,
-                  label: Text('$pendingRequestsCount'),
+                  isLabelVisible: (pendingRequestsCount + pendingInbounds.length) > 0,
+                  label: Text('${pendingRequestsCount + pendingInbounds.length}'),
                   backgroundColor: const Color(0xFFF37021),
                   child: const Icon(Icons.inventory_2_outlined),
                 ),
-                label: 'Stock & Queue',
+                label: 'Stock & Inbound',
               ),
               const BottomNavigationBarItem(
                 icon: Icon(Icons.swap_horiz_rounded),
@@ -270,14 +308,51 @@ class _DCStockOperationsPageState extends ConsumerState<DCStockOperationsPage> {
           constraints: const BoxConstraints(maxWidth: 640),
           child: Column(
             children: [
-              // 2x2 Grid KPI Metrics Header (NO Horizontal Scrolling, ZERO Overflow)
+              // 5-Card Responsive KPI Metrics Header (NO Horizontal Scrolling, ZERO Overflow)
               if (_activeTab != 4)
                 _buildKpiGrid(
-                  totalWarehouseUnits,
-                  totalFieldCustodyUnits,
-                  pendingRequestsCount,
-                  totalDamagedUnits,
-                  isDark,
+                  warehouseUnits: totalWarehouseUnits,
+                  custodyUnits: totalFieldCustodyUnits,
+                  dailyBurnRate: totalDailyBurnRate,
+                  restockAlertsCount: restockAlertsCount,
+                  pendingInboundsCount: pendingInbounds.length,
+                  onTapInbound: () {
+                    setState(() {
+                      _activeTab = 0;
+                      _tab0Segment = 1;
+                    });
+                  },
+                  onTapAlerts: () {
+                    setState(() {
+                      _activeTab = 0;
+                      _tab0Segment = 0;
+                      _productAlertFilter = 'critical';
+                    });
+                  },
+                  isDark: isDark,
+                ),
+
+              // Executive Quick Action Bar
+              if (_activeTab == 0)
+                _buildQuickActionBar(
+                  context: context,
+                  warehouseItems: warehouseItems,
+                  drivers: drivers,
+                  pendingInbounds: pendingInbounds,
+                  isDark: isDark,
+                ),
+
+              // Dynamic Restock Alert Banner (when critical products exist)
+              if (_activeTab == 0 && criticalItems.isNotEmpty && _tab0Segment != 1)
+                _buildCriticalRestockAlertBanner(
+                  criticalItems: criticalItems,
+                  onViewCritical: () {
+                    setState(() {
+                      _tab0Segment = 0;
+                      _productAlertFilter = 'critical';
+                    });
+                  },
+                  isDark: isDark,
                 ),
 
               // Main Operational Tab Body
@@ -291,6 +366,8 @@ class _DCStockOperationsPageState extends ConsumerState<DCStockOperationsPage> {
                   dcs,
                   currentDc,
                   dcState.activeHubId,
+                  pendingInbounds,
+                  productVelocities,
                   isDark,
                 ),
               ),
@@ -302,15 +379,18 @@ class _DCStockOperationsPageState extends ConsumerState<DCStockOperationsPage> {
   }
 
   // ==========================================
-  // RESPONSIVE 2x2 KPI GRID (NO SCROLLING)
+  // RESPONSIVE 5-METRIC KPI GRID & QUICK ACTIONS
   // ==========================================
-  Widget _buildKpiGrid(
-    int warehouseUnits,
-    int custodyUnits,
-    int pendingReqs,
-    int damagedUnits,
-    bool isDark,
-  ) {
+  Widget _buildKpiGrid({
+    required int warehouseUnits,
+    required int custodyUnits,
+    required double dailyBurnRate,
+    required int restockAlertsCount,
+    required int pendingInboundsCount,
+    required VoidCallback onTapInbound,
+    required VoidCallback onTapAlerts,
+    required bool isDark,
+  }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
@@ -326,13 +406,13 @@ class _DCStockOperationsPageState extends ConsumerState<DCStockOperationsPage> {
                   title: 'STATION ON-HAND',
                   value: '$warehouseUnits',
                   unit: 'Units',
-                  subtitle: 'In DC Warehouse',
+                  subtitle: 'DC Shelf Stock',
                   icon: Icons.inventory_2_outlined,
                   color: const Color(0xFF2563EB),
                   isDark: isDark,
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
                 child: _buildCompactKpiCard(
                   title: 'RIDER CUSTODY',
@@ -344,32 +424,52 @@ class _DCStockOperationsPageState extends ConsumerState<DCStockOperationsPage> {
                   isDark: isDark,
                 ),
               ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildCompactKpiCard(
+                  title: 'SALES VELOCITY',
+                  value: dailyBurnRate.toStringAsFixed(1),
+                  unit: 'U/Day',
+                  subtitle: 'Current Burn Rate',
+                  icon: Icons.bolt_rounded,
+                  color: const Color(0xFF0284C7),
+                  isDark: isDark,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
-                child: _buildCompactKpiCard(
-                  title: 'RESTOCK QUEUE',
-                  value: '$pendingReqs',
-                  unit: 'Pending',
-                  subtitle: 'Awaiting Action',
-                  icon: Icons.move_to_inbox_rounded,
-                  color: const Color(0xFFF37021),
-                  isDark: isDark,
+                child: InkWell(
+                  onTap: onTapAlerts,
+                  borderRadius: BorderRadius.circular(10),
+                  child: _buildCompactKpiCard(
+                    title: 'RESTOCK ALERTS',
+                    value: '$restockAlertsCount',
+                    unit: 'Items',
+                    subtitle: restockAlertsCount > 0 ? 'Runway Low / Critical' : 'Stock Levels Healthy',
+                    icon: restockAlertsCount > 0 ? Icons.warning_amber_rounded : Icons.check_circle_outline_rounded,
+                    color: restockAlertsCount > 0 ? const Color(0xFFDC2626) : const Color(0xFF16A34A),
+                    isDark: isDark,
+                  ),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
-                child: _buildCompactKpiCard(
-                  title: 'RETURNS / SPOILAGE',
-                  value: '$damagedUnits',
-                  unit: 'Units',
-                  subtitle: 'Quarantined Stock',
-                  icon: Icons.warning_amber_rounded,
-                  color: const Color(0xFFDC2626),
-                  isDark: isDark,
+                child: InkWell(
+                  onTap: onTapInbound,
+                  borderRadius: BorderRadius.circular(10),
+                  child: _buildCompactKpiCard(
+                    title: 'PENDING INBOUNDS',
+                    value: '$pendingInboundsCount',
+                    unit: 'Shipments',
+                    subtitle: 'Merchants, DCs & Riders',
+                    icon: Icons.move_to_inbox_rounded,
+                    color: pendingInboundsCount > 0 ? const Color(0xFFF37021) : const Color(0xFF64748B),
+                    isDark: isDark,
+                  ),
                 ),
               ),
             ],
@@ -389,7 +489,7 @@ class _DCStockOperationsPageState extends ConsumerState<DCStockOperationsPage> {
     required bool isDark,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF0F172A) : color.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(10),
@@ -408,9 +508,9 @@ class _DCStockOperationsPageState extends ConsumerState<DCStockOperationsPage> {
                 child: Text(
                   title,
                   style: GoogleFonts.inter(
-                    fontSize: 9.5,
+                    fontSize: 9.0,
                     fontWeight: FontWeight.w700,
-                    letterSpacing: 0.5,
+                    letterSpacing: 0.4,
                     color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                   ),
                   maxLines: 1,
@@ -418,12 +518,12 @@ class _DCStockOperationsPageState extends ConsumerState<DCStockOperationsPage> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.all(4),
+                padding: const EdgeInsets.all(3.5),
                 decoration: BoxDecoration(
                   color: color.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(5),
                 ),
-                child: Icon(icon, size: 14, color: color),
+                child: Icon(icon, size: 13, color: color),
               ),
             ],
           ),
@@ -436,7 +536,7 @@ class _DCStockOperationsPageState extends ConsumerState<DCStockOperationsPage> {
                 child: Text(
                   value,
                   style: GoogleFonts.jetBrainsMono(
-                    fontSize: 16.5,
+                    fontSize: 16.0,
                     fontWeight: FontWeight.w900,
                     color: isDark ? Colors.white : const Color(0xFF0F172A),
                   ),
@@ -447,15 +547,192 @@ class _DCStockOperationsPageState extends ConsumerState<DCStockOperationsPage> {
               const SizedBox(width: 4),
               Text(
                 unit,
-                style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: color),
+                style: GoogleFonts.inter(fontSize: 9.5, fontWeight: FontWeight.w600, color: color),
               ),
             ],
           ),
           Text(
             subtitle,
-            style: GoogleFonts.inter(fontSize: 9.5, color: const Color(0xFF64748B)),
+            style: GoogleFonts.inter(fontSize: 9.0, color: const Color(0xFF64748B)),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==========================================
+  // QUICK ACTION BAR
+  // ==========================================
+  Widget _buildQuickActionBar({
+    required BuildContext context,
+    required List<StockItemEntity> warehouseItems,
+    required List<DCFleetDriver> drivers,
+    required List<StockTransferRecord> pendingInbounds,
+    required bool isDark,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+        border: Border(bottom: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            // Receive Inbound
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF00522A),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              icon: const Icon(Icons.download_rounded, size: 15),
+              label: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Receive Inbound', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                  if (pendingInbounds.isNotEmpty) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF37021),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '${pendingInbounds.length}',
+                        style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              onPressed: () => DCUnifiedInboundModal.show(context: context),
+            ),
+            const SizedBox(width: 8),
+
+            // Allocate Stock
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: isDark ? Colors.white : const Color(0xFF0F172A),
+                side: BorderSide(color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              icon: const Icon(Icons.person_add_alt_1_outlined, size: 15),
+              label: const Text('Allocate to Rider', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
+              onPressed: () => _openAssignStockModal(context, warehouseItems, drivers, isDark),
+            ),
+            const SizedBox(width: 8),
+
+            // Restock Notice
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFFD97706),
+                side: const BorderSide(color: Color(0xFFF59E0B)),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              icon: const Icon(Icons.campaign_outlined, size: 15),
+              label: const Text('Restock Notice', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
+              onPressed: () {
+                final low = warehouseItems.where((i) => i.availableCount <= 10).firstOrNull ?? warehouseItems.firstOrNull;
+                if (low != null) {
+                  final dcName = ref.read(dcConsoleProvider).activeHubName;
+                  DCNotifyMerchantRestockModal.show(context, item: low, dcName: dcName);
+                }
+              },
+            ),
+            const SizedBox(width: 8),
+
+            // Inter-DC Transfer
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                side: BorderSide(color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              icon: const Icon(Icons.local_shipping_outlined, size: 15),
+              label: const Text('Transfer to DC', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
+              onPressed: () => setState(() => _activeTab = 2),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ==========================================
+  // CRITICAL RESTOCK ALERT BANNER
+  // ==========================================
+  Widget _buildCriticalRestockAlertBanner({
+    required List<DCStockVelocity> criticalItems,
+    required VoidCallback onViewCritical,
+    required bool isDark,
+  }) {
+    if (criticalItems.isEmpty) return const SizedBox.shrink();
+
+    final count = criticalItems.length;
+    final sampleNames = criticalItems.take(2).map((c) => c.product.name).join(', ');
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        color: const Color(0xFFDC2626).withValues(alpha: isDark ? 0.2 : 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFDC2626).withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(5),
+            decoration: BoxDecoration(
+              color: const Color(0xFFDC2626).withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.warning_rounded, color: Color(0xFFDC2626), size: 17),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'CRITICAL RESTOCK REQUIRED ($count Product${count > 1 ? 's' : ''})',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFFDC2626),
+                    letterSpacing: 0.3,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$sampleNames ${count > 2 ? 'and ${count - 2} more' : ''} have <= 3 days of stock remaining at current velocity.',
+                  style: GoogleFonts.inter(fontSize: 10, color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569)),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              textStyle: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.bold),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+              elevation: 0,
+            ),
+            onPressed: onViewCritical,
+            child: const Text('Review'),
           ),
         ],
       ),
@@ -474,6 +751,8 @@ class _DCStockOperationsPageState extends ConsumerState<DCStockOperationsPage> {
     List<DistributionCenter> dcs,
     DistributionCenter? currentDc,
     String activeHubId,
+    List<StockTransferRecord> pendingInbounds,
+    List<DCStockVelocity> productVelocities,
     bool isDark,
   ) {
     switch (_activeTab) {
@@ -483,6 +762,8 @@ class _DCStockOperationsPageState extends ConsumerState<DCStockOperationsPage> {
           riderAllocations,
           drivers,
           inboundRequests,
+          pendingInbounds,
+          productVelocities,
           isDark,
         );
       case 1:
@@ -505,19 +786,23 @@ class _DCStockOperationsPageState extends ConsumerState<DCStockOperationsPage> {
           riderAllocations,
           drivers,
           inboundRequests,
+          pendingInbounds,
+          productVelocities,
           isDark,
         );
     }
   }
 
   // ==========================================
-  // TAB 0: ASSIGN STOCK & RESTOCK REQUESTS
+  // TAB 0: ASSIGN STOCK, VELOCITY & INBOUNDS
   // ==========================================
   Widget _buildAssignStockView(
     List<StockItemEntity> warehouseItems,
     List<RiderStockAllocation> allocations,
     List<DCFleetDriver> drivers,
     List<InboundStockRequest> inboundRequests,
+    List<StockTransferRecord> pendingInbounds,
+    List<DCStockVelocity> productVelocities,
     bool isDark,
   ) {
     final riderSummaries = _buildRiderSummaries(allocations, drivers);
@@ -525,125 +810,1017 @@ class _DCStockOperationsPageState extends ConsumerState<DCStockOperationsPage> {
 
     return Column(
       children: [
-        // Sub-Tab Switcher Pills: In-Field Custody vs Restock Queue
+        // Sub-Tab Switcher Pills (Horizontal Scrollable, Overflow-Proof)
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF1E293B) : Colors.white,
             border: Border(bottom: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
           ),
-          child: Row(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildSegmentPill(
+                  index: 0,
+                  label: 'Products & Velocity',
+                  badgeCount: warehouseItems.length,
+                  icon: Icons.inventory_2_outlined,
+                  activeColor: const Color(0xFF0284C7),
+                  isDark: isDark,
+                ),
+                const SizedBox(width: 8),
+                _buildSegmentPill(
+                  index: 1,
+                  label: 'Inbound Handshake',
+                  badgeCount: pendingInbounds.length,
+                  icon: Icons.download_rounded,
+                  activeColor: const Color(0xFF00522A),
+                  highlightBadge: pendingInbounds.isNotEmpty,
+                  isDark: isDark,
+                ),
+                const SizedBox(width: 8),
+                _buildSegmentPill(
+                  index: 2,
+                  label: 'In-Field Custody',
+                  badgeCount: riderSummaries.length,
+                  icon: Icons.motorcycle_rounded,
+                  activeColor: const Color(0xFF16A34A),
+                  isDark: isDark,
+                ),
+                const SizedBox(width: 8),
+                _buildSegmentPill(
+                  index: 3,
+                  label: 'Restock Queue',
+                  badgeCount: pendingCount,
+                  icon: Icons.move_to_inbox_rounded,
+                  activeColor: const Color(0xFFF37021),
+                  highlightBadge: pendingCount > 0,
+                  isDark: isDark,
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Sub-Tab Content
+        Expanded(
+          child: () {
+            switch (_tab0Segment) {
+              case 0:
+                return _buildProductsVelocitySegment(
+                  productVelocities,
+                  warehouseItems,
+                  allocations,
+                  drivers,
+                  isDark,
+                );
+              case 1:
+                return _buildInboundQueueSegment(
+                  pendingInbounds,
+                  warehouseItems,
+                  isDark,
+                );
+              case 2:
+                return _buildInFieldCustodySegment(
+                  riderSummaries,
+                  warehouseItems,
+                  allocations,
+                  drivers,
+                  isDark,
+                );
+              case 3:
+              default:
+                return _buildRestockQueueSegment(
+                  inboundRequests,
+                  warehouseItems,
+                  allocations,
+                  drivers,
+                  isDark,
+                );
+            }
+          }(),
+        ),
+      ],
+    );
+  }
+
+  // ==========================================
+  // SUB-TAB 0.0: PRODUCTS & SALES VELOCITY
+  // ==========================================
+  Widget _buildProductsVelocitySegment(
+    List<DCStockVelocity> velocities,
+    List<StockItemEntity> warehouseItems,
+    List<RiderStockAllocation> allocations,
+    List<DCFleetDriver> drivers,
+    bool isDark,
+  ) {
+    final query = _productSearchController.text.trim().toLowerCase();
+    final filtered = velocities.where((v) {
+      if (query.isNotEmpty) {
+        final matchName = v.product.name.toLowerCase().contains(query);
+        final matchSku = v.product.sku.toLowerCase().contains(query);
+        final matchCat = v.product.category.toLowerCase().contains(query);
+        if (!matchName && !matchSku && !matchCat) return false;
+      }
+      if (_productAlertFilter == 'critical') {
+        return v.severity == RestockAlertSeverity.critical;
+      } else if (_productAlertFilter == 'warning') {
+        return v.severity == RestockAlertSeverity.warning;
+      } else if (_productAlertFilter == 'healthy') {
+        return v.severity == RestockAlertSeverity.healthy || v.severity == RestockAlertSeverity.wellStocked;
+      }
+      return true;
+    }).toList();
+
+    final criticalCount = velocities.where((v) => v.severity == RestockAlertSeverity.critical).length;
+    final warningCount = velocities.where((v) => v.severity == RestockAlertSeverity.warning).length;
+    final healthyCount = velocities.where((v) => v.severity == RestockAlertSeverity.healthy || v.severity == RestockAlertSeverity.wellStocked).length;
+
+    final dcName = ref.read(dcConsoleProvider).activeHubName;
+
+    return Column(
+      children: [
+        // Search & Filter Bar
+        Container(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            border: Border(bottom: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
+          ),
+          child: Column(
             children: [
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => setState(() => _tab0Segment = 0),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    decoration: BoxDecoration(
-                      color: _tab0Segment == 0
-                          ? const Color(0xFF00522A)
-                          : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9)),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    alignment: Alignment.center,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.motorcycle_rounded,
-                          size: 15,
-                          color: _tab0Segment == 0 ? Colors.white : const Color(0xFF64748B),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          'In-Field Custody (${riderSummaries.length})',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: _tab0Segment == 0 ? Colors.white : const Color(0xFF64748B),
-                          ),
-                        ),
-                      ],
-                    ),
+              TextField(
+                controller: _productSearchController,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  hintText: 'Search products by name, SKU or category...',
+                  hintStyle: GoogleFonts.inter(fontSize: 12.0, color: const Color(0xFF94A3B8)),
+                  prefixIcon: const Icon(Icons.search_rounded, size: 17),
+                  suffixIcon: _productSearchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear_rounded, size: 15),
+                          onPressed: () => setState(() => _productSearchController.clear()),
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => setState(() => _tab0Segment = 1),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    decoration: BoxDecoration(
-                      color: _tab0Segment == 1
-                          ? const Color(0xFFF37021)
-                          : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9)),
-                      borderRadius: BorderRadius.circular(8),
+              const SizedBox(height: 8),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _buildCustomFilterChip(
+                      label: 'All Products (${velocities.length})',
+                      isSelected: _productAlertFilter == 'all',
+                      color: const Color(0xFF0284C7),
+                      onTap: () => setState(() => _productAlertFilter = 'all'),
+                      isDark: isDark,
                     ),
-                    alignment: Alignment.center,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.move_to_inbox_rounded,
-                          size: 15,
-                          color: _tab0Segment == 1 ? Colors.white : const Color(0xFF64748B),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Restock Queue',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: _tab0Segment == 1 ? Colors.white : const Color(0xFF64748B),
-                          ),
-                        ),
-                        if (pendingCount > 0) ...[
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                            decoration: BoxDecoration(
-                              color: _tab0Segment == 1 ? Colors.white : const Color(0xFFF37021),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              '$pendingCount',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: _tab0Segment == 1 ? const Color(0xFFF37021) : Colors.white,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
+                    const SizedBox(width: 6),
+                    _buildCustomFilterChip(
+                      label: 'Critical Alert ($criticalCount)',
+                      isSelected: _productAlertFilter == 'critical',
+                      color: const Color(0xFFDC2626),
+                      onTap: () => setState(() => _productAlertFilter = 'critical'),
+                      isDark: isDark,
                     ),
-                  ),
+                    const SizedBox(width: 6),
+                    _buildCustomFilterChip(
+                      label: 'Low Runway ($warningCount)',
+                      isSelected: _productAlertFilter == 'warning',
+                      color: const Color(0xFFF59E0B),
+                      onTap: () => setState(() => _productAlertFilter = 'warning'),
+                      isDark: isDark,
+                    ),
+                    const SizedBox(width: 6),
+                    _buildCustomFilterChip(
+                      label: 'Healthy Stock ($healthyCount)',
+                      isSelected: _productAlertFilter == 'healthy',
+                      color: const Color(0xFF16A34A),
+                      onTap: () => setState(() => _productAlertFilter = 'healthy'),
+                      isDark: isDark,
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
         ),
 
-        // Sub-Tab Content
+        // Products List
         Expanded(
-          child: _tab0Segment == 0
-              ? _buildInFieldCustodySegment(
-                  riderSummaries,
-                  warehouseItems,
-                  allocations,
-                  drivers,
-                  isDark,
+          child: filtered.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.inventory_2_outlined, size: 48, color: isDark ? const Color(0xFF475569) : const Color(0xFF94A3B8)),
+                        const SizedBox(height: 12),
+                        Text(
+                          'No Products Found',
+                          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'No products match your search or filter selection.',
+                          style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
                 )
-              : _buildRestockQueueSegment(
-                  inboundRequests,
-                  warehouseItems,
-                  allocations,
-                  drivers,
-                  isDark,
+              : ListView.separated(
+                  padding: const EdgeInsets.all(14),
+                  itemCount: filtered.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final v = filtered[index];
+                    return _buildProductVelocityCard(
+                      velocity: v,
+                      warehouseItems: warehouseItems,
+                      allocations: allocations,
+                      drivers: drivers,
+                      dcName: dcName,
+                      isDark: isDark,
+                    );
+                  },
                 ),
         ),
       ],
+    );
+  }
+
+  Widget _buildProductVelocityCard({
+    required DCStockVelocity velocity,
+    required List<StockItemEntity> warehouseItems,
+    required List<RiderStockAllocation> allocations,
+    required List<DCFleetDriver> drivers,
+    required String dcName,
+    required bool isDark,
+  }) {
+    final v = velocity;
+    final alertColor = v.severityColor;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: v.severity == RestockAlertSeverity.critical
+              ? const Color(0xFFDC2626).withValues(alpha: 0.6)
+              : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+          width: v.severity == RestockAlertSeverity.critical ? 1.5 : 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header: Product Title & Alert Pill
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF0F172A).withValues(alpha: 0.5) : const Color(0xFFF8FAFC),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
+              border: Border(bottom: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        v.product.name,
+                        style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          if (v.product.sku.isNotEmpty) ...[
+                            Text(
+                              'SKU: ${v.product.sku}',
+                              style: GoogleFonts.jetBrainsMono(fontSize: 9.5, color: const Color(0xFF64748B)),
+                            ),
+                            const Text(' • ', style: TextStyle(color: Color(0xFF64748B), fontSize: 9.5)),
+                          ],
+                          Flexible(
+                            child: Text(
+                              v.product.category.isNotEmpty ? v.product.category : 'General Health',
+                              style: GoogleFonts.inter(fontSize: 10.0, color: const Color(0xFF0284C7), fontWeight: FontWeight.w500),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
+                  decoration: BoxDecoration(
+                    color: alertColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: alertColor.withValues(alpha: 0.4)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        v.severity == RestockAlertSeverity.critical
+                            ? Icons.error_outline_rounded
+                            : (v.severity == RestockAlertSeverity.warning
+                                ? Icons.warning_amber_rounded
+                                : Icons.check_circle_outline_rounded),
+                        size: 12,
+                        color: alertColor,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        v.statusLabel,
+                        style: GoogleFonts.inter(fontSize: 10.0, fontWeight: FontWeight.w800, color: alertColor),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Stock & Burn Rate Metrics Row
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            child: Row(
+              children: [
+                // Station Shelf Stock
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'DC SHELF',
+                        style: GoogleFonts.inter(fontSize: 9.0, fontWeight: FontWeight.w700, color: const Color(0xFF64748B)),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${v.dcShelfStock}',
+                        style: GoogleFonts.jetBrainsMono(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w900,
+                          color: v.dcShelfStock == 0 ? const Color(0xFFDC2626) : (isDark ? Colors.white : const Color(0xFF0F172A)),
+                        ),
+                      ),
+                      Text(
+                        'In Station',
+                        style: GoogleFonts.inter(fontSize: 9.0, color: const Color(0xFF94A3B8)),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Rider Field Custody
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'RIDER FIELD',
+                        style: GoogleFonts.inter(fontSize: 9.0, fontWeight: FontWeight.w700, color: const Color(0xFF64748B)),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${v.inFieldCustody}',
+                        style: GoogleFonts.jetBrainsMono(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w900,
+                          color: const Color(0xFF16A34A),
+                        ),
+                      ),
+                      Text(
+                        'In Vans',
+                        style: GoogleFonts.inter(fontSize: 9.0, color: const Color(0xFF94A3B8)),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Daily Sales Velocity
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'VELOCITY',
+                        style: GoogleFonts.inter(fontSize: 9.0, fontWeight: FontWeight.w700, color: const Color(0xFF64748B)),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${v.dailyBurnRate.toStringAsFixed(1)} /d',
+                        style: GoogleFonts.jetBrainsMono(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w900,
+                          color: const Color(0xFF0284C7),
+                        ),
+                      ),
+                      Text(
+                        '${v.deliveredUnits} sold',
+                        style: GoogleFonts.inter(fontSize: 9.0, color: const Color(0xFF94A3B8)),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Runway Remaining
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'RUNWAY',
+                        style: GoogleFonts.inter(fontSize: 9.0, fontWeight: FontWeight.w700, color: const Color(0xFF64748B)),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        v.dcShelfStock == 0
+                            ? '0 Days'
+                            : (v.dailyBurnRate <= 0 ? 'Stable' : '${v.daysRemaining.toStringAsFixed(0)} Days'),
+                        style: GoogleFonts.jetBrainsMono(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w900,
+                          color: alertColor,
+                        ),
+                      ),
+                      Text(
+                        v.dcShelfStock == 0
+                            ? 'STOCKOUT'
+                            : (v.daysRemaining <= 3 ? 'Critical' : (v.daysRemaining <= 7 ? 'Warning' : 'Healthy')),
+                        style: GoogleFonts.inter(
+                          fontSize: 9.0,
+                          fontWeight: FontWeight.w600,
+                          color: alertColor,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Recommendation Bar
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+            decoration: BoxDecoration(
+              color: alertColor.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: alertColor.withValues(alpha: 0.2)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline_rounded, size: 13, color: alertColor),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: Text(
+                    v.recommendation,
+                    style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w600, color: alertColor),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 9),
+
+          // Action Buttons Bar
+          Container(
+            padding: const EdgeInsets.fromLTRB(12, 7, 12, 9),
+            decoration: BoxDecoration(
+              border: Border(top: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
+            ),
+            child: Row(
+              children: [
+                // Allocate to Rider
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF00522A),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 7),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      elevation: 0,
+                    ),
+                    icon: const Icon(Icons.person_add_alt_1_outlined, size: 13),
+                    label: const Text('Allocate', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                    onPressed: () => _openAssignStockModal(
+                      context,
+                      warehouseItems,
+                      drivers,
+                      isDark,
+                      preselectedProductId: v.product.id,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+
+                // Restock Notice
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFD97706),
+                      side: const BorderSide(color: Color(0xFFF59E0B)),
+                      padding: const EdgeInsets.symmetric(vertical: 7),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    icon: const Icon(Icons.campaign_outlined, size: 13),
+                    label: const Text('Restock Notice', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                    onPressed: () => DCNotifyMerchantRestockModal.show(
+                      context,
+                      item: v.product,
+                      dcName: dcName,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+
+                // Details
+                IconButton(
+                  tooltip: 'Product Details & Batches',
+                  icon: const Icon(Icons.more_horiz_rounded, size: 17),
+                  style: IconButton.styleFrom(
+                    backgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.all(7),
+                  ),
+                  onPressed: () => DCProductDetailModal.show(
+                    context,
+                    item: v.product,
+                    drivers: drivers,
+                    allocations: allocations,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==========================================
+  // SUB-TAB 0.1: INBOUND RECEPTION QUEUE
+  // ==========================================
+  Widget _buildInboundQueueSegment(
+    List<StockTransferRecord> pendingInbounds,
+    List<StockItemEntity> warehouseItems,
+    bool isDark,
+  ) {
+    final filtered = pendingInbounds.where((t) {
+      if (_inboundChannelFilter == 'merchant') {
+        return t.isClientSupply || t.transferType == 'client_supply';
+      } else if (_inboundChannelFilter == 'dc') {
+        return t.isInterDc || t.transferType == 'dc_to_dc';
+      } else if (_inboundChannelFilter == 'rider') {
+        return t.isRiderReturn || t.transferType == 'rider_return';
+      }
+      return true;
+    }).toList();
+
+    final merchantCount = pendingInbounds.where((t) => t.isClientSupply || t.transferType == 'client_supply').length;
+    final dcCount = pendingInbounds.where((t) => t.isInterDc || t.transferType == 'dc_to_dc').length;
+    final riderCount = pendingInbounds.where((t) => t.isRiderReturn || t.transferType == 'rider_return').length;
+
+    return Column(
+      children: [
+        // Filter Channel Tabs + Direct Supply Action
+        Container(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            border: Border(bottom: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
+          ),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Inbound Reception Queue (${pendingInbounds.length})',
+                          style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          'Handshake verification from Merchants, DCs & Riders',
+                          style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF00522A),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      elevation: 0,
+                    ),
+                    icon: const Icon(Icons.add_box_rounded, size: 14),
+                    label: const Text('Open Handshake', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                    onPressed: () => DCUnifiedInboundModal.show(context: context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _buildCustomFilterChip(
+                      label: 'All Channels (${pendingInbounds.length})',
+                      isSelected: _inboundChannelFilter == 'all',
+                      color: const Color(0xFF0284C7),
+                      onTap: () => setState(() => _inboundChannelFilter = 'all'),
+                      isDark: isDark,
+                    ),
+                    const SizedBox(width: 6),
+                    _buildCustomFilterChip(
+                      label: 'Merchants ($merchantCount)',
+                      isSelected: _inboundChannelFilter == 'merchant',
+                      color: const Color(0xFF2563EB),
+                      onTap: () => setState(() => _inboundChannelFilter = 'merchant'),
+                      isDark: isDark,
+                    ),
+                    const SizedBox(width: 6),
+                    _buildCustomFilterChip(
+                      label: 'Other DCs ($dcCount)',
+                      isSelected: _inboundChannelFilter == 'dc',
+                      color: const Color(0xFF9333EA),
+                      onTap: () => setState(() => _inboundChannelFilter = 'dc'),
+                      isDark: isDark,
+                    ),
+                    const SizedBox(width: 6),
+                    _buildCustomFilterChip(
+                      label: 'Riders ($riderCount)',
+                      isSelected: _inboundChannelFilter == 'rider',
+                      color: const Color(0xFF0D9488),
+                      onTap: () => setState(() => _inboundChannelFilter = 'rider'),
+                      isDark: isDark,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Inbounds List
+        Expanded(
+          child: filtered.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.mark_email_read_outlined, size: 48, color: isDark ? const Color(0xFF475569) : const Color(0xFF94A3B8)),
+                        const SizedBox(height: 12),
+                        Text(
+                          'No Inbounds Awaiting Acceptance',
+                          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'All shipments from merchants, other DCs, and riders have been received.',
+                          style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 14),
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.add_shopping_cart_rounded, size: 16),
+                          label: const Text('Log Unannounced Merchant Supply'),
+                          onPressed: () => DCUnifiedInboundModal.show(context: context, initialTab: 0),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.all(14),
+                  itemCount: filtered.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (context, index) {
+                    final inbound = filtered[index];
+                    return _buildInboundTransferCard(inbound, warehouseItems, isDark);
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInboundTransferCard(
+    StockTransferRecord inbound,
+    List<StockItemEntity> warehouseItems,
+    bool isDark,
+  ) {
+    final isMerchant = inbound.isClientSupply || inbound.transferType == 'client_supply';
+    final isDc = inbound.isInterDc || inbound.transferType == 'dc_to_dc';
+
+    Color channelColor;
+    String channelLabel;
+    IconData channelIcon;
+    int tabIndex = 0;
+
+    if (isMerchant) {
+      channelColor = const Color(0xFF2563EB);
+      channelLabel = 'MERCHANT SUPPLY';
+      channelIcon = Icons.storefront_rounded;
+      tabIndex = 0;
+    } else if (isDc) {
+      channelColor = const Color(0xFF9333EA);
+      channelLabel = 'INTER-DC TRANSFER';
+      channelIcon = Icons.swap_horiz_rounded;
+      tabIndex = 1;
+    } else {
+      channelColor = const Color(0xFF0D9488);
+      channelLabel = 'RIDER VEHICLE OFFLOAD';
+      channelIcon = Icons.motorcycle_rounded;
+      tabIndex = 2;
+    }
+
+    final totalUnits = inbound.items.fold(0, (sum, i) => sum + i.quantity);
+    final productSummary = inbound.items.isNotEmpty
+        ? inbound.items.map((i) => '${i.quantity}x ${i.productName}').join(', ')
+        : 'Inbound Inventory Shipment';
+
+    final senderInfo = inbound.clientName ??
+        inbound.sourceWarehouseName ??
+        inbound.senderName ??
+        (isMerchant ? 'Merchant Client' : (isDc ? 'Origin DC' : 'Field Rider'));
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: channelColor.withValues(alpha: 0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: channelColor.withValues(alpha: 0.08),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(channelIcon, size: 14, color: channelColor),
+                    const SizedBox(width: 6),
+                    Text(
+                      channelLabel,
+                      style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w800, color: channelColor),
+                    ),
+                  ],
+                ),
+                Text(
+                  inbound.transferNumber.isNotEmpty ? inbound.transferNumber : 'Ref: #${inbound.id.substring(0, 8)}',
+                  style: GoogleFonts.jetBrainsMono(fontSize: 10, fontWeight: FontWeight.w700, color: const Color(0xFF64748B)),
+                ),
+              ],
+            ),
+          ),
+
+          // Body
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        productSummary,
+                        style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        'From: $senderInfo',
+                        style: GoogleFonts.inter(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (inbound.notes != null && inbound.notes!.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          inbound.notes!,
+                          style: GoogleFonts.inter(fontSize: 10.5, fontStyle: FontStyle.italic, color: const Color(0xFF64748B)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '$totalUnits',
+                      style: GoogleFonts.jetBrainsMono(fontSize: 18, fontWeight: FontWeight.w900, color: channelColor),
+                    ),
+                    Text(
+                      'Declared Units',
+                      style: GoogleFonts.inter(fontSize: 9.5, color: const Color(0xFF94A3B8)),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // Action Footer
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              border: Border(top: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Status: Pending DC Physical Counting & Verification',
+                    style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFFF37021), fontWeight: FontWeight.w600),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: channelColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                    elevation: 0,
+                  ),
+                  icon: const Icon(Icons.check_circle_outline_rounded, size: 14),
+                  label: const Text('Verify & Receive', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                  onPressed: () => DCUnifiedInboundModal.show(context: context, initialTab: tabIndex),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCustomFilterChip({
+    required String label,
+    required bool isSelected,
+    required Color color,
+    required VoidCallback onTap,
+    required bool isDark,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isSelected ? color : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9)),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? color : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+          ),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+            color: isSelected ? Colors.white : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSegmentPill({
+    required int index,
+    required String label,
+    required int badgeCount,
+    required IconData icon,
+    required Color activeColor,
+    bool highlightBadge = false,
+    required bool isDark,
+  }) {
+    final isSelected = _tab0Segment == index;
+    return GestureDetector(
+      onTap: () => setState(() => _tab0Segment = index),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: isSelected ? activeColor : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9)),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 14,
+              color: isSelected ? Colors.white : const Color(0xFF64748B),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 11.5,
+                fontWeight: FontWeight.bold,
+                color: isSelected ? Colors.white : const Color(0xFF64748B),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? Colors.white
+                    : (highlightBadge ? const Color(0xFFF37021) : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$badgeCount',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: isSelected
+                      ? activeColor
+                      : (highlightBadge ? Colors.white : (isDark ? Colors.white : const Color(0xFF334155))),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -2364,6 +3541,7 @@ class _DCStockOperationsPageState extends ConsumerState<DCStockOperationsPage> {
     List<DCFleetDriver> drivers,
     bool isDark, {
     String? preselectedDriverId,
+    String? preselectedProductId,
   }) {
     if (warehouseItems.isEmpty || drivers.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2372,7 +3550,9 @@ class _DCStockOperationsPageState extends ConsumerState<DCStockOperationsPage> {
       return;
     }
 
-    String selectedProductId = warehouseItems.first.id;
+    String selectedProductId = preselectedProductId != null && warehouseItems.any((i) => i.id == preselectedProductId)
+        ? preselectedProductId
+        : warehouseItems.first.id;
     String selectedDriverId = preselectedDriverId != null && drivers.any((d) => d.id == preselectedDriverId)
         ? preselectedDriverId
         : drivers.first.id;

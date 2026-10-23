@@ -186,7 +186,7 @@ class StockTransferRecord {
       transferType == 'supplier_supply';
   bool get isDcToRider => transferType == 'dc_to_rider';
   bool get isRiderReturn => transferType == 'rider_return';
-  bool get isInterDc => transferType == 'inter_dc';
+  bool get isInterDc => transferType == 'inter_dc' || transferType == 'dc_to_dc';
 
   bool get isPendingReception =>
       status == 'dispatched' || status == 'in_transit' || status == 'pending_dc_acceptance';

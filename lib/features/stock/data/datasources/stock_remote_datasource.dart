@@ -1989,13 +1989,14 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
         final Map<String, dynamic> dcStocks =
             rawMap.map((k, v) => MapEntry(k.toString(), (v as num).toInt()));
         final currentDcStock = (dcStocks[dcId] as num?)?.toInt() ?? 0;
-        if (currentDcStock < receivedQty) {
-          dcStocks[dcId] = currentDcStock + receivedQty;
-          await dbClient.from('products').update({
-            'dc_stocks': dcStocks,
-          }).eq('id', productId);
-          debugPrint('[STOCK_DATASOURCE] ✅ Fallback: Credited $receivedQty units to DC $dcId (New total: ${dcStocks[dcId]})');
-        }
+        final currentGlobal = (pRow['stock_quantity'] as num?)?.toInt() ?? 0;
+        dcStocks[dcId] = currentDcStock + receivedQty;
+        await dbClient.from('products').update({
+          'dc_stocks': dcStocks,
+          'stock_quantity': currentGlobal + receivedQty,
+          'updated_at': DateTime.now().toIso8601String(),
+        }).eq('id', productId);
+        debugPrint('[STOCK_DATASOURCE] ✅ Fallback: Credited $receivedQty units to DC $dcId (New total: ${dcStocks[dcId]})');
       }
     } catch (e) {
       debugPrint('[STOCK_DATASOURCE] ⚠️ _ensureDcStockCredited note: $e');
