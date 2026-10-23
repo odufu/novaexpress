@@ -76,7 +76,9 @@ class SalesSupervisorState {
           r.closerName.toLowerCase().contains(q) ||
           r.customerPhone.contains(q)).toList();
     }
-    return list;
+    final sorted = List<UpgRequest>.from(list);
+    sorted.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return sorted;
   }
 
   int get approvedTodayCount {
@@ -274,19 +276,27 @@ class SalesSupervisorNotifier extends StateNotifier<SalesSupervisorState> {
         final candidateClosers = closersList.isNotEmpty ? closersList : [
           const ClientCloser(
             id: 'c1',
-            clientId: 'c1',
-            closerCode: 'CLS-001',
-            fullName: 'Amaka Chioma',
-            email: 'amaka@novacale.ng',
-            phone: '08021122334',
+            clientId: '00000000-0000-4000-8000-791731264594',
+            closerCode: 'CLS-NOVA-106',
+            fullName: 'Prestige Godwin Uto',
+            email: 'prestige.godwin@novaxpress.net',
+            phone: '08123456789',
           ),
           const ClientCloser(
             id: 'c2',
-            clientId: 'c1',
-            closerCode: 'CLS-002',
-            fullName: 'Nwoye Blessing Ugochi',
-            email: 'nwoye.blessing@novaxpress.ng',
-            phone: '08039988776',
+            clientId: '00000000-0000-4000-8000-791731264594',
+            closerCode: 'CLS-NOVA-103',
+            fullName: 'Ojo Modupeolami',
+            email: 'ojo.modupeolami@novaxpress.ng',
+            phone: '08098765432',
+          ),
+          const ClientCloser(
+            id: 'c3',
+            clientId: '00000000-0000-4000-8000-791731264594',
+            closerCode: 'CLS-NOVA-104',
+            fullName: 'Adewole Ibukun',
+            email: 'adewole.ibukun@novaxpress.ng',
+            phone: '08011223344',
           ),
         ];
 
@@ -352,6 +362,8 @@ class SalesSupervisorNotifier extends StateNotifier<SalesSupervisorState> {
           ));
         }
       }
+
+      upgList.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
       state = state.copyWith(
         isLoading: false,

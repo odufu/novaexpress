@@ -116,8 +116,12 @@ class UserEntity {
       role == 'sales_rep_supervisor';
   bool get isCloserRaw => role == 'closer' || role == 'client_closer';
   bool get isCloser => isCloserRaw || isCloserSupervisor;
-  bool get isMarketerSupervisor => isSupervisor || role == 'marketing_supervisor' || role == 'supervisor_marketer';
-  bool get isMarketer => role == 'marketer' || role == 'digital_marketer' || isMarketerSupervisor;
+  bool get isMarketerRaw => role == 'marketer' || role == 'digital_marketer';
+  bool get isMarketerSupervisor =>
+      (isMarketerRaw && isSupervisor) ||
+      role == 'marketing_supervisor' ||
+      role == 'supervisor_marketer';
+  bool get isMarketer => isMarketerRaw || isMarketerSupervisor;
   bool get isClientAdmin => role == 'client' || role == 'merchant' || role == 'seller';
   bool get isClient => isClientAdmin || isCloser || isMarketer;
 
