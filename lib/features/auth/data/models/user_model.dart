@@ -47,6 +47,11 @@ class UserModel extends UserEntity {
             ? (json['coverage_states'] as List).first.toString() 
             : 'Abuja (FCT)');
 
+    final isSupervisorRole = json['role'] == 'sales_supervisor' ||
+        json['role'] == 'closer_supervisor' ||
+        json['role'] == 'sales_rep_supervisor' ||
+        json['is_supervisor'] == true ||
+        json['is_supervisor'] == 'true';
     final isClientRole = json['role'] == 'client' || json['role'] == 'merchant';
     final resolvedClientName = json['client_company_name'] ?? json['company_name'] ?? (isClientRole ? (json['business_name'] ?? 'Client Merchant') : null);
 
@@ -54,18 +59,24 @@ class UserModel extends UserEntity {
       id: json['id'] ?? '',
       authUserId: json['auth_user_id'],
       email: json['email'] ?? '',
-      firstName: json['first_name'] ?? (isClientRole ? 'Merchant' : 'Field'),
-      lastName: json['last_name'] ?? (isClientRole ? 'Admin' : 'Agent'),
+      firstName: json['first_name'] ?? (isSupervisorRole ? 'Joel' : (isClientRole ? 'Merchant' : 'Field')),
+      lastName: json['last_name'] ?? (isSupervisorRole ? 'Supervisor' : (isClientRole ? 'Admin' : 'Agent')),
       phone: json['phone'] ?? json['phone_number'] ?? '',
       role: json['role'] ?? 'delivery_agent',
       companyId: json['company_id'] ?? '11111111-1111-4111-8111-111111111111',
-      deliveryAgentId: deliveryAgentId ?? json['delivery_agent_id'],
-      deliveryAgentCode: json['delivery_agent_code'] ?? json['agent_code'] ?? (json['role'] == 'dc_manager' ? 'DC-MGR' : (isClientRole ? 'CLI-01' : 'PDA')),
+      deliveryAgentId: isSupervisorRole ? null : (deliveryAgentId ?? json['delivery_agent_id']),
+      deliveryAgentCode: json['delivery_agent_code'] ??
+          json['agent_code'] ??
+          (isSupervisorRole
+              ? 'SUP-CLS-01'
+              : (json['role'] == 'dc_manager'
+                  ? 'DC-MGR'
+                  : (isClientRole ? 'CLI-01' : 'PDA'))),
       distributionCenterId: json['distribution_center_id'] ?? '22222222-2222-4222-8222-222222222222',
       distributionCenterName: json['distribution_center_name'] ?? json['dc_name'] ?? 'Wuse Distribution Center',
       lifetimeDeliveriesCount: (json['lifetime_deliveries_count'] as num?)?.toInt() ?? 0,
       rating: (json['rating'] as num?)?.toDouble() ?? 5.0,
-      personnelType: json['personnel_type'] ?? 'pda',
+      personnelType: isSupervisorRole ? null : (json['personnel_type'] ?? 'pda'),
       compensationType: json['compensation_type'] ?? 'commission',
       commissionRate: (json['commission_rate'] as num?)?.toDouble() ?? 1000.0,
       transportAllowance: (json['transport_allowance'] as num?)?.toDouble() ?? 1500.0,
@@ -82,8 +93,14 @@ class UserModel extends UserEntity {
       agentStatus: json['current_status'] ?? json['status'] ?? 'available',
       clientId: json['client_id'] ?? (isClientRole ? json['id'] : null),
       clientCompanyName: resolvedClientName,
-      closerId: json['closer_id'] ?? (json['role'] == 'closer' ? json['id'] : null),
-      closerCode: json['closer_code'] ?? (json['role'] == 'closer' ? 'CLS-001' : null),
+      closerId: json['closer_id'] ??
+          ((json['role'] == 'closer' || isSupervisorRole)
+              ? (json['id'] ?? 'sup-${json['email'] ?? "closer"}')
+              : null),
+      closerCode: json['closer_code'] ??
+          (isSupervisorRole
+              ? 'SUP-CLS-01'
+              : (json['role'] == 'closer' ? 'CLS-001' : null)),
       marketerId: json['marketer_id'] ?? (json['role'] == 'marketer' ? json['id'] : null),
       marketerCode: json['marketer_code'] ?? (json['role'] == 'marketer' ? 'MKT-001' : null),
       avatarUrl: json['avatar_url']?.toString() ??
@@ -91,7 +108,11 @@ class UserModel extends UserEntity {
           json['profile_photo_url']?.toString() ??
           json['avatar']?.toString() ??
           json['image_url']?.toString(),
-      isSupervisor: json['is_supervisor'] == true || json['is_supervisor'] == 'true' || json['role'] == 'marketing_supervisor' || json['role'] == 'supervisor_marketer' || json['role'] == 'sales_supervisor' || json['role'] == 'closer_supervisor' || json['role'] == 'sales_rep_supervisor',
+      isSupervisor: json['is_supervisor'] == true ||
+          json['is_supervisor'] == 'true' ||
+          isSupervisorRole ||
+          json['role'] == 'marketing_supervisor' ||
+          json['role'] == 'supervisor_marketer',
     );
   }
 

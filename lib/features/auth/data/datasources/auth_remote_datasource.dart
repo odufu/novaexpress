@@ -121,6 +121,33 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
       return _currentUser!;
     }
 
+        if (clean == 'joelsupervisor@novaxpress.ng' ||
+        clean == 'sales.supervisor@novaxpress.ng' ||
+        clean == 'joelsupervisor') {
+      if (password != 'joelsupervisor@novaxpress.ng' &&
+          password != 'Password123!' &&
+          password != 'joelsupervisor') {
+        throw AppAuthException(
+            'Invalid email or password. Please check your credentials.');
+      }
+      _currentUser = const UserModel(
+        id: 'bcf5a83f-684f-4e5b-855e-b24115c178e1',
+        email: 'joelsupervisor@novaxpress.ng',
+        firstName: 'Joel',
+        lastName: 'Supervisor',
+        phone: '08085040146',
+        role: 'sales_supervisor',
+        closerId: 'sup-joelsupervisor',
+        closerCode: 'SUP-CLS-01',
+        clientId: '00000000-0000-4000-8000-791731264594',
+        clientCompanyName: 'NOVACARE LIMITED',
+        operatingState: 'Federal Capital Territory',
+        operatingCity: 'Abuja',
+        isSupervisor: true,
+      );
+      return _currentUser!;
+    }
+
     if (clean == 'closer.amaka@novacale.ng' || clean == 'closer@novacare.com') {
       if (password != 'CloserPass123!' && password != 'Password123!') {
         throw AppAuthException(
@@ -1966,7 +1993,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         } catch (_) {}
       }
       if (rawRole.isEmpty) {
-        if (cleanEmail.contains('client') || cleanEmail.contains('merchant')) {
+        if (cleanEmail.contains('sales_supervisor') ||
+            cleanEmail.contains('joelsupervisor') ||
+            cleanEmail.contains('closer_supervisor') ||
+            cleanEmail.contains('sales_rep_supervisor')) {
+          rawRole = 'sales_supervisor';
+        } else if (cleanEmail.contains('client') || cleanEmail.contains('merchant')) {
           rawRole = 'client';
         } else if (cleanEmail.contains('closer')) {
           rawRole = 'closer';
@@ -1996,13 +2028,21 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         }
       }
 
-      final isCloser = rawRole == 'closer' || rawRole == 'client_closer';
+      final isCloserSupervisor = rawRole == 'sales_supervisor' ||
+          rawRole == 'closer_supervisor' ||
+          rawRole == 'sales_rep_supervisor' ||
+          cleanEmail.contains('joelsupervisor') ||
+          (rawRole == 'closer' &&
+              (userRes?['is_supervisor'] == true ||
+                  userRes?['is_supervisor'] == 'true'));
+      final isCloser = (rawRole == 'closer' || rawRole == 'client_closer') &&
+          !isCloserSupervisor;
       final isMarketer = rawRole == 'marketer' || rawRole == 'digital_marketer';
       final isClientAdmin =
           rawRole == 'client' || rawRole == 'merchant' || rawRole == 'seller';
-      final isDcStaff = rawRole == 'dc_manager' ||
+      final isDcStaff = (rawRole == 'dc_manager' ||
           rawRole == 'dc_supervisor' ||
-          rawRole == 'super_admin';
+          rawRole == 'super_admin') && !isCloserSupervisor;
       final isDcOperations = rawRole == 'dc_operations' ||
           rawRole == 'operations_officer' ||
           rawRole == 'dispatcher' ||
@@ -2024,7 +2064,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           rawRole == 'chief_accountant' ||
           rawRole == 'accountant' ||
           rawRole == 'finance_director';
-      final isNonRider = isCloser ||
+      final isNonRider = isCloserSupervisor ||
+          isCloser ||
           isMarketer ||
           isClientAdmin ||
           isDcStaff ||
@@ -2036,7 +2077,87 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       String? deliveryAgentId;
       Map<String, dynamic>? agentRes;
 
-      if (isCloser) {
+      if (isCloserSupervisor) {
+        merged['role'] = 'sales_supervisor';
+        merged['is_supervisor'] = true;
+        merged['delivery_agent_id'] = null;
+        merged['personnel_type'] = null;
+        merged['delivery_agent_code'] = 'SUP-CLS-01';
+
+        try {
+          final closerRes = await dbClient
+              .from('client_closers')
+              .select()
+              .or('email.ilike.$cleanEmail,id.eq.$userId,user_id.eq.$userId')
+              .maybeSingle();
+          if (closerRes != null) {
+            merged['closer_id'] = closerRes['id'];
+            merged['closer_code'] = closerRes['closer_code'];
+            merged['phone'] =
+                closerRes['phone'] ?? merged['phone'] ?? merged['phone_number'];
+            if (closerRes['avatar_url'] != null &&
+                closerRes['avatar_url'].toString().isNotEmpty) {
+              merged['avatar_url'] = closerRes['avatar_url'];
+            }
+            if (closerRes['full_name'] != null) {
+              final parts = closerRes['full_name'].toString().trim().split(' ');
+              merged['first_name'] = parts.first;
+              merged['last_name'] =
+                  parts.length > 1 ? parts.sublist(1).join(' ') : '';
+            }
+            final clientId = closerRes['client_id'] ?? userRes?['client_id'];
+            if (clientId != null) {
+              final clientRes = await dbClient
+                  .from('clients')
+                  .select('id, name')
+                  .eq('id', clientId)
+                  .maybeSingle();
+              if (clientRes != null) {
+                merged['client_id'] = clientRes['id'];
+                merged['client_company_name'] = clientRes['name'];
+                merged['company_name'] = clientRes['name'];
+              }
+            }
+          } else {
+            final linkedClientId = userRes?['client_id'] ??
+                '00000000-0000-4000-8000-791731264594';
+            merged['client_id'] = linkedClientId;
+            final clientRes = await dbClient
+                .from('clients')
+                .select('id, name')
+                .eq('id', linkedClientId)
+                .maybeSingle();
+            if (clientRes != null) {
+              merged['client_company_name'] = clientRes['name'];
+              merged['company_name'] = clientRes['name'];
+            }
+          }
+        } catch (e) {
+          debugPrint('[AUTH_DATASOURCE] ℹ️ Sales supervisor query notice ($e)');
+        }
+
+        merged['closer_id'] ??=
+            'sup-${cleanEmail.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')}';
+        merged['closer_code'] ??= 'SUP-CLS-01';
+        merged['client_company_name'] ??= 'NOVACARE LIMITED';
+        merged['company_name'] ??= 'NOVACARE LIMITED';
+        merged['first_name'] ??= userRes?['first_name'] ?? 'Joel';
+        merged['last_name'] ??= userRes?['last_name'] ?? 'Supervisor';
+
+        // Auto-heal / synchronize to public.users table so it is permanently persisted
+        try {
+          await dbClient.from(SupabaseConstants.usersTable).upsert({
+            'id': userId,
+            'email': cleanEmail,
+            'first_name': merged['first_name'],
+            'last_name': merged['last_name'],
+            'role': 'sales_supervisor',
+            'is_supervisor': true,
+            'client_id': merged['client_id'] ?? '00000000-0000-4000-8000-791731264594',
+            'is_active': true,
+          });
+        } catch (_) {}
+      } else if (isCloser) {
         merged['role'] = 'closer';
         merged['delivery_agent_id'] = null;
 

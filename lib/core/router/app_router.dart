@@ -53,6 +53,7 @@ class RouterRefreshNotifier extends ChangeNotifier {
             previous?.user?.isDcManager != next.user?.isDcManager ||
             previous?.user?.isDcOperations != next.user?.isDcOperations ||
             previous?.user?.isCloser != next.user?.isCloser ||
+            previous?.user?.isCloserSupervisor != next.user?.isCloserSupervisor ||
             previous?.user?.isMarketer != next.user?.isMarketer ||
             previous?.user?.isClientAdmin != next.user?.isClientAdmin) {
           notifyListeners();
