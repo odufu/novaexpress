@@ -1034,6 +1034,9 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
           'transfer_type': 'dc_to_rider',
           'source_dc_id': resolvedDcId,
           'destination_warehouse_id': riderWarehouseId,
+          'receiver_id': resolvedRiderAgentId,
+          'receiver_name': riderName,
+          'receiver_role': 'delivery_agent',
           'dispatched_by': validDispatchedBy,
           'status': 'pending_rider_acceptance',
           'notes': 'DC Handover to $riderName ($riderCode)',
@@ -2076,8 +2079,18 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
                 'delivered_count_today': 0,
                 'returned_count': 0,
                 'awaiting_return_count': 0,
+                'updated_at': DateTime.now().toIso8601String(),
               });
-              debugPrint('[STOCK_DATASOURCE] ✅ Fallback: Created agent_inventory for rider $riderId with $rec units');
+              debugPrint('[STOCK_DATASOURCE] ✅ Created agent_inventory for rider $riderId with $rec units');
+            } else {
+              final curCustody = (existing['total_in_custody'] as num?)?.toInt() ?? 0;
+              final curAvail = (existing['available_count'] as num?)?.toInt() ?? 0;
+              await dbClient.from('agent_inventory').update({
+                'total_in_custody': curCustody + rec,
+                'available_count': curAvail + rec,
+                'updated_at': DateTime.now().toIso8601String(),
+              }).eq('id', existing['id']);
+              debugPrint('[STOCK_DATASOURCE] ✅ Incremented agent_inventory for rider $riderId ($curCustody -> ${curCustody + rec} units)');
             }
           }
         }
@@ -2159,24 +2172,49 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
       if (riderId != null && riderId.isNotEmpty) {
         String effectiveAgentId = riderId;
         String? linkedUserId;
+        String? agentCode;
+        String? agentName;
         try {
           final daRes = await dbClient
               .from('delivery_agents')
-              .select('id, user_id')
+              .select('id, user_id, agent_code, first_name, last_name, users(first_name, last_name)')
               .or('id.eq.$riderId,user_id.eq.$riderId')
               .limit(1);
           if ((daRes as List).isNotEmpty) {
-            effectiveAgentId = daRes.first['id']?.toString() ?? riderId;
-            linkedUserId = daRes.first['user_id']?.toString();
+            final row = daRes.first;
+            effectiveAgentId = row['id']?.toString() ?? riderId;
+            linkedUserId = row['user_id']?.toString();
+            agentCode = row['agent_code']?.toString();
+            final fName = row['first_name'] ?? (row['users'] is Map ? row['users']['first_name'] : null);
+            final lName = row['last_name'] ?? (row['users'] is Map ? row['users']['last_name'] : null);
+            if (fName != null) agentName = '$fName ${lName ?? ""}'.trim();
           }
         } catch (_) {}
 
-        return list.where((trf) =>
-            trf.receiverId == effectiveAgentId ||
-            (linkedUserId != null && trf.receiverId == linkedUserId) ||
-            trf.senderId == effectiveAgentId ||
-            (linkedUserId != null && trf.senderId == linkedUserId) ||
-            (trf.notes != null && (trf.notes!.contains(effectiveAgentId) || (linkedUserId != null && trf.notes!.contains(linkedUserId))))).toList();
+        // Resolve all warehouses belonging to this rider
+        List<String> riderWarehouseIds = [];
+        try {
+          final filter = linkedUserId != null && linkedUserId != effectiveAgentId
+              ? 'rider_id.eq.$effectiveAgentId,rider_id.eq.$linkedUserId'
+              : 'rider_id.eq.$effectiveAgentId';
+          final wRes = await dbClient.from('warehouses').select('id').or(filter);
+          riderWarehouseIds = (wRes as List).map((w) => w['id'].toString()).toList();
+        } catch (_) {}
+
+        return list.where((trf) {
+          final destW = trf.destinationWarehouseId;
+          final isDestWarehouseMatch = destW != null && riderWarehouseIds.contains(destW);
+          final isReceiverMatch = trf.receiverId == effectiveAgentId ||
+              (linkedUserId != null && trf.receiverId == linkedUserId);
+          final isSenderMatch = trf.senderId == effectiveAgentId ||
+              (linkedUserId != null && trf.senderId == linkedUserId);
+          final isNotesMatch = trf.notes != null &&
+              (trf.notes!.contains(effectiveAgentId) ||
+                  (linkedUserId != null && trf.notes!.contains(linkedUserId)) ||
+                  (agentCode != null && trf.notes!.contains(agentCode)) ||
+                  (agentName != null && trf.notes!.toLowerCase().contains(agentName.toLowerCase())));
+          return isDestWarehouseMatch || isReceiverMatch || isSenderMatch || isNotesMatch;
+        }).toList();
       }
 
       return list;
