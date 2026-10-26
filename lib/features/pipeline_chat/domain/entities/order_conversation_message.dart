@@ -18,6 +18,9 @@ enum ChatMessageType {
   deliveryCompleted,
   deliveryFailed,
   rescheduled,
+  voiceNote,
+  fileAttachment,
+  image,
 }
 
 /// A message or automated milestone in the Order Conversation
@@ -58,8 +61,47 @@ class OrderConversationMessageEntity {
   });
 
   bool get isSystem => senderRole == ChatSenderRole.system;
+
   bool get isStatusEvent =>
-      messageType != ChatMessageType.text;
+      messageType != ChatMessageType.text &&
+      messageType != ChatMessageType.voiceNote &&
+      messageType != ChatMessageType.fileAttachment &&
+      messageType != ChatMessageType.image;
+
+  bool get isVoiceNote =>
+      messageType == ChatMessageType.voiceNote ||
+      metadata['type'] == 'voice_note' ||
+      metadata['audio_url'] != null;
+
+  String? get voiceNoteUrl => metadata['audio_url']?.toString();
+
+  int get voiceNoteDuration =>
+      (metadata['duration_seconds'] as num?)?.toInt() ??
+      (metadata['duration'] as num?)?.toInt() ??
+      0;
+
+  bool get isFileAttachment =>
+      messageType == ChatMessageType.fileAttachment ||
+      metadata['type'] == 'file_attachment';
+
+  bool get isImage =>
+      messageType == ChatMessageType.image ||
+      metadata['type'] == 'image' ||
+      (isFileAttachment &&
+          (metadata['mime_type']?.toString().startsWith('image/') == true ||
+              metadata['file_name']?.toString().toLowerCase().endsWith('.png') == true ||
+              metadata['file_name']?.toString().toLowerCase().endsWith('.jpg') == true ||
+              metadata['file_name']?.toString().toLowerCase().endsWith('.jpeg') == true ||
+              metadata['file_name']?.toString().toLowerCase().endsWith('.webp') == true));
+
+  String? get fileUrl =>
+      metadata['file_url']?.toString() ?? metadata['image_url']?.toString();
+
+  String? get fileName => metadata['file_name']?.toString();
+
+  int? get fileSize => (metadata['file_size'] as num?)?.toInt();
+
+  String? get fileMimeType => metadata['mime_type']?.toString();
 }
 
 typedef OrderConversationMessage = OrderConversationMessageEntity;

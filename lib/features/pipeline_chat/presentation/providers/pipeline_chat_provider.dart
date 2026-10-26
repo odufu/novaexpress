@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import '../../domain/entities/order_conversation.dart';
 import '../../domain/entities/order_conversation_message.dart';
+import '../../data/services/chat_storage_service.dart';
 import '../../data/datasources/pipeline_chat_remote_datasource.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../dc_console/presentation/providers/dc_console_provider.dart';
@@ -439,6 +440,195 @@ class PipelineChatNotifier extends StateNotifier<PipelineChatState> {
         senderAvatarUrl: senderAvatar,
         senderRole: role,
         messageBody: body.trim(),
+      );
+
+      state = state.copyWith(isSending: false);
+      AudioService().playMessageSent();
+      return true;
+    } catch (e) {
+      state = state.copyWith(isSending: false, errorMessage: e.toString());
+      return false;
+    }
+  }
+
+  ({String? senderId, String senderName, String? senderAvatar, ChatSenderRole role}) _resolveSender(dynamic user) {
+    String senderName = 'User';
+    String? senderId = user?.id;
+    String? senderAvatar = user?.avatarUrl;
+    ChatSenderRole role = ChatSenderRole.system;
+
+    if (user != null) {
+      senderName = user.fullName.trim().isNotEmpty
+          ? user.fullName
+          : (user.email.split('@').first);
+
+      final rStr = user.role.toLowerCase();
+      if (user.isCloser || rStr.contains('closer')) {
+        role = ChatSenderRole.closer;
+      } else if (rStr.contains('marketer')) {
+        role = ChatSenderRole.marketer;
+      } else if (rStr.contains('client')) {
+        role = ChatSenderRole.client;
+      } else if (rStr.contains('dc') ||
+          rStr.contains('admin') ||
+          rStr.contains('manager') ||
+          rStr.contains('operations') ||
+          rStr.contains('dispatcher') ||
+          user.isDcOperations ||
+          user.isDcManager) {
+        role = ChatSenderRole.dcManager;
+      } else if (rStr.contains('agent') || rStr.contains('rider')) {
+        role = ChatSenderRole.deliveryAgent;
+      }
+    }
+    return (senderId: senderId, senderName: senderName, senderAvatar: senderAvatar, role: role);
+  }
+
+  /// Send a voice note in active conversation (optimized for speed)
+  Future<bool> sendVoiceNote({
+    required Uint8List audioBytes,
+    required Duration duration,
+    String mimeType = 'audio/webm',
+    String fileExtension = 'webm',
+  }) async {
+    final conv = state.activeConversation;
+    if (conv == null || audioBytes.isEmpty) return false;
+
+    state = state.copyWith(isSending: true);
+    try {
+      final authState = _ref.read(authProvider);
+      final user = authState.user;
+
+      if (user?.isCloser == true) {
+        final closerId = user?.closerId ?? user?.id;
+        final closerName = user?.fullName.trim().toLowerCase();
+        final matchId = conv.closerId != null && (conv.closerId == closerId || conv.closerId == user?.id);
+        final matchName = closerName != null &&
+            closerName.isNotEmpty &&
+            conv.closerName != null &&
+            conv.closerName!.trim().toLowerCase() == closerName;
+        if (!matchId && !matchName) {
+          state = state.copyWith(
+              isSending: false,
+              errorMessage: 'Access Restricted: You cannot post in conversations for other orders.');
+          return false;
+        }
+      }
+
+      final sender = _resolveSender(user);
+
+      // 1. Upload audio bytes directly to Supabase Storage
+      final audioUrl = await ChatStorageService.uploadVoiceNote(
+        bytes: audioBytes,
+        conversationId: conv.id,
+        ext: fileExtension,
+        mimeType: mimeType,
+      );
+
+      final seconds = duration.inSeconds;
+      final minutes = duration.inMinutes;
+      final remainingSec = seconds % 60;
+      final durationStr = '${minutes.toString().padLeft(1, '0')}:${remainingSec.toString().padLeft(2, '0')}';
+      final messageBody = '🎤 Voice note ($durationStr)';
+
+      await _dataSource.sendMessage(
+        conversationId: conv.id,
+        orderId: conv.orderId,
+        senderId: sender.senderId,
+        senderName: sender.senderName,
+        senderAvatarUrl: sender.senderAvatar,
+        senderRole: sender.role,
+        messageType: ChatMessageType.voiceNote,
+        messageBody: messageBody,
+        metadata: {
+          'type': 'voice_note',
+          'audio_url': audioUrl,
+          'duration_seconds': seconds,
+          'file_size': audioBytes.length,
+          'mime_type': mimeType,
+        },
+      );
+
+      state = state.copyWith(isSending: false);
+      AudioService().playMessageSent();
+      return true;
+    } catch (e) {
+      state = state.copyWith(isSending: false, errorMessage: e.toString());
+      return false;
+    }
+  }
+
+  /// Send a document or image file attachment
+  Future<bool> sendFileAttachment({
+    required Uint8List fileBytes,
+    required String fileName,
+    String? mimeType,
+    String? caption,
+    bool isImage = false,
+  }) async {
+    final conv = state.activeConversation;
+    if (conv == null || fileBytes.isEmpty) return false;
+
+    state = state.copyWith(isSending: true);
+    try {
+      final authState = _ref.read(authProvider);
+      final user = authState.user;
+
+      if (user?.isCloser == true) {
+        final closerId = user?.closerId ?? user?.id;
+        final closerName = user?.fullName.trim().toLowerCase();
+        final matchId = conv.closerId != null && (conv.closerId == closerId || conv.closerId == user?.id);
+        final matchName = closerName != null &&
+            closerName.isNotEmpty &&
+            conv.closerName != null &&
+            conv.closerName!.trim().toLowerCase() == closerName;
+        if (!matchId && !matchName) {
+          state = state.copyWith(
+              isSending: false,
+              errorMessage: 'Access Restricted: You cannot post in conversations for other orders.');
+          return false;
+        }
+      }
+
+      final sender = _resolveSender(user);
+
+      // 1. Upload file to Supabase Storage
+      final fileUrl = isImage
+          ? await ChatStorageService.uploadImage(
+              bytes: fileBytes,
+              conversationId: conv.id,
+              ext: fileName.split('.').last,
+            )
+          : await ChatStorageService.uploadFileAttachment(
+              bytes: fileBytes,
+              conversationId: conv.id,
+              originalFileName: fileName,
+              mimeType: mimeType,
+            );
+
+      final defaultBody = isImage ? '📷 $fileName' : '📎 $fileName';
+      final messageBody = (caption != null && caption.trim().isNotEmpty)
+          ? caption.trim()
+          : defaultBody;
+
+      await _dataSource.sendMessage(
+        conversationId: conv.id,
+        orderId: conv.orderId,
+        senderId: sender.senderId,
+        senderName: sender.senderName,
+        senderAvatarUrl: sender.senderAvatar,
+        senderRole: sender.role,
+        messageType: isImage ? ChatMessageType.image : ChatMessageType.fileAttachment,
+        messageBody: messageBody,
+        metadata: {
+          'type': isImage ? 'image' : 'file_attachment',
+          'file_url': fileUrl,
+          if (isImage) 'image_url': fileUrl,
+          'file_name': fileName,
+          'file_size': fileBytes.length,
+          if (mimeType != null) 'mime_type': mimeType,
+          if (caption != null && caption.trim().isNotEmpty) 'caption': caption.trim(),
+        },
       );
 
       state = state.copyWith(isSending: false);

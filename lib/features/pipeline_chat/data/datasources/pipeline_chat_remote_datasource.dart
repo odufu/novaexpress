@@ -399,6 +399,9 @@ class PipelineChatRemoteDataSourceImpl implements PipelineChatRemoteDataSource {
     String tStr = 'text';
     switch (messageType) {
       case ChatMessageType.text:
+      case ChatMessageType.voiceNote:
+      case ChatMessageType.fileAttachment:
+      case ChatMessageType.image:
         tStr = 'text';
         break;
       case ChatMessageType.statusChange:

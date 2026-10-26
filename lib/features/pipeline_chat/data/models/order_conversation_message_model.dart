@@ -33,6 +33,10 @@ class OrderConversationMessageModel extends OrderConversationMessageEntity {
       role = ChatSenderRole.deliveryAgent;
     }
 
+    final meta = json['metadata'] is Map
+        ? Map<String, dynamic>.from(json['metadata'] as Map)
+        : <String, dynamic>{};
+
     ChatMessageType type = ChatMessageType.text;
     final tStr = json['message_type']?.toString().toLowerCase();
     switch (tStr) {
@@ -57,13 +61,26 @@ class OrderConversationMessageModel extends OrderConversationMessageEntity {
       case 'rescheduled':
         type = ChatMessageType.rescheduled;
         break;
+      case 'voice_note':
+        type = ChatMessageType.voiceNote;
+        break;
+      case 'file_attachment':
+        type = ChatMessageType.fileAttachment;
+        break;
+      case 'image':
+        type = ChatMessageType.image;
+        break;
       default:
-        type = ChatMessageType.text;
+        if (meta['type'] == 'voice_note' || meta['audio_url'] != null) {
+          type = ChatMessageType.voiceNote;
+        } else if (meta['type'] == 'image') {
+          type = ChatMessageType.image;
+        } else if (meta['type'] == 'file_attachment') {
+          type = ChatMessageType.fileAttachment;
+        } else {
+          type = ChatMessageType.text;
+        }
     }
-
-    final meta = json['metadata'] is Map
-        ? Map<String, dynamic>.from(json['metadata'] as Map)
-        : <String, dynamic>{};
 
     final avatar = json['sender_avatar_url']?.toString() ??
         (meta['avatar_url']?.toString());
@@ -152,6 +169,9 @@ class OrderConversationMessageModel extends OrderConversationMessageEntity {
       case ChatMessageType.rescheduled:
         tStr = 'rescheduled';
         break;
+      case ChatMessageType.voiceNote:
+      case ChatMessageType.fileAttachment:
+      case ChatMessageType.image:
       default:
         tStr = 'text';
     }
@@ -174,4 +194,3 @@ class OrderConversationMessageModel extends OrderConversationMessageEntity {
     };
   }
 }
-

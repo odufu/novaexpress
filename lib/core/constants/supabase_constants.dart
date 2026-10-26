@@ -64,4 +64,5 @@ class SupabaseConstants {
   static const String proofOfDeliveryBucket = 'pod-proofs';
   static const String remittanceReceiptsBucket = 'remittance-proofs';
   static const String receiptsBucket = 'receipts';
+  static const String chatAttachmentsBucket = 'chat-attachments';
 }

@@ -15,6 +15,28 @@ import '../../../../core/widgets/app_logo_widget.dart';
 import '../providers/pipeline_chat_provider.dart';
 import 'conversation_list_modal.dart';
 import 'chat_user_profile_card_modal.dart';
+import 'dart:async';
+import 'package:file_picker/file_picker.dart';
+import '../../../../core/services/voice_recorder/voice_recorder.dart';
+import 'voice_note_player_widget.dart';
+import 'file_attachment_bubble_widget.dart';
+
+class ChatPickedAttachment {
+  final Uint8List bytes;
+  final String fileName;
+  final int fileSize;
+  final bool isImage;
+  final String? mimeType;
+
+  const ChatPickedAttachment({
+    required this.bytes,
+    required this.fileName,
+    required this.fileSize,
+    required this.isImage,
+    this.mimeType,
+  });
+}
+
 
 class OrderPipelineChatSheet extends ConsumerStatefulWidget {
   final String orderId;
@@ -91,6 +113,12 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
   String _mentionQuery = '';
   int _mentionStartIndex = -1;
 
+  late final VoiceNoteRecorder _voiceRecorder;
+  bool _isRecordingVoice = false;
+  Duration _recordingDuration = Duration.zero;
+  StreamSubscription? _recordingSub;
+  ChatPickedAttachment? _stagedAttachment;
+
   @override
   void initState() {
     super.initState();
@@ -103,6 +131,10 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
     );
 
     _msgController.addListener(_onTextChanged);
+    _voiceRecorder = VoiceNoteRecorder();
+    _recordingSub = _voiceRecorder.durationStream.listen((dur) {
+      if (mounted) setState(() => _recordingDuration = dur);
+    });
 
     if (widget.initialMessage != null && widget.initialMessage!.isNotEmpty) {
       _msgController.text = widget.initialMessage!;
@@ -117,6 +149,8 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
 
   @override
   void dispose() {
+    _recordingSub?.cancel();
+    _voiceRecorder.dispose();
     _shimmerController.dispose();
     _msgController.removeListener(_onTextChanged);
     _msgController.dispose();
@@ -158,6 +192,8 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
 
     if (_showMentionSuggestions) {
       setState(() => _showMentionSuggestions = false);
+    } else {
+      if (mounted) setState(() {});
     }
   }
 
@@ -309,7 +345,156 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
     }
   }
 
+  Widget _buildMessageContent(
+    OrderConversationMessageEntity msg, {
+    required bool isMyMessage,
+    required bool isDark,
+    required OrderConversationEntity? conv,
+  }) {
+    if (msg.isVoiceNote && msg.voiceNoteUrl != null) {
+      return VoiceNotePlayerWidget(
+        audioUrl: msg.voiceNoteUrl!,
+        durationSeconds: msg.voiceNoteDuration,
+        isMyMessage: isMyMessage,
+        isDark: isDark,
+      );
+    }
+    if (msg.isFileAttachment || msg.isImage) {
+      return FileAttachmentBubbleWidget(
+        msg: msg,
+        isMyMessage: isMyMessage,
+        isDark: isDark,
+      );
+    }
+    return _buildMessageBodyWithInteractiveMentions(
+      msg.messageBody,
+      isMyMessage: isMyMessage,
+      isDark: isDark,
+      conv: conv,
+    );
+  }
+
+  Future<void> _startVoiceRecording() async {
+    final started = await _voiceRecorder.start();
+    if (started) {
+      setState(() {
+        _isRecordingVoice = true;
+        _recordingDuration = Duration.zero;
+      });
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Microphone access is required to record voice notes.',
+              style: GoogleFonts.inter(color: Colors.white),
+            ),
+            backgroundColor: const Color(0xFFEF4444),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _cancelVoiceRecording() async {
+    await _voiceRecorder.cancel();
+    if (mounted) {
+      setState(() {
+        _isRecordingVoice = false;
+        _recordingDuration = Duration.zero;
+      });
+    }
+  }
+
+  Future<void> _sendVoiceRecording() async {
+    final result = await _voiceRecorder.stop();
+    if (mounted) {
+      setState(() {
+        _isRecordingVoice = false;
+        _recordingDuration = Duration.zero;
+      });
+    }
+
+    if (result != null && result.bytes.isNotEmpty) {
+      final ok = await ref.read(pipelineChatProvider.notifier).sendVoiceNote(
+            audioBytes: result.bytes,
+            duration: result.duration,
+            mimeType: result.mimeType,
+            fileExtension: result.fileExtension,
+          );
+      if (ok) {
+        Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
+      }
+    }
+  }
+
+  Future<void> _pickMediaAttachment({required bool isImageOnly}) async {
+    try {
+      final result = await FilePickerPlatform.instance.pickFiles(
+        type: isImageOnly ? FileType.custom : FileType.any,
+        allowedExtensions: isImageOnly ? ['png', 'jpg', 'jpeg', 'webp', 'gif'] : null,
+      );
+
+      if (result.isNotEmpty) {
+        final file = result.first;
+        final bytes = await file.readAsBytes();
+        if (bytes.isNotEmpty) {
+          final ext = file.extension?.toLowerCase() ?? '';
+          final isImg = isImageOnly || ['png', 'jpg', 'jpeg', 'webp', 'gif'].contains(ext);
+          String? mime;
+          if (isImg) {
+            mime = ext == 'png' ? 'image/png' : 'image/jpeg';
+          } else if (ext == 'pdf') {
+            mime = 'application/pdf';
+          }
+
+          setState(() {
+            _stagedAttachment = ChatPickedAttachment(
+              bytes: bytes,
+              fileName: file.name,
+              fileSize: bytes.length,
+              isImage: isImg,
+              mimeType: mime,
+            );
+          });
+          _msgFocusNode.requestFocus();
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to select file: $e', style: GoogleFonts.inter(color: Colors.white)),
+            backgroundColor: const Color(0xFFEF4444),
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _handleSendMessage() async {
+    if (_stagedAttachment != null) {
+      final attachment = _stagedAttachment!;
+      final caption = _msgController.text.trim();
+      _msgController.clear();
+      setState(() {
+        _stagedAttachment = null;
+        _showMentionSuggestions = false;
+      });
+
+      final ok = await ref.read(pipelineChatProvider.notifier).sendFileAttachment(
+            fileBytes: attachment.bytes,
+            fileName: attachment.fileName,
+            mimeType: attachment.mimeType,
+            caption: caption.isNotEmpty ? caption : null,
+            isImage: attachment.isImage,
+          );
+      if (ok) {
+        Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
+      }
+      return;
+    }
+
     final text = _msgController.text.trim();
     if (text.isEmpty) return;
 
@@ -1039,8 +1224,8 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                         ),
                       ],
                     ),
-                    child: _buildMessageBodyWithInteractiveMentions(
-                      msg.messageBody,
+                    child: _buildMessageContent(
+                      msg,
                       isMyMessage: true,
                       isDark: isDark,
                       conv: conv,
@@ -1182,8 +1367,8 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                     ),
                     border: Border.all(color: bubbleBorder),
                   ),
-                  child: _buildMessageBodyWithInteractiveMentions(
-                    msg.messageBody,
+                  child: _buildMessageContent(
+                    msg,
                     isMyMessage: false,
                     isDark: isDark,
                     conv: conv,
@@ -1545,6 +1730,13 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
     );
   }
 
+  String _formatFileSize(int bytes) {
+    if (bytes <= 0) return '0 B';
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
   Widget _buildInputFooter(
     BuildContext context,
     bool isDark,
@@ -1553,6 +1745,8 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
   ) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final bottomPadding = MediaQuery.of(context).padding.bottom;
+    final hasText = _msgController.text.trim().isNotEmpty;
+    final hasAttachment = _stagedAttachment != null;
 
     return Container(
       padding: EdgeInsets.only(
@@ -1569,170 +1763,479 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
           if (_showMentionSuggestions)
             _buildMentionSuggestionsOverlay(context, isDark, conv),
 
-          // Completely Free, Borderless Pill Container
-          Container(
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(26),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // Pure borderless free input
-                Expanded(
-                  child: TextField(
-                    controller: _msgController,
-                    focusNode: _msgFocusNode,
-                    minLines: 1,
-                    maxLines: 4,
-                    textCapitalization: TextCapitalization.sentences,
-                    onSubmitted: (_) => _handleSendMessage(),
-                    style: GoogleFonts.inter(
-                      fontSize: 13.5,
-                      color: isDark ? Colors.white : const Color(0xFF0F172A),
-                      height: 1.35,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: 'Type a message... (type @ to tag)',
-                      hintStyle: GoogleFonts.inter(
-                        fontSize: 13,
-                        color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
-                      ),
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 8),
-                      border: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      errorBorder: InputBorder.none,
-                      disabledBorder: InputBorder.none,
+          // 1. WhatsApp-style Attachment Staging Preview (if file/photo staged)
+          if (_stagedAttachment != null)
+            Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                  width: 0.8,
+                ),
+              ),
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: _stagedAttachment!.isImage
+                        ? Image.memory(
+                            _stagedAttachment!.bytes,
+                            width: 38,
+                            height: 38,
+                            fit: BoxFit.cover,
+                          )
+                        : Container(
+                            width: 38,
+                            height: 38,
+                            color: const Color(0xFF0284C7).withValues(alpha: 0.15),
+                            child: const Icon(
+                              Icons.insert_drive_file_rounded,
+                              color: Color(0xFF0284C7),
+                              size: 22,
+                            ),
+                          ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _stagedAttachment!.fileName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          ),
+                        ),
+                        Text(
+                          _formatFileSize(_stagedAttachment!.fileSize),
+                          style: GoogleFonts.inter(
+                            fontSize: 10.5,
+                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-                const SizedBox(width: 4),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, size: 18),
+                    tooltip: 'Discard attachment',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                    onPressed: () => setState(() => _stagedAttachment = null),
+                  ),
+                ],
+              ),
+            ),
 
-                // Emoji Quick Picker Popup Button (mog) INSIDE AT THE END
-                Tooltip(
-                  message: 'Add Emoji',
-                  child: PopupMenuButton<String>(
+          // 2. Main Input / Recording Container
+          if (_isRecordingVoice)
+            // WhatsApp Live Voice Recording Mode
+            Container(
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(26),
+                border: Border.all(
+                  color: const Color(0xFFEF4444).withValues(alpha: 0.5),
+                  width: 1.0,
+                ),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              child: Row(
+                children: [
+                  // Pulsing recording red dot
+                  FadeTransition(
+                    opacity: _shimmerAnimation,
+                    child: Container(
+                      width: 10,
+                      height: 10,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFEF4444),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+
+                  // Stopwatch Duration Timer
+                  Text(
+                    '${_recordingDuration.inMinutes}:${(_recordingDuration.inSeconds % 60).toString().padLeft(2, '0')}',
+                    style: GoogleFonts.inter(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFFEF4444),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+
+                  // Waveform hint
+                  Expanded(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.graphic_eq_rounded,
+                          size: 18,
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Recording voice note...',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+
+                  // WhatsApp Trash / Discard Button
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 22),
+                    tooltip: 'Cancel & Discard',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    onPressed: _cancelVoiceRecording,
+                  ),
+                  const SizedBox(width: 6),
+
+                  // WhatsApp Send Voice Note Button
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Color(0xFF10B981), Color(0xFF059669)], // WhatsApp Emerald
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Color(0x4410B981),
+                          blurRadius: 6,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(17),
+                        onTap: isSending ? null : _sendVoiceRecording,
+                        child: Center(
+                          child: isSending
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.arrow_upward_rounded,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            // Standard WhatsApp Chat Bar
+            Container(
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(26),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // 1. WhatsApp Attachment Button (Paperclip)
+                  PopupMenuButton<String>(
                     icon: Icon(
-                      Icons.sentiment_satisfied_alt_outlined,
+                      Icons.attach_file_rounded,
                       size: 20,
                       color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                     ),
                     padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                    tooltip: 'Add emoji',
+                    constraints: const BoxConstraints(minWidth: 190),
+                    tooltip: 'Attach photo or file',
                     color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    onSelected: (emoji) {
-                      final cur = _msgController.text;
-                      _msgController.text = '$cur $emoji '.trimLeft();
-                      _msgController.selection = TextSelection.fromPosition(
-                        TextPosition(offset: _msgController.text.length),
-                      );
-                      _msgFocusNode.requestFocus();
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    offset: const Offset(0, -115),
+                    onSelected: (val) {
+                      if (val == 'photo') {
+                        _pickMediaAttachment(isImageOnly: true);
+                      } else if (val == 'doc') {
+                        _pickMediaAttachment(isImageOnly: false);
+                      }
                     },
                     itemBuilder: (ctx) => [
                       PopupMenuItem(
-                        enabled: false,
-                        child: Text(
-                          'Quick Reactions',
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                          ),
-                        ),
-                      ),
-                      const PopupMenuDivider(height: 4),
-                      PopupMenuItem(
-                        padding: EdgeInsets.zero,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          child: Wrap(
-                            spacing: 10,
-                            runSpacing: 10,
-                            children: [
-                              '👍', '✅', '📦', '🚚', '📍', '💰', '📞', '⚠️', '🚨', '🙏'
-                            ].map((emoji) {
-                              return InkWell(
-                                onTap: () => Navigator.of(ctx).pop(emoji),
-                                borderRadius: BorderRadius.circular(8),
-                                child: Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: BoxDecoration(
-                                    color: isDark
-                                        ? const Color(0xFF334155).withValues(alpha: 0.5)
-                                        : const Color(0xFFF1F5F9),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(emoji, style: const TextStyle(fontSize: 18)),
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 4),
-
-                // Circular Organic Send Button INSIDE AT THE END
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [
-                        Color(0xFF0284C7),
-                        Color(0xFF0369A1),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF0284C7).withValues(alpha: 0.3),
-                        blurRadius: 4,
-                        offset: const Offset(0, 1.5),
-                      ),
-                    ],
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(16),
-                      onTap: isSending ? null : _handleSendMessage,
-                      child: Center(
-                        child: isSending
-                            ? FadeTransition(
-                                opacity: _shimmerAnimation,
-                                child: const Icon(
-                                  Icons.arrow_upward_rounded,
-                                  color: Colors.white,
-                                  size: 16,
-                                ),
-                              )
-                            : const Icon(
-                                Icons.send_rounded,
-                                color: Colors.white,
-                                size: 16,
+                        value: 'photo',
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(7),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                                shape: BoxShape.circle,
                               ),
+                              child: const Icon(Icons.image_rounded, size: 18, color: Color(0xFF10B981)),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Photos & Media',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'doc',
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(7),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF3B82F6).withValues(alpha: 0.15),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.insert_drive_file_rounded, size: 18, color: Color(0xFF3B82F6)),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Document / File',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 2),
+
+                  // 2. Pure borderless free input
+                  Expanded(
+                    child: TextField(
+                      controller: _msgController,
+                      focusNode: _msgFocusNode,
+                      minLines: 1,
+                      maxLines: 4,
+                      textCapitalization: TextCapitalization.sentences,
+                      onSubmitted: (_) => _handleSendMessage(),
+                      style: GoogleFonts.inter(
+                        fontSize: 13.5,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        height: 1.35,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: _stagedAttachment != null
+                            ? 'Add a caption...'
+                            : 'Type a message... (type @ to tag)',
+                        hintStyle: GoogleFonts.inter(
+                          fontSize: 13,
+                          color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                        ),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                        border: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        errorBorder: InputBorder.none,
+                        disabledBorder: InputBorder.none,
                       ),
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 4),
+
+                  // 3. Emoji Quick Picker Popup Button
+                  Tooltip(
+                    message: 'Add Emoji',
+                    child: PopupMenuButton<String>(
+                      icon: Icon(
+                        Icons.sentiment_satisfied_alt_outlined,
+                        size: 20,
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      ),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      tooltip: 'Add emoji',
+                      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      onSelected: (emoji) {
+                        final cur = _msgController.text;
+                        _msgController.text = '$cur $emoji '.trimLeft();
+                        _msgController.selection = TextSelection.fromPosition(
+                          TextPosition(offset: _msgController.text.length),
+                        );
+                        _msgFocusNode.requestFocus();
+                      },
+                      itemBuilder: (ctx) => [
+                        PopupMenuItem(
+                          enabled: false,
+                          child: Text(
+                            'Quick Reactions',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                            ),
+                          ),
+                        ),
+                        const PopupMenuDivider(height: 4),
+                        PopupMenuItem(
+                          padding: EdgeInsets.zero,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            child: Wrap(
+                              spacing: 10,
+                              runSpacing: 10,
+                              children: [
+                                '👍', '✅', '📦', '🚚', '📍', '💰', '📞', '⚠️', '🚨', '🙏'
+                              ].map((emoji) {
+                                return InkWell(
+                                  onTap: () => Navigator.of(ctx).pop(emoji),
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: isDark
+                                          ? const Color(0xFF334155).withValues(alpha: 0.5)
+                                          : const Color(0xFFF1F5F9),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(emoji, style: const TextStyle(fontSize: 18)),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+
+                  // 4. Dynamic WhatsApp Button (Mic when empty, Send when has text/file)
+                  if (hasText || hasAttachment)
+                    // Send Button
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [
+                            Color(0xFF0284C7),
+                            Color(0xFF0369A1),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF0284C7).withValues(alpha: 0.3),
+                            blurRadius: 4,
+                            offset: const Offset(0, 1.5),
+                          ),
+                        ],
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: isSending ? null : _handleSendMessage,
+                          child: Center(
+                            child: isSending
+                                ? FadeTransition(
+                                    opacity: _shimmerAnimation,
+                                    child: const Icon(
+                                      Icons.arrow_upward_rounded,
+                                      color: Colors.white,
+                                      size: 16,
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.send_rounded,
+                                    color: Colors.white,
+                                    size: 16,
+                                  ),
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    // WhatsApp Microphone Button
+                    Tooltip(
+                      message: 'Record voice note',
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [
+                              Color(0xFF10B981), // WhatsApp Emerald
+                              Color(0xFF059669),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF10B981).withValues(alpha: 0.35),
+                              blurRadius: 5,
+                              offset: const Offset(0, 1.5),
+                            ),
+                          ],
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(16),
+                            onTap: _startVoiceRecording,
+                            child: const Center(
+                              child: Icon(
+                                Icons.mic_rounded,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
-          ),
         ],
       ),
     );
   }
 }
-
