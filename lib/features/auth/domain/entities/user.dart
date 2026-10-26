@@ -13,7 +13,7 @@ class UserEntity {
   final String? distributionCenterName;
   final int? lifetimeDeliveriesCount;
   final double? rating;
-  final String personnelType; // 'pda' (own vehicle) | 'in_house_rider' (company bike)
+  final String? personnelType; // 'pda' (own vehicle) | 'in_house_rider' (company bike)
   final String compensationType; // 'commission' | 'salary' | 'hybrid'
   final double commissionRate; // e.g. 1000.0 (PDA) or 500.0 (Rider)
   final double transportAllowance; // e.g. 1500.0 (PDA transport)

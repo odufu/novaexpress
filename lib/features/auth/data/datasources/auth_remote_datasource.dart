@@ -2081,7 +2081,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         merged['role'] = 'sales_supervisor';
         merged['is_supervisor'] = true;
         merged['delivery_agent_id'] = null;
-        merged['personnel_type'] = null;
+        merged['personnel_type'] = 'supervisor';
         merged['delivery_agent_code'] = 'SUP-CLS-01';
 
         try {
@@ -2695,7 +2695,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
       // Strip rider compensation defaults for non-riders
       if (isNonRider) {
-        merged['personnel_type'] = null;
+        merged['personnel_type'] = isCloserSupervisor ? 'supervisor' : 'non_rider';
         merged['commission_rate'] = null;
         merged['transport_allowance'] = null;
         merged['fuel_allowance'] = null;

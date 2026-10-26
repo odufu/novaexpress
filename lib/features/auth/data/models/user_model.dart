@@ -76,7 +76,7 @@ class UserModel extends UserEntity {
       distributionCenterName: json['distribution_center_name'] ?? json['dc_name'] ?? 'Wuse Distribution Center',
       lifetimeDeliveriesCount: (json['lifetime_deliveries_count'] as num?)?.toInt() ?? 0,
       rating: (json['rating'] as num?)?.toDouble() ?? 5.0,
-      personnelType: isSupervisorRole ? null : (json['personnel_type'] ?? 'pda'),
+      personnelType: (json['personnel_type'] as String?) ?? (isSupervisorRole ? 'supervisor' : 'pda'),
       compensationType: json['compensation_type'] ?? 'commission',
       commissionRate: (json['commission_rate'] as num?)?.toDouble() ?? 1000.0,
       transportAllowance: (json['transport_allowance'] as num?)?.toDouble() ?? 1500.0,
