@@ -395,7 +395,7 @@ class SalesSupervisorNotifier extends StateNotifier<SalesSupervisorState> {
       // 1. Update the order in Supabase
       final order = state.orders.where((o) => o.id == upg.orderId || o.orderNumber == upg.orderNumber).firstOrNull;
       final existingDeliveryNotes = order?.deliveryNotes ?? '';
-      final updatedNotes = '$existingDeliveryNotes [UPG APPROVED by $supervisorName: +?${upg.upsellDelta.toStringAsFixed(0)} on ${DateTime.now().toLocal()}]'.trim();
+      final updatedNotes = '$existingDeliveryNotes [UPG APPROVED by $supervisorName: +₦${upg.upsellDelta.toStringAsFixed(0)} on ${DateTime.now().toLocal()}]'.trim();
 
       await client.from('orders').update({
         'total_amount': upg.upgradedAmount,
@@ -406,7 +406,38 @@ class SalesSupervisorNotifier extends StateNotifier<SalesSupervisorState> {
         'updated_at': DateTime.now().toIso8601String(),
       }).eq('id', upg.orderId);
 
-      // 2. Record activity in order_activities
+      // 2. Update order_conversations in Supabase for live chat pipeline banner
+      try {
+        await client.from('order_conversations').update({
+          'current_package_name': upg.upgradedProduct,
+          'current_total_amount': upg.upgradedAmount,
+          'last_message_at': DateTime.now().toIso8601String(),
+        }).or('order_id.eq.${upg.orderId},order_number.eq.${upg.orderNumber}');
+      } catch (_) {}
+
+      // 3. Post System event message to pipeline chat
+      try {
+        final convCheck = await client
+            .from('order_conversations')
+            .select('id')
+            .or('order_id.eq.${upg.orderId},order_number.eq.${upg.orderNumber}')
+            .limit(1);
+        if ((convCheck as List).isNotEmpty) {
+          final convId = convCheck.first['id'].toString();
+          await client.from('order_conversation_messages').insert({
+            'conversation_id': convId,
+            'sender_id': '00000000-0000-0000-0000-000000000000',
+            'sender_name': 'NovaXpress System',
+            'sender_role': 'system',
+            'message_type': 'product_changed',
+            'content': '⚡ Order package upgraded to "${upg.upgradedProduct}" (${upg.upgradedQuantity} units @ ₦${upg.upgradedAmount.toStringAsFixed(0)}). Approved by Supervisor $supervisorName.',
+            'message_body': '⚡ Order package upgraded to "${upg.upgradedProduct}" (${upg.upgradedQuantity} units @ ₦${upg.upgradedAmount.toStringAsFixed(0)}). Approved by Supervisor $supervisorName.',
+            'created_at': DateTime.now().toIso8601String(),
+          });
+        }
+      } catch (_) {}
+
+      // 4. Record activity in order_activities
       await client.from('order_activities').insert({
         'order_id': upg.orderId,
         'activity_type': 'upg_approved',
@@ -420,12 +451,12 @@ class SalesSupervisorNotifier extends StateNotifier<SalesSupervisorState> {
         'created_at': DateTime.now().toIso8601String(),
       });
 
-      // 3. Send notification to closer
+      // 5. Send notification to closer
       try {
         await client.from('notifications').insert({
           'company_id': '11111111-1111-4111-8111-111111111111',
-          'title': 'UPG Approved! ??',
-          'message': 'Your package upgrade on Order #${upg.orderNumber} (+?${upg.upsellDelta.toStringAsFixed(0)}) was authorized by Supervisor $supervisorName.',
+          'title': 'UPG Approved! 🚀',
+          'message': 'Your package upgrade on Order #${upg.orderNumber} (+₦${upg.upsellDelta.toStringAsFixed(0)}) was authorized by Supervisor $supervisorName.',
           'category': 'sales',
           'action_route': '/closer',
           'is_read': false,
@@ -433,7 +464,7 @@ class SalesSupervisorNotifier extends StateNotifier<SalesSupervisorState> {
         });
       } catch (_) {}
 
-      // 4. Update local state
+      // 6. Update local state for both requests and orders
       final updatedRequests = state.upgRequests.map((r) {
         if (r.id == upgId) {
           return r.copyWith(
@@ -445,7 +476,23 @@ class SalesSupervisorNotifier extends StateNotifier<SalesSupervisorState> {
         return r;
       }).toList();
 
-      state = state.copyWith(upgRequests: updatedRequests);
+      final updatedOrders = state.orders.map((o) {
+        if (o.id == upg.orderId || o.orderNumber == upg.orderNumber) {
+          return o.copyWith(
+            packageDealName: upg.upgradedProduct,
+            quantity: upg.upgradedQuantity,
+            totalAmount: upg.upgradedAmount,
+            upsellAmount: upg.upsellDelta,
+            deliveryNotes: updatedNotes,
+          );
+        }
+        return o;
+      }).toList();
+
+      state = state.copyWith(
+        upgRequests: updatedRequests,
+        orders: updatedOrders,
+      );
 
       return {
         'success': true,
@@ -574,9 +621,38 @@ class SalesSupervisorNotifier extends StateNotifier<SalesSupervisorState> {
           'upsell_amount': delta,
           'quantity': upgradedQuantity,
           'package_deal_name': upgradedProduct,
-          'delivery_notes': '[UPG DIRECT: +?$delta by $supervisorName]',
+          'delivery_notes': '[UPG DIRECT: +₦${delta.toStringAsFixed(0)} by $supervisorName]',
           'updated_at': DateTime.now().toIso8601String(),
         }).eq('id', orderId);
+
+        try {
+          await client.from('order_conversations').update({
+            'current_package_name': upgradedProduct,
+            'current_total_amount': upgradedAmount,
+            'last_message_at': DateTime.now().toIso8601String(),
+          }).or('order_id.eq.$orderId,order_number.eq.$orderNumber');
+        } catch (_) {}
+
+        try {
+          final convCheck = await client
+              .from('order_conversations')
+              .select('id')
+              .or('order_id.eq.$orderId,order_number.eq.$orderNumber')
+              .limit(1);
+          if ((convCheck as List).isNotEmpty) {
+            final convId = convCheck.first['id'].toString();
+            await client.from('order_conversation_messages').insert({
+              'conversation_id': convId,
+              'sender_id': '00000000-0000-0000-0000-000000000000',
+              'sender_name': 'NovaXpress System',
+              'sender_role': 'system',
+              'message_type': 'product_changed',
+              'content': '⚡ Order package upgraded to "$upgradedProduct" ($upgradedQuantity units @ ₦${upgradedAmount.toStringAsFixed(0)}). Approved directly by Supervisor $supervisorName.',
+              'message_body': '⚡ Order package upgraded to "$upgradedProduct" ($upgradedQuantity units @ ₦${upgradedAmount.toStringAsFixed(0)}). Approved directly by Supervisor $supervisorName.',
+              'created_at': DateTime.now().toIso8601String(),
+            });
+          }
+        } catch (_) {}
 
         await client.from('order_activities').insert({
           'order_id': orderId,
@@ -593,7 +669,22 @@ class SalesSupervisorNotifier extends StateNotifier<SalesSupervisorState> {
         });
       }
 
-      state = state.copyWith(upgRequests: [newReq, ...state.upgRequests]);
+      final updatedOrders = state.orders.map((o) {
+        if (o.id == orderId || o.orderNumber == orderNumber) {
+          return o.copyWith(
+            packageDealName: upgradedProduct,
+            quantity: upgradedQuantity,
+            totalAmount: upgradedAmount,
+            upsellAmount: delta,
+          );
+        }
+        return o;
+      }).toList();
+
+      state = state.copyWith(
+        upgRequests: [newReq, ...state.upgRequests],
+        orders: updatedOrders,
+      );
 
       return {
         'success': true,
