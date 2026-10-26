@@ -415,7 +415,7 @@ class SalesSupervisorNotifier extends StateNotifier<SalesSupervisorState> {
         }).or('order_id.eq.${upg.orderId},order_number.eq.${upg.orderNumber}');
       } catch (_) {}
 
-      // 3. Post System event message to pipeline chat
+      // 3. Post System event message to pipeline chat (no invalid 'content' column)
       try {
         final convCheck = await client
             .from('order_conversations')
@@ -426,30 +426,58 @@ class SalesSupervisorNotifier extends StateNotifier<SalesSupervisorState> {
           final convId = convCheck.first['id'].toString();
           await client.from('order_conversation_messages').insert({
             'conversation_id': convId,
+            'order_id': upg.orderId,
             'sender_id': '00000000-0000-0000-0000-000000000000',
             'sender_name': 'NovaXpress System',
             'sender_role': 'system',
             'message_type': 'product_changed',
-            'content': '⚡ Order package upgraded to "${upg.upgradedProduct}" (${upg.upgradedQuantity} units @ ₦${upg.upgradedAmount.toStringAsFixed(0)}). Approved by Supervisor $supervisorName.',
             'message_body': '⚡ Order package upgraded to "${upg.upgradedProduct}" (${upg.upgradedQuantity} units @ ₦${upg.upgradedAmount.toStringAsFixed(0)}). Approved by Supervisor $supervisorName.',
             'created_at': DateTime.now().toIso8601String(),
           });
         }
       } catch (_) {}
 
-      // 4. Record activity in order_activities
-      await client.from('order_activities').insert({
-        'order_id': upg.orderId,
-        'activity_type': 'upg_approved',
-        'notes': jsonEncode({
-          ...upg.toJson(),
-          'status': 'approved',
-          'approved_by': supervisorName,
-          'approved_at': DateTime.now().toIso8601String(),
-          'supervisor_notes': notes ?? 'Approved package upgrade for customer.',
-        }),
-        'created_at': DateTime.now().toIso8601String(),
+      final approvedJson = jsonEncode({
+        ...upg.toJson(),
+        'status': 'approved',
+        'approved_by': supervisorName,
+        'approved_at': DateTime.now().toIso8601String(),
+        'supervisor_notes': notes ?? 'Approved package upgrade for customer.',
       });
+
+      // 4. Update existing activity row in order_activities to permanently prevent resurrection
+      try {
+        if (upg.id.contains('-') && upg.id.length >= 32) {
+          await client.from('order_activities').update({
+            'activity_type': 'upg_approved',
+            'notes': approvedJson,
+          }).eq('id', upg.id);
+        }
+        await client.from('order_activities').update({
+          'activity_type': 'upg_approved',
+          'notes': approvedJson,
+        }).eq('order_id', upg.orderId).eq('activity_type', 'upg_request');
+      } catch (actErr) {
+        debugPrint('[SALES_SUPERVISOR] Notice: update order_activities: $actErr');
+      }
+
+      // Ensure at least one upg_approved record exists in order_activities
+      try {
+        final existingApproved = await client
+            .from('order_activities')
+            .select('id')
+            .eq('order_id', upg.orderId)
+            .eq('activity_type', 'upg_approved')
+            .limit(1);
+        if ((existingApproved as List).isEmpty) {
+          await client.from('order_activities').insert({
+            'order_id': upg.orderId,
+            'activity_type': 'upg_approved',
+            'notes': approvedJson,
+            'created_at': DateTime.now().toIso8601String(),
+          });
+        }
+      } catch (_) {}
 
       // 5. Send notification to closer
       try {
@@ -466,7 +494,7 @@ class SalesSupervisorNotifier extends StateNotifier<SalesSupervisorState> {
 
       // 6. Update local state for both requests and orders
       final updatedRequests = state.upgRequests.map((r) {
-        if (r.id == upgId) {
+        if (r.id == upgId || (r.orderId == upg.orderId && r.isPending)) {
           return r.copyWith(
             status: 'approved',
             approvedAt: DateTime.now(),
@@ -516,19 +544,47 @@ class SalesSupervisorNotifier extends StateNotifier<SalesSupervisorState> {
     }
 
     try {
-      // 1. Record rejection activity in order_activities
-      await client.from('order_activities').insert({
-        'order_id': upg.orderId,
-        'activity_type': 'upg_rejected',
-        'notes': jsonEncode({
-          ...upg.toJson(),
-          'status': 'rejected',
-          'rejection_reason': reason,
-          'approved_by': supervisorName,
-          'approved_at': DateTime.now().toIso8601String(),
-        }),
-        'created_at': DateTime.now().toIso8601String(),
+      final rejectedJson = jsonEncode({
+        ...upg.toJson(),
+        'status': 'rejected',
+        'rejection_reason': reason,
+        'approved_by': supervisorName,
+        'approved_at': DateTime.now().toIso8601String(),
       });
+
+      // 1. Update existing activity row in order_activities to permanently prevent resurrection
+      try {
+        if (upg.id.contains('-') && upg.id.length >= 32) {
+          await client.from('order_activities').update({
+            'activity_type': 'upg_rejected',
+            'notes': rejectedJson,
+          }).eq('id', upg.id);
+        }
+        await client.from('order_activities').update({
+          'activity_type': 'upg_rejected',
+          'notes': rejectedJson,
+        }).eq('order_id', upg.orderId).eq('activity_type', 'upg_request');
+      } catch (actErr) {
+        debugPrint('[SALES_SUPERVISOR] Notice: update order_activities rejection: $actErr');
+      }
+
+      // Ensure an upg_rejected record exists
+      try {
+        final existingRejected = await client
+            .from('order_activities')
+            .select('id')
+            .eq('order_id', upg.orderId)
+            .eq('activity_type', 'upg_rejected')
+            .limit(1);
+        if ((existingRejected as List).isEmpty) {
+          await client.from('order_activities').insert({
+            'order_id': upg.orderId,
+            'activity_type': 'upg_rejected',
+            'notes': rejectedJson,
+            'created_at': DateTime.now().toIso8601String(),
+          });
+        }
+      } catch (_) {}
 
       // 2. Notify closer
       try {
@@ -545,7 +601,7 @@ class SalesSupervisorNotifier extends StateNotifier<SalesSupervisorState> {
 
       // 3. Update local state
       final updatedRequests = state.upgRequests.map((r) {
-        if (r.id == upgId) {
+        if (r.id == upgId || (r.orderId == upg.orderId && r.isPending)) {
           return r.copyWith(
             status: 'rejected',
             rejectionReason: reason,
@@ -590,7 +646,7 @@ class SalesSupervisorNotifier extends StateNotifier<SalesSupervisorState> {
     final delta = upgradedAmount - originalAmount;
     final newUpgId = 'upg_${DateTime.now().millisecondsSinceEpoch}';
 
-    final newReq = UpgRequest(
+    var newReq = UpgRequest(
       id: newUpgId,
       orderId: orderId,
       orderNumber: orderNumber,
@@ -643,30 +699,38 @@ class SalesSupervisorNotifier extends StateNotifier<SalesSupervisorState> {
             final convId = convCheck.first['id'].toString();
             await client.from('order_conversation_messages').insert({
               'conversation_id': convId,
+              'order_id': orderId,
               'sender_id': '00000000-0000-0000-0000-000000000000',
               'sender_name': 'NovaXpress System',
               'sender_role': 'system',
               'message_type': 'product_changed',
-              'content': '⚡ Order package upgraded to "$upgradedProduct" ($upgradedQuantity units @ ₦${upgradedAmount.toStringAsFixed(0)}). Approved directly by Supervisor $supervisorName.',
               'message_body': '⚡ Order package upgraded to "$upgradedProduct" ($upgradedQuantity units @ ₦${upgradedAmount.toStringAsFixed(0)}). Approved directly by Supervisor $supervisorName.',
               'created_at': DateTime.now().toIso8601String(),
             });
           }
         } catch (_) {}
 
-        await client.from('order_activities').insert({
+        final insertRes = await client.from('order_activities').insert({
           'order_id': orderId,
           'activity_type': 'upg_approved',
           'notes': jsonEncode(newReq.toJson()),
           'created_at': DateTime.now().toIso8601String(),
-        });
+        }).select('id');
+        if ((insertRes as List).isNotEmpty) {
+          final realId = insertRes.first['id']?.toString() ?? newUpgId;
+          newReq = newReq.copyWith(id: realId);
+        }
       } else {
-        await client.from('order_activities').insert({
+        final insertRes = await client.from('order_activities').insert({
           'order_id': orderId,
           'activity_type': 'upg_request',
           'notes': jsonEncode(newReq.toJson()),
           'created_at': DateTime.now().toIso8601String(),
-        });
+        }).select('id');
+        if ((insertRes as List).isNotEmpty) {
+          final realId = insertRes.first['id']?.toString() ?? newUpgId;
+          newReq = newReq.copyWith(id: realId);
+        }
       }
 
       final updatedOrders = state.orders.map((o) {
