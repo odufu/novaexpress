@@ -15,6 +15,7 @@ import '../widgets/dc_rider_detail_modal.dart';
 import '../widgets/dc_onboard_rider_modal.dart';
 import '../../../client_portal/data/repositories/expenditure_repository.dart';
 import '../../../client_portal/presentation/widgets/client_add_expenditure_modal.dart';
+import '../../../client_portal/presentation/widgets/pangea_date_range_picker_modal.dart';
 
 class DCDashboardPage extends ConsumerStatefulWidget {
   const DCDashboardPage({super.key});
@@ -90,31 +91,18 @@ class _DCDashboardPageState extends ConsumerState<DCDashboardPage> {
   }
 
   Future<void> _selectCustomDateRange() async {
-    final picked = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime(2024),
-      lastDate: DateTime.now().add(const Duration(days: 1)),
-      initialDateRange: DateTimeRange(start: _startDate, end: _endDate),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: Color(0xFF38BDF8),
-              onPrimary: Colors.white,
-              surface: Color(0xFF1E293B),
-              onSurface: Colors.white,
-            ),
-          ),
-          child: child!,
-        );
-      },
+    final result = await PangeaDateRangePickerModal.show(
+      context,
+      initialStartDate: _startDate,
+      initialEndDate: _endDate,
+      initialPreset: DateRangePreset.custom,
     );
 
-    if (picked != null) {
+    if (result != null) {
       setState(() {
         _selectedQuickRange = 'custom';
-        _startDate = picked.start;
-        _endDate = picked.end;
+        _startDate = result.startDate;
+        _endDate = result.endDate;
       });
       _loadFinancialData();
     }
@@ -243,10 +231,10 @@ class _DCDashboardPageState extends ConsumerState<DCDashboardPage> {
     final isCumulative = _selectedDcId == null;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 22),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF0F172A) : Colors.white,
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
           width: 0.8,
@@ -255,295 +243,99 @@ class _DCDashboardPageState extends ConsumerState<DCDashboardPage> {
           BoxShadow(
             color: (isCumulative ? const Color(0xFF0284C7) : const Color(0xFF059669))
                 .withValues(alpha: isDark ? 0.08 : 0.04),
-            blurRadius: 32,
-            offset: const Offset(0, 10),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 10,
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          // Row 1: Brand / Facility Identity + Organic DC Switcher Capsule
-          Wrap(
-            spacing: 16,
-            runSpacing: 14,
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              // Facility & Scope Identity
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: isCumulative
-                            ? [const Color(0xFF0284C7), const Color(0xFF38BDF8)]
-                            : [const Color(0xFF059669), const Color(0xFF10B981)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: (isCumulative ? const Color(0xFF0284C7) : const Color(0xFF059669))
-                              .withValues(alpha: 0.35),
-                          blurRadius: 14,
-                          offset: const Offset(0, 5),
-                        ),
-                      ],
-                    ),
-                    child: Icon(
-                      isCumulative ? Icons.hub_rounded : Icons.warehouse_rounded,
-                      color: Colors.white,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            isCumulative
-                                ? 'Apex Logistics Control Tower'
-                                : (activeDc?.name ?? 'Station Logistics Console'),
-                            style: GoogleFonts.outfit(
-                              fontSize: 21,
-                              fontWeight: FontWeight.w700,
-                              color: isDark ? Colors.white : const Color(0xFF0F172A),
-                              letterSpacing: -0.3,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF10B981).withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  width: 6,
-                                  height: 6,
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFF10B981),
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'LIVE PULSE',
-                                  style: GoogleFonts.firaCode(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    color: const Color(0xFF10B981),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        isCumulative
-                            ? 'Enterprise Telemetry Across All Registered Hubs • Vault Balances, OpEx & Route Radar'
-                            : 'Dedicated Facility Console • Generator Diesel, Local Deliveries & Rider Settlement',
-                        style: GoogleFonts.inter(
-                          fontSize: 12.5,
-                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+          // Segmented Date Capsule Ribbon (Today | 7D | 30D | This Month | All Time | 📅)
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                width: 0.6,
               ),
+            ),
+            child: Wrap(
+              spacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                _buildSegmentedDatePill('Today', 'today', isDark),
+                _buildSegmentedDatePill('7D', '7d', isDark),
+                _buildSegmentedDatePill('30D', '30d', isDark),
+                _buildSegmentedDatePill('This Month', 'this_month', isDark),
+                _buildSegmentedDatePill('All Time', 'all_time', isDark),
+                IconButton(
+                  tooltip: 'Custom Calendar Range',
+                  padding: const EdgeInsets.all(6),
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  icon: Icon(
+                    Icons.calendar_month_rounded,
+                    size: 17,
+                    color: _selectedQuickRange == 'custom'
+                        ? const Color(0xFF38BDF8)
+                        : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                  ),
+                  onPressed: _selectCustomDateRange,
+                ),
+              ],
+            ),
+          ),
 
-              // THE TACTILE FACILITY CAPSULE SWITCHER (Like E-Commerce Product Filter)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(30),
-                  border: Border.all(
+          // Tactile Action Pills: + Record Station OpEx & + Onboard Rider
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ElevatedButton.icon(
+                onPressed: () async {
+                  final result = await ClientAddExpenditureModal.show(
+                    context,
+                    distributionCenterId: _selectedDcId ?? activeHubId,
+                    entityType: 'grand_dc',
+                  );
+                  if (result != null) {
+                    _loadFinancialData();
+                  }
+                },
+                icon: const Icon(Icons.add_rounded, size: 16),
+                label: Text(
+                  isCumulative ? 'Record Station OpEx' : 'Record ${activeDc?.code ?? "DC"} OpEx',
+                  style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFF43F5E),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                  elevation: 0,
+                ),
+              ),
+              const SizedBox(width: 10),
+              OutlinedButton.icon(
+                onPressed: () => DCOnboardRiderModal.show(context),
+                icon: const Icon(Icons.person_add_alt_1_rounded, size: 16),
+                label: Text(
+                  'Onboard Rider',
+                  style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: isDark ? Colors.white : const Color(0xFF0F172A),
+                  side: BorderSide(
                     color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
                     width: 0.8,
                   ),
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
                 ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String?>(
-                    value: _selectedDcId,
-                    dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-                    borderRadius: BorderRadius.circular(18),
-                    icon: Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7),
-                    ),
-                    items: [
-                      // 1. Cumulative Network Filter Option
-                      DropdownMenuItem<String?>(
-                        value: null,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.public_rounded, size: 17, color: Color(0xFF38BDF8)),
-                            const SizedBox(width: 8),
-                            Text(
-                              '🌐 All Distribution Centers (Cumulative Network)',
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: isDark ? Colors.white : const Color(0xFF0F172A),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // 2. Individual Station Distribution Centers
-                      ...allDcs.map((dc) {
-                        return DropdownMenuItem<String?>(
-                          value: dc.id,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                dc.isGrandDc ? Icons.stars_rounded : Icons.warehouse_rounded,
-                                size: 17,
-                                color: dc.isGrandDc ? const Color(0xFFF59E0B) : const Color(0xFF10B981),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                '${dc.name} (${dc.code})',
-                                style: GoogleFonts.inter(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }),
-                    ],
-                    onChanged: (newDcId) {
-                      setState(() {
-                        _selectedDcId = newDcId;
-                      });
-                      ref.read(dcConsoleProvider.notifier).selectDistributionCenter(newDcId);
-                      _loadFinancialData();
-                    },
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 18),
-          Divider(
-            height: 1,
-            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
-            thickness: 0.8,
-          ),
-          const SizedBox(height: 16),
-
-          // Row 2: Segmented Date Capsule Ribbon & Tactile Action Pills
-          Wrap(
-            spacing: 12,
-            runSpacing: 10,
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              // Segmented Date Capsule Ribbon
-              Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(
-                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                    width: 0.6,
-                  ),
-                ),
-                child: Wrap(
-                  spacing: 4,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    _buildSegmentedDatePill('Today', 'today', isDark),
-                    _buildSegmentedDatePill('7D', '7d', isDark),
-                    _buildSegmentedDatePill('30D', '30d', isDark),
-                    _buildSegmentedDatePill('This Month', 'this_month', isDark),
-                    _buildSegmentedDatePill('All Time', 'all_time', isDark),
-                    IconButton(
-                      tooltip: 'Custom Calendar Range',
-                      padding: const EdgeInsets.all(6),
-                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                      icon: Icon(
-                        Icons.calendar_month_rounded,
-                        size: 17,
-                        color: _selectedQuickRange == 'custom'
-                            ? const Color(0xFF38BDF8)
-                            : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-                      ),
-                      onPressed: _selectCustomDateRange,
-                    ),
-                  ],
-                ),
-              ),
-
-              // Tactile Action Pills: + Record Station OpEx & + Onboard Rider
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: () async {
-                      final result = await ClientAddExpenditureModal.show(
-                        context,
-                        distributionCenterId: _selectedDcId ?? activeHubId,
-                        entityType: 'grand_dc',
-                      );
-                      if (result != null) {
-                        _loadFinancialData();
-                      }
-                    },
-                    icon: const Icon(Icons.add_rounded, size: 16),
-                    label: Text(
-                      isCumulative ? 'Record Station OpEx' : 'Record ${activeDc?.code ?? "DC"} OpEx',
-                      style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFF43F5E),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                      elevation: 0,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  OutlinedButton.icon(
-                    onPressed: () => DCOnboardRiderModal.show(context),
-                    icon: const Icon(Icons.person_add_alt_1_rounded, size: 16),
-                    label: Text(
-                      'Onboard Rider',
-                      style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: isDark ? Colors.white : const Color(0xFF0F172A),
-                      side: BorderSide(
-                        color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
-                        width: 0.8,
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                    ),
-                  ),
-                ],
               ),
             ],
           ),

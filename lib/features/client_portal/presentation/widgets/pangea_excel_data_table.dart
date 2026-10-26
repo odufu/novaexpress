@@ -415,6 +415,50 @@ class _PangeaExcelDataTableState<T> extends State<PangeaExcelDataTable<T>> {
     widget.onDateRangeChanged?.call(null, DateRangePreset.custom, false);
   }
 
+  void _applyQuickPreset(DateRangePreset preset) {
+    final now = DateTime.now();
+    DateTime start;
+    DateTime end = DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
+
+    switch (preset) {
+      case DateRangePreset.today:
+        start = DateTime(now.year, now.month, now.day, 0, 0, 0);
+        break;
+      case DateRangePreset.yesterday:
+        final y = now.subtract(const Duration(days: 1));
+        start = DateTime(y.year, y.month, y.day, 0, 0, 0);
+        end = DateTime(y.year, y.month, y.day, 23, 59, 59, 999);
+        break;
+      case DateRangePreset.last7Days:
+        final d = now.subtract(const Duration(days: 6));
+        start = DateTime(d.year, d.month, d.day, 0, 0, 0);
+        break;
+      case DateRangePreset.last30Days:
+        final d = now.subtract(const Duration(days: 29));
+        start = DateTime(d.year, d.month, d.day, 0, 0, 0);
+        break;
+      case DateRangePreset.thisMonth:
+        start = DateTime(now.year, now.month, 1, 0, 0, 0);
+        break;
+      default:
+        start = DateTime(now.year, now.month, 1, 0, 0, 0);
+        break;
+    }
+
+    setState(() {
+      _activeStartDate = start;
+      _activeEndDate = end;
+      _activeDatePreset = preset;
+      _currentPage = 0;
+    });
+
+    widget.onDateRangeChanged?.call(
+      DateTimeRange(start: start, end: end),
+      preset,
+      false,
+    );
+  }
+
   Future<void> _openDateCardFilterModal(BuildContext context) async {
     final lagosNow = DateTime.now().toUtc().add(const Duration(hours: 1));
     final defaultEnd = DateTime(lagosNow.year, lagosNow.month, lagosNow.day);
@@ -1230,96 +1274,118 @@ class _PangeaExcelDataTableState<T> extends State<PangeaExcelDataTable<T>> {
     final hasActive = hasActiveDateFilter;
     final primary = widget.brandPrimary;
 
-    String dateText;
-    if (hasActive) {
-      final startFmt = DateFormat('d MMM yyyy').format(_activeStartDate!);
-      final endFmt = DateFormat('d MMM yyyy').format(_activeEndDate!);
-      if (_activeStartDate!.year == _activeEndDate!.year &&
-          _activeStartDate!.month == _activeEndDate!.month &&
-          _activeStartDate!.day == _activeEndDate!.day) {
-        dateText = startFmt;
-      } else {
-        dateText = '$startFmt – $endFmt';
-      }
-    } else {
-      dateText = widget.dateFilterLabel;
-    }
-
-    return Tooltip(
-      message: hasActive ? 'Active Date Filter: $dateText\nClick to change' : 'Filter rows by Date Range',
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          key: const ValueKey('pangea_table_date_filter_btn'),
-          onTap: () => _openDateCardFilterModal(context),
-          borderRadius: BorderRadius.circular(6),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-            decoration: BoxDecoration(
-              color: hasActive
-                  ? primary.withValues(alpha: isDark ? 0.22 : 0.1)
-                  : (isDark ? const Color(0xFF1E293B) : Colors.white),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(
-                color: hasActive
-                    ? primary.withValues(alpha: 0.6)
-                    : (isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
-                width: hasActive ? 1.3 : 1.0,
-              ),
-              boxShadow: hasActive
-                  ? [
-                      BoxShadow(
-                        color: primary.withValues(alpha: 0.15),
-                        blurRadius: 4,
-                        offset: const Offset(0, 1),
-                      ),
-                    ]
-                  : null,
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.calendar_month_rounded,
-                  size: 14,
-                  color: hasActive ? primary : const Color(0xFF64748B),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  dateText,
-                  style: GoogleFonts.inter(
-                    fontSize: 11.5,
-                    fontWeight: hasActive ? FontWeight.w700 : FontWeight.w500,
-                    color: hasActive
-                        ? (isDark ? Colors.white : primary)
-                        : (isDark ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B)),
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: borderColor, width: 0.8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          _buildQuickPresetPill('Today', DateRangePreset.today, isDark),
+          _buildQuickPresetPill('7D', DateRangePreset.last7Days, isDark),
+          _buildQuickPresetPill('30D', DateRangePreset.last30Days, isDark),
+          _buildQuickPresetPill('This Month', DateRangePreset.thisMonth, isDark),
+          _buildQuickPresetPill('All Time', null, isDark),
+          const SizedBox(width: 2),
+          Tooltip(
+            message: hasActive
+                ? 'Active: ${DateFormat('d MMM').format(_activeStartDate!)} – ${DateFormat('d MMM').format(_activeEndDate!)}\nClick to edit or clear'
+                : 'Custom Calendar Date Range',
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                key: const ValueKey('pangea_table_custom_date_btn'),
+                onTap: () => _openDateCardFilterModal(context),
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: (_activeDatePreset == DateRangePreset.custom && hasActive)
+                        ? primary.withValues(alpha: isDark ? 0.35 : 0.15)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                ),
-                if (hasActive) ...[
-                  const SizedBox(width: 6),
-                  InkWell(
-                    onTap: _clearDateFilter,
-                    borderRadius: BorderRadius.circular(10),
-                    child: Padding(
-                      padding: const EdgeInsets.all(2),
-                      child: Icon(
-                        Icons.close_rounded,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.calendar_month_rounded,
                         size: 13,
-                        color: hasActive ? primary : const Color(0xFF94A3B8),
+                        color: hasActive ? primary : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                       ),
-                    ),
+                      if (hasActive && _activeDatePreset == DateRangePreset.custom) ...[
+                        const SizedBox(width: 4),
+                        Text(
+                          '${DateFormat('d MMM').format(_activeStartDate!)} - ${DateFormat('d MMM').format(_activeEndDate!)}',
+                          style: GoogleFonts.inter(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.bold,
+                            color: primary,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        InkWell(
+                          onTap: _clearDateFilter,
+                          borderRadius: BorderRadius.circular(10),
+                          child: Icon(Icons.close_rounded, size: 12, color: primary),
+                        ),
+                      ],
+                    ],
                   ),
-                ] else ...[
-                  const SizedBox(width: 4),
-                  Icon(
-                    Icons.arrow_drop_down_rounded,
-                    size: 16,
-                    color: const Color(0xFF94A3B8),
-                  ),
-                ],
-              ],
+                ),
+              ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickPresetPill(String label, DateRangePreset? preset, bool isDark) {
+    final primary = widget.brandPrimary;
+    final isSelected = (preset == null)
+        ? !hasActiveDateFilter
+        : (_activeDatePreset == preset && hasActiveDateFilter);
+
+    return InkWell(
+      onTap: () {
+        if (preset == null) {
+          _clearDateFilter();
+        } else {
+          _applyQuickPreset(preset);
+        }
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? (isDark ? primary : Colors.white)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.06),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ]
+              : null,
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 10.5,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            color: isSelected
+                ? (isDark ? Colors.white : const Color(0xFF0F172A))
+                : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
           ),
         ),
       ),

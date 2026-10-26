@@ -41,7 +41,7 @@ class DCExpendituresState {
     this.selectedDcId = 'all',
     this.startDate,
     this.endDate,
-    this.datePreset = 'September 2026',
+    this.datePreset = 'All Time',
     this.liveOrdersAssigned = 1709,
     this.liveOrdersDelivered = 1224,
     this.liveRevenueTotal = 7635000.0,
@@ -565,34 +565,47 @@ class DCExpendituresNotifier extends StateNotifier<DCExpendituresState> {
     DateTime? end;
     final now = DateTime.now();
 
-    switch (preset) {
-      case 'September 2026':
-        start = DateTime(2026, 9, 1);
-        end = DateTime(2026, 9, 30);
+    switch (preset.toLowerCase()) {
+      case 'today':
+        start = DateTime(now.year, now.month, now.day, 0, 0, 0);
+        end = DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
         break;
-      case 'July 2026':
-        start = DateTime(2026, 7, 1);
-        end = DateTime(2026, 7, 31);
+      case '7d':
+      case '7 days':
+        start = now.subtract(const Duration(days: 6));
+        end = now;
         break;
-      case 'August 2026':
-        start = DateTime(2026, 8, 1);
-        end = DateTime(2026, 8, 31);
+      case '30d':
+      case '30 days':
+        start = now.subtract(const Duration(days: 29));
+        end = now;
         break;
-      case 'This Month':
+      case 'this month':
+      case 'this_month':
         start = DateTime(now.year, now.month, 1);
         end = now;
         break;
-      case 'Today':
-        start = DateTime(now.year, now.month, now.day);
-        end = now;
+      case 'september 2026':
+        start = DateTime(2026, 9, 1);
+        end = DateTime(2026, 9, 30);
         break;
-      case 'Last 90 Days':
+      case 'august 2026':
+        start = DateTime(2026, 8, 1);
+        end = DateTime(2026, 8, 31);
+        break;
+      case 'july 2026':
+        start = DateTime(2026, 7, 1);
+        end = DateTime(2026, 7, 31);
+        break;
+      case 'last 90 days':
         start = now.subtract(const Duration(days: 90));
         end = now;
         break;
-      case 'All Time':
-        start = DateTime(2024, 1, 1);
-        end = now;
+      case 'all time':
+      case 'all_time':
+      default:
+        start = null;
+        end = null;
         break;
     }
 

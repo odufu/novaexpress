@@ -10,6 +10,8 @@ import '../providers/dc_expenditures_provider.dart';
 import '../services/dc_finance_excel_exporter.dart';
 import '../widgets/dc_create_expenditure_modal.dart';
 import '../widgets/dc_receipt_preview_modal.dart';
+import '../../../client_portal/presentation/widgets/pangea_excel_data_table.dart';
+import '../../../client_portal/presentation/widgets/pangea_date_range_picker_modal.dart';
 
 class DCExpendituresPage extends ConsumerStatefulWidget {
   const DCExpendituresPage({super.key});
@@ -314,6 +316,43 @@ class _DCExpendituresPageState extends ConsumerState<DCExpendituresPage> with Si
     );
   }
 
+  Widget _buildHeaderDatePill(String label, String key, String activePreset, bool isDark, DCExpendituresNotifier notifier) {
+    final isSelected = activePreset.toLowerCase() == key.toLowerCase();
+    return InkWell(
+      onTap: () => notifier.setDatePreset(key),
+      borderRadius: BorderRadius.circular(20),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? (isDark ? const Color(0xFFF37021) : Colors.white)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.06),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ]
+              : null,
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 11.5,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            color: isSelected
+                ? (isDark ? Colors.white : const Color(0xFF0F172A))
+                : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+          ),
+        ),
+      ),
+    );
+  }
+
   // ==========================================
   // 1. EXECUTIVE HEADER CONTROL BAR
   // ==========================================
@@ -453,34 +492,73 @@ class _DCExpendituresPageState extends ConsumerState<DCExpendituresPage> with Si
             runSpacing: 10,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              // Period Dropdown
+              // Segmented Date Capsule Ribbon (Today | 7D | 30D | This Month | All Time | 📅)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF0B1021) : const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
+                  color: isDark ? const Color(0xFF0B1021) : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0), width: 0.8),
                 ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: state.datePreset,
-                    dropdownColor: isDark ? const Color(0xFF151D36) : Colors.white,
-                    style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF0F172A)),
-                    icon: const Icon(Icons.calendar_month_rounded, size: 16, color: Color(0xFFF37021)),
-                    items: const [
-                      DropdownMenuItem(value: 'September 2026', child: Text('September 2026 (Audited)')),
-                      DropdownMenuItem(value: 'August 2026', child: Text('August 2026 (Audited)')),
-                      DropdownMenuItem(value: 'July 2026', child: Text('July 2026 (Audited)')),
-                      DropdownMenuItem(value: 'This Month', child: Text('Current Month (Live)')),
-                      DropdownMenuItem(value: 'Last 90 Days', child: Text('Last 90 Days (Quarter)')),
-                      DropdownMenuItem(value: 'All Time', child: Text('All Time History')),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) notifier.setDatePreset(val);
-                    },
-                  ),
+                child: Wrap(
+                  spacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    _buildHeaderDatePill('Today', 'Today', state.datePreset, isDark, notifier),
+                    _buildHeaderDatePill('7D', '7D', state.datePreset, isDark, notifier),
+                    _buildHeaderDatePill('30D', '30D', state.datePreset, isDark, notifier),
+                    _buildHeaderDatePill('This Month', 'This Month', state.datePreset, isDark, notifier),
+                    _buildHeaderDatePill('All Time', 'All Time', state.datePreset, isDark, notifier),
+                    IconButton(
+                      tooltip: 'Custom Calendar Date Range',
+                      padding: const EdgeInsets.all(6),
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      icon: Icon(
+                        Icons.calendar_month_rounded,
+                        size: 16,
+                        color: (state.datePreset == 'Custom' || state.startDate != null)
+                            ? const Color(0xFFF37021)
+                            : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                      ),
+                      onPressed: () async {
+                        final result = await PangeaDateRangePickerModal.show(
+                          context,
+                          initialStartDate: state.startDate ?? DateTime.now().subtract(const Duration(days: 30)),
+                          initialEndDate: state.endDate ?? DateTime.now(),
+                          initialPreset: DateRangePreset.custom,
+                        );
+                        if (result != null) {
+                          notifier.setDateRange(result.startDate, result.endDate, preset: 'Custom');
+                        }
+                      },
+                    ),
+                  ],
                 ),
               ),
+              if (state.datePreset == 'Custom' && state.startDate != null && state.endDate != null) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF37021).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFFF37021)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${DateFormat('dd MMM').format(state.startDate!)} - ${DateFormat('dd MMM').format(state.endDate!)}',
+                        style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFFF37021)),
+                      ),
+                      const SizedBox(width: 4),
+                      InkWell(
+                        onTap: () => notifier.setDatePreset('All Time'),
+                        child: const Icon(Icons.close_rounded, size: 14, color: Color(0xFFF37021)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
 
               // Station Scope Filter
               if (userIsAbujaMain) ...[
@@ -1068,6 +1146,51 @@ class _DCExpendituresPageState extends ConsumerState<DCExpendituresPage> with Si
           ),
           const SizedBox(height: 12),
 
+          // Date Filter Ribbon (Today | 7D | 30D | This Month | All Time | 📅)
+          Container(
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF0B1021) : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0), width: 0.8),
+            ),
+            child: Wrap(
+              spacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                _buildHeaderDatePill('Today', 'Today', state.datePreset, isDark, notifier),
+                _buildHeaderDatePill('7D', '7D', state.datePreset, isDark, notifier),
+                _buildHeaderDatePill('30D', '30D', state.datePreset, isDark, notifier),
+                _buildHeaderDatePill('This Month', 'This Month', state.datePreset, isDark, notifier),
+                _buildHeaderDatePill('All Time', 'All Time', state.datePreset, isDark, notifier),
+                IconButton(
+                  tooltip: 'Custom Calendar Date Range',
+                  padding: const EdgeInsets.all(4),
+                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                  icon: Icon(
+                    Icons.calendar_month_rounded,
+                    size: 15,
+                    color: (state.datePreset == 'Custom' || state.startDate != null)
+                        ? const Color(0xFFF37021)
+                        : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                  ),
+                  onPressed: () async {
+                    final result = await PangeaDateRangePickerModal.show(
+                      context,
+                      initialStartDate: state.startDate ?? DateTime.now().subtract(const Duration(days: 30)),
+                      initialEndDate: state.endDate ?? DateTime.now(),
+                      initialPreset: DateRangePreset.custom,
+                    );
+                    if (result != null) {
+                      notifier.setDateRange(result.startDate, result.endDate, preset: 'Custom');
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
           // Category Chips
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
@@ -1109,95 +1232,147 @@ class _DCExpendituresPageState extends ConsumerState<DCExpendituresPage> with Si
   }
 
   Widget _buildDesktopLedgerTable(List<BusinessExpenditureEntity> list, bool isDark, List<DistributionCenter> dcs) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF151D36) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isDark ? const Color(0xFF2E3D6B) : const Color(0xFFE2E8F0)),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: DataTable(
-          headingRowColor: WidgetStateProperty.all(isDark ? const Color(0xFF0B1021) : const Color(0xFFF8FAFC)),
-          dataRowMinHeight: 48,
-          dataRowMaxHeight: 56,
-          columns: const [
-            DataColumn(label: Text('DATE')),
-            DataColumn(label: Text('TITLE & VENDOR')),
-            DataColumn(label: Text('CATEGORY')),
-            DataColumn(label: Text('STATION')),
-            DataColumn(label: Text('INVOICE / METHOD')),
-            DataColumn(label: Text('AMOUNT (₦)')),
-            DataColumn(label: Text('RECEIPT')),
-            DataColumn(label: Text('ACTION')),
-          ],
-          rows: list.map((exp) {
-            final catColor = _getCategoryColor(exp.category);
-            return DataRow(
-              cells: [
-                DataCell(Text(DateFormat('MMM dd, yyyy').format(exp.expenditureDate), style: GoogleFonts.inter(fontSize: 12))),
-                DataCell(
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(exp.title, style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
-                      if (exp.vendorName != null && exp.vendorName!.isNotEmpty)
-                        Text('Vendor: ${exp.vendorName}', style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF94A3B8))),
-                    ],
-                  ),
-                ),
-                DataCell(
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: catColor.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(_getCategoryIcon(exp.category), size: 13, color: catColor),
-                        const SizedBox(width: 5),
-                        Text(exp.category.label, style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: catColor)),
-                      ],
-                    ),
-                  ),
-                ),
-                DataCell(Text(_getDcName(exp.distributionCenterId, dcs), style: GoogleFonts.inter(fontSize: 11.5))),
-                DataCell(
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(exp.invoiceNumber?.isNotEmpty == true ? '#${exp.invoiceNumber}' : 'Direct Debit', style: GoogleFonts.jetBrainsMono(fontSize: 11)),
-                      Text(exp.paymentMethod ?? 'Bank Transfer', style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8))),
-                    ],
-                  ),
-                ),
-                DataCell(
-                  Text(_currencyFormat.format(exp.amount), style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w900, color: const Color(0xFFF37021))),
-                ),
-                DataCell(
-                  exp.hasReceipt
-                      ? IconButton(
-                          icon: const Icon(Icons.receipt_rounded, size: 18, color: Color(0xFF10B981)),
-                          tooltip: 'Preview Attachment',
-                          onPressed: () => DCReceiptPreviewModal.show(context, exp, dcName: _getDcName(exp.distributionCenterId, dcs)),
-                        )
-                      : const Text('No File', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
-                ),
-                DataCell(
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Color(0xFFEF4444)),
-                    tooltip: 'Delete Record',
-                    onPressed: () => _confirmDelete(exp),
-                  ),
-                ),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: PangeaExcelDataTable<BusinessExpenditureEntity>(
+        items: list,
+        brandPrimary: const Color(0xFFF37021),
+        enablePagination: true,
+        initialPageSize: 25,
+        rowHeight: 56.0,
+        dateExtractor: (exp) => exp.expenditureDate,
+        showDateFilter: true,
+        columns: [
+          ExcelColumnDef<BusinessExpenditureEntity>(
+            key: 'date',
+            group: 'Expense Record',
+            label: 'DATE',
+            defaultWidth: 130,
+            minWidth: 100,
+            sortValue: (exp) => exp.expenditureDate,
+            dateValue: (exp) => exp.expenditureDate,
+            searchString: (exp) => DateFormat('MMM dd, yyyy').format(exp.expenditureDate),
+            cellBuilder: (ctx, exp, row, isDark, brand) => Text(
+              DateFormat('MMM dd, yyyy').format(exp.expenditureDate),
+              style: GoogleFonts.inter(fontSize: 12),
+            ),
+          ),
+          ExcelColumnDef<BusinessExpenditureEntity>(
+            key: 'title_vendor',
+            group: 'Expense Record',
+            label: 'TITLE & VENDOR',
+            defaultWidth: 240,
+            minWidth: 180,
+            searchString: (exp) => '${exp.title} ${exp.vendorName ?? ""}',
+            sortValue: (exp) => exp.title,
+            cellBuilder: (ctx, exp, row, isDark, brand) => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(exp.title, style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
+                if (exp.vendorName != null && exp.vendorName!.isNotEmpty)
+                  Text('Vendor: ${exp.vendorName}', style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF94A3B8))),
               ],
-            );
-          }).toList(),
-        ),
+            ),
+          ),
+          ExcelColumnDef<BusinessExpenditureEntity>(
+            key: 'category',
+            group: 'Classification',
+            label: 'CATEGORY',
+            defaultWidth: 180,
+            minWidth: 140,
+            searchString: (exp) => exp.category.label,
+            sortValue: (exp) => exp.category.label,
+            cellBuilder: (ctx, exp, row, isDark, brand) {
+              final catColor = _getCategoryColor(exp.category);
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: catColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(_getCategoryIcon(exp.category), size: 13, color: catColor),
+                    const SizedBox(width: 5),
+                    Text(exp.category.label, style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: catColor)),
+                  ],
+                ),
+              );
+            },
+          ),
+          ExcelColumnDef<BusinessExpenditureEntity>(
+            key: 'station',
+            group: 'Classification',
+            label: 'STATION',
+            defaultWidth: 160,
+            minWidth: 120,
+            searchString: (exp) => _getDcName(exp.distributionCenterId, dcs),
+            sortValue: (exp) => _getDcName(exp.distributionCenterId, dcs),
+            cellBuilder: (ctx, exp, row, isDark, brand) => Text(
+              _getDcName(exp.distributionCenterId, dcs),
+              style: GoogleFonts.inter(fontSize: 11.5),
+            ),
+          ),
+          ExcelColumnDef<BusinessExpenditureEntity>(
+            key: 'invoice_method',
+            group: 'Payment Info',
+            label: 'INVOICE / METHOD',
+            defaultWidth: 160,
+            minWidth: 120,
+            searchString: (exp) => '${exp.invoiceNumber ?? ""} ${exp.paymentMethod ?? ""}',
+            cellBuilder: (ctx, exp, row, isDark, brand) => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (exp.invoiceNumber != null && exp.invoiceNumber!.isNotEmpty)
+                  Text(exp.invoiceNumber!, style: GoogleFonts.firaCode(fontSize: 11, fontWeight: FontWeight.w600)),
+                Text(exp.paymentMethod ?? 'Direct Transfer', style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF94A3B8))),
+              ],
+            ),
+          ),
+          ExcelColumnDef<BusinessExpenditureEntity>(
+            key: 'amount',
+            group: 'Financial Value',
+            label: 'AMOUNT (₦)',
+            defaultWidth: 140,
+            minWidth: 110,
+            sortValue: (exp) => exp.amount,
+            cellBuilder: (ctx, exp, row, isDark, brand) => Text(
+              _currencyFormat.format(exp.amount),
+              style: GoogleFonts.firaCode(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFFF43F5E)),
+            ),
+          ),
+          ExcelColumnDef<BusinessExpenditureEntity>(
+            key: 'receipt',
+            group: 'Audit Documents',
+            label: 'RECEIPT',
+            defaultWidth: 120,
+            minWidth: 90,
+            cellBuilder: (ctx, exp, row, isDark, brand) {
+              final hasReceipt = exp.receiptUrl != null && exp.receiptUrl!.isNotEmpty;
+              if (!hasReceipt) return const Text('No Receipt', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)));
+              return TextButton.icon(
+                onPressed: () => DCReceiptPreviewModal.show(context, exp, dcName: _getDcName(exp.distributionCenterId, dcs)),
+                icon: const Icon(Icons.receipt_long_rounded, size: 14, color: Color(0xFFF37021)),
+                label: const Text('View', style: TextStyle(fontSize: 11, color: Color(0xFFF37021))),
+              );
+            },
+          ),
+          ExcelColumnDef<BusinessExpenditureEntity>(
+            key: 'action',
+            group: 'Audit Documents',
+            label: 'ACTION',
+            defaultWidth: 90,
+            minWidth: 70,
+            cellBuilder: (ctx, exp, row, isDark, brand) => IconButton(
+              icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Color(0xFFF43F5E)),
+              tooltip: 'Delete Expenditure',
+              onPressed: () => _confirmDelete(exp),
+            ),
+          ),
+        ],
       ),
     );
   }
