@@ -149,37 +149,44 @@ class _UpgDetailModalState extends ConsumerState<UpgDetailModal> {
         children: [
           // Header
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF37021).withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF37021).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.upgrade_rounded, size: 20, color: Color(0xFFF37021)),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Package Upgrade (UPG) Review',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.bold),
                     ),
-                    child: const Icon(Icons.upgrade_rounded, size: 22, color: Color(0xFFF37021)),
-                  ),
-                  const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Package Upgrade (UPG) Review',
-                        style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold),
+                    Text(
+                      'Order #${req.orderNumber} • ${DateFormat.yMMMd().add_jm().format(req.createdAt)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                       ),
-                      Text(
-                        'Order #${req.orderNumber} • ${DateFormat.yMMMd().add_jm().format(req.createdAt)}',
-                        style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
-                      ),
-                    ],
-                  ),
-                ],
+                    ),
+                  ],
+                ),
               ),
               IconButton(
                 onPressed: () => Navigator.pop(context),
                 icon: const Icon(Icons.close_rounded, size: 20),
+                tooltip: 'Close',
+                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
               ),
             ],
           ),
@@ -214,37 +221,45 @@ class _UpgDetailModalState extends ConsumerState<UpgDetailModal> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            Icon(
-                              isApproved
-                                  ? Icons.check_circle_rounded
-                                  : (isPending ? Icons.pending_actions_rounded : Icons.cancel_rounded),
-                              size: 16,
-                              color: isApproved
-                                  ? const Color(0xFF10B981)
-                                  : (isPending ? const Color(0xFFF37021) : const Color(0xFFDC2626)),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              isApproved
-                                  ? 'UPG AUTHORIZED & APPLIED'
-                                  : (isPending ? 'AWAITING SUPERVISOR AUTHORIZATION' : 'UPG DECLINED'),
-                              style: GoogleFonts.jetBrainsMono(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.bold,
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Icon(
+                                isApproved
+                                    ? Icons.check_circle_rounded
+                                    : (isPending ? Icons.pending_actions_rounded : Icons.cancel_rounded),
+                                size: 16,
                                 color: isApproved
                                     ? const Color(0xFF10B981)
                                     : (isPending ? const Color(0xFFF37021) : const Color(0xFFDC2626)),
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  isApproved
+                                      ? 'UPG AUTHORIZED & APPLIED'
+                                      : (isPending ? 'AWAITING SUPERVISOR AUTHORIZATION' : 'UPG DECLINED'),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.jetBrainsMono(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: isApproved
+                                        ? const Color(0xFF10B981)
+                                        : (isPending ? const Color(0xFFF37021) : const Color(0xFFDC2626)),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                        if (isApproved && req.approvedBy != null)
+                        if (isApproved && req.approvedBy != null) ...[
+                          const SizedBox(width: 6),
                           Text(
                             'By: ${req.approvedBy}',
                             style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF10B981)),
                           ),
+                        ],
                       ],
                     ),
                   ),
@@ -523,20 +538,28 @@ class _UpgDetailModalState extends ConsumerState<UpgDetailModal> {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Row(
-                                children: [
-                                  const Icon(Icons.trending_up_rounded, size: 16, color: Color(0xFF10B981)),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    'Incremental Upsell Gain:',
-                                    style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold),
-                                  ),
-                                ],
+                              Flexible(
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.trending_up_rounded, size: 16, color: Color(0xFF10B981)),
+                                    const SizedBox(width: 6),
+                                    Flexible(
+                                      child: Text(
+                                        'Upsell Gain:',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
+                              const SizedBox(width: 6),
                               Text(
                                 '+${_currency.format(req.upsellDelta)} (${req.upsellPercentage.toStringAsFixed(0)}% gain)',
                                 style: GoogleFonts.jetBrainsMono(
-                                  fontSize: 13,
+                                  fontSize: 12.5,
                                   fontWeight: FontWeight.w900,
                                   color: const Color(0xFF10B981),
                                 ),
@@ -646,33 +669,54 @@ class _UpgDetailModalState extends ConsumerState<UpgDetailModal> {
           if (isPending)
             Row(
               children: [
+                // Modern Decline Button (Compact, clear, single line with icon)
                 Expanded(
-                  child: OutlinedButton(
+                  flex: 2,
+                  child: OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFFDC2626),
-                      side: const BorderSide(color: Color(0xFFDC2626)),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      side: BorderSide(
+                        color: const Color(0xFFDC2626).withValues(alpha: 0.6),
+                        width: 1.2,
+                      ),
+                      backgroundColor: const Color(0xFFDC2626).withValues(alpha: 0.05),
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
                     onPressed: _isProcessing ? null : _showDeclinePrompt,
-                    child: const Text('Decline Upgrade', style: TextStyle(fontWeight: FontWeight.bold)),
+                    icon: const Icon(Icons.close_rounded, size: 16),
+                    label: const Text(
+                      'Decline',
+                      maxLines: 1,
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
+                // Approve & Apply UPG Button
                 Expanded(
-                  flex: 2,
+                  flex: 3,
                   child: ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF10B981),
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
                     onPressed: _isProcessing ? null : _approveUpg,
                     icon: _isProcessing
-                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                        : const Icon(Icons.check_circle_rounded, size: 18),
-                    label: const Text('Approve & Apply UPG', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          )
+                        : const Icon(Icons.check_circle_rounded, size: 17),
+                    label: const Text(
+                      'Approve UPG',
+                      maxLines: 1,
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
                   ),
                 ),
               ],

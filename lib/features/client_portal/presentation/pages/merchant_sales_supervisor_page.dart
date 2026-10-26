@@ -697,9 +697,13 @@ class _MerchantSalesSupervisorPageState
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Tap card for full audit & call details →',
-                  style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8)),
+                Flexible(
+                  child: Text(
+                    'Tap card for details →',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8)),
+                  ),
                 ),
                 if (isPending)
                   Row(
