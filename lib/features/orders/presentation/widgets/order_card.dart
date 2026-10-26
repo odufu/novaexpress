@@ -147,7 +147,47 @@ class OrderCard extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(Icons.inventory_2_outlined, size: 16, color: Color(0xFFF37021)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      order.packageDealName != null && order.packageDealName!.isNotEmpty
+                          ? '${order.productName.isNotEmpty ? order.productName : "Product"} (${order.packageDealName})'
+                          : '${order.productName.isNotEmpty ? order.productName : "Package"} (${order.quantity > 0 ? order.quantity : 1} units)',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimaryDark,
+                      ),
+                    ),
+                  ),
+                  if (order.upsellAmount > 0) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+                      ),
+                      child: const Text(
+                        'UPG ?',
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF059669),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 10),
               const Divider(color: AppColors.cardDark, height: 1),
               const SizedBox(height: 10),
               Row(

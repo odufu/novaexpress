@@ -16,6 +16,7 @@ import '../widgets/reschedule_callback_modal.dart';
 import '../widgets/upsell_selector_modal.dart';
 import '../widgets/multi_stop_pickup_manifest_card.dart';
 import '../../../client_portal/presentation/widgets/client_edit_order_modal.dart';
+import '../../../pipeline_chat/presentation/widgets/order_pipeline_chat_sheet.dart';
 
 class OrderDetailPage extends ConsumerWidget {
   final String orderId;
@@ -324,6 +325,11 @@ class OrderDetailPage extends ConsumerWidget {
         ),
         centerTitle: true,
         actions: [
+          IconButton(
+            tooltip: 'Order Pipeline Chat',
+            icon: const Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFF0D9488)),
+            onPressed: () => OrderPipelineChatSheet.showForOrder(context, order),
+          ),
           if (!isRiderUser)
             IconButton(
               tooltip: 'Edit Order & Package Deal',
@@ -1003,6 +1009,129 @@ class OrderDetailPage extends ConsumerWidget {
               const SizedBox(height: 14),
             ],
 
+            // 5c. Package & Order Items Card
+            Container(
+              padding: const EdgeInsets.all(16),
+              margin: const EdgeInsets.only(bottom: 14),
+              decoration: BoxDecoration(
+                color: theme.cardColor,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.15)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Row(
+                          children: [
+                            const Icon(Icons.inventory_2_outlined, color: Color(0xFFF37021), size: 20),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                'Package & Order Items',
+                                style: GoogleFonts.inter(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: theme.colorScheme.onSurface,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (order.upsellAmount > 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+                          ),
+                          child: Text(
+                            'UPG APPROVED ? (+?${order.upsellAmount.toStringAsFixed(0)})',
+                            style: GoogleFonts.jetBrainsMono(
+                              color: const Color(0xFF059669),
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainer,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'PRODUCT:',
+                              style: GoogleFonts.jetBrainsMono(fontSize: 10, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurfaceVariant),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                order.productName.isNotEmpty ? order.productName : (order.productSku ?? 'Product Item'),
+                                textAlign: TextAlign.right,
+                                style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'PACKAGE DEAL:',
+                              style: GoogleFonts.jetBrainsMono(fontSize: 10, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurfaceVariant),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                order.packageDealName != null && order.packageDealName!.isNotEmpty
+                                    ? order.packageDealName!
+                                    : 'Standard Package',
+                                textAlign: TextAlign.right,
+                                style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: const Color(0xFFF37021)),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'TOTAL QUANTITY:',
+                              style: GoogleFonts.jetBrainsMono(fontSize: 10, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurfaceVariant),
+                            ),
+                            Text(
+                              '${order.quantity > 0 ? order.quantity : 1} Physical Units',
+                              style: GoogleFonts.jetBrainsMono(fontSize: 12, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
             // 6. Payment Collection & Financial Entitlements Card
             Container(
               padding: const EdgeInsets.all(16),
