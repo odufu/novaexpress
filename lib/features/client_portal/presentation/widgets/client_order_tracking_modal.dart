@@ -324,27 +324,29 @@ class ClientOrderTrackingModal extends ConsumerWidget {
                     runSpacing: 6,
                     alignment: WrapAlignment.end,
                     children: [
-                      OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF10B981),
-                          side: const BorderSide(color: Color(0xFF10B981)),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      if (ref.watch(authProvider).user?.isCloser == true) ...[
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF10B981),
+                            side: const BorderSide(color: Color(0xFF10B981)),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          icon: const Icon(Icons.upgrade_rounded, size: 18),
+                          label: const Text('UPG'),
+                          onPressed: () {
+                            final currentUser = ref.read(authProvider).user;
+                            RequestUpgModal.show(
+                              context,
+                              order: currentOrder,
+                              closerId: currentUser?.id ?? '',
+                              closerName: currentUser?.fullName ?? 'Staff',
+                              closerCode: currentUser?.closerCode ?? 'REP',
+                              isSupervisor: currentUser?.isCloserSupervisor == true,
+                            );
+                          },
                         ),
-                        icon: const Icon(Icons.upgrade_rounded, size: 18),
-                        label: const Text('Upgrade (UPG)'),
-                        onPressed: () {
-                          final currentUser = ref.read(authProvider).user;
-                          RequestUpgModal.show(
-                            context,
-                            order: currentOrder,
-                            closerId: currentUser?.id ?? '',
-                            closerName: currentUser?.fullName ?? 'Staff',
-                            closerCode: currentUser?.closerCode ?? 'REP',
-                            isSupervisor: currentUser?.isCloserSupervisor == true,
-                          );
-                        },
-                      ),
+                      ],
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF0D9488),

@@ -1340,10 +1340,11 @@ class ClientPortalNotifier extends StateNotifier<ClientPortalState> {
           );
 
           final filters = <String>[];
-          if (clientId.isNotEmpty) filters.add('client_id.eq.$clientId');
+          final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
+          if (clientId.isNotEmpty && uuidRegex.hasMatch(clientId)) filters.add('client_id.eq.$clientId');
           if (companyName.isNotEmpty) filters.add('client_name.ilike.%$companyName%');
           final closerId = user?.closerId ?? (user?.isCloser == true ? user?.id : null);
-          if (closerId != null && closerId.isNotEmpty) filters.add('closer_id.eq.$closerId');
+          if (closerId != null && closerId.isNotEmpty && uuidRegex.hasMatch(closerId)) filters.add('closer_id.eq.$closerId');
           final closerCode = user?.closerCode;
           if (closerCode != null && closerCode.isNotEmpty) filters.add('closer_code.eq.$closerCode');
 

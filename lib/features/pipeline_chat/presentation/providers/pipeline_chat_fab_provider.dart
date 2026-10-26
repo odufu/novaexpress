@@ -93,15 +93,18 @@ class PipelineChatDraggableFabLocation extends FloatingActionButtonLocation {
     final double maxW = scaffoldGeometry.scaffoldSize.width;
     final double maxH = scaffoldGeometry.scaffoldSize.height;
 
+    if (maxW <= 0 || maxH <= 0 || maxW < fabWidth || maxH < fabHeight) {
+      return Offset.zero;
+    }
+
+    final double maxPossibleX = (maxW - fabWidth - margin) > 0 ? (maxW - fabWidth - margin) : 0.0;
+    final double maxPossibleY = (maxH - fabHeight - margin) > 0 ? (maxH - fabHeight - margin) : 0.0;
+    final double minPossibleX = margin < maxPossibleX ? margin : maxPossibleX;
+    final double minPossibleY = margin < maxPossibleY ? margin : maxPossibleY;
+
     if (customOffset != null) {
-      final double clampedX = customOffset!.dx.clamp(
-        margin,
-        (maxW - fabWidth - margin).clamp(margin, maxW),
-      );
-      final double clampedY = customOffset!.dy.clamp(
-        margin,
-        (maxH - fabHeight - margin).clamp(margin, maxH),
-      );
+      final double clampedX = customOffset!.dx.clamp(minPossibleX, maxPossibleX);
+      final double clampedY = customOffset!.dy.clamp(minPossibleY, maxPossibleY);
       return Offset(clampedX, clampedY);
     }
 
@@ -111,9 +114,9 @@ class PipelineChatDraggableFabLocation extends FloatingActionButtonLocation {
     // On wide desktop screens without a bottom bar, float at 84.0 to clear sticky footers.
     final bool hasBottomBar = scaffoldGeometry.contentBottom < (maxH - 30);
     final double bottomMargin = hasBottomBar ? 16.0 : (maxW >= 960 ? 84.0 : 16.0);
-    final double defaultX = maxW - fabWidth - margin;
-    final double defaultY = (scaffoldGeometry.contentBottom - fabHeight - bottomMargin)
-        .clamp(margin, maxH - fabHeight - margin);
+    final double defaultX = maxPossibleX;
+    final double rawY = scaffoldGeometry.contentBottom - fabHeight - bottomMargin;
+    final double defaultY = rawY.clamp(minPossibleY, maxPossibleY);
 
     return Offset(defaultX, defaultY);
   }

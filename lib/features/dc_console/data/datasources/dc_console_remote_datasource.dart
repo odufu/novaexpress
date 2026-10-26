@@ -1103,29 +1103,7 @@ class DCConsoleRemoteDataSourceImpl implements DCConsoleRemoteDataSource {
   }) async {
     final adminDb = _getAdminClient();
 
-    // 1. Attempt Stored Procedure RPC first
-    try {
-      final response = await adminDb.rpc('fn_generate_merchant_daily_settlement', params: {
-        'p_client_id': clientId,
-        'p_dc_id': dcId,
-        'p_period_start': periodStart.toIso8601String(),
-        'p_period_end': periodEnd.toIso8601String(),
-        if (customDeductions != null) 'p_custom_deductions': customDeductions,
-        if (orderIds != null && orderIds.isNotEmpty) 'p_order_ids': orderIds,
-        if (proofOfPaymentUrl != null) 'p_proof_of_payment_url': proofOfPaymentUrl,
-        if (payoutReference != null) 'p_payout_reference': payoutReference,
-        'p_status': 'remitted',
-      });
-
-      if (response != null && (response as Map)['success'] == true) {
-        debugPrint('[DC_CONSOLE] ✅ Client settlement generated via RPC: ${response['settlement_number']}');
-        return Map<String, dynamic>.from(response);
-      }
-    } catch (rpcErr) {
-      debugPrint('[DC_CONSOLE] ℹ️ RPC settlement creation: $rpcErr. Executing resilient PostgREST fallback.');
-    }
-
-    // 2. Resilient Direct PostgREST Creation Fallback
+    // Direct resilient PostgREST settlement creation (authoritative)
     try {
       final settlementId = _generateUuid();
       final dateStr = DateFormat('yyyyMMdd').format(DateTime.now());

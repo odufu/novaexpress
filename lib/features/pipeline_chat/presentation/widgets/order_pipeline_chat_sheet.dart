@@ -1,3 +1,5 @@
+import '../../../client_portal/presentation/widgets/request_upg_modal.dart';
+import '../../../orders/presentation/providers/orders_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,7 +11,6 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/entities/order_conversation.dart';
 import '../../domain/entities/order_conversation_message.dart';
 import '../../../orders/domain/entities/order.dart';
-import '../../../orders/presentation/widgets/order_product_switch_modal.dart';
 import '../../../../core/widgets/user_avatar_widget.dart';
 import '../../../../core/widgets/app_logo_widget.dart';
 import '../providers/pipeline_chat_provider.dart';
@@ -877,13 +878,6 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
   }
 
   Widget _buildHeader(BuildContext context, OrderConversationEntity? conv, bool isDark) {
-    final authState = ref.watch(authProvider);
-    final userRole = authState.user?.role.toLowerCase() ?? '';
-    final isDcOperations = userRole.contains('dc') ||
-        userRole.contains('manager') ||
-        userRole.contains('admin') ||
-        userRole.contains('operation') ||
-        userRole.contains('supervisor');
 
     // Receiver is the customer who will receive the delivery
     final receiverName = (conv?.customerName != null && conv!.customerName.trim().isNotEmpty)
@@ -1013,30 +1007,7 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
             const SizedBox(width: 6),
           ],
 
-          // Action: Switch Product (Restricted to DC Operations & Managers)
-          if (isDcOperations) ...[
-            IconButton(
-              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-              padding: const EdgeInsets.all(6),
-              visualDensity: VisualDensity.compact,
-              tooltip: 'Switch Product',
-              icon: const Icon(Icons.swap_horiz_rounded, size: 20, color: Color(0xFF6366F1)),
-              onPressed: () {
-                showDialog(
-                  context: context,
-                  builder: (ctx) => OrderProductSwitchModal(
-                    orderId: widget.orderId,
-                    orderNumber: widget.orderNumber,
-                    currentProductName: conv?.currentProductName ?? 'Current Product',
-                    currentPackageName: conv?.currentPackageName,
-                    currentTotalAmount: conv?.currentTotalAmount ?? 0.0,
-                    currentClientId: conv?.clientId ?? '',
-                    currentClientName: conv?.clientName ?? '',
-                  ),
-                );
-              },
-            ),
-          ],
+
 
           // Close button
           IconButton(
@@ -1055,21 +1026,21 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
 
   Widget _buildOrderInfoBanner(BuildContext context, OrderConversationEntity conv, bool isDark) {
     final currency = NumberFormat.currency(locale: 'en_NG', symbol: '₦', decimalDigits: 0);
+    final authUser = ref.watch(authProvider).user;
+    final isCloser = authUser?.isCloser == true;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           // Current product package & total price
-          Flexible(
+          Expanded(
             child: Row(
-              mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(Icons.inventory_2_outlined, size: 15, color: Color(0xFF0D9488)),
                 const SizedBox(width: 6),
-                Flexible(
+                Expanded(
                   child: Text(
                     '${conv.currentProductName ?? 'Product'} (${conv.currentPackageName ?? 'Standard'})',
                     maxLines: 1,
@@ -1093,58 +1064,81 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
               ],
             ),
           ),
-          const SizedBox(width: 10),
 
-          // UPG Upgrade Sale Button (Replaces the account listings)
-          InkWell(
-            onTap: () {
-              showDialog(
-                context: context,
-                builder: (ctx) => OrderProductSwitchModal(
-                  orderId: widget.orderId,
-                  orderNumber: widget.orderNumber,
-                  currentProductName: conv.currentProductName ?? 'Current Product',
-                  currentPackageName: conv.currentPackageName,
-                  currentTotalAmount: conv.currentTotalAmount,
-                  currentClientId: conv.clientId,
-                  currentClientName: conv.clientName,
-                ),
-              );
-            },
-            borderRadius: BorderRadius.circular(6),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF8B5CF6), Color(0xFF6D28D9)],
-                ),
-                borderRadius: BorderRadius.circular(6),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF8B5CF6).withValues(alpha: 0.35),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
+          // UPG Request Button - strictly for Closers ONLY
+          if (isCloser) ...[
+            const SizedBox(width: 10),
+            InkWell(
+              onTap: () {
+                final orders = ref.read(ordersProvider).orders;
+                final existingOrder = orders.where((o) => o.id == widget.orderId || o.orderNumber == widget.orderNumber).firstOrNull;
+                final currentOrder = existingOrder ??
+                    OrderEntity(
+                      id: widget.orderId,
+                      orderNumber: widget.orderNumber,
+                      customerName: conv.customerName,
+                      customerPhone: conv.customerPhone ?? '',
+                      deliveryAddress: 'Customer Delivery Address',
+                      deliveryCity: 'City',
+                      deliveryState: 'State',
+                      productName: conv.currentProductName ?? 'Current Product',
+                      packageDealName: conv.currentPackageName,
+                      quantity: 1,
+                      basePrice: conv.currentTotalAmount,
+                      upsellAmount: 0.0,
+                      totalAmount: conv.currentTotalAmount,
+                      paymentType: 'pay_on_delivery',
+                      paymentStatus: 'pending',
+                      status: 'booked',
+                      clientName: conv.clientName,
+                      clientCompany: conv.clientName,
+                      createdAt: DateTime.now(),
+                    );
+
+                RequestUpgModal.show(
+                  context,
+                  order: currentOrder,
+                  closerId: authUser?.id ?? '',
+                  closerName: authUser?.fullName ?? 'Closer',
+                  closerCode: authUser?.closerCode ?? 'CLS',
+                  isSupervisor: authUser?.isCloserSupervisor == true,
+                );
+              },
+              borderRadius: BorderRadius.circular(6),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF8B5CF6), Color(0xFF6D28D9)],
                   ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.bolt_rounded, size: 14, color: Colors.amberAccent),
-                  const SizedBox(width: 4),
-                  Text(
-                    'UPG Upgrade Sale',
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                      letterSpacing: 0.2,
+                  borderRadius: BorderRadius.circular(6),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF8B5CF6).withValues(alpha: 0.35),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
                     ),
-                  ),
-                ],
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.bolt_rounded, size: 14, color: Colors.amberAccent),
+                    const SizedBox(width: 4),
+                    Text(
+                      'UPG',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -1886,11 +1880,14 @@ class _OrderPipelineChatSheetState extends ConsumerState<OrderPipelineChatSheet>
                           color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                         ),
                         const SizedBox(width: 6),
-                        Text(
-                          'Recording voice note...',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                        Flexible(
+                          child: Text(
+                            'Recording voice note...',
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                            ),
                           ),
                         ),
                       ],

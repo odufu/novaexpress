@@ -2178,7 +2178,7 @@ class StockRemoteDataSourceImpl implements StockRemoteDataSource {
         try {
           final daRes = await dbClient
               .from('delivery_agents')
-              .select('id, user_id, agent_code, first_name, last_name, users(first_name, last_name)')
+              .select('id, user_id, agent_code')
               .or('id.eq.$riderId,user_id.eq.$riderId')
               .limit(1);
           if ((daRes as List).isNotEmpty) {
